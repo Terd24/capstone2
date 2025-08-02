@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Request Document</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+  
+  <div class="bg-white p-4 flex items-center shadow">
+    <button onclick="history.back()" class="text-2xl mr-4">←</button>
+    <h1 class="text-xl font-semibold">Request Document</h1>
+  </div>
+
+  
+  <div class="p-6 flex justify-center">
+    <div class="bg-white p-6 rounded-lg shadow w-full max-w-lg">
+      <h2 class="text-center font-semibold text-lg mb-4">Request Document</h2>
+
+      <form class="space-y-4">
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Document Type</label>
+          <select class="w-full border border-gray-300 p-2 rounded shadow-sm">
+            <option>Form 137</option>
+            <option>Transcript of Records</option>
+            <option>Certificate of Enrollment</option>
+          </select>
+        </div>
+
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Purpose<span class="text-red-500">*</span></label>
+          <textarea class="w-full border border-gray-300 p-3 rounded shadow-sm" rows="4" placeholder="Enter the purpose for requesting the document"></textarea>
+        </div>
+
+        
+        <button type="submit" class="w-full bg-black text-white py-2 rounded hover:bg-gray-800">Submit</button>
+      </form>
+    </div>
+  </div>
+
+</body>
+</html>
