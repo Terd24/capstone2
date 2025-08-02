@@ -1,3 +1,15 @@
+<?php
+session_start();
+if (!isset($_SESSION['id_number'])) {
+    header("Location: index.html");
+    exit();
+}
+
+$id_number = $_SESSION['id_number'];
+$full_name = $_SESSION['full_name'];
+$program = $_SESSION['program'];
+$year_section = $_SESSION['year_section'];
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -7,7 +19,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-sans">
-
   
   <div class="bg-white p-4 flex items-center shadow">
     <button onclick="history.back()" class="text-2xl mr-4">←</button>
@@ -15,27 +26,23 @@
   </div>
 
   <div class="p-6 grid md:grid-cols-2 gap-6">
-
-    
     <div class="bg-white p-6 rounded-lg shadow flex flex-col gap-6">
       <div class="flex gap-4 items-start">
         <div class="text-4xl">👤</div>
         <div>
-          <p class="font-semibold">John Hayes A. Sunico</p>
-          <p class="text-sm text-gray-500">ID: 02000181589</p>
-          <p class="text-sm text-gray-500">Program: BS Information Tech</p>
-          <p class="text-sm text-gray-500">Year & Section:4th - 702</p>
+          <p class="font-semibold"><?= htmlspecialchars($full_name) ?></p>
+          <p class="text-sm text-gray-500">ID: <?= htmlspecialchars($id_number) ?></p>
+          <p class="text-sm text-gray-500">Program: <?= htmlspecialchars($program) ?></p>
+          <p class="text-sm text-gray-500">Year & Section: <?= htmlspecialchars($year_section) ?></p>
         </div>
       </div>
 
-      
       <div class="flex flex-col gap-3">
-        <button onclick="location.href='documents.html'" class="bg-black text-white py-3 rounded-lg flex items-center justify-center hover:bg-gray-800">📄 Documents</button>
-        <button onclick="location.href='request-document.html'" class="bg-black text-white py-3 rounded-lg flex items-center justify-center hover:bg-gray-800">📝 Request Document</button>
+        <button onclick="location.href='documents.php'" class="bg-black text-white py-3 rounded-lg flex items-center justify-center hover:bg-gray-800">📄 Documents</button>
+        <button onclick="location.href='request-document.php'" class="bg-black text-white py-3 rounded-lg flex items-center justify-center hover:bg-gray-800">📝 Request Document</button>
       </div>
     </div>
 
-    
     <div class="bg-white p-6 rounded-lg shadow">
       <div class="flex justify-between mb-2">
         <p class="font-semibold">Notification</p>
@@ -52,7 +59,6 @@
         </li>
       </ul>
     </div>
-
   </div>
 
 </body>

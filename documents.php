@@ -2,14 +2,12 @@
 session_start();
 include("db_conn.php");
 
-// For testing only: fallback ID number (remove this in production)
 if (!isset($_SESSION['id_number'])) {
-    $_SESSION['id_number'] = '24'; // sample ID for testing
+    $_SESSION['id_number'] = '24'; 
 }
 
 $id_number = $_SESSION['id_number'];
 
-// Query the submitted documents for this user
 $sql = "SELECT document_name, date_submitted, remarks FROM submitted_documents WHERE id_number = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $id_number);

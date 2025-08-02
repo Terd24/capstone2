@@ -36,7 +36,7 @@ if (!isset($_SESSION['id_number'])) {
     </div>
 
     <div class="w-full md:w-1/2 flex flex-col gap-4">
-      <button onclick="location.href='registrar.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Registrar</button>
+      <button onclick="location.href='registrar.php'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Registrar</button>
       <button onclick="location.href='balances.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Balances</button>
       <button onclick="location.href='grades.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Grades</button>
       <button onclick="location.href='attendance.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Attendance</button>
