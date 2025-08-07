@@ -2,12 +2,12 @@
 session_start();
 include 'db_conn.php';
 
-if (!isset($_SESSION['id_number'])) {
-    header("Location: index.php");
+if (!isset($_SESSION['child_id'])) {
+    header("Location: ParentLogin.html");
     exit();
 }
 
-$id_number = $_SESSION['id_number'];
+$id_number = $_SESSION['child_id'];
 
 $startDate = $_GET['start_date'] ?? null;
 $endDate = $_GET['end_date'] ?? null;
@@ -26,7 +26,6 @@ $stmt->bind_param(str_repeat("s", count($params)), ...$params);
 $stmt->execute();
 $result = $stmt->get_result();
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>

@@ -7,7 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $parent_password = $_POST['parent_password'] ?? '';
 
     // Prepare and execute SQL securely
-    $query = "SELECT * FROM parents WHERE parent_id = ?";
+    $query = "SELECT * FROM parent_account WHERE parent_id = ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $parent_id);
     $stmt->execute();

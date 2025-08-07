@@ -1,20 +1,21 @@
 <?php
 session_start();
-if (!isset($_SESSION['id_number'])) {
-    header("Location: index.php");
+include 'db_conn.php';
+
+// Redirect if parent not logged in
+if (!isset($_SESSION['child_id'])) {
+    header("Location: ParentLogin.html");
     exit();
 }
 
-include 'db_conn.php';
-
-$id_number = $_SESSION['id_number'];
+$child_id = $_SESSION['child_id'];
 
 // Handle selected term from dropdown (GET method)
 $selected_term = isset($_GET['term']) ? $_GET['term'] : null;
 
 // Fetch all available terms for the dropdown
 $term_query = $conn->prepare("SELECT DISTINCT school_year_term FROM grades_record WHERE id_number = ? ORDER BY school_year_term DESC");
-$term_query->bind_param("s", $id_number);
+$term_query->bind_param("s", $child_id);
 $term_query->execute();
 $term_result = $term_query->get_result();
 
@@ -23,14 +24,14 @@ while ($row = $term_result->fetch_assoc()) {
     $terms[] = $row['school_year_term'];
 }
 
-// If no term selected, use the first available one (if exists)
+// Default to first term if none selected
 if (!$selected_term && count($terms) > 0) {
     $selected_term = $terms[0];
 }
 
-// Fetch grades for the selected term including teacher_name
+// Fetch grades for the selected term
 $stmt = $conn->prepare("SELECT subject, teacher_name, prelim, midterm, pre_finals, finals FROM grades_record WHERE id_number = ? AND school_year_term = ?");
-$stmt->bind_param("ss", $id_number, $selected_term);
+$stmt->bind_param("ss", $child_id, $selected_term);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -38,6 +39,13 @@ $grades = [];
 while ($row = $result->fetch_assoc()) {
     $grades[] = $row;
 }
+
+// Optionally fetch full name of student (child)
+$name_stmt = $conn->prepare("SELECT full_name FROM student_account WHERE id_number = ?");
+$name_stmt->bind_param("s", $child_id);
+$name_stmt->execute();
+$name_result = $name_stmt->get_result();
+$student_name = $name_result->num_rows > 0 ? $name_result->fetch_assoc()['full_name'] : 'Your Child';
 ?>
 
 <!DOCTYPE html>
@@ -73,7 +81,7 @@ while ($row = $result->fetch_assoc()) {
       <?php foreach ($grades as $grade): ?>
       <div class="bg-white p-4 rounded shadow">
         <div class="mb-2">
-          <p class="font-semibold"><?= htmlspecialchars($grade['teacher_name']) ?></p>
+          <p class="font-semibold"><?= htmlspecialchars($student_name) ?></p>
           <p class="text-sm text-gray-500"><?= htmlspecialchars($grade['subject']) ?></p>
         </div>
         <div class="border-t mt-2 pt-2">

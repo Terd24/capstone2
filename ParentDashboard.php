@@ -13,7 +13,7 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-$child_query = $conn->prepare("SELECT full_name, program, year_section FROM users WHERE id_number = ?");
+$child_query = $conn->prepare("SELECT full_name, program, year_section FROM student_account WHERE id_number = ?");
 $child_query->bind_param("s", $child_id);
 $child_query->execute();
 $child_result = $child_query->get_result();
@@ -59,10 +59,10 @@ if ($child_result->num_rows === 1) {
     </div>
 
     <div class="w-full md:w-1/2 flex flex-col gap-4">
-      <button onclick="location.href='ParentBalances.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Balances</button>
-      <button onclick="location.href='ParentGrades.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Grades</button>
-      <button onclick="location.href='ParentAttendance.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Attendance</button>
-      <button onclick="location.href='ParentGuidanceRecord.html'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Guidance Record</button>
+      <button onclick="location.href='ParentBalances.php'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Balances</button>
+      <button onclick="location.href='ParentGrades.php'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Grades</button>
+      <button onclick="location.href='ParentAttendance.php'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Attendance</button>
+      <button onclick="location.href='ParentGuidanceRecord.php'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Guidance Record</button>
     </div>
   </div>
 </body>

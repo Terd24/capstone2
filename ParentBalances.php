@@ -2,7 +2,12 @@
 session_start();
 include 'db_conn.php';
 
-$id_number = $_SESSION['id_number'];
+if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
+    header("Location: ParentLogin.html");
+    exit();
+}
+
+$id_number = $_SESSION['child_id']; // Get student ID from session
 
 // Get all available terms dynamically
 $term_result = $conn->query("SELECT DISTINCT school_year_term FROM student_balances WHERE id_number = '$id_number' ORDER BY school_year_term DESC");

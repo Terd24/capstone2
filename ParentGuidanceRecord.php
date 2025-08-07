@@ -2,26 +2,38 @@
 session_start();
 include 'db_conn.php';
 
-if (!isset($_SESSION['id_number'])) {
-  header("Location: index.php");
-  exit();
+if (!isset($_SESSION['child_id'])) {
+    header("Location: ParentLogin.html");
+    exit();
 }
 
-$id_number = $_SESSION['id_number'];
-$full_name = $_SESSION['full_name'];
-$program = $_SESSION['program'];
-$year_section = $_SESSION['year_section'];
+$child_id = $_SESSION['child_id'];
 
-// Get guidance record
-$sql = "SELECT * FROM guidance_records WHERE id_number = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("s", $id_number);
-$stmt->execute();
-$result = $stmt->get_result();
+// Fetch student info
+$student_stmt = $conn->prepare("SELECT full_name, program, year_section FROM student_account WHERE id_number = ?");
+$student_stmt->bind_param("s", $child_id);
+$student_stmt->execute();
+$student_result = $student_stmt->get_result();
+
+if ($student_result->num_rows === 0) {
+    echo "<p>Student not found.</p>";
+    exit();
+}
+
+$student = $student_result->fetch_assoc();
+$full_name = $student['full_name'];
+$program = $student['program'];
+$year_section = $student['year_section'];
+
+// Fetch guidance records
+$guidance_stmt = $conn->prepare("SELECT * FROM guidance_records WHERE id_number = ? ORDER BY record_date DESC");
+$guidance_stmt->bind_param("s", $child_id);
+$guidance_stmt->execute();
+$guidance_result = $guidance_stmt->get_result();
 
 $guidance_data = [];
-while ($row = $result->fetch_assoc()) {
-  $guidance_data[] = $row;
+while ($row = $guidance_result->fetch_assoc()) {
+    $guidance_data[] = $row;
 }
 ?>
 
@@ -53,7 +65,7 @@ while ($row = $result->fetch_assoc()) {
           </div>
         </div>
         <div class="text-sm text-gray-600 space-y-1">
-          <p><strong>ID:</strong> <?= htmlspecialchars($id_number) ?></p>
+          <p><strong>ID:</strong> <?= htmlspecialchars($child_id) ?></p>
           <p><strong>Program:</strong> <?= htmlspecialchars($program) ?></p>
           <p><strong>Year & Section:</strong> <?= htmlspecialchars($year_section) ?></p>
         </div>

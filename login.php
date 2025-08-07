@@ -10,7 +10,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     $id_number = $conn->real_escape_string($id_number);
 
-    $sql = "SELECT * FROM users WHERE id_number = '$id_number'";
+    $sql = "SELECT * FROM student_account WHERE id_number = '$id_number'";
     $result = $conn->query($sql);
 
     if ($result && $result->num_rows > 0) {
