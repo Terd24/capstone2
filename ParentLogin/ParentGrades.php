@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db_conn.php';
+include '../StudentLogin/db_conn.php';
 
 // Redirect if parent not logged in
 if (!isset($_SESSION['child_id'])) {

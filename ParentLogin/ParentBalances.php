@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db_conn.php';
+include '../StudentLogin/db_conn.php';
 
 if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
     header("Location: ParentLogin.html");

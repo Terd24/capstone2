@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db_conn.php';
+include '../StudentLogin/db_conn.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $parent_id = $_POST['parent_id'] ?? '';
