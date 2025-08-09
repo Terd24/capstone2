@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cashier Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen">
+
+ 
+  <div class="bg-white p-4 border-b shadow-sm flex items-center gap-4">
+    <div class="text-2xl">&#9776;</div>
+    <h1 class="text-gray-500 text-sm">Cashier Dashboard</h1>
+  </div>
+
+  
+  <div class="bg-white px-6 py-3 border-b flex justify-start gap-6">
+    <button onclick="showTab('balance')" class="tab-btn font-medium border-b-2 border-black">Student Balance</button>
+    <button onclick="showTab('history')" class="tab-btn text-gray-600 hover:text-black">Transaction History</button>
+  </div>
+
+ 
+  <div class="p-6 flex flex-col lg:flex-row gap-6">
+
+   
+    <div class="bg-white rounded-lg p-4 w-full lg:w-1/4 shadow">
+      <div class="flex items-center mb-3">
+        <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-xl">👤</div>
+        <div class="ml-3 font-medium">John Hayes Sunico</div>
+      </div>
+      <p class="text-sm text-gray-600">ID: 02000181689</p>
+      <p class="text-sm text-gray-600">Program: BSIT</p>
+      <p class="text-sm text-gray-600">Year & Section:4TH - 702</p>
+    </div>
+
+    
+    <div class="w-full lg:w-3/4 space-y-4">
+
+      
+      <div id="tab-balance">
+        <div class="flex justify-between items-center">
+          <label class="font-medium">2023–2024 Second Term</label>
+          <button class="bg-gray-200 text-sm px-3 py-1 rounded">Payment Schedule</button>
+        </div>
+
+        <div class="overflow-x-auto mt-4">
+          <table class="min-w-full bg-white rounded shadow text-sm">
+            <thead class="bg-black text-white">
+              <tr>
+                <th class="px-4 py-2">#</th>
+                <th class="px-4 py-2">Fee Type</th>
+                <th class="px-4 py-2">Amount Due</th>
+                <th class="px-4 py-2">Paid</th>
+                <th class="px-4 py-2">Balance</th>
+              </tr>
+            </thead>
+            <tbody class="text-gray-800">
+              <tr class="text-center">
+                <td class="px-4 py-2">1</td>
+                <td class="px-4 py-2">Tuition</td>
+                <td class="px-4 py-2">₱4,500</td>
+                <td class="px-4 py-2">₱1,500</td>
+                <td class="px-4 py-2">₱3,000</td>
+              </tr>
+              <tr class="bg-gray-100 text-center">
+                <td class="px-4 py-2">2</td>
+                <td class="px-4 py-2">Document Request (Form 137)</td>
+                <td class="px-4 py-2">₱200</td>
+                <td class="px-4 py-2">₱0</td>
+                <td class="px-4 py-2">₱200</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="text-right text-sm mt-2 font-medium">Total Remaining Balance: ₱3,200</p>
+        </div>
+      </div>
+
+    
+      <div id="tab-history" class="hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full bg-white rounded shadow text-sm">
+            <thead class="bg-black text-white">
+              <tr>
+                <th class="px-4 py-2">#</th>
+                <th class="px-4 py-2">Date</th>
+                <th class="px-4 py-2">Description</th>
+                <th class="px-4 py-2">Amount</th>
+                <th class="px-4 py-2">Method</th>
+              </tr>
+            </thead>
+            <tbody class="text-gray-800 text-center">
+              <tr>
+                <td class="px-4 py-2">1</td>
+                <td class="px-4 py-2">12-04-25</td>
+                <td class="px-4 py-2">Tuition Payment</td>
+                <td class="px-4 py-2">₱1,500</td>
+                <td class="px-4 py-2">GCash</td>
+              </tr>
+              <tr class="bg-gray-100">
+                <td class="px-4 py-2">2</td>
+                <td class="px-4 py-2">20-04-25</td>
+                <td class="px-4 py-2">Misc. Fees Payment</td>
+                <td class="px-4 py-2">₱1,500</td>
+                <td class="px-4 py-2">Cash</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  
+  <script>
+    function showTab(tab) {
+      document.getElementById('tab-balance').classList.add('hidden');
+      document.getElementById('tab-history').classList.add('hidden');
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('border-black', 'font-medium', 'text-black'));
+      if (tab === 'balance') {
+        document.getElementById('tab-balance').classList.remove('hidden');
+        document.querySelectorAll('.tab-btn')[0].classList.add('border-black', 'font-medium', 'text-black');
+      } else {
+        document.getElementById('tab-history').classList.remove('hidden');
+        document.querySelectorAll('.tab-btn')[1].classList.add('border-black', 'font-medium', 'text-black');
+      }
+    }
+  </script>
+
+</body>
+</html>

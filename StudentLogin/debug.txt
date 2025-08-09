@@ -1,2 +1,0 @@
-Starting login process
-{"id_number":"02000181589","password":"Alticen24"}
