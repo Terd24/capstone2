@@ -167,13 +167,17 @@ $result = $stmt->get_result();
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const input = document.getElementById("rfidInput");
+    const EXPECTED_RFID_LENGTH = 10;
+
     input.focus();
     input.addEventListener("input", function() {
-        if (input.value.trim() !== "") {
+        const val = input.value.trim();
+        if (val.length === EXPECTED_RFID_LENGTH) {
             document.getElementById("rfidForm").submit();
         }
     });
 });
+
 </script>
 
 </body>
