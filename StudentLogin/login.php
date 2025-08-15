@@ -16,11 +16,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if ($result && $result->num_rows > 0) {
         $row = $result->fetch_assoc();
-
         if (password_verify($password, $row['password'])) {
-            $_SESSION['username'] = $row['username'];
+            $_SESSION['guidance_username'] = $row['username'];
+            $_SESSION['guidance_name'] = $row['full_name'] ?? '';
             $_SESSION['role'] = 'guidance';
-
             echo json_encode([
                 'status' => 'success',
                 'redirect' => '../GuidanceF/GuidanceDashboard.html'
@@ -38,17 +37,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if ($result && $result->num_rows > 0) {
         $row = $result->fetch_assoc();
-
         if (password_verify($password, $row['password'])) {
             $_SESSION['id_number'] = $row['id_number'];
             $_SESSION['full_name'] = $row['full_name'];
             $_SESSION['program'] = $row['program'];
             $_SESSION['year_section'] = $row['year_section'];
             $_SESSION['role'] = 'student';
-
             echo json_encode([
                 'status' => 'success',
-                'redirect' => 'studentdashboard.php'
+                'redirect' => 'studentDashboard.php'
             ]);
             exit;
         } else {
@@ -63,15 +60,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if ($result && $result->num_rows > 0) {
         $row = $result->fetch_assoc();
-
         if (password_verify($password, $row['password'])) {
-            $_SESSION['username'] = $row['username'];
-            $_SESSION['full_name'] = $row['full_name'];
+            $_SESSION['cashier_username'] = $row['username'];
+            $_SESSION['cashier_name'] = $row['full_name'];
             $_SESSION['role'] = 'cashier';
-
             echo json_encode([
                 'status' => 'success',
-                'redirect' => '../CashierF/Dashboard.html' 
+                'redirect' => '../CashierF/Dashboard.html'
             ]);
             exit;
         } else {
@@ -80,6 +75,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
+    // 4️⃣ Check registrar account
+    $sql = "SELECT * FROM registrar_account WHERE username = '$id_number'";
+    $result = $conn->query($sql);
+
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        if (password_verify($password, $row['password'])) {
+            $_SESSION['registrar_username'] = $row['username'];
+            $_SESSION['registrar_name'] = $row['registrar_name'];
+            $_SESSION['registrar_id'] = $row['registrar_id'] ?? '';
+            $_SESSION['role'] = 'registrar';
+            echo json_encode([
+                'status' => 'success',
+                'redirect' => '../RegistrarF/RegistrarDashboard.php'
+            ]);
+            exit;
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Incorrect password.']);
+            exit;
+        }
+    }
+
+    // ❌ No match found
     echo json_encode(['status' => 'error', 'message' => 'User not found.']);
     exit;
 }
