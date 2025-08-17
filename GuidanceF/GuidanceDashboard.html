@@ -224,7 +224,7 @@ function saveViolation() {
     .then(r => r.json())
     .then(data => {
       if (data.error) {
-        // show error nicely instead of alert
+
         searchError.textContent = data.error;
         return;
       }

@@ -6,15 +6,14 @@
   <title>Cashier Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 font-sans min-h-screen" onload="focusRFID()">
+<body class="bg-gray-100 font-sans min-h-screen">
 
   <!-- Hidden RFID input -->
   <input 
     type="text" 
     id="rfidInput" 
     autofocus 
-    class="absolute opacity-0" 
-    onchange="handleRFID(this.value)"
+    class="absolute opacity-0"
   >
 
   <!-- Header -->
@@ -54,11 +53,29 @@
   </div>
 
   <script>
+    const rfidInput = document.getElementById('rfidInput');
+
     function focusRFID() {
-      const rfidInput = document.getElementById('rfidInput');
-      rfidInput.value = '';  // Clear input so onchange triggers on every scan
-      rfidInput.focus();
+      // Always be ready for next scan without breaking highlight
+      if (document.activeElement !== rfidInput) {
+        rfidInput.focus({ preventScroll: true });
+      }
     }
+
+    // Detect start of RFID scan
+    document.addEventListener('keydown', (e) => {
+      // Ignore if typing into other inputs/textareas
+      if (!['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        focusRFID();
+      }
+    });
+
+    // Listen for RFID complete (scanners usually send Enter key)
+    rfidInput.addEventListener('change', () => {
+      const rfid = rfidInput.value.trim();
+      if (!rfid) return;
+      handleRFID(rfid);
+    });
 
     function showTab(tab) {
       document.getElementById('tab-balance').classList.add('hidden');
@@ -71,13 +88,11 @@
         document.getElementById('tab-history').classList.remove('hidden');
         document.querySelectorAll('.tab-btn')[1].classList.add('border-black', 'font-medium', 'text-black');
       }
-      focusRFID(); // Refocus RFID input when tab changes
+      focusRFID(); 
     }
 
     function handleRFID(rfid) {
-      if (!rfid.trim()) return;
-
-      fetch(`GetBalance.php?rfid_uid=${encodeURIComponent(rfid.trim())}`)
+      fetch(`GetBalance.php?rfid_uid=${encodeURIComponent(rfid)}`)
         .then(res => res.json())
         .then(data => {
           if (data.error) {
@@ -113,7 +128,6 @@
                       <th class="px-4 py-2 w-32 text-right">Balance</th>
                     </tr>
                   </thead>
-
                   <tbody class="text-gray-800">
                     <tr class="text-center">
                       <td class="px-4 py-2">1</td>
@@ -122,7 +136,6 @@
                       <td class="px-4 py-2 text-right">₱${Number(data.tuition_paid ?? 0).toFixed(2)}</td>
                       <td class="px-4 py-2 text-right">₱${(Number(data.tuition_fee) - Number(data.tuition_paid ?? 0)).toFixed(2)}</td>
                     </tr>
-
                     <tr class="text-center">
                       <td class="px-4 py-2">2</td>
                       <td class="px-4 py-2 text-left">Other Fees</td>
@@ -130,7 +143,6 @@
                       <td class="px-4 py-2 text-right">₱${Number(data.other_paid ?? 0).toFixed(2)}</td>
                       <td class="px-4 py-2 text-right">₱${(Number(data.other_fees) - Number(data.other_paid ?? 0)).toFixed(2)}</td>
                     </tr>
-
                     <tr class="text-center">
                       <td class="px-4 py-2">3</td>
                       <td class="px-4 py-2 text-left">Student Fees</td>
@@ -181,25 +193,19 @@
             `;
           }
 
-          // Clear and focus RFID input ready for next scan
-          const rfidInput = document.getElementById('rfidInput');
+          // Reset for next scan
           rfidInput.value = '';
-          rfidInput.focus();
+          focusRFID();
         })
         .catch(err => {
           console.error(err);
-          const rfidInput = document.getElementById('rfidInput');
           rfidInput.value = '';
-          rfidInput.focus();
+          focusRFID();
         });
     }
 
-    // Refocus RFID input after clicking tab buttons
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        focusRFID();
-      });
-    });
+    // Focus RFID when page loads
+    window.onload = focusRFID;
   </script>
 
 </body>

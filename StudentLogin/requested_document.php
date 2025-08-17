@@ -4,7 +4,7 @@ include("db_conn.php");
 
 $id_number = $_SESSION['id_number'];
 
-$sql = "SELECT document_type, date_requested, student_id, status 
+$sql = "SELECT document_type, date_requested, date_claimed, student_id, status 
         FROM document_requests 
         WHERE student_id = ? 
         ORDER BY date_requested DESC";
@@ -31,37 +31,43 @@ $result = $stmt->get_result();
     <div class="bg-white p-4 rounded-lg shadow overflow-x-auto">
       <table class="w-full table-auto text-left border border-gray-200">
         <thead>
-          <tr class="bg-black text-white text-sm">
-            <th class="py-2 px-4 border">Document Name</th>
-            <th class="py-2 px-4 border">Date Submitted</th>
-            <th class="py-2 px-4 border">Status</th>
-          </tr>
-        </thead>
-        <tbody class="text-sm bg-gray-100">
-          <?php if ($result->num_rows > 0): ?>
-            <?php while ($row = $result->fetch_assoc()): ?>
-              <tr>
-                <td class="py-2 px-4 border"><?= htmlspecialchars($row['document_type']) ?></td>
-                <td class="py-2 px-4 border"><?= $row['date_requested'] ?: '---' ?></td>
-                <td class="py-2 px-4 border">
-                  <?php if ($row['status'] === 'Pending'): ?>
-                    <span class="text-yellow-600 font-medium">Pending</span>
-                  <?php elseif ($row['status'] === 'Ready for Claiming'): ?>
-                    <span class="text-green-600 font-medium">Ready for Claiming</span>
-                  <?php else: ?>
-                    <?= htmlspecialchars($row['status']) ?>
-                  <?php endif; ?>
-                </td>
-              </tr>
-            <?php endwhile; ?>
+  <tr class="bg-black text-white text-sm">
+    <th class="py-2 px-4 border">Document Name</th>
+    <th class="py-2 px-4 border">Date Requested</th>
+    <th class="py-2 px-4 border">Claimed At</th>
+    <th class="py-2 px-4 border">Status</th>
+  </tr>
+</thead>
+<tbody class="text-sm bg-gray-100">
+  <?php if ($result->num_rows > 0): ?>
+    <?php while ($row = $result->fetch_assoc()): ?>
+      <tr>
+        <td class="py-2 px-4 border"><?= htmlspecialchars($row['document_type']) ?></td>
+        <td class="py-2 px-4 border"><?= $row['date_requested'] ?: '---' ?></td>
+        <td class="py-2 px-4 border">
+          <?= $row['date_claimed'] && $row['status']==='Claimed' ? $row['date_claimed'] : '---' ?>
+        </td>
+        <td class="py-2 px-4 border">
+          <?php if ($row['status'] === 'Pending'): ?>
+            <span class="text-yellow-600 font-medium">Pending</span>
+          <?php elseif ($row['status'] === 'Ready to Claim' || $row['status'] === 'Ready for Claiming'): ?>
+            <span class="text-green-600 font-medium">Ready to Claim</span>
+          <?php elseif ($row['status'] === 'Claimed'): ?>
+            <span class="text-blue-600 font-medium">Claimed</span>
           <?php else: ?>
-            <tr>
-              <td colspan="4" class="py-4 px-4 text-center border text-gray-500">
-                No requested documents.
-              </td>
-            </tr>
+            <?= htmlspecialchars($row['status']) ?>
           <?php endif; ?>
-        </tbody>
+        </td>
+      </tr>
+    <?php endwhile; ?>
+  <?php else: ?>
+    <tr>
+      <td colspan="4" class="py-4 px-4 text-center border text-gray-500">
+        No requested documents.
+      </td>
+    </tr>
+  <?php endif; ?>
+</tbody>
       </table>
     </div>
   </div>
