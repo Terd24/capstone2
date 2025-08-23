@@ -2,7 +2,6 @@
 session_start();
 include '../StudentLogin/db_conn.php';
 
-// Redirect if parent not logged in
 if (!isset($_SESSION['child_id'])) {
     header("Location: ParentLogin.html");
     exit();
@@ -10,10 +9,8 @@ if (!isset($_SESSION['child_id'])) {
 
 $child_id = $_SESSION['child_id'];
 
-// Handle selected term from dropdown (GET method)
 $selected_term = isset($_GET['term']) ? $_GET['term'] : null;
 
-// Fetch all available terms for the dropdown
 $term_query = $conn->prepare("SELECT DISTINCT school_year_term FROM grades_record WHERE id_number = ? ORDER BY school_year_term DESC");
 $term_query->bind_param("s", $child_id);
 $term_query->execute();
@@ -24,12 +21,10 @@ while ($row = $term_result->fetch_assoc()) {
     $terms[] = $row['school_year_term'];
 }
 
-// Default to first term if none selected
 if (!$selected_term && count($terms) > 0) {
     $selected_term = $terms[0];
 }
 
-// Fetch grades for the selected term
 $stmt = $conn->prepare("SELECT subject, teacher_name, prelim, midterm, pre_finals, finals FROM grades_record WHERE id_number = ? AND school_year_term = ?");
 $stmt->bind_param("ss", $child_id, $selected_term);
 $stmt->execute();
@@ -40,7 +35,6 @@ while ($row = $result->fetch_assoc()) {
     $grades[] = $row;
 }
 
-// Optionally fetch full name of student (child)
 $name_stmt = $conn->prepare("SELECT full_name FROM student_account WHERE id_number = ?");
 $name_stmt->bind_param("s", $child_id);
 $name_stmt->execute();
@@ -59,7 +53,7 @@ $student_name = $name_result->num_rows > 0 ? $name_result->fetch_assoc()['full_n
 <body class="bg-gray-100 font-sans">
 
   <div class="bg-white p-4 flex items-center shadow-md">
-    <button onclick="window.history.back()" class="text-2xl mr-4">←</button>
+    <button onclick="window.location.href='ParentDashboard.php'" class="text-2xl mr-4">←</button>
     <h1 class="text-xl font-semibold">Grades</h1>
   </div>
 

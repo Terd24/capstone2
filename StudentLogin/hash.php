@@ -1,5 +1,5 @@
 <?php
-$pass = 'registrar123'; 
+$pass = 'studentpass'; 
 $hashed = password_hash($pass, PASSWORD_DEFAULT);
 echo $hashed;
 ?>

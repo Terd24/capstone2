@@ -2,6 +2,17 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
+// 🔒 Prevent access if not logged in
+if (!isset($_SESSION['registrar_id'])) {
+    header("Location: ../StudentLogin/login.html");
+    exit;
+}
+
+// 🚫 Prevent browser caching (stops back after logout)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 // Fetch all requests
 $result = $conn->query("SELECT * FROM document_requests ORDER BY date_requested DESC");
 ?>
@@ -23,8 +34,22 @@ $result = $conn->query("SELECT * FROM document_requests ORDER BY date_requested 
 </form>
 
 <!-- Header -->
-<div class="bg-white p-4 flex items-center justify-between shadow-sm">
-    <h1 class="text-lg font-semibold text-gray-700">Registrar Dashboard</h1>
+<div class="bg-white p-4 flex items-center justify-between shadow-sm relative">
+    <h1 class="text-lg font-semibold text-gray-700 flex items-center gap-4">
+        Registrar Dashboard
+    </h1>
+
+    <!-- Burger / Dropdown -->
+    <div class="relative">
+        <button id="menuBtn" class="p-2 rounded hover:bg-gray-100 focus:outline-none">
+            ☰
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-40 bg-white border rounded shadow-md">
+            <a href="logout.php" class="block px-4 py-2 text-black-500 hover:bg-gray-100">Logout</a>
+        </div>
+    </div>
 </div>
 
 <!-- Content -->
@@ -68,27 +93,23 @@ $result = $conn->query("SELECT * FROM document_requests ORDER BY date_requested 
 </div>
 
 <script>
+// RFID Scanner Logic
 let rfidBuffer = "";
 let lastKeyTime = Date.now();
 const rfidInput = document.getElementById("rfid_input");
 const rfidForm = document.getElementById("rfidForm");
 
-// Listen to all key presses
 document.addEventListener('keydown', (e) => {
     const currentTime = Date.now();
-
-    // If time between keys is long, reset buffer
     if (currentTime - lastKeyTime > 100) {
         rfidBuffer = "";
     }
     lastKeyTime = currentTime;
 
-    // Ignore if focused on actual text input/textarea
     if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
         return;
     }
 
-    // If Enter is pressed, submit RFID
     if (e.key === 'Enter') {
         if (rfidBuffer.length >= 5) {
             rfidInput.value = rfidBuffer.trim();
@@ -97,10 +118,24 @@ document.addEventListener('keydown', (e) => {
         rfidBuffer = "";
         e.preventDefault();
     } else {
-        // Add key to buffer (ignore special keys)
         if (e.key.length === 1) {
             rfidBuffer += e.key;
         }
+    }
+});
+
+// Dropdown toggle
+const menuBtn = document.getElementById("menuBtn");
+const dropdownMenu = document.getElementById("dropdownMenu");
+
+menuBtn.addEventListener("click", () => {
+    dropdownMenu.classList.toggle("hidden");
+});
+
+// Hide menu when clicking outside
+document.addEventListener("click", (e) => {
+    if (!menuBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+        dropdownMenu.classList.add("hidden");
     }
 });
 </script>

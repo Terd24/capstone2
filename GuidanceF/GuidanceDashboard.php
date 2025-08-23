@@ -1,3 +1,18 @@
+<?php
+session_start();
+
+// redirect if not guidance
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'guidance') {
+    header("Location: ../StudentLogin/login.php");
+    exit;
+}
+
+// prevent caching (so back button after logout doesn’t show dashboard)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+header("Expires: 0");
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,7 +20,6 @@
   <title>Guidance Record System</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
       20%, 60% { transform: translateX(-5px); }
@@ -19,11 +33,22 @@
 <body class="bg-gray-50 text-gray-800 min-h-screen p-6">
 
   <div class="max-w-4xl mx-auto mb-6">
-    <div class="flex items-center justify-between mb-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4 relative">
       <h2 class="text-2xl font-semibold">Guidance Dashboard</h2>
-      <button class="text-2xl">&#9776;</button>
+
+      <!-- Burger Menu -->
+      <div class="relative z-50">
+          <button id="burgerBtn" class="text-2xl focus:outline-none">&#9776;</button>
+          <div id="burgerMenu" 
+              class="hidden absolute right-0 mt-2 w-40 bg-white border rounded shadow-lg z-50">
+            <!-- ✅ make sure logout.php is inside the same folder as this file -->
+            <a href="logout.php" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Logout</a>
+          </div>
+      </div>
     </div>
 
+    <!-- Search Bar -->
     <div class="flex gap-2 items-center relative">
       <input
         type="text"
@@ -38,10 +63,12 @@
     <p id="searchError" class="text-red-600 text-sm mt-1 min-h-[1.25rem]"></p>
   </div>
 
+  <!-- Student List -->
   <div id="studentList" class="max-w-4xl mx-auto space-y-4">
     <p class="text-center text-gray-500">No student data loaded. Tap RFID card or search to load a student.</p>
   </div>
 
+  <!-- Violation Form -->
   <div id="formView" class="hidden max-w-md mx-auto mt-10 p-6 border rounded-md shadow bg-white">
     <button onclick="closeForm()" class="mb-4 text-2xl">&#8592;</button>
 
@@ -63,6 +90,28 @@
   </div>
 
 <script>
+  // ===== BURGER MENU =====
+  const burgerBtn = document.getElementById("burgerBtn");
+  const burgerMenu = document.getElementById("burgerMenu");
+
+  burgerBtn.addEventListener("click", () => {
+    burgerMenu.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!burgerBtn.contains(e.target) && !burgerMenu.contains(e.target)) {
+      burgerMenu.classList.add("hidden");
+    }
+  });
+
+  // ===== PREVENT BACK BUTTON AFTER LOGOUT =====
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted || (performance.navigation.type === 2)) {
+      window.location.reload();
+    }
+  });
+
+  // ===== STUDENT RECORD SYSTEM =====
   let students = [];
   let selectedStudentIndex = null;
 
@@ -106,56 +155,53 @@
     document.getElementById('studentList').classList.remove('hidden');
   }
 
-function saveViolation() {
-  const date = document.getElementById('violationDate').value;
-  const type = document.getElementById('violationType').value;
-  if (!date || !type) return alert("Fill all fields");
+  function saveViolation() {
+    const date = document.getElementById('violationDate').value;
+    const type = document.getElementById('violationType').value;
+    if (!date || !type) return alert("Fill all fields");
 
-  if (selectedStudentIndex === null) {
-    alert("No student selected");
-    return;
-  }
-
-  const studentId = students[selectedStudentIndex].id;
-
-  const formData = new FormData();
-  formData.append('id_number', studentId);
-  formData.append('violation_date', date);
-  formData.append('violation_type', type);
-
-  fetch('AddViolation.php', {
-    method: 'POST',
-    body: formData
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.error) {
-      alert(data.error);
+    if (selectedStudentIndex === null) {
+      alert("No student selected");
       return;
     }
-    const newViolation = `${type} on ${new Date(date).toLocaleDateString('en-GB')}`;
-    students[selectedStudentIndex].violations.push(newViolation);
 
-    document.getElementById('violationDate').value = '';
-    document.getElementById('violationType').selectedIndex = 0;
+    const studentId = students[selectedStudentIndex].id;
 
-    closeForm();
-    renderStudents();
-  })
-  .catch(() => {
-    alert("Failed to save violation");
-  });
-}
+    const formData = new FormData();
+    formData.append('id_number', studentId);
+    formData.append('violation_date', date);
+    formData.append('violation_type', type);
 
+    fetch('AddViolation.php', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+      const newViolation = `${type} on ${new Date(date).toLocaleDateString('en-GB')}`;
+      students[selectedStudentIndex].violations.push(newViolation);
 
-  // Clear error message
+      document.getElementById('violationDate').value = '';
+      document.getElementById('violationType').selectedIndex = 0;
+
+      closeForm();
+      renderStudents();
+    })
+    .catch(() => {
+      alert("Failed to save violation");
+    });
+  }
+
   function clearError() {
     searchError.textContent = '';
     searchBtn.classList.remove('bg-red-600', 'shake');
     searchBtn.classList.add('bg-black');
   }
 
-  // Shake and highlight the search button on error
   function showError(msg) {
     searchError.textContent = msg;
     searchBtn.classList.remove('bg-black');
@@ -204,7 +250,7 @@ function saveViolation() {
       });
   }
 
-  // RFID input listener
+  // ===== RFID input listener =====
   let buffer = '';
   let timer;
   window.addEventListener('keydown', e => {
@@ -219,29 +265,27 @@ function saveViolation() {
   });
 
   function loadStudentData(id) {
-  clearError();
-  fetch(`GetRecord.php?rfid_uid=${encodeURIComponent(id)}`)
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) {
-
-        searchError.textContent = data.error;
-        return;
-      }
-      students = [{
-        id: data.student.id_number,
-        name: data.student.full_name,
-        program: data.student.program,
-        section: data.student.year_section,
-        violations: data.guidance_records.map(r => `${r.remarks.trim()} (${new Date(r.record_date).toLocaleDateString()})`)
-      }];
-      renderStudents();
-    })
-    .catch(() => {
-      searchError.textContent = "Failed to load student data";
-    });
-}
-
+    clearError();
+    fetch(`GetRecord.php?rfid_uid=${encodeURIComponent(id)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          searchError.textContent = data.error;
+          return;
+        }
+        students = [{
+          id: data.student.id_number,
+          name: data.student.full_name,
+          program: data.student.program,
+          section: data.student.year_section,
+          violations: data.guidance_records.map(r => `${r.remarks.trim()} (${new Date(r.record_date).toLocaleDateString()})`)
+        }];
+        renderStudents();
+      })
+      .catch(() => {
+        searchError.textContent = "Failed to load student data";
+      });
+  }
 
   renderStudents();
 </script>

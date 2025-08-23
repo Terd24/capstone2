@@ -7,17 +7,15 @@ if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
     exit();
 }
 
-$id_number = $_SESSION['child_id']; // Get student ID from session
+$id_number = $_SESSION['child_id'];
 
-// Get all available terms dynamically
 $term_result = $conn->query("SELECT DISTINCT school_year_term FROM student_balances WHERE id_number = '$id_number' ORDER BY school_year_term DESC");
 
-// Dropdown selected term
 $selected_term = $_GET['term'] ?? '';
 if (!$selected_term && $term_result->num_rows > 0) {
     $row = $term_result->fetch_assoc();
     $selected_term = $row['school_year_term'];
-    $term_result->data_seek(0); // reset pointer
+    $term_result->data_seek(0);
 }
 
 $school_year_term = $selected_term;
@@ -66,14 +64,13 @@ $sched_total = 0;
   <div class="bg-white shadow-lg rounded-lg max-w-3xl w-full p-6 space-y-6">
     
     <!-- Back -->
-    <button onclick="history.back()" class="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
+    <button onclick="location.href='ParentDashboard.php'" class="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
       <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
       </svg>
       <span>Back</span>
     </button>
-
-    <!-- Dropdown Form (Auto-generated from DB) -->
+  
     <form method="get">
       <label for="termSelect" class="block mb-1 font-semibold text-gray-700">School Year & Term:</label>
       <select name="term" id="termSelect" class="border border-gray-300 rounded px-3 py-2 w-full max-w-xs" onchange="this.form.submit()">

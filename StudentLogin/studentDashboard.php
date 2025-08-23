@@ -1,7 +1,18 @@
 <?php
 session_start();
+
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'student') {
+    header("Location: login.php");
+    exit;
+}
+
+// Prevent browser from caching this page
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 if (!isset($_SESSION['id_number'])) {
-    header("Location: login.html");
+    header("Location: login.php");
     exit();
 }
 ?>
@@ -16,23 +27,28 @@ if (!isset($_SESSION['id_number'])) {
 </head>
 <body class="bg-white font-sans">
 
-  <!-- Header with menu and notifications -->
   <div class="p-4 flex justify-between items-center border-b relative">
-    <!-- Menu button -->
-    <div id="menuBtn" class="text-2xl font-bold cursor-pointer">&#9776;</div>
-    <div class="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">🔔</div>
 
-    <!-- Dropdown menu -->
-    <div id="menuDropdown" class="hidden absolute top-12 left-4 bg-white border border-gray-300 rounded shadow-md">
-        <button onclick="location.href='Login.html'" class="block px-4 py-2 text-left w-full hover:bg-gray-100">
-            Logout
-        </button>
+    <div class="relative">
+      <button id="menuBtn" class="text-2xl font-bold hover:text-blue-600 transition">
+        &#9776;
+      </button>
+
+      <div id="menuDropdown" 
+           class="hidden absolute left-0 mt-2 w-40 bg-white border rounded-lg shadow-lg z-50">
+        <a href="logout.php" 
+           class="block px-4 py-2 text-black-500 hover:bg-gray-100">
+          Logout
+        </a>
+      </div>
     </div>
+    <div class="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">🔔</div>
   </div>
 
-  <!-- Main content -->
+  <!-- Main Content -->
   <div class="p-6 flex flex-col md:flex-row gap-6">
     
+    <!-- Student Info -->
     <div class="bg-gray-100 w-full md:w-1/2 p-6 rounded-lg shadow-md">
       <div class="flex items-center mb-4">
         <div class="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-xl">👤</div>
@@ -45,6 +61,7 @@ if (!isset($_SESSION['id_number'])) {
       <p class="text-sm text-gray-700">Year & Section: <?= $_SESSION['year_section'] ?></p>
     </div>
 
+    <!-- Buttons -->
     <div class="w-full md:w-1/2 flex flex-col gap-4">
       <button onclick="location.href='registrar.php'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Registrar</button>
       <button onclick="location.href='balances.php'" class="bg-black text-white py-3 rounded-lg hover:bg-gray-800">Balances</button>
@@ -54,21 +71,27 @@ if (!isset($_SESSION['id_number'])) {
     </div>
   </div>
 
-<script>
-// Toggle dropdown when clicking menu icon
-document.getElementById('menuBtn').addEventListener('click', function () {
-    document.getElementById('menuDropdown').classList.toggle('hidden');
-});
-
-// Close dropdown if clicking outside
-document.addEventListener('click', function (e) {
+  <script>
     const menuBtn = document.getElementById('menuBtn');
     const menuDropdown = document.getElementById('menuDropdown');
-    if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
-        menuDropdown.classList.add('hidden');
-    }
-});
-</script>
 
+    menuBtn.addEventListener('click', () => {
+      menuDropdown.classList.toggle('hidden');
+    });
+
+    window.addEventListener('click', (e) => {
+      if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
+        menuDropdown.classList.add('hidden');
+      }
+    });
+  </script>
+<script>
+  // Prevent Back button from showing cached dashboard
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+</script>
 </body>
 </html>

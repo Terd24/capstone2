@@ -9,7 +9,6 @@ include 'db_conn.php';
 
 $id_number = $_SESSION['id_number'];
 
-// Handle selected term from dropdown (GET method)
 $selected_term = isset($_GET['term']) ? $_GET['term'] : null;
 
 // Fetch all available terms for the dropdown
@@ -23,12 +22,10 @@ while ($row = $term_result->fetch_assoc()) {
     $terms[] = $row['school_year_term'];
 }
 
-// If no term selected, use the first available one (if exists)
 if (!$selected_term && count($terms) > 0) {
     $selected_term = $terms[0];
 }
 
-// Fetch grades for the selected term including teacher_name
 $stmt = $conn->prepare("SELECT subject, teacher_name, prelim, midterm, pre_finals, finals FROM grades_record WHERE id_number = ? AND school_year_term = ?");
 $stmt->bind_param("ss", $id_number, $selected_term);
 $stmt->execute();
@@ -51,7 +48,7 @@ while ($row = $result->fetch_assoc()) {
 <body class="bg-gray-100 font-sans">
 
   <div class="bg-white p-4 flex items-center shadow-md">
-    <button onclick="window.history.back()" class="text-2xl mr-4">←</button>
+    <button onclick="window.location.href='studentdashboard.php'" class="text-2xl mr-4">←</button>
     <h1 class="text-xl font-semibold">Grades</h1>
   </div>
 

@@ -1,3 +1,17 @@
+<?php
+session_start();
+
+// ✅ Require cashier role
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'cashier') {
+    header("Location: ../StudentLogin/login.php");
+    exit;
+}
+
+// ✅ Prevent caching (para hindi bumalik gamit ang Back button)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +22,7 @@
 </head>
 <body class="bg-gray-100 font-sans min-h-screen">
 
-  <!-- Hidden RFID input -->
+  <!-- ✅ Hidden RFID input -->
   <input 
     type="text" 
     id="rfidInput" 
@@ -17,9 +31,18 @@
   >
 
   <!-- Header -->
-  <div class="bg-white p-4 border-b shadow-sm flex items-center gap-4">
-    <div class="text-2xl">&#9776;</div>
-    <h1 class="text-gray-500 text-sm">Cashier Dashboard</h1>
+  <div class="bg-white p-4 border-b shadow-sm flex items-center justify-between relative">
+    <div class="flex items-center gap-4">
+      <!-- Burger Menu -->
+      <div class="relative">
+        <button id="menuBtn" class="text-2xl cursor-pointer">&#9776;</button>
+        <!-- Dropdown -->
+        <div id="menuDropdown" class="absolute left-0 mt-2 w-40 bg-white border rounded-lg shadow-lg hidden">
+          <a href="logout.php" class="block px-4 py-2 text-black-500 hover:bg-gray-100">Logout</a>
+        </div>
+      </div>
+      <h1 class="text-gray-1000 text-sm">Cashier Dashboard</h1>
+    </div>
   </div>
 
   <!-- Tabs -->
@@ -53,24 +76,35 @@
   </div>
 
   <script>
+    // ✅ Dropdown toggle
+    const menuBtn = document.getElementById("menuBtn");
+    const menuDropdown = document.getElementById("menuDropdown");
+
+    menuBtn.addEventListener("click", () => {
+      menuDropdown.classList.toggle("hidden");
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
+        menuDropdown.classList.add("hidden");
+      }
+    });
+
+    // ✅ RFID Logic (from old working version)
     const rfidInput = document.getElementById('rfidInput');
 
     function focusRFID() {
-      // Always be ready for next scan without breaking highlight
       if (document.activeElement !== rfidInput) {
         rfidInput.focus({ preventScroll: true });
       }
     }
 
-    // Detect start of RFID scan
     document.addEventListener('keydown', (e) => {
-      // Ignore if typing into other inputs/textareas
       if (!['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
         focusRFID();
       }
     });
 
-    // Listen for RFID complete (scanners usually send Enter key)
     rfidInput.addEventListener('change', () => {
       const rfid = rfidInput.value.trim();
       if (!rfid) return;
@@ -100,7 +134,7 @@
             document.getElementById('tab-balance').innerHTML = `<p class="text-sm text-gray-500 italic">No balance data yet.</p>`;
             document.getElementById('tab-history').innerHTML = `<p class="text-sm text-gray-500 italic">No transaction history loaded.</p>`;
           } else {
-            // Student Info
+            // ✅ Student Info
             document.getElementById('student-info').innerHTML = `
               <div class="flex items-center mb-3">
                 <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-xl">👤</div>
@@ -111,7 +145,7 @@
               <p class="text-sm text-gray-600">Year & Section: ${data.year_section || '-'}</p>
             `;
 
-            // Balance Tab
+            // ✅ Balance Tab
             document.getElementById('tab-balance').innerHTML = `
               <div class="flex justify-between items-center">
                 <label class="font-medium">${data.school_year_term}</label>
@@ -156,7 +190,7 @@
               </div>
             `;
 
-            // History Tab
+            // ✅ History Tab
             let historyHTML = '';
             if (data.history && data.history.length > 0) {
               data.history.forEach((row, index) => {
@@ -204,7 +238,7 @@
         });
     }
 
-    // Focus RFID when page loads
+    // ✅ Focus RFID when page loads
     window.onload = focusRFID;
   </script>
 

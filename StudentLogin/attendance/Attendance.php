@@ -94,8 +94,13 @@ $result = $stmt->get_result();
 </head>
 <body class="bg-gray-100 font-sans min-h-screen p-6">
 
-<header class="text-gray-400 font-semibold text-lg mb-4">Attendance</header>
-<button onclick="window.location.href='../StudentDashboard.php'" class="mb-4 text-lg">←</button>
+  <header class="mb-6">
+    <div class="bg-white p-4 flex items-center shadow-md">
+      <button onclick="window.location.replace('../studentdashboard.php')" class="text-2xl mr-4">←</button>
+      <h1 class="text-xl font-semibold text-gray-800">Attendance</h1>
+    </div>
+  </header>
+
 
 <?php if (isset($_SESSION['error'])): ?>
   <div class="bg-red-100 text-red-800 p-3 rounded mb-4">

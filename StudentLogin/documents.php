@@ -8,7 +8,7 @@ if (!isset($_SESSION['id_number'])) {
 
 $id_number = $_SESSION['id_number'];
 
-$sql = "SELECT document_name, date_submitted, remarks FROM submitted_documents WHERE id_number = ?";
+$sql = "SELECT document_name, date_submitted, remarks FROM submitted_documents WHERE id_number = ? ORDER BY date_submitted DESC";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $id_number);
 $stmt->execute();

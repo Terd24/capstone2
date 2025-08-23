@@ -36,7 +36,10 @@ while ($row = $result->fetch_assoc()) {
 <body class="bg-gray-100 min-h-screen font-sans p-6">
 
   <header class="mb-6">
-    <h1 class="text-xl font-semibold text-gray-800">Guidance</h1>
+    <div class="bg-white p-4 flex items-center shadow-md">
+      <button onclick="window.location.replace('studentdashboard.php')" class="text-2xl mr-4">←</button>
+      <h1 class="text-xl font-semibold text-gray-800">Guidance</h1>
+    </div>
   </header>
 
   <div class="bg-white rounded-lg shadow-md p-6">
