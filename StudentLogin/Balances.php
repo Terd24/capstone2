@@ -82,7 +82,7 @@ $sched_total = 0;
 
     <!-- Gross Assessment -->
     <section class="bg-gray-100 rounded p-4 space-y-2">
-      <h2 class="font-semibold text-lg border-b border-gray-300 pb-1">Gross Assessment</h2>
+      <h2 class="font-semibold text-lg border-b border-gray-300 pb-1">Total Balance</h2>
       <div class="flex justify-between">
         <span>Tuition Fee</span>
         <span>₱<?= number_format($tuition_fee, 2) ?></span>
@@ -96,7 +96,7 @@ $sched_total = 0;
         <span>₱<?= number_format($student_fees, 2) ?></span>
       </div>
       <div class="flex justify-between border-t border-gray-400 font-semibold pt-1 text-red-700">
-        <span>Gross Assessment</span>
+        <span>Balance</span>
         <span>₱<?= number_format($gross_total, 2) ?></span>
       </div>
     </section>

@@ -30,6 +30,8 @@ header("Expires: 0");
 </head>
 <body class="bg-gray-100 font-sans min-h-screen">
 
+
+
   <!-- ✅ Hidden RFID input -->
   <input type="text" id="rfidInput" autofocus class="absolute opacity-0">
 
@@ -301,109 +303,120 @@ const items = slice.map(s => {
 
     // ===== FETCH BALANCE & HISTORY =====
     function handleRFID(rfid) {
-      fetch(`GetBalance.php?rfid_uid=${encodeURIComponent(rfid)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            document.getElementById('student-info').innerHTML = `<p class="text-red-500">${data.error}</p>`;
-            document.getElementById('tab-balance').innerHTML = `<p class="text-sm text-gray-500 italic">No balance data yet.</p>`;
-            document.getElementById('tab-history').innerHTML = `<p class="text-sm text-gray-500 italic">No transaction history loaded.</p>`;
-          } else {
-            document.getElementById('student-info').innerHTML = `
-              <div class="flex items-center mb-3">
-                <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-xl">👤</div>
-                <div class="ml-3 font-medium">${data.full_name || 'Unknown Student'}</div>
-              </div>
-              <p class="text-sm text-gray-600">ID: ${data.id_number}</p>
-              <p class="text-sm text-gray-600">Program: ${data.program || '-'}</p>
-              <p class="text-sm text-gray-600">Year & Section: ${data.year_section || '-'}</p>
-            `;
-            document.getElementById('tab-balance').innerHTML = `
-              <div class="flex justify-between items-center">
-                <label class="font-medium">${data.school_year_term}</label>
-              </div>
-              <div class="overflow-x-auto mt-4">
-                <table class="min-w-full bg-white rounded shadow text-sm table-fixed">
-                  <thead class="bg-black text-white">
-                    <tr>
-                      <th class="px-4 py-2 w-12 text-center">#</th>
-                      <th class="px-4 py-2 w-48">Fee Type</th>
-                      <th class="px-4 py-2 w-32 text-right">Amount Due</th>
-                      <th class="px-4 py-2 w-32 text-right">Paid</th>
-                      <th class="px-4 py-2 w-32 text-right">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody class="text-gray-800">
-                    <tr class="text-center">
-                      <td class="px-4 py-2">1</td>
-                      <td class="px-4 py-2 text-left">Tuition Fee</td>
-                      <td class="px-4 py-2 text-right">₱${Number(data.tuition_fee).toFixed(2)}</td>
-                      <td class="px-4 py-2 text-right">₱${Number(data.tuition_paid ?? 0).toFixed(2)}</td>
-                      <td class="px-4 py-2 text-right">₱${(Number(data.tuition_fee) - Number(data.tuition_paid ?? 0)).toFixed(2)}</td>
-                    </tr>
-                    <tr class="text-center">
-                      <td class="px-4 py-2">2</td>
-                      <td class="px-4 py-2 text-left">Other Fees</td>
-                      <td class="px-4 py-2 text-right">₱${Number(data.other_fees).toFixed(2)}</td>
-                      <td class="px-4 py-2 text-right">₱${Number(data.other_paid ?? 0).toFixed(2)}</td>
-                      <td class="px-4 py-2 text-right">₱${(Number(data.other_fees) - Number(data.other_paid ?? 0)).toFixed(2)}</td>
-                    </tr>
-                    <tr class="text-center">
-                      <td class="px-4 py-2">3</td>
-                      <td class="px-4 py-2 text-left">Student Fees</td>
-                      <td class="px-4 py-2 text-right">₱${Number(data.student_fees).toFixed(2)}</td>
-                      <td class="px-4 py-2 text-right">₱${Number(data.student_paid ?? 0).toFixed(2)}</td>
-                      <td class="px-4 py-2 text-right">₱${(Number(data.student_fees) - Number(data.student_paid ?? 0)).toFixed(2)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p class="text-right text-sm mt-2 font-medium">Total: ₱${Number(data.gross_total).toFixed(2)}</p>
-              </div>
-            `;
-            let historyHTML = '';
-            if (data.history && data.history.length > 0) {
-              data.history.forEach((row, index) => {
-                historyHTML += `
-                  <tr>
-                    <td class="px-4 py-2">${index + 1}</td>
-                    <td class="px-4 py-2">${row.date}</td>
-                    <td class="px-4 py-2">Tuition fee</td>
-                    <td class="px-4 py-2">₱${row.amount}</td>
-                    <td class="px-4 py-2">Cash</td>
-                  </tr>
-                `;
-              });
-            } else {
-              historyHTML = `<tr><td colspan="5" class="px-4 py-2">No history available</td></tr>`;
-            }
-            document.getElementById('tab-history').innerHTML = `
-              <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded shadow text-sm">
-                  <thead class="bg-black text-white">
-                    <tr>
-                      <th class="px-4 py-2">#</th>
-                      <th class="px-4 py-2">Date</th>
-                      <th class="px-4 py-2">Description</th>
-                      <th class="px-4 py-2">Amount</th>
-                      <th class="px-4 py-2">Method</th>
-                    </tr>
-                  </thead>
-                  <tbody class="text-gray-800 text-center">
-                    ${historyHTML}
-                  </tbody>
-                </table>
-              </div>
-            `;
-          }
-          rfidInput.value = '';
-          focusRFID();
-        })
-        .catch(err => {
-          console.error(err);
-          rfidInput.value = '';
-          focusRFID();
+  fetch(`GetBalance.php?rfid_uid=${encodeURIComponent(rfid)}`)
+    .then(res => res.json())
+    .then(data => {
+      // ✅ Always render student info (never "Unknown Student")
+      document.getElementById('student-info').innerHTML = `
+        <div class="flex items-center mb-3">
+          <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-xl">👤</div>
+          <div class="ml-3 font-medium">${data.full_name || ''}</div>
+        </div>
+        <p class="text-sm text-gray-600">ID: ${data.id_number || ''}</p>
+        <p class="text-sm text-gray-600">Program: ${data.program || ''}</p>
+        <p class="text-sm text-gray-600">Year & Section: ${data.year_section || ''}</p>
+      `;
+
+      // ✅ If no balance record, just fill in zeros
+      const tuition_fee = Number(data.tuition_fee ?? 0);
+      const tuition_paid = Number(data.tuition_paid ?? 0);
+      const other_fees = Number(data.other_fees ?? 0);
+      const other_paid = Number(data.other_paid ?? 0);
+      const student_fees = Number(data.student_fees ?? 0);
+      const student_paid = Number(data.student_paid ?? 0);
+      const gross_total = Number(data.gross_total ?? 0);
+      const term = data.school_year_term || "No balance record";
+
+      document.getElementById('tab-balance').innerHTML = `
+        <div class="flex justify-between items-center">
+          <label class="font-medium">${term}</label>
+        </div>
+        <div class="overflow-x-auto mt-4">
+          <table class="min-w-full bg-white rounded shadow text-sm table-fixed">
+            <thead class="bg-black text-white">
+              <tr>
+                <th class="px-4 py-2 w-12 text-center">#</th>
+                <th class="px-4 py-2 w-48">Fee Type</th>
+                <th class="px-4 py-2 w-32 text-right">Amount Due</th>
+                <th class="px-4 py-2 w-32 text-right">Paid</th>
+                <th class="px-4 py-2 w-32 text-right">Balance</th>
+              </tr>
+            </thead>
+            <tbody class="text-gray-800">
+              <tr class="text-center">
+                <td class="px-4 py-2">1</td>
+                <td class="px-4 py-2 text-left">Tuition Fee</td>
+                <td class="px-4 py-2 text-right">₱${tuition_fee.toFixed(2)}</td>
+                <td class="px-4 py-2 text-right">₱${tuition_paid.toFixed(2)}</td>
+                <td class="px-4 py-2 text-right">₱${(tuition_fee - tuition_paid).toFixed(2)}</td>
+              </tr>
+              <tr class="text-center">
+                <td class="px-4 py-2">2</td>
+                <td class="px-4 py-2 text-left">Other Fees</td>
+                <td class="px-4 py-2 text-right">₱${other_fees.toFixed(2)}</td>
+                <td class="px-4 py-2 text-right">₱${other_paid.toFixed(2)}</td>
+                <td class="px-4 py-2 text-right">₱${(other_fees - other_paid).toFixed(2)}</td>
+              </tr>
+              <tr class="text-center">
+                <td class="px-4 py-2">3</td>
+                <td class="px-4 py-2 text-left">Student Fees</td>
+                <td class="px-4 py-2 text-right">₱${student_fees.toFixed(2)}</td>
+                <td class="px-4 py-2 text-right">₱${student_paid.toFixed(2)}</td>
+                <td class="px-4 py-2 text-right">₱${(student_fees - student_paid).toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="text-right text-sm mt-2 font-medium">Total: ₱${gross_total.toFixed(2)}</p>
+        </div>
+      `;
+
+      // ✅ History stays empty if none
+      let historyHTML = '';
+      if (data.history && data.history.length > 0) {
+        data.history.forEach((row, index) => {
+          historyHTML += `
+            <tr>
+              <td class="px-4 py-2">${index + 1}</td>
+              <td class="px-4 py-2">${row.date}</td>
+              <td class="px-4 py-2">Tuition fee</td>
+              <td class="px-4 py-2">₱${row.amount}</td>
+              <td class="px-4 py-2">Cash</td>
+            </tr>
+          `;
         });
-    }
+      } else {
+        historyHTML = `<tr><td colspan="5" class="px-4 py-2">No history available</td></tr>`;
+      }
+
+      document.getElementById('tab-history').innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full bg-white rounded shadow text-sm">
+            <thead class="bg-black text-white">
+              <tr>
+                <th class="px-4 py-2">#</th>
+                <th class="px-4 py-2">Date</th>
+                <th class="px-4 py-2">Description</th>
+                <th class="px-4 py-2">Amount</th>
+                <th class="px-4 py-2">Method</th>
+              </tr>
+            </thead>
+            <tbody class="text-gray-800 text-center">
+              ${historyHTML}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      rfidInput.value = '';
+      focusRFID();
+    })
+    .catch(err => {
+      console.error(err);
+      rfidInput.value = '';
+      focusRFID();
+    });
+}
+
 
     // ====== AUTOCOMPLETE SEARCH ======
 
