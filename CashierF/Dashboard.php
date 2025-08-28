@@ -328,47 +328,65 @@ const items = slice.map(s => {
       const term = data.school_year_term || "No balance record";
 
       document.getElementById('tab-balance').innerHTML = `
-        <div class="flex justify-between items-center">
-          <label class="font-medium">${term}</label>
-        </div>
-        <div class="overflow-x-auto mt-4">
-          <table class="min-w-full bg-white rounded shadow text-sm table-fixed">
-            <thead class="bg-black text-white">
-              <tr>
-                <th class="px-4 py-2 w-12 text-center">#</th>
-                <th class="px-4 py-2 w-48">Fee Type</th>
-                <th class="px-4 py-2 w-32 text-right">Amount Due</th>
-                <th class="px-4 py-2 w-32 text-right">Paid</th>
-                <th class="px-4 py-2 w-32 text-right">Balance</th>
-              </tr>
-            </thead>
-            <tbody class="text-gray-800">
-              <tr class="text-center">
-                <td class="px-4 py-2">1</td>
-                <td class="px-4 py-2 text-left">Tuition Fee</td>
-                <td class="px-4 py-2 text-right">₱${tuition_fee.toFixed(2)}</td>
-                <td class="px-4 py-2 text-right">₱${tuition_paid.toFixed(2)}</td>
-                <td class="px-4 py-2 text-right">₱${(tuition_fee - tuition_paid).toFixed(2)}</td>
-              </tr>
-              <tr class="text-center">
-                <td class="px-4 py-2">2</td>
-                <td class="px-4 py-2 text-left">Other Fees</td>
-                <td class="px-4 py-2 text-right">₱${other_fees.toFixed(2)}</td>
-                <td class="px-4 py-2 text-right">₱${other_paid.toFixed(2)}</td>
-                <td class="px-4 py-2 text-right">₱${(other_fees - other_paid).toFixed(2)}</td>
-              </tr>
-              <tr class="text-center">
-                <td class="px-4 py-2">3</td>
-                <td class="px-4 py-2 text-left">Student Fees</td>
-                <td class="px-4 py-2 text-right">₱${student_fees.toFixed(2)}</td>
-                <td class="px-4 py-2 text-right">₱${student_paid.toFixed(2)}</td>
-                <td class="px-4 py-2 text-right">₱${(student_fees - student_paid).toFixed(2)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="text-right text-sm mt-2 font-medium">Total: ₱${gross_total.toFixed(2)}</p>
-        </div>
-      `;
+  <div class="flex justify-between items-center">
+    <label class="font-medium">${term}</label>
+  </div>
+  <div class="overflow-x-auto mt-4">
+    <table class="min-w-full bg-white rounded shadow text-sm table-fixed">
+      <thead class="bg-black text-white">
+        <tr>
+          <th class="px-4 py-2 w-12 text-center">#</th>
+          <th class="px-4 py-2 w-48">Fee Type</th>
+          <th class="px-4 py-2 w-32 text-right">Amount Due</th>
+          <th class="px-4 py-2 w-32 text-right">Paid</th>
+          <th class="px-4 py-2 w-32 text-right">Balance</th>
+        </tr>
+      </thead>
+      <tbody class="text-gray-800">
+        <tr class="text-center">
+          <td class="px-4 py-2">1</td>
+          <td class="px-4 py-2 text-left">Tuition Fee</td>
+          <td class="px-4 py-2 text-right">₱${tuition_fee.toFixed(2)}</td>
+          <td class="px-4 py-2 text-right">₱${tuition_paid.toFixed(2)}</td>
+          <td class="px-4 py-2 text-right">₱${(tuition_fee - tuition_paid).toFixed(2)}</td>
+        </tr>
+        <tr class="text-center">
+          <td class="px-4 py-2">2</td>
+          <td class="px-4 py-2 text-left">Other Fees</td>
+          <td class="px-4 py-2 text-right">₱${other_fees.toFixed(2)}</td>
+          <td class="px-4 py-2 text-right">₱${other_paid.toFixed(2)}</td>
+          <td class="px-4 py-2 text-right">₱${(other_fees - other_paid).toFixed(2)}</td>
+        </tr>
+        <tr class="text-center">
+          <td class="px-4 py-2">3</td>
+          <td class="px-4 py-2 text-left">Student Fees</td>
+          <td class="px-4 py-2 text-right">₱${student_fees.toFixed(2)}</td>
+          <td class="px-4 py-2 text-right">₱${student_paid.toFixed(2)}</td>
+          <td class="px-4 py-2 text-right">₱${(student_fees - student_paid).toFixed(2)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="text-right text-sm mt-2 font-medium">Total: ₱${gross_total.toFixed(2)}</p>
+
+    <!-- ✅ Add Fee Section -->
+    <div class="mt-4 border-t pt-4">
+      <h3 class="text-sm font-medium mb-2">Add New Fee</h3>
+      <div class="flex flex-col gap-2">
+        <input type="text" id="feeType" placeholder="Fee Type" 
+          class="border rounded px-3 py-1 text-sm w-60"/>
+        <input type="number" id="feeAmount" placeholder="Amount Due" 
+          class="border rounded px-3 py-1 text-sm w-60"/>
+        <input type="number" id="feePaid" placeholder="Amount Paid" 
+          class="border rounded px-3 py-1 text-sm w-60"/>
+        <button onclick="addFee('${rfid}')" 
+          class="bg-black text-white px-4 py-2 rounded text-sm hover:bg-gray-800 w-32">
+          Add Fee
+        </button>
+      </div>
+    </div>
+  </div>
+`;
+
 
       // ✅ History stays empty if none
       let historyHTML = '';
@@ -419,6 +437,35 @@ const items = slice.map(s => {
 
 
     // ====== AUTOCOMPLETE SEARCH ======
+function addFee(rfid) {
+  const feeType = document.getElementById('feeType').value.trim();
+  const feeAmount = document.getElementById('feeAmount').value.trim();
+  const feePaid = document.getElementById('feePaid').value.trim();
+
+  if (!feeType || !feeAmount) {
+    alert("Please enter fee type and amount due.");
+    return;
+  }
+
+  fetch("AddFee.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `rfid_uid=${encodeURIComponent(rfid)}&fee_type=${encodeURIComponent(feeType)}&amount=${encodeURIComponent(feeAmount)}&paid=${encodeURIComponent(feePaid)}`
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert("Fee added successfully!");
+      handleRFID(rfid); // ✅ refresh student balance
+    } else {
+      alert("Failed to add fee: " + (data.error || "Unknown error"));
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Error adding fee");
+  });
+}
 
 // debounce helper (wait before firing fetch)
 function debounce(func, delay) {

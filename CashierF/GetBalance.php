@@ -62,6 +62,21 @@ $student_fees = $bal['student_fees'] ?? 0;
 $gross_total = $tuition_fee + $other_fees + $student_fees;
 $bal_stmt->close();
 
+// ✅ Get additional fee items
+$item_stmt = $conn->prepare("SELECT fee_type, amount, paid FROM student_fee_items 
+                             WHERE id_number = ? AND school_year_term = ?");
+$item_stmt->bind_param("ss", $id_number, $school_year_term);
+$item_stmt->execute();
+$item_res = $item_stmt->get_result();
+
+$fee_items = [];
+while ($row = $item_res->fetch_assoc()) {
+    $fee_items[] = $row;
+    $gross_total += ($row['amount'] ?? 0);
+}
+$item_stmt->close();
+
+
 // ✅ Get payment history (if any)
 $hist_stmt = $conn->prepare("SELECT date, or_number, (misc_fee + other_school_fee + tuition_fee) AS amount 
                              FROM student_payments 
@@ -87,6 +102,7 @@ echo json_encode([
     "other_fees" => $other_fees,
     "student_fees" => $student_fees,
     "gross_total" => $gross_total,
+    "custom_fees" => $fee_items,
     "history" => $history
 ]);
 ?>
