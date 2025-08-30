@@ -22,7 +22,7 @@
             <div class="col-span-3 grid grid-cols-3 gap-6">
                 <div>
                     <label class="block text-sm font-semibold mb-1">LRN</label>
-                    <input type="number" name="lrn" required value="<?= htmlspecialchars($form_data['lrn'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="number" name="lrn" required value="<?= htmlspecialchars($form_data['lrn'] ?? '') ?>" pattern="[0-9]+" title="Please enter numbers only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
      <div>
   <label class="block text-sm font-semibold mb-1">Academic Track / Course</label>
@@ -86,22 +86,22 @@
             <div class="col-span-3 grid grid-cols-3 gap-6">
                 <div>
                     <label class="block text-sm font-semibold mb-1">Last Name</label>
-                    <input type="text" name="last_name" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="last_name" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">First Name</label>
-                    <input type="text" name="first_name" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="first_name" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold mb-1">Middle Name</label>
-                    <input type="text" name="middle_name" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                    <input type="text" name="middle_name" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
             </div>
 
             <!-- Other Student Info -->           
              <div>
                 <label class="block text-sm font-semibold mb-1">School Year</label>
-                <input type="text" name="school_year" required value="<?= htmlspecialchars($form_data['school_year'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                <input type="text" name="school_year" required value="<?= htmlspecialchars($form_data['school_year'] ?? '') ?>" pattern="[0-9\-]+" title="Please enter numbers and dash only (e.g. 2024-2025)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Grade Level</label>
@@ -127,7 +127,7 @@
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Birthplace</label>
-                <input type="text" name="birthplace" required value="<?= htmlspecialchars($form_data['birthplace'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                <input type="text" name="birthplace" required value="<?= htmlspecialchars($form_data['birthplace'] ?? '') ?>" pattern="[A-Za-z\s,.-]+" title="Please enter a valid location" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
             </div>
                       <div>
                 <label class="block text-sm font-semibold mb-1">Gender</label>
@@ -138,7 +138,7 @@
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Religion</label>
-                <input type="text" name="religion" required value="<?= htmlspecialchars($form_data['religion'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                <input type="text" name="religion" required value="<?= htmlspecialchars($form_data['religion'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
             </div>
 
                             <!-- Credentials -->
@@ -176,23 +176,23 @@
             <div class="col-span-3 space-y-6">
                 <h3 class="font-semibold mt-4">Father's Info</h3>
                 <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="father_name" placeholder="Name" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="father_name" placeholder="Name" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" pattern="[0-9+\-\s()]+" title="Please enter numbers only" oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
 
                 <h3 class="font-semibold mt-4">Mother's Info</h3>
                 <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="mother_name" placeholder="Name" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="mother_name" placeholder="Name" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" pattern="[0-9+\-\s()]+" title="Please enter numbers only" oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
 
                 <h3 class="font-semibold mt-4">Guardian's Info</h3>
                 <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="guardian_name" placeholder="Name" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="guardian_name" placeholder="Name" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="tel" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" pattern="[0-9+\-\s()]*" title="Please enter numbers only" oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
             </div>
 
@@ -200,11 +200,11 @@
             <div class="col-span-3 grid grid-cols-2 gap-6 mt-4">
                 <div>
                     <label class="block text-sm font-semibold mb-1">Last School Attended</label>
-                    <input type="text" name="last_school" placeholder="School Name" value="<?= htmlspecialchars($form_data['last_school'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="last_school" placeholder="School Name" value="<?= htmlspecialchars($form_data['last_school'] ?? '') ?>" pattern="[A-Za-z\s.-]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">School Year</label>
-                    <input type="text" name="last_school_year" placeholder="School Year" value="<?= htmlspecialchars($form_data['last_school_year'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="last_school_year" placeholder="School Year (e.g. 2023-2024)" value="<?= htmlspecialchars($form_data['last_school_year'] ?? '') ?>" pattern="[0-9\-]*" title="Please enter numbers and dash only (e.g. 2023-2024)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
             </div>
             
@@ -219,8 +219,9 @@
     <!-- Student ID -->
     <div>
         <label class="block text-sm font-semibold mb-1">Student ID</label>
-        <input type="text" name="id_number" required
+        <input type="number" name="id_number" required
                value="<?= htmlspecialchars($old_id ?? '') ?>"
+               pattern="[0-9]+" title="Please enter numbers only" oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_id) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
         <?php if (!empty($error_id)): ?>
             <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_id) ?></p>
@@ -238,8 +239,9 @@
     <!-- RFID Number -->
     <div>
         <label class="block text-sm font-semibold mb-1">RFID Number</label>
-        <input type="text" name="rfid_uid" required
+        <input type="number" name="rfid_uid" required
                value="<?= htmlspecialchars($old_rfid ?? '') ?>"
+               pattern="[0-9]+" title="Please enter numbers only" oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
         <?php if (!empty($error_rfid)): ?>
             <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
@@ -433,19 +435,27 @@ document.getElementById('studentForm').addEventListener('submit', function(e) {
     });
 });
 
-// Clear error styling when user types
+// Clear error styling only when user enters valid data
 document.querySelector('input[name="id_number"]').addEventListener('input', function() {
-    this.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
-    this.classList.add('border-gray-300', 'focus:ring-[#2F8D46]');
-    const errorMsg = this.parentNode.querySelector('.text-red-500');
-    if (errorMsg) errorMsg.remove();
+    const value = this.value.trim();
+    // Only clear error if field has valid numbers
+    if (value && value.match(/^[0-9]+$/)) {
+        this.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+        this.classList.add('border-gray-300', 'focus:ring-[#2F8D46]');
+        const errorMsg = this.parentNode.querySelector('.text-red-500');
+        if (errorMsg) errorMsg.remove();
+    }
 });
 
 document.querySelector('input[name="rfid_uid"]').addEventListener('input', function() {
-    this.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
-    this.classList.add('border-gray-300', 'focus:ring-[#2F8D46]');
-    const errorMsg = this.parentNode.querySelector('.text-red-500');
-    if (errorMsg) errorMsg.remove();
+    const value = this.value.trim();
+    // Only clear error if field has valid numbers
+    if (value && value.match(/^[0-9]+$/)) {
+        this.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+        this.classList.add('border-gray-300', 'focus:ring-[#2F8D46]');
+        const errorMsg = this.parentNode.querySelector('.text-red-500');
+        if (errorMsg) errorMsg.remove();
+    }
 });
 </script>
 <script>
@@ -466,7 +476,7 @@ if (notif) {
 }
 
 // Handle validation errors
-<?php if (!empty($error_id) || !empty($error_rfid)): ?>
+<?php if (!empty($error_id) || !empty($error_rfid) || !empty($error_msg) || $show_modal): ?>
 // Show modal if there are errors
 document.getElementById('addStudentModal').classList.remove('hidden');
 document.getElementById('modalContent').classList.remove('scale-95');
@@ -481,5 +491,69 @@ setTimeout(() => {
     }
 }, 300);
 <?php endif; ?>
-</script>
 
+// Retrieve session errors for display
+<?php 
+$session_error_id = $_SESSION['error_id'] ?? "";
+$session_error_rfid = $_SESSION['error_rfid'] ?? "";
+if (!empty($session_error_id) || !empty($session_error_rfid)): 
+?>
+// Show modal and errors from session
+document.getElementById('addStudentModal').classList.remove('hidden');
+document.getElementById('modalContent').classList.remove('scale-95');
+document.getElementById('modalContent').classList.add('scale-100');
+
+<?php if (!empty($session_error_id)): ?>
+// Show Student ID error
+const idField = document.querySelector('input[name="id_number"]');
+if (idField) {
+    idField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+    idField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
+    
+    let errorMsg = idField.parentNode.querySelector('.text-red-500');
+    if (!errorMsg) {
+        errorMsg = document.createElement('p');
+        errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
+        idField.parentNode.appendChild(errorMsg);
+    }
+    errorMsg.textContent = '<?= htmlspecialchars($session_error_id) ?>';
+    
+    // Auto-scroll and focus on error field
+    setTimeout(() => {
+        idField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        idField.focus();
+    }, 500);
+}
+<?php endif; ?>
+
+<?php if (!empty($session_error_rfid)): ?>
+// Show RFID error
+const rfidField = document.querySelector('input[name="rfid_uid"]');
+if (rfidField) {
+    rfidField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+    rfidField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
+    
+    let errorMsg = rfidField.parentNode.querySelector('.text-red-500');
+    if (!errorMsg) {
+        errorMsg = document.createElement('p');
+        errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
+        rfidField.parentNode.appendChild(errorMsg);
+    }
+    errorMsg.textContent = '<?= htmlspecialchars($session_error_rfid) ?>';
+    
+    // Auto-scroll and focus on error field if no ID error
+    <?php if (empty($session_error_id)): ?>
+    setTimeout(() => {
+        rfidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        rfidField.focus();
+    }, 500);
+    <?php endif; ?>
+}
+<?php endif; ?>
+
+// Clear session errors after displaying
+<?php 
+unset($_SESSION['error_id'], $_SESSION['error_rfid']);
+?>
+<?php endif; ?>
+</script>
