@@ -55,7 +55,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $last_school_year = $_POST['last_school_year'] ?? '';
 
     $id_number = $_POST['id_number'] ?? '';
-    $password = password_hash($_POST['password'] ?? '', PASSWORD_DEFAULT);
+    $raw_password = $_POST['password'] ?? '';
+    $password = password_hash($raw_password, PASSWORD_DEFAULT);
     $rfid_uid = $_POST['rfid_uid'] ?? '';
 
     // Store all form data for repopulation

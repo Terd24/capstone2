@@ -232,7 +232,6 @@
         <label class="block text-sm font-semibold mb-1">Password</label>
         <div class="relative">
             <input type="text" name="password" required value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-            <span class="absolute right-3 top-2 text-xs text-gray-500">Visible for verification</span>
         </div>
     </div>
 
@@ -348,6 +347,105 @@ window.addEventListener('load', function() {
     if (savedTrack) {
         populateGradeLevels(savedTrack, savedGrade);
     }
+});
+
+// Add client-side validation to prevent page flicker
+document.getElementById('studentForm').addEventListener('submit', function(e) {
+    const studentId = document.querySelector('input[name="id_number"]').value.trim();
+    const rfidUid = document.querySelector('input[name="rfid_uid"]').value.trim();
+    
+    if (!studentId || !rfidUid) {
+        return; // Let normal validation handle empty fields
+    }
+    
+    // Show loading state
+    const submitBtn = document.getElementById('submitBtn');
+    const submitText = document.getElementById('submitText');
+    const submitLoader = document.getElementById('submitLoader');
+    
+    submitBtn.disabled = true;
+    submitText.classList.add('hidden');
+    submitLoader.classList.remove('hidden');
+    
+    // Check for duplicates via AJAX
+    const formData = new FormData();
+    formData.append('check_duplicates', '1');
+    formData.append('id_number', studentId);
+    formData.append('rfid_uid', rfidUid);
+    
+    fetch('Accounts/check_duplicates.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error_id || data.error_rfid) {
+            e.preventDefault();
+            
+            // Show errors without page reload
+            if (data.error_id) {
+                const idField = document.querySelector('input[name="id_number"]');
+                idField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+                idField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
+                
+                let errorMsg = idField.parentNode.querySelector('.text-red-500');
+                if (!errorMsg) {
+                    errorMsg = document.createElement('p');
+                    errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
+                    idField.parentNode.appendChild(errorMsg);
+                }
+                errorMsg.textContent = data.error_id;
+            }
+            
+            if (data.error_rfid) {
+                const rfidField = document.querySelector('input[name="rfid_uid"]');
+                rfidField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+                rfidField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
+                
+                let errorMsg = rfidField.parentNode.querySelector('.text-red-500');
+                if (!errorMsg) {
+                    errorMsg = document.createElement('p');
+                    errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
+                    rfidField.parentNode.appendChild(errorMsg);
+                }
+                errorMsg.textContent = data.error_rfid;
+            }
+            
+            // Scroll to first error
+            const firstError = document.querySelector('.border-red-500');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstError.focus();
+            }
+        }
+        
+        // Reset button state
+        submitBtn.disabled = false;
+        submitText.classList.remove('hidden');
+        submitLoader.classList.add('hidden');
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Reset button state and allow normal form submission
+        submitBtn.disabled = false;
+        submitText.classList.remove('hidden');
+        submitLoader.classList.add('hidden');
+    });
+});
+
+// Clear error styling when user types
+document.querySelector('input[name="id_number"]').addEventListener('input', function() {
+    this.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+    this.classList.add('border-gray-300', 'focus:ring-[#2F8D46]');
+    const errorMsg = this.parentNode.querySelector('.text-red-500');
+    if (errorMsg) errorMsg.remove();
+});
+
+document.querySelector('input[name="rfid_uid"]').addEventListener('input', function() {
+    this.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+    this.classList.add('border-gray-300', 'focus:ring-[#2F8D46]');
+    const errorMsg = this.parentNode.querySelector('.text-red-500');
+    if (errorMsg) errorMsg.remove();
 });
 </script>
 <script>
