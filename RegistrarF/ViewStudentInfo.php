@@ -146,12 +146,12 @@ if ($docType === 'submitted') {
         <!-- Tabs -->
         <div class="flex flex-col md:flex-row gap-3 w-full justify-center mt-4">
             <a href="javascript:void(0);" onclick="switchTab('requested')" 
-               class="py-3 rounded-lg flex-1 text-center font-semibold <?= $docType==='requested' ? 'bg-black text-white' : 'bg-gray-200 text-black' ?>">
-               📝 Requested Documents
+            class="py-3 rounded-lg flex-1 text-center font-semibold <?= $docType==='requested' ? 'bg-black text-white' : 'bg-gray-200 text-black' ?>">
+            📝 Requested Documents
             </a>
             <a href="javascript:void(0);" onclick="switchTab('submitted')" 
-               class="py-3 rounded-lg flex-1 text-center font-semibold <?= $docType==='submitted' ? 'bg-black text-white' : 'bg-gray-200 text-black' ?>">
-               📄 Submitted Documents
+            class="py-3 rounded-lg flex-1 text-center font-semibold <?= $docType==='submitted' ? 'bg-black text-white' : 'bg-gray-200 text-black' ?>">
+            📄 Submitted Documents
             </a>
         </div>
     </div>
@@ -166,10 +166,9 @@ if ($docType === 'submitted') {
             <!-- Add Submitted Document -->
             <div class="mb-6">
                 <button onclick="document.getElementById('addSubmittedForm').classList.toggle('hidden')" 
-                        class="bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
+                        class="bg-black text-white px-4 py-2 rounded hover:bg-white hover:text-black border border-black transition-all duration-200">
                     Add Submitted Document
                 </button>
-
                 <div id="addSubmittedForm" class="hidden mt-4 bg-gray-50 p-4 rounded border">
                     <form method="POST" class="space-y-4">
                         <input type="hidden" name="id_number" value="<?= htmlspecialchars($student['id_number']) ?>">
@@ -190,7 +189,7 @@ if ($docType === 'submitted') {
                                 ?>
                             </select>
                         </div>
-                        <button type="submit" class="w-full bg-black text-white py-2 rounded hover:bg-gray-800">
+                        <button type="submit" class="w-full bg-black text-white py-2 rounded hover:bg-white hover:text-black border border-black transition-all duration-200">
                             Submit Document
                         </button>
                     </form>
@@ -198,60 +197,129 @@ if ($docType === 'submitted') {
             </div>
         <?php endif; ?>
 
-        <!-- Table -->
-        <table class="w-full text-sm border border-gray-300">
-            <thead class="bg-black text-white">
-                <tr>
+<!-- Table -->
+<table class="w-full text-sm border border-gray-300">
+    <thead class="bg-black text-white">
+        <tr>
+            <?php if($docType==='requested'): ?>
+                <th class="py-2 px-4 border text-left">Document Type</th>
+                <th class="py-2 px-4 border text-left">Purpose</th>
+                <th class="py-2 px-4 border text-left">Date Requested</th>
+                <th class="py-2 px-4 border text-left">Claimed At</th>
+                <th class="py-2 px-4 border text-left">Status</th>
+                <th class="py-2 px-4 border"></th>
+            <?php else: ?>
+                <th class="py-2 px-4 border text-left">Document Name</th>
+                <th class="py-2 px-4 border text-left">Date Submitted</th>
+                <th class="py-2 px-4 border text-left">Remarks</th>
+                <th class="py-2 px-4 border"></th>
+            <?php endif; ?>
+        </tr>
+    </thead>
+    <tbody>
+        <?php if ($docs->num_rows > 0): ?>
+            <?php while($doc=$docs->fetch_assoc()): ?>
+                <tr class="cursor-pointer toggle-row">
                     <?php if($docType==='requested'): ?>
-                        <th class="py-2 px-4 border">Document Type</th>
-                        <th class="py-2 px-4 border">Purpose</th>
-                        <th class="py-2 px-4 border">Date Requested</th>
-                        <th class="py-2 px-4 border">Claimed At</th>
-                        <th class="py-2 px-4 border">Status</th>
+                        <td class="py-2 px-4 border"><?= htmlspecialchars($doc['document_type']) ?></td>
+                        <td class="py-2 px-4 border truncate max-w-[150px]"><?= htmlspecialchars($doc['purpose']) ?></td>
+                        <td class="py-2 px-4 border"><?= $doc['date_requested'] ?></td>
+                        <td class="py-2 px-4 border">
+                            <?= ($doc['date_claimed'] && $doc['status']==='Claimed') ? $doc['date_claimed'] : '---' ?>
+                        </td>
+                        <td class="py-2 px-4 border">
+                            <select class="border px-2 py-1 rounded bg-white"
+                                    onchange="updateStatus(<?= $doc['id'] ?>, this)">
+                                <option value="Pending"        <?= $doc['status']==='Pending' ? 'selected' : '' ?>>Pending</option>
+                                <option value="Ready to Claim" <?= $doc['status']==='Ready to Claim' ? 'selected' : '' ?>>Ready to Claim</option>
+                                <option value="Claimed"        <?= $doc['status']==='Claimed' ? 'selected' : '' ?>>Claimed</option>
+                            </select>
+                        </td>
+                        <td class="py-2 px-4 border text-center">
+                            <span class="arrow">&#9662;</span>
+                        </td>
                     <?php else: ?>
-                        <th class="py-2 px-4 border">Document Name</th>
-                        <th class="py-2 px-4 border">Date Submitted</th>
-                        <th class="py-2 px-4 border">Remarks</th>
+                        <td class="py-2 px-4 border"><?= htmlspecialchars($doc['document_name']) ?></td>
+                        <td class="py-2 px-4 border"><?= date('Y-m-d H:i:s', strtotime($doc['date_submitted'])) ?></td>
+                        <td class="py-2 px-4 border"><?= htmlspecialchars($doc['remarks']) ?></td>
+                        <td class="py-2 px-4 border text-center">
+                            <span class="arrow">&#9662;</span>
+                        </td>
                     <?php endif; ?>
                 </tr>
-            </thead>
-            <tbody>
-                <?php if ($docs->num_rows > 0): ?>
-                    <?php while($doc=$docs->fetch_assoc()): ?>
-                        <tr>
-                            <?php if($docType==='requested'): ?>
-                                <td class="py-2 px-4 border"><?= htmlspecialchars($doc['document_type']) ?></td>
-                                <td class="py-2 px-4 border"><?= htmlspecialchars($doc['purpose']) ?></td>
-                                <td class="py-2 px-4 border"><?= $doc['date_requested'] ?></td>
-                                <td class="py-2 px-4 border">
-                                    <?= ($doc['date_claimed'] && $doc['status']==='Claimed') ? $doc['date_claimed'] : '---' ?>
-                                </td>
-                                <td class="py-2 px-4 border">
-                                    <select class="border px-2 py-1 rounded bg-white"
-                                            onchange="updateStatus(<?= $doc['id'] ?>, this)">
-                                        <option value="Pending"        <?= $doc['status']==='Pending' ? 'selected' : '' ?>>Pending</option>
-                                        <option value="Ready to Claim" <?= $doc['status']==='Ready to Claim' ? 'selected' : '' ?>>Ready to Claim</option>
-                                        <option value="Claimed"        <?= $doc['status']==='Claimed' ? 'selected' : '' ?>>Claimed</option>
-                                    </select>
-                                </td>
-                            <?php else: ?>
-                                <td class="py-2 px-4 border"><?= htmlspecialchars($doc['document_name']) ?></td>
-                                <td class="py-2 px-4 border"><?= date('Y-m-d H:i:s', strtotime($doc['date_submitted'])) ?></td>
-                                <td class="py-2 px-4 border"><?= htmlspecialchars($doc['remarks']) ?></td>
-                            <?php endif; ?>
-                        </tr>
-                    <?php endwhile; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="<?= $docType==='requested'?5:4 ?>" 
-                            class="text-center py-3 text-gray-500">
-                            No documents found.
-                        </td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+                <!-- Hidden expandable row -->
+                <tr class="hidden detail-row bg-gray-50">
+                    <td colspan="<?= $docType==='requested'?6:4 ?>" class="p-4 text-gray-700">
+                        <?php if($docType==='requested'): ?>
+                            <div>
+                                <p><strong>Document Type:</strong> <?= htmlspecialchars($doc['document_type']) ?></p>
+                                <p><strong>Purpose:</strong> <?= htmlspecialchars($doc['purpose']) ?></p>
+                                <p><strong>Date Requested:</strong> <?= $doc['date_requested'] ?></p>
+                                <p><strong>Status:</strong> <?= htmlspecialchars($doc['status']) ?></p>
+                                <p><strong>Claimed At:</strong> <?= $doc['date_claimed'] ?: '---' ?></p>
+                            </div>
+                        <?php else: ?>
+                            <div>
+                                <p><strong>Document Name:</strong> <?= htmlspecialchars($doc['document_name']) ?></p>
+                                <p><strong>Date Submitted:</strong> <?= date('Y-m-d H:i:s', strtotime($doc['date_submitted'])) ?></p>
+                                <p><strong>Remarks:</strong> <?= htmlspecialchars($doc['remarks']) ?></p>
+                            </div>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endwhile; ?>
+        <?php else: ?>
+            <tr>
+                <td colspan="<?= $docType==='requested'?6:4 ?>" 
+                    class="text-center py-3 text-gray-500">
+                    No documents found.
+                </td>
+            </tr>
+        <?php endif; ?>
+    </tbody>
+</table>
+
+<script>
+document.querySelectorAll(".toggle-row").forEach((row, index) => {
+    row.addEventListener("click", () => {
+        const detailRow = row.nextElementSibling;
+        const arrow = row.querySelector(".arrow");
+        detailRow.classList.toggle("hidden");
+        arrow.innerHTML = detailRow.classList.contains("hidden") ? "&#9662;" : "&#9652;";
+    });
+});
+
+// ===== RFID Scanner Logic =====
+let rfidBuffer = "";
+let lastKeyTime = Date.now();
+const rfidInput = document.getElementById("rfid_input");
+const rfidForm = document.getElementById("rfidForm");
+
+document.addEventListener('keydown', (e) => {
+    const currentTime = Date.now();
+    
+    // Reset buffer if too much time passed between keys
+    if (currentTime - lastKeyTime > 100) rfidBuffer = "";
+    lastKeyTime = currentTime;
+
+    // Ignore typing in inputs or textareas
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+    if (e.key === 'Enter') {
+        // Submit only if buffer has reasonable length
+        if (rfidBuffer.length >= 5) {
+            rfidInput.value = rfidBuffer.trim();
+            rfidForm.submit();
+        }
+        rfidBuffer = "";
+        e.preventDefault();
+    } else if (e.key.length === 1) {
+        rfidBuffer += e.key;
+    }
+});
+</script>
+
+</div>
 </div>
 </body>
 </html>
