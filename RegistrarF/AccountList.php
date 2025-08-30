@@ -23,6 +23,9 @@ if ($success_msg) {
 // Default account type
 $accountType = $_GET['type'] ?? 'student';
 
+// Debug: Check what account type we're viewing
+// echo "Current account type: " . $accountType;
+
 // Fetch accounts based on type
 switch ($accountType) {
     case 'registrar':
@@ -120,7 +123,7 @@ input[type=number] { -moz-appearance: textfield; }
             <tbody id="accountTable" class="divide-y divide-gray-200">
                 <?php if ($result && $result->num_rows > 0): ?>
                     <?php while ($row = $result->fetch_assoc()): ?>
-                        <tr class="hover:bg-[#FBB917]/20 transition">
+                        <tr class="hover:bg-[#FBB917]/20 transition <?= $accountType === 'student' ? 'cursor-pointer' : '' ?>" <?= $accountType === 'student' ? 'onclick="viewStudent(\'' . htmlspecialchars($row['id_number']) . '\');"' : '' ?>>
                             <?php foreach ($row as $value): ?>
                                 <td class="px-4 py-3"><?= htmlspecialchars($value) ?></td>
                             <?php endforeach; ?>
@@ -147,20 +150,27 @@ input[type=number] { -moz-appearance: textfield; }
 <?php include("Accounts/add_student.php"); ?>
 
 <script>
+// Define viewStudent function at global scope immediately
+window.viewStudent = function(studentId) {
+    console.log('Clicked student ID:', studentId);
+    console.log('Navigating to:', `Accounts/view_student.php?id=${studentId}`);
+    window.location.href = `Accounts/view_student.php?id=${studentId}`;
+};
+
 // Show success notification with animation
-const notif = document.getElementById("notif");
-if (notif) {
+const notificationElement = document.getElementById("notif");
+if (notificationElement) {
     // Show notification with slide-in effect
     setTimeout(() => {
-        notif.style.transform = 'translateX(0)';
-        notif.style.opacity = '1';
+        notificationElement.style.transform = 'translateX(0)';
+        notificationElement.style.opacity = '1';
     }, 100);
     
     // Hide after 4 seconds with fade out
     setTimeout(() => {
-        notif.style.opacity = '0';
-        notif.style.transform = 'translateX(100px)';
-        setTimeout(() => notif.remove(), 300);
+        notificationElement.style.opacity = '0';
+        notificationElement.style.transform = 'translateX(100px)';
+        setTimeout(() => notificationElement.remove(), 300);
     }, 4000);
 }
 
@@ -184,6 +194,8 @@ function updateEntries() {
 showEntriesInput.addEventListener('input', updateEntries);
 searchInput.addEventListener('input', updateEntries);
 updateEntries();
+
+// Remove duplicate function definition since it's now at the top
 </script>
 </body>
 </html>

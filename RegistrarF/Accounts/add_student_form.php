@@ -269,26 +269,7 @@
 </style>
 
 <script>
-function changeType(type){ window.location.href = `AccountList.php?type=${type}`; }
-
-const searchInput = document.getElementById('searchInput');
-const showEntriesInput = document.getElementById('showEntries');
-let tableRows = Array.from(document.querySelectorAll('#accountTable tr'));
-
-function updateEntries() {
-    const value = parseInt(showEntriesInput.value) || tableRows.length;
-    let shown = 0;
-    tableRows.forEach(row => row.style.display = '');
-    const query = searchInput.value.toLowerCase().trim();
-    tableRows.forEach(row => { if (!row.textContent.toLowerCase().includes(query)) row.style.display='none'; });
-    shown = 0;
-    tableRows.forEach(row => {
-        if(row.style.display !== 'none'){ if(shown<value) row.style.display=''; else row.style.display='none'; shown++; }
-    });
-}
-showEntriesInput.addEventListener('input', updateEntries);
-searchInput.addEventListener('input', updateEntries);
-updateEntries();
+// Remove duplicate JavaScript code that's already in AccountList.php
 
 function openModal(){ 
     document.getElementById('addStudentModal').classList.remove('hidden'); 
