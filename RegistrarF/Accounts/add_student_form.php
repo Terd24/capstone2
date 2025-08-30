@@ -5,18 +5,49 @@
 </div>
 <?php endif; ?>
 
-<!-- Add Student Modal -->
-<div id="addStudentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+<!-- Add Account Modal -->
+<div id="addAccountModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 <?= $show_modal ? '' : 'hidden' ?>">
     <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-gray-200 transform transition-all scale-95" id="modalContent">
         
         <!-- Header -->
 <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#1E4D92] text-white">
-    <h2 class="text-lg font-semibold">Add New Student</h2>
+    <h2 class="text-lg font-semibold">Add New Account</h2>
     <button onclick="closeModal()" class="text-2xl font-bold hover:text-gray-300">&times;</button>
 </div>
 
-        <!-- Form -->
-        <form id="studentForm" action="AccountList.php" method="POST" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+        <!-- Account Type Selection -->
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <label class="block text-sm font-semibold mb-2">Select Account Type *</label>
+            <select id="accountType" onchange="showAccountForm()" class="w-full max-w-md border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" required>
+                <option value="">-- Choose Account Type to Create --</option>
+                <option value="student" <?= ($form_data['account_type'] ?? '') === 'student' ? 'selected' : '' ?>>Student Account</option>
+                <option value="registrar" <?= ($form_data['account_type'] ?? '') === 'registrar' ? 'selected' : '' ?>>Registrar Account</option>
+            </select>
+            <p class="text-sm text-gray-600 mt-1">Please select the type of account you want to create</p>
+        </div>
+
+        <!-- No Selection Message -->
+        <div id="noSelectionMessage" class="px-6 py-12 text-center" style="display: block;">
+            <div class="max-w-md mx-auto">
+                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">Select Account Type</h3>
+                <p class="text-gray-500">Choose the type of account you want to create from the dropdown above to get started.</p>
+            </div>
+        </div>
+
+        <!-- Error Messages -->
+        <?php if (!empty($error_msg)): ?>
+            <div class="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <?= $error_msg ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Student Form -->
+        <div id="studentForm" class="account-form hidden">
+            <form method="POST" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+                <input type="hidden" name="account_type" value="student">
 
             <!-- Row: LRN and Student ID -->
             <div class="col-span-3 grid grid-cols-3 gap-6">
@@ -254,11 +285,16 @@
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
                 <button type="button" onclick="closeModal()" class="px-5 py-2 border border-[#1E4D92] text-[#1E4D92] rounded-xl hover:bg-[#1E4D92] hover:text-white transition">Cancel</button>
                 <button type="submit" id="submitBtn" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">
-                    <span id="submitText">Add Student</span>
+                    <span id="submitText">Create Student Account</span>
                     <span id="submitLoader" class="hidden">Processing...</span>
                 </button>
             </div>
         </form>
+        </div>
+
+        <!-- Include Registrar Form -->
+        <?php include("add_registrar_form.php"); ?>
+
     </div>
 </div>
 
@@ -271,13 +307,40 @@
 <script>
 // Remove duplicate JavaScript code that's already in AccountList.php
 
+// Show/hide account forms based on selection
+function showAccountForm() {
+    const accountType = document.getElementById('accountType').value;
+    const studentForm = document.getElementById('studentForm');
+    const registrarForm = document.getElementById('registrarForm');
+    const noSelectionMessage = document.getElementById('noSelectionMessage');
+    
+    // Hide all forms and message first
+    studentForm.style.display = 'none';
+    registrarForm.style.display = 'none';
+    noSelectionMessage.style.display = 'none';
+    
+    // Show selected form or default message
+    if (accountType === 'student') {
+        studentForm.style.display = 'block';
+    } else if (accountType === 'registrar') {
+        registrarForm.style.display = 'block';
+    } else {
+        // No selection - show the message
+        noSelectionMessage.style.display = 'block';
+    }
+}
+
 function openModal(){ 
-    document.getElementById('addStudentModal').classList.remove('hidden'); 
+    document.getElementById('addAccountModal').classList.remove('hidden'); 
     document.getElementById('modalContent').classList.remove('scale-95');
     document.getElementById('modalContent').classList.add('scale-100');
+    
+    // Reset to show selection message when modal opens
+    document.getElementById('accountType').value = '';
+    showAccountForm();
 }
 function closeModal(){ 
-    document.getElementById('addStudentModal').classList.add('hidden'); 
+    document.getElementById('addAccountModal').classList.add('hidden'); 
 }
 function toggleNewOptions() {
   const newOptions = document.getElementById("newOptions");
@@ -330,90 +393,105 @@ window.addEventListener('load', function() {
     if (savedTrack) {
         populateGradeLevels(savedTrack, savedGrade);
     }
+    
+    // Initialize form display based on saved account type or show selection message
+    const savedAccountType = '<?= $form_data["account_type"] ?? "" ?>';
+    if (savedAccountType) {
+        document.getElementById('accountType').value = savedAccountType;
+        showAccountForm();
+    } else {
+        // Default to showing no selection message
+        showAccountForm(); // This will show the "Select Account Type" message
+    }
 });
 
 // Add client-side validation to prevent page flicker
-document.getElementById('studentForm').addEventListener('submit', function(e) {
-    const studentId = document.querySelector('input[name="id_number"]').value.trim();
-    const rfidUid = document.querySelector('input[name="rfid_uid"]').value.trim();
-    
-    if (!studentId || !rfidUid) {
-        return; // Let normal validation handle empty fields
+document.addEventListener('DOMContentLoaded', function() {
+    const studentFormElement = document.getElementById('studentForm');
+    if (studentFormElement) {
+        studentFormElement.addEventListener('submit', function(e) {
+            const studentId = document.querySelector('input[name="id_number"]').value.trim();
+            const rfidUid = document.querySelector('input[name="rfid_uid"]').value.trim();
+            
+            if (!studentId || !rfidUid) {
+                return; // Let normal validation handle empty fields
+            }
+            
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const submitText = document.getElementById('submitText');
+            const submitLoader = document.getElementById('submitLoader');
+            
+            submitBtn.disabled = true;
+            submitText.classList.add('hidden');
+            submitLoader.classList.remove('hidden');
+            
+            // Check for duplicates via AJAX
+            const formData = new FormData();
+            formData.append('check_duplicates', '1');
+            formData.append('id_number', studentId);
+            formData.append('rfid_uid', rfidUid);
+            
+            fetch('Accounts/check_duplicates.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error_id || data.error_rfid) {
+                    e.preventDefault();
+                    
+                    // Show errors without page reload
+                    if (data.error_id) {
+                        const idField = document.querySelector('input[name="id_number"]');
+                        idField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+                        idField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
+                        
+                        let errorMsg = idField.parentNode.querySelector('.text-red-500');
+                        if (!errorMsg) {
+                            errorMsg = document.createElement('p');
+                            errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
+                            idField.parentNode.appendChild(errorMsg);
+                        }
+                        errorMsg.textContent = data.error_id;
+                    }
+                    
+                    if (data.error_rfid) {
+                        const rfidField = document.querySelector('input[name="rfid_uid"]');
+                        rfidField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+                        rfidField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
+                        
+                        let errorMsg = rfidField.parentNode.querySelector('.text-red-500');
+                        if (!errorMsg) {
+                            errorMsg = document.createElement('p');
+                            errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
+                            rfidField.parentNode.appendChild(errorMsg);
+                        }
+                        errorMsg.textContent = data.error_rfid;
+                    }
+                    
+                    // Scroll to first error
+                    const firstError = document.querySelector('.border-red-500');
+                    if (firstError) {
+                        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstError.focus();
+                    }
+                }
+                
+                // Reset button state
+                submitBtn.disabled = false;
+                submitText.classList.remove('hidden');
+                submitLoader.classList.add('hidden');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Reset button state and allow normal form submission
+                submitBtn.disabled = false;
+                submitText.classList.remove('hidden');
+                submitLoader.classList.add('hidden');
+            });
+        });
     }
-    
-    // Show loading state
-    const submitBtn = document.getElementById('submitBtn');
-    const submitText = document.getElementById('submitText');
-    const submitLoader = document.getElementById('submitLoader');
-    
-    submitBtn.disabled = true;
-    submitText.classList.add('hidden');
-    submitLoader.classList.remove('hidden');
-    
-    // Check for duplicates via AJAX
-    const formData = new FormData();
-    formData.append('check_duplicates', '1');
-    formData.append('id_number', studentId);
-    formData.append('rfid_uid', rfidUid);
-    
-    fetch('Accounts/check_duplicates.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error_id || data.error_rfid) {
-            e.preventDefault();
-            
-            // Show errors without page reload
-            if (data.error_id) {
-                const idField = document.querySelector('input[name="id_number"]');
-                idField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
-                idField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
-                
-                let errorMsg = idField.parentNode.querySelector('.text-red-500');
-                if (!errorMsg) {
-                    errorMsg = document.createElement('p');
-                    errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
-                    idField.parentNode.appendChild(errorMsg);
-                }
-                errorMsg.textContent = data.error_id;
-            }
-            
-            if (data.error_rfid) {
-                const rfidField = document.querySelector('input[name="rfid_uid"]');
-                rfidField.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
-                rfidField.classList.remove('border-gray-300', 'focus:ring-[#2F8D46]');
-                
-                let errorMsg = rfidField.parentNode.querySelector('.text-red-500');
-                if (!errorMsg) {
-                    errorMsg = document.createElement('p');
-                    errorMsg.className = 'text-red-500 text-sm mt-1 font-medium';
-                    rfidField.parentNode.appendChild(errorMsg);
-                }
-                errorMsg.textContent = data.error_rfid;
-            }
-            
-            // Scroll to first error
-            const firstError = document.querySelector('.border-red-500');
-            if (firstError) {
-                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                firstError.focus();
-            }
-        }
-        
-        // Reset button state
-        submitBtn.disabled = false;
-        submitText.classList.remove('hidden');
-        submitLoader.classList.add('hidden');
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        // Reset button state and allow normal form submission
-        submitBtn.disabled = false;
-        submitText.classList.remove('hidden');
-        submitLoader.classList.add('hidden');
-    });
 });
 
 // Clear error styling only when user enters valid data
@@ -459,9 +537,16 @@ if (notif) {
 // Handle validation errors
 <?php if (!empty($error_id) || !empty($error_rfid) || !empty($error_msg) || $show_modal): ?>
 // Show modal if there are errors
-document.getElementById('addStudentModal').classList.remove('hidden');
+document.getElementById('addAccountModal').classList.remove('hidden');
 document.getElementById('modalContent').classList.remove('scale-95');
 document.getElementById('modalContent').classList.add('scale-100');
+
+// Show the appropriate form based on account type
+const accountType = '<?= $form_data['account_type'] ?? '' ?>';
+if (accountType) {
+    document.getElementById('accountType').value = accountType;
+    showAccountForm();
+}
 
 // Scroll to first error field
 setTimeout(() => {

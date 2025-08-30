@@ -208,8 +208,14 @@ input[type=number] { -moz-appearance: textfield; }
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Grade Level</label>
-                <input type="text" name="grade_level" value="<?= htmlspecialchars($student_data['grade_level'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                <select id="gradeLevel" name="grade_level" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                    <option value="">-- Select Grade Level --</option>
+                    <?php if (!empty($student_data['grade_level'])): ?>
+                        <option value="<?= htmlspecialchars($student_data['grade_level']) ?>" selected><?= htmlspecialchars($student_data['grade_level']) ?></option>
+                    <?php endif; ?>
+                </select>
             </div>
+
             <div>
                 <label class="block text-sm font-semibold mb-1">Semester</label>
                 <select name="semester" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
@@ -365,6 +371,56 @@ input[type=number] { -moz-appearance: textfield; }
 </div>
 
 <script>
+// Grade level options mapping
+const gradeOptions = {
+    "Elementary": ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
+    "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
+    "Senior High School Strands": ["Grade 11", "Grade 12"],
+    "STEM": ["Grade 11", "Grade 12"],
+    "ABM": ["Grade 11", "Grade 12"],
+    "HUMSS": ["Grade 11", "Grade 12"],
+    "GAS": ["Grade 11", "Grade 12"],
+    "TVL": ["Grade 11", "Grade 12"],
+    "Arts and Design": ["Grade 11", "Grade 12"],
+    "BS Information Technology": ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+    "BS Computer Science": ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+    "BS Business Administration": ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+    "BS Accountancy": ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+    "BS Hospitality Management": ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+    "BS Education": ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+};
+
+function updateGradeLevels() {
+    const academicTrack = document.querySelector('select[name="academic_track"]');
+    const gradeLevel = document.getElementById('gradeLevel');
+    
+    if (!academicTrack || !gradeLevel) return;
+    
+    const selectedTrack = academicTrack.value;
+    const selectedGrade = gradeLevel.value;
+    
+    // Get the optgroup label if it exists
+    const selected = selectedTrack ? academicTrack.options[academicTrack.selectedIndex].parentNode.label : '';
+    const course = selectedTrack;
+    
+    gradeLevel.innerHTML = '<option value="">-- Select Grade Level --</option>';
+    
+    let levels = [];
+    if (gradeOptions[selected]) {
+        levels = gradeOptions[selected];
+    } else if (gradeOptions[course]) {
+        levels = gradeOptions[course];
+    }
+    
+    levels.forEach(level => {
+        const option = document.createElement('option');
+        option.value = level;
+        option.textContent = level;
+        if (level === selectedGrade) option.selected = true;
+        gradeLevel.appendChild(option);
+    });
+}
+
 function toggleEdit() {
     const editBtn = document.getElementById('editBtn');
     const saveBtn = document.getElementById('saveBtn');
@@ -404,8 +460,21 @@ function toggleEdit() {
                 field.disabled = false;
             }
         });
+        
+        // Update grade levels when entering edit mode
+        updateGradeLevels();
     }
 }
+
+// Initialize grade levels on page load and add event listener
+document.addEventListener('DOMContentLoaded', function() {
+    updateGradeLevels();
+    
+    const academicTrack = document.querySelector('select[name="academic_track"]');
+    if (academicTrack) {
+        academicTrack.addEventListener('change', updateGradeLevels);
+    }
+});
 </script>
 
 </body>

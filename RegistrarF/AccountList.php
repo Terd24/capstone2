@@ -10,7 +10,7 @@ if (!isset($_SESSION['registrar_id'])) {
 
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    include("Accounts/add_student.php");
+    include("Accounts/add_account.php");
 }
 
 // Handle success message from add_student.php
@@ -91,23 +91,15 @@ input[type=number] { -moz-appearance: textfield; }
             <input type="number" id="showEntries" min="1" value="10" class="w-20 border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#C41E3A]"/>
         </div>
 
-        <div class="flex items-center">
-            <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#0B2C62]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1110.5 3a7.5 7.5 0 016.15 13.65z" />
-                    </svg>
-                </span>
-                <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-64 border border-[#0B2C62]/40 rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-[#C41E3A]"/>
-            </div>
+        <div class="flex items-center gap-3">
+            <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-64 border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#C41E3A]"/>
+            <button onclick="openModal()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg shadow hover:bg-[#256f37] transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add Account
+            </button>
         </div>
-
-        <?php if($accountType==='student'): ?>
-        <button onclick="openModal()" class="bg-[#2F8D46] text-white px-5 py-2 rounded-xl shadow hover:bg-[##2F8D46] transition">
-            + Add Student
-        </button>
-        <?php endif; ?>
     </div>
 
     <!-- Accounts Table -->
@@ -147,7 +139,7 @@ input[type=number] { -moz-appearance: textfield; }
 <?php endif; ?>
 
 <!-- Include Modal -->
-<?php include("Accounts/add_student.php"); ?>
+<?php include("Accounts/add_account.php"); ?>
 
 <script>
 // Define viewStudent function at global scope immediately
