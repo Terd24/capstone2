@@ -14,14 +14,15 @@
     <h2 class="text-lg font-semibold">Add New Student</h2>
     <button onclick="closeModal()" class="text-2xl font-bold hover:text-gray-300">&times;</button>
 </div>
+
         <!-- Form -->
-        <form action="AccountList.php" method="POST" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+        <form id="studentForm" action="AccountList.php" method="POST" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
 
             <!-- Row: LRN and Student ID -->
             <div class="col-span-3 grid grid-cols-3 gap-6">
                 <div>
                     <label class="block text-sm font-semibold mb-1">LRN</label>
-                    <input type="number" name="lrn" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="number" name="lrn" required value="<?= htmlspecialchars($form_data['lrn'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
      <div>
   <label class="block text-sm font-semibold mb-1">Academic Track / Course</label>
@@ -29,31 +30,31 @@
       <option value="">-- Select Academic Track / Course --</option>
       
         <optgroup label="Elementary">
-          <option value="Elementary">Elementary</option>
+          <option value="Elementary" <?= ($form_data['academic_track'] ?? '') === 'Elementary' ? 'selected' : '' ?>>Elementary</option>
       </optgroup>
       <!-- Junior High -->
       <optgroup label="Junior High School">
-          <option value="Junior High School">Junior High School</option>
+          <option value="Junior High School" <?= ($form_data['academic_track'] ?? '') === 'Junior High School' ? 'selected' : '' ?>>Junior High School</option>
       </optgroup>
 
       <!-- Senior High -->
       <optgroup label="Senior High School Strands">
-          <option value="STEM">STEM (Science, Technology, Engineering & Mathematics)</option>
-          <option value="ABM">ABM (Accountancy, Business & Management)</option>
-          <option value="HUMSS">HUMSS (Humanities & Social Sciences)</option>
-          <option value="GAS">GAS (General Academic Strand)</option>
-          <option value="TVL">TVL (Technical-Vocational-Livelihood)</option>
-          <option value="Arts and Design">Arts and Design</option>
+          <option value="STEM" <?= ($form_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
+          <option value="ABM" <?= ($form_data['academic_track'] ?? '') === 'ABM' ? 'selected' : '' ?>>ABM (Accountancy, Business & Management)</option>
+          <option value="HUMSS" <?= ($form_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
+          <option value="GAS" <?= ($form_data['academic_track'] ?? '') === 'GAS' ? 'selected' : '' ?>>GAS (General Academic Strand)</option>
+          <option value="TVL" <?= ($form_data['academic_track'] ?? '') === 'TVL' ? 'selected' : '' ?>>TVL (Technical-Vocational-Livelihood)</option>
+          <option value="Arts and Design" <?= ($form_data['academic_track'] ?? '') === 'Arts and Design' ? 'selected' : '' ?>>Arts and Design</option>
       </optgroup>
 
       <!-- College -->
       <optgroup label="College Courses">
-          <option value="BS Information Technology">BS Information Technology</option>
-          <option value="BS Computer Science">BS Computer Science</option>
-          <option value="BS Business Administration">BS Business Administration</option>
-          <option value="BS Accountancy">BS Accountancy</option>
-          <option value="BS Hospitality Management">BS Hospitality Management</option>
-          <option value="BS Education">BS Education</option>
+          <option value="BS Information Technology" <?= ($form_data['academic_track'] ?? '') === 'BS Information Technology' ? 'selected' : '' ?>>BS Information Technology</option>
+          <option value="BS Computer Science" <?= ($form_data['academic_track'] ?? '') === 'BS Computer Science' ? 'selected' : '' ?>>BS Computer Science</option>
+          <option value="BS Business Administration" <?= ($form_data['academic_track'] ?? '') === 'BS Business Administration' ? 'selected' : '' ?>>BS Business Administration</option>
+          <option value="BS Accountancy" <?= ($form_data['academic_track'] ?? '') === 'BS Accountancy' ? 'selected' : '' ?>>BS Accountancy</option>
+          <option value="BS Hospitality Management" <?= ($form_data['academic_track'] ?? '') === 'BS Hospitality Management' ? 'selected' : '' ?>>BS Hospitality Management</option>
+          <option value="BS Education" <?= ($form_data['academic_track'] ?? '') === 'BS Education' ? 'selected' : '' ?>>BS Education</option>
       </optgroup>
   </select>
 </div>
@@ -62,20 +63,20 @@
   <label class="block text-sm font-semibold mb-1">Enrollment Status</label>
   <div class="flex items-center gap-6 mt-1">
     <label class="flex items-center gap-2">
-      <input type="radio" name="enrollment_status" value="OLD" onchange="toggleNewOptions()"> OLD
+      <input type="radio" name="enrollment_status" value="OLD" <?= ($form_data['enrollment_status'] ?? '') === 'OLD' ? 'checked' : '' ?> onchange="toggleNewOptions()"> OLD
     </label>
     <label class="flex items-center gap-2">
-      <input type="radio" name="enrollment_status" value="NEW" onchange="toggleNewOptions()"> NEW
+      <input type="radio" name="enrollment_status" value="NEW" <?= ($form_data['enrollment_status'] ?? '') === 'NEW' ? 'checked' : '' ?> onchange="toggleNewOptions()"> NEW
     </label>
   </div>
 
   <!-- Hidden extra options (only for NEW) -->
-  <div id="newOptions" class="flex items-center gap-6 mt-3 hidden ml-4">
+  <div id="newOptions" class="flex items-center gap-6 mt-3 <?= ($form_data['enrollment_status'] ?? '') === 'NEW' ? '' : 'hidden' ?> ml-4">
     <label class="flex items-center gap-2">
-      <input type="radio" name="school_type" value="PUBLIC"> Public
+      <input type="radio" name="school_type" value="PUBLIC" <?= ($form_data['school_type'] ?? '') === 'PUBLIC' ? 'checked' : '' ?>> Public
     </label>
     <label class="flex items-center gap-2">
-      <input type="radio" name="school_type" value="PRIVATE"> Private
+      <input type="radio" name="school_type" value="PRIVATE" <?= ($form_data['school_type'] ?? '') === 'PRIVATE' ? 'checked' : '' ?>> Private
     </label>
   </div>
 </div>
@@ -85,66 +86,70 @@
             <div class="col-span-3 grid grid-cols-3 gap-6">
                 <div>
                     <label class="block text-sm font-semibold mb-1">Last Name</label>
-                    <input type="text" name="last_name" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="last_name" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">First Name</label>
-                    <input type="text" name="first_name" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="first_name" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">Middle Name</label>
-                    <input type="text" name="middle_name" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="middle_name" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
             </div>
 
             <!-- Other Student Info -->           
              <div>
                 <label class="block text-sm font-semibold mb-1">School Year</label>
-                <input type="text" name="school_year" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                <input type="text" name="school_year" required value="<?= htmlspecialchars($form_data['school_year'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Grade Level</label>
                 <select id="gradeLevel" name="grade_level" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                     <option value="">-- Select Grade Level --</option>
+                    <?php if (!empty($form_data['grade_level'])): ?>
+                        <option value="<?= htmlspecialchars($form_data['grade_level']) ?>" selected><?= htmlspecialchars($form_data['grade_level']) ?></option>
+                    <?php endif; ?>
                 </select>
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Semester</label>
                 <select name="semester" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                     <option value="">Select Term</option>
-                    <option value="1st">1st Term</option>
-                    <option value="2nd">2nd Term</option>
+                    <option value="1st" <?= ($form_data['semester'] ?? '') === '1st' ? 'selected' : '' ?>>1st Term</option>
+                    <option value="2nd" <?= ($form_data['semester'] ?? '') === '2nd' ? 'selected' : '' ?>>2nd Term</option>
                 </select>
             </div>
             
             <div>
                 <label class="block text-sm font-semibold mb-1">Date of Birth</label>
-                <input type="date" name="dob" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                <input type="date" name="dob" required value="<?= htmlspecialchars($form_data['dob'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Birthplace</label>
-                <input type="text" name="birthplace" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                <input type="text" name="birthplace" required value="<?= htmlspecialchars($form_data['birthplace'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
             </div>
                       <div>
                 <label class="block text-sm font-semibold mb-1">Gender</label>
                 <div class="flex items-center gap-6 mt-1">
-                    <label class="flex items-center gap-2"><input type="radio" name="gender" value="M" required> Male</label>
-                    <label class="flex items-center gap-2"><input type="radio" name="gender" value="F" required> Female</label>
+                    <label class="flex items-center gap-2"><input type="radio" name="gender" value="M" <?= ($form_data['gender'] ?? '') === 'M' ? 'checked' : '' ?> required> Male</label>
+                    <label class="flex items-center gap-2"><input type="radio" name="gender" value="F" <?= ($form_data['gender'] ?? '') === 'F' ? 'checked' : '' ?> required> Female</label>
                 </div>
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Religion</label>
-                <input type="text" name="religion" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                <input type="text" name="religion" required value="<?= htmlspecialchars($form_data['religion'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
             </div>
 
                             <!-- Credentials -->
                 <div>
                     <label class="block text-sm font-semibold mb-1">Credentials Submitted</label>
                     <div class="grid grid-cols-2 gap-y-2 text-sm ml-2">
-                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="F-138"> <span>F-138</span></label>
-                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="Good Moral"> <span>Good Moral</span></label>
-                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="PSA Birth"> <span>PSA Birth</span></label>
-                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="ESC Certification"> <span>ESC Certification</span></label>
+                        <?php $saved_credentials = $form_data['credentials'] ?? []; ?>
+                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="F-138" <?= in_array('F-138', $saved_credentials) ? 'checked' : '' ?>> <span>F-138</span></label>
+                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="Good Moral" <?= in_array('Good Moral', $saved_credentials) ? 'checked' : '' ?>> <span>Good Moral</span></label>
+                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="PSA Birth" <?= in_array('PSA Birth', $saved_credentials) ? 'checked' : '' ?>> <span>PSA Birth</span></label>
+                        <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="ESC Certification" <?= in_array('ESC Certification', $saved_credentials) ? 'checked' : '' ?>> <span>ESC Certification</span></label>
                     </div>
                 </div>
 
@@ -152,8 +157,8 @@
     <div>
         <label class="block text-sm font-semibold mb-1">Mode of Payment</label>
         <div class="flex items-center gap-6 mt-1">
-            <label class="flex items-center gap-2"><input type="radio" name="payment_mode" value="Cash" required> Cash</label>
-            <label class="flex items-center gap-2"><input type="radio" name="payment_mode" value="Installment" required> Installment</label>
+            <label class="flex items-center gap-2"><input type="radio" name="payment_mode" value="Cash" <?= ($form_data['payment_mode'] ?? '') === 'Cash' ? 'checked' : '' ?> required> Cash</label>
+            <label class="flex items-center gap-2"><input type="radio" name="payment_mode" value="Installment" <?= ($form_data['payment_mode'] ?? '') === 'Installment' ? 'checked' : '' ?> required> Installment</label>
         </div>
     </div>
 </div>
@@ -163,7 +168,7 @@
                 <!-- Complete Address -->
                 <div>
                     <label class="block text-sm font-semibold mb-1">Complete Address</label>
-                    <textarea name="address" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]"></textarea>
+                    <textarea name="address" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
                 </div>
             </div>
 
@@ -171,23 +176,23 @@
             <div class="col-span-3 space-y-6">
                 <h3 class="font-semibold mt-4">Father's Info</h3>
                 <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="father_name" placeholder="Name" required class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="father_occupation" placeholder="Occupation" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="father_contact" placeholder="Contact No." class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="father_name" placeholder="Name" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
 
                 <h3 class="font-semibold mt-4">Mother's Info</h3>
                 <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="mother_name" placeholder="Name" required class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="mother_occupation" placeholder="Occupation" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="mother_contact" placeholder="Contact No." class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="mother_name" placeholder="Name" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
 
                 <h3 class="font-semibold mt-4">Guardian's Info</h3>
                 <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="guardian_name" placeholder="Name" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="guardian_occupation" placeholder="Occupation" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                    <input type="text" name="guardian_contact" placeholder="Contact No." class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="guardian_name" placeholder="Name" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
             </div>
 
@@ -195,11 +200,11 @@
             <div class="col-span-3 grid grid-cols-2 gap-6 mt-4">
                 <div>
                     <label class="block text-sm font-semibold mb-1">Last School Attended</label>
-                    <input type="text" name="last_school" placeholder="School Name" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="last_school" placeholder="School Name" value="<?= htmlspecialchars($form_data['last_school'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">School Year</label>
-                    <input type="text" name="school_year" placeholder="School Year" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                    <input type="text" name="last_school_year" placeholder="School Year" value="<?= htmlspecialchars($form_data['last_school_year'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                 </div>
             </div>
             
@@ -216,16 +221,19 @@
         <label class="block text-sm font-semibold mb-1">Student ID</label>
         <input type="text" name="id_number" required
                value="<?= htmlspecialchars($old_id ?? '') ?>"
-               class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= $error_id ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
-        <?php if ($error_id): ?>
-            <p class="text-red-500 text-sm mt-1"><?= $error_id ?></p>
+               class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_id) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
+        <?php if (!empty($error_id)): ?>
+            <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_id) ?></p>
         <?php endif; ?>
     </div>
 
     <!-- Password -->
     <div>
         <label class="block text-sm font-semibold mb-1">Password</label>
-        <input type="password" name="password" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+        <div class="relative">
+            <input type="text" name="password" required value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+            <span class="absolute right-3 top-2 text-xs text-gray-500">Visible for verification</span>
+        </div>
     </div>
 
     <!-- RFID Number -->
@@ -233,9 +241,9 @@
         <label class="block text-sm font-semibold mb-1">RFID Number</label>
         <input type="text" name="rfid_uid" required
                value="<?= htmlspecialchars($old_rfid ?? '') ?>"
-               class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= $error_rfid ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
-        <?php if ($error_rfid): ?>
-            <p class="text-red-500 text-sm mt-1"><?= $error_rfid ?></p>
+               class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
+        <?php if (!empty($error_rfid)): ?>
+            <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
         <?php endif; ?>
     </div>
 </div>
@@ -244,7 +252,10 @@
             <!-- Submit Buttons -->
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
                 <button type="button" onclick="closeModal()" class="px-5 py-2 border border-[#1E4D92] text-[#1E4D92] rounded-xl hover:bg-[#1E4D92] hover:text-white transition">Cancel</button>
-                <button type="submit" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">Add Student</button>
+                <button type="submit" id="submitBtn" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">
+                    <span id="submitText">Add Student</span>
+                    <span id="submitLoader" class="hidden">Processing...</span>
+                </button>
             </div>
         </form>
     </div>
@@ -302,36 +313,75 @@ const gradeOptions = {
     "College Courses": ["1st Year", "2nd Year", "3rd Year", "4th Year"]
 };
 
-// Detect selection & update grade level
-academicTrack.addEventListener('change', function() {
-    const selected = academicTrack.options[academicTrack.selectedIndex].parentNode.label;
-    const course = academicTrack.value;
+// Function to populate grade levels
+function populateGradeLevels(selectedTrack, selectedGrade = '') {
+    const selected = selectedTrack ? academicTrack.options[academicTrack.selectedIndex].parentNode.label : '';
+    const course = selectedTrack;
 
     gradeLevel.innerHTML = '<option value="">-- Select Grade Level --</option>';
 
+    let levels = [];
     if (gradeOptions[selected]) {
-        gradeOptions[selected].forEach(level => {
-            let option = document.createElement("option");
-            option.value = level;
-            option.textContent = level;
-            gradeLevel.appendChild(option);
-        });
-    } 
-    // In case Elementary/Junior High/College is chosen directly without optgroup
-    else if (gradeOptions[course]) {
-        gradeOptions[course].forEach(level => {
-            let option = document.createElement("option");
-            option.value = level;
-            option.textContent = level;
-            gradeLevel.appendChild(option);
-        });
+        levels = gradeOptions[selected];
+    } else if (gradeOptions[course]) {
+        levels = gradeOptions[course];
+    }
+
+    levels.forEach(level => {
+        let option = document.createElement("option");
+        option.value = level;
+        option.textContent = level;
+        if (level === selectedGrade) option.selected = true;
+        gradeLevel.appendChild(option);
+    });
+}
+
+// Detect selection & update grade level
+academicTrack.addEventListener('change', function() {
+    populateGradeLevels(academicTrack.value);
+});
+
+// Initialize grade levels on page load if academic track is selected
+window.addEventListener('load', function() {
+    const savedTrack = '<?= $form_data["academic_track"] ?? "" ?>';
+    const savedGrade = '<?= $form_data["grade_level"] ?? "" ?>';
+    if (savedTrack) {
+        populateGradeLevels(savedTrack, savedGrade);
     }
 });
 </script>
 <script>
 const notif = document.getElementById("notif");
 if (notif) {
-    setTimeout(() => notif.classList.add("hidden"), 3000); // hide after 3 seconds
+    // Show notification with slide-in effect
+    setTimeout(() => {
+        notif.style.transform = 'translateX(0)';
+        notif.style.opacity = '1';
+    }, 100);
+    
+    // Hide after 4 seconds with fade out
+    setTimeout(() => {
+        notif.style.opacity = '0';
+        notif.style.transform = 'translateX(100px)';
+        setTimeout(() => notif.classList.add("hidden"), 300);
+    }, 4000);
 }
+
+// Handle validation errors
+<?php if (!empty($error_id) || !empty($error_rfid)): ?>
+// Show modal if there are errors
+document.getElementById('addStudentModal').classList.remove('hidden');
+document.getElementById('modalContent').classList.remove('scale-95');
+document.getElementById('modalContent').classList.add('scale-100');
+
+// Scroll to first error field
+setTimeout(() => {
+    const firstError = document.querySelector('.border-red-500');
+    if (firstError) {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstError.focus();
+    }
+}, 300);
+<?php endif; ?>
 </script>
 

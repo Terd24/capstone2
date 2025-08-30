@@ -8,8 +8,15 @@ if (!isset($_SESSION['registrar_id'])) {
     exit;
 }
 
+// Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    include("Accounts/add_student.php"); // Handles the form submission
+    include("Accounts/add_student.php");
+}
+
+// Handle success message from add_student.php
+$success_msg = $_SESSION['success_msg'] ?? '';
+if ($success_msg) {
+    unset($_SESSION['success_msg']);
 }
 
 
@@ -36,8 +43,8 @@ switch ($accountType) {
         break;
     default:
         // student
-        $result = $conn->query("SELECT id_number, full_name, program, year_section FROM student_account ORDER BY full_name ASC");
-        $columns = ['ID Number', 'Full Name','Program', 'Year & Section'];
+        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track, grade_level FROM students ORDER BY last_name ASC");
+        $columns = ['ID Number', 'Full Name','Academic Track', 'Grade Level'];
         break;
 }
 ?>
@@ -129,10 +136,34 @@ input[type=number] { -moz-appearance: textfield; }
     </div>
 </div>
 
+<!-- Success Notification -->
+<?php if (!empty($success_msg)): ?>
+<div id="notif" class="fixed top-4 right-4 bg-green-400 text-white px-4 py-2 rounded shadow-lg z-50 transform translate-x-full opacity-0 transition-all duration-300">
+    <?= htmlspecialchars($success_msg) ?>
+</div>
+<?php endif; ?>
+
 <!-- Include Modal -->
 <?php include("Accounts/add_student.php"); ?>
 
 <script>
+// Show success notification with animation
+const notif = document.getElementById("notif");
+if (notif) {
+    // Show notification with slide-in effect
+    setTimeout(() => {
+        notif.style.transform = 'translateX(0)';
+        notif.style.opacity = '1';
+    }, 100);
+    
+    // Hide after 4 seconds with fade out
+    setTimeout(() => {
+        notif.style.opacity = '0';
+        notif.style.transform = 'translateX(100px)';
+        setTimeout(() => notif.remove(), 300);
+    }, 4000);
+}
+
 function changeType(type){ window.location.href = `AccountList.php?type=${type}`; }
 
 const searchInput = document.getElementById('searchInput');

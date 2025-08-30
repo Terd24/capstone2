@@ -6,6 +6,7 @@ $error_id = "";
 $error_rfid = "";
 $old_id = "";
 $old_rfid = "";
+$success_msg = "";
 
 // Check if DB connection exists
 if (!$conn) {
@@ -14,7 +15,7 @@ if (!$conn) {
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // Safely collect form data with defaults
+    // Safely collect form data with defaults and preserve for form repopulation
     $lrn = $_POST['lrn'] ?? '';
     $academic_track = $_POST['academic_track'] ?? '';
     $enrollment_status = $_POST['enrollment_status'] ?? '';
@@ -51,34 +52,43 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $guardian_contact = $_POST['guardian_contact'] ?? '';
 
     $last_school = $_POST['last_school'] ?? '';
-    $last_school_year = $_POST['school_year'] ?? '';
+    $last_school_year = $_POST['last_school_year'] ?? '';
 
     $id_number = $_POST['id_number'] ?? '';
     $password = password_hash($_POST['password'] ?? '', PASSWORD_DEFAULT);
     $rfid_uid = $_POST['rfid_uid'] ?? '';
 
+    // Store all form data for repopulation
+    $form_data = $_POST;
+
     $old_id = $id_number;
     $old_rfid = $rfid_uid;
 
-    // Check duplicates
-    $check_id = $conn->prepare("SELECT id_number FROM students WHERE id_number=?");
-    $check_id->bind_param("s", $id_number);
-    $check_id->execute();
-    $check_id->store_result();
-    if ($check_id->num_rows > 0) {
-        $error_id = "Student ID already in use!";
+    // Check duplicates - only if values are not empty
+    if (!empty($id_number)) {
+        $check_id = $conn->prepare("SELECT id_number FROM students WHERE id_number=?");
+        $check_id->bind_param("s", $id_number);
+        $check_id->execute();
+        $check_id->store_result();
+        if ($check_id->num_rows > 0) {
+            $error_id = "Student ID already in use!";
+        }
+        $check_id->close();
     }
 
-    $check_rfid = $conn->prepare("SELECT rfid_uid FROM students WHERE rfid_uid=?");
-    $check_rfid->bind_param("s", $rfid_uid);
-    $check_rfid->execute();
-    $check_rfid->store_result();
-    if ($check_rfid->num_rows > 0) {
-        $error_rfid = "RFID already in use!";
+    if (!empty($rfid_uid)) {
+        $check_rfid = $conn->prepare("SELECT rfid_uid FROM students WHERE rfid_uid=?");
+        $check_rfid->bind_param("s", $rfid_uid);
+        $check_rfid->execute();
+        $check_rfid->store_result();
+        if ($check_rfid->num_rows > 0) {
+            $error_rfid = "RFID already in use!";
+        }
+        $check_rfid->close();
     }
 
     // Only insert if no errors
-    if (!$error_id && !$error_rfid) {
+    if (empty($error_id) && empty($error_rfid)) {
         $sql = "INSERT INTO students (
             lrn, academic_track, enrollment_status, school_type,
             last_name, first_name, middle_name, 
@@ -108,10 +118,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         );
 
         if ($stmt->execute()) {
-            echo "<script>alert('Student Added Successfully!'); window.location='AccountList.php';</script>";
+            $_SESSION['success_msg'] = "Student account created successfully!";
+            // Redirect to AccountList.php to show success message
+            header("Location: AccountList.php?type=student");
             exit;
         } else {
-            echo "Database error: " . $stmt->error;
+            echo "<div class='bg-red-500 text-white px-4 py-2 rounded mb-4'>Database error: " . $stmt->error . "</div>";
         }
     }
 }
