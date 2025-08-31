@@ -12,8 +12,8 @@ $registrar_id = $_GET['id'] ?? '';
 $registrar_data = null;
 
 if (!empty($registrar_id)) {
-    $stmt = $conn->prepare("SELECT * FROM registrar WHERE registrar_id = ?");
-    $stmt->bind_param("i", $registrar_id);
+    $stmt = $conn->prepare("SELECT * FROM registrar_account WHERE id_number = ?");
+    $stmt->bind_param("s", $registrar_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $registrar_data = $result->fetch_assoc();
@@ -31,21 +31,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_registrar'])) {
     $address = $_POST['address'] ?? '';
     $id_number = $_POST['id_number'] ?? '';
     $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
 
     // Update registrar record
-    $update_sql = "UPDATE registrar SET 
-        last_name = ?, first_name = ?, middle_name = ?, 
-        dob = ?, birthplace = ?, gender = ?, address = ?,
-        id_number = ?, username = ?
-        WHERE registrar_id = ?";
-
-    $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param(
-        "sssssssssi",
-        $last_name, $first_name, $middle_name,
-        $dob, $birthplace, $gender, $address,
-        $id_number, $username, $registrar_id
-    );
+    if (!empty($password)) {
+        // Update with new password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $update_sql = "UPDATE registrar_account SET 
+            last_name = ?, first_name = ?, middle_name = ?, 
+            dob = ?, birthplace = ?, gender = ?, address = ?,
+            id_number = ?, username = ?, password = ?
+            WHERE id_number = ?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param(
+            "sssssssssss",
+            $last_name, $first_name, $middle_name,
+            $dob, $birthplace, $gender, $address,
+            $id_number, $username, $hashed_password, $registrar_id
+        );
+    } else {
+        // Update without changing password
+        $update_sql = "UPDATE registrar_account SET 
+            last_name = ?, first_name = ?, middle_name = ?, 
+            dob = ?, birthplace = ?, gender = ?, address = ?,
+            id_number = ?, username = ?
+            WHERE id_number = ?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param(
+            "ssssssssss",
+            $last_name, $first_name, $middle_name,
+            $dob, $birthplace, $gender, $address,
+            $id_number, $username, $registrar_id
+        );
+    }
 
     if ($update_stmt->execute()) {
         $_SESSION['success_msg'] = "Registrar information updated successfully!";
@@ -163,7 +181,8 @@ input[type=number] { -moz-appearance: textfield; }
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Password</label>
-                <input type="password" value="••••••••" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50">
+                <input type="text" name="password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 registrar-field">
+                <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
             </div>
 
             <!-- Submit Buttons -->

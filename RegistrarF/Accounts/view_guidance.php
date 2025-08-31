@@ -12,8 +12,8 @@ $guidance_id = $_GET['id'] ?? '';
 $guidance_data = null;
 
 if (!empty($guidance_id)) {
-    $stmt = $conn->prepare("SELECT * FROM guidance_account WHERE id = ?");
-    $stmt->bind_param("i", $guidance_id);
+    $stmt = $conn->prepare("SELECT * FROM guidance_account WHERE id_number = ?");
+    $stmt->bind_param("s", $guidance_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $guidance_data = $result->fetch_assoc();
@@ -31,21 +31,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_guidance'])) {
     $address = $_POST['address'] ?? '';
     $id_number = $_POST['id_number'] ?? '';
     $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
 
     // Update guidance record
-    $update_sql = "UPDATE guidance_account SET 
-        first_name = ?, last_name = ?, middle_name = ?, 
-        dob = ?, birthplace = ?, gender = ?, address = ?,
-        id_number = ?, username = ?
-        WHERE id = ?";
-
-    $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param(
-        "sssssssssi",
-        $first_name, $last_name, $middle_name,
-        $dob, $birthplace, $gender, $address,
-        $id_number, $username, $guidance_id
-    );
+    if (!empty($password)) {
+        // Update with new password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $update_sql = "UPDATE guidance_account SET 
+            first_name = ?, last_name = ?, middle_name = ?, 
+            dob = ?, birthplace = ?, gender = ?, address = ?,
+            id_number = ?, username = ?, password = ?
+            WHERE id_number = ?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param(
+            "sssssssssss",
+            $first_name, $last_name, $middle_name,
+            $dob, $birthplace, $gender, $address,
+            $id_number, $username, $hashed_password, $guidance_id
+        );
+    } else {
+        // Update without changing password
+        $update_sql = "UPDATE guidance_account SET 
+            first_name = ?, last_name = ?, middle_name = ?, 
+            dob = ?, birthplace = ?, gender = ?, address = ?,
+            id_number = ?, username = ?
+            WHERE id_number = ?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param(
+            "ssssssssss",
+            $first_name, $last_name, $middle_name,
+            $dob, $birthplace, $gender, $address,
+            $id_number, $username, $guidance_id
+        );
+    }
 
     if ($update_stmt->execute()) {
         $_SESSION['success_msg'] = "Guidance information updated successfully!";
@@ -163,7 +181,8 @@ input[type=number] { -moz-appearance: textfield; }
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-1">Password</label>
-                <input type="password" value="••••••••" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50">
+                <input type="text" name="password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 guidance-field">
+                <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
             </div>
 
             <!-- Submit Buttons -->

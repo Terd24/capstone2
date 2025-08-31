@@ -14,7 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['check_duplicates'])) {
     
     // Check Student ID duplicate
     if (!empty($id_number)) {
-        $check_id = $conn->prepare("SELECT id_number FROM students WHERE id_number=?");
+        $check_id = $conn->prepare("SELECT id_number FROM student_account WHERE id_number=?");
         $check_id->bind_param("s", $id_number);
         $check_id->execute();
         $check_id->store_result();
@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['check_duplicates'])) {
     
     // Check RFID duplicate
     if (!empty($rfid_uid)) {
-        $check_rfid = $conn->prepare("SELECT rfid_uid FROM students WHERE rfid_uid=?");
+        $check_rfid = $conn->prepare("SELECT rfid_uid FROM student_account WHERE rfid_uid=?");
         $check_rfid->bind_param("s", $rfid_uid);
         $check_rfid->execute();
         $check_rfid->store_result();

@@ -23,30 +23,27 @@ if ($success_msg) {
 // Default account type
 $accountType = $_GET['type'] ?? 'student';
 
-// Debug: Check what account type we're viewing
-// echo "Current account type: " . $accountType;
-
 // Fetch accounts based on type
 switch ($accountType) {
     case 'registrar':
-        $result = $conn->query("SELECT registrar_id, CONCAT(first_name, ' ', last_name) as full_name, username FROM registrar ORDER BY last_name ASC");
-        $columns = ['Registrar ID', 'Full Name', 'Username'];
+        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, username FROM registrar_account ORDER BY last_name ASC");
+        $columns = ['ID Number', 'Full Name', 'Username'];
         break;
     case 'cashier':
-        $result = $conn->query("SELECT id, CONCAT(first_name, ' ', last_name) as full_name, username FROM cashier_account ORDER BY last_name ASC");
-        $columns = ['Cashier ID', 'Full Name', 'Username'];
+        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, username FROM cashier_account ORDER BY last_name ASC");
+        $columns = ['ID Number', 'Full Name', 'Username'];
         break;
     case 'guidance':
-        $result = $conn->query("SELECT id, CONCAT(first_name, ' ', last_name) as full_name, username FROM guidance_account ORDER BY last_name ASC");
-        $columns = ['Guidance ID', 'Full Name', 'Username'];
+        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, username FROM guidance_account ORDER BY last_name ASC");
+        $columns = ['ID Number', 'Full Name', 'Username'];
         break;
     case 'parent':
-        $result = $conn->query("SELECT parent_id, parent_name, child_id FROM parent_account ORDER BY parent_name ASC");
-        $columns = ['Parent ID', 'Parent Name', 'Child ID'];
+        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, child_name FROM parent_account ORDER BY last_name ASC");
+        $columns = ['ID Number', 'Full Name', 'Child Name'];
         break;
     default:
         // student
-        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track, grade_level FROM students ORDER BY last_name ASC");
+        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track, grade_level FROM student_account ORDER BY last_name ASC");
         $columns = ['ID Number', 'Full Name','Academic Track', 'Grade Level'];
         break;
 }
@@ -123,13 +120,16 @@ input[type=number] { -moz-appearance: textfield; }
                                 $onclick = 'onclick="viewStudent(\'' . htmlspecialchars($row['id_number']) . '\');"';
                                 break;
                             case 'registrar':
-                                $onclick = 'onclick="viewRegistrar(\'' . htmlspecialchars($row['registrar_id']) . '\');"';
+                                $onclick = 'onclick="viewRegistrar(\'' . htmlspecialchars($row['id_number']) . '\');"';
                                 break;
                             case 'cashier':
-                                $onclick = 'onclick="viewCashier(\'' . htmlspecialchars($row['id']) . '\');"';
+                                $onclick = 'onclick="viewCashier(\'' . htmlspecialchars($row['id_number']) . '\');"';
                                 break;
                             case 'guidance':
-                                $onclick = 'onclick="viewGuidance(\'' . htmlspecialchars($row['id']) . '\');"';
+                                $onclick = 'onclick="viewGuidance(\'' . htmlspecialchars($row['id_number']) . '\');"';
+                                break;
+                            case 'parent':
+                                $onclick = 'onclick="viewParent(\'' . htmlspecialchars($row['id_number']) . '\');"';
                                 break;
                             default:
                                 $clickable = false;
@@ -185,6 +185,12 @@ window.viewGuidance = function(guidanceId) {
     console.log('Clicked guidance ID:', guidanceId);
     console.log('Navigating to:', `Accounts/view_guidance.php?id=${guidanceId}`);
     window.location.href = `Accounts/view_guidance.php?id=${guidanceId}`;
+};
+
+window.viewParent = function(parentId) {
+    console.log('Clicked parent ID:', parentId);
+    console.log('Navigating to:', `Accounts/view_parent.php?id=${parentId}`);
+    window.location.href = `Accounts/view_parent.php?id=${parentId}`;
 };
 
 // Show success notification with animation

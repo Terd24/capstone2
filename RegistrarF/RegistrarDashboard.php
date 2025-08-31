@@ -35,81 +35,125 @@ function timeAgo($time) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Registrar Dashboard</title>
+<title>Registrar Dashboard - Cornerstone College Inc.</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<link rel="icon" type="image/png" href="../images/Logo.png">
+<style>
+  .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
+  .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+</style>
 </head>
-<body class="bg-gray-100 font-sans min-h-screen">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 <!-- RFID Form -->
 <form id="rfidForm" method="get" action="ViewStudentInfo.php">
     <input type="hidden" id="rfid_input" name="student_id" autocomplete="off">
 </form>
 
-<!-- Header -->
-<div class="bg-gray-900 text-white px-6 py-4 flex items-center justify-between shadow-lg">
-    <h1 class="text-xl font-bold tracking-wide">Registrar Dashboard</h1>
-    <div class="relative">
-        <button id="menuBtn" class="p-2 rounded hover:bg-gray-100 focus:outline-none">☰</button>
-        <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-40 bg-white border rounded shadow-md">
-            <a href="logout.php" class="block px-4 py-2 text-black-500 hover:bg-gray-100">Logout</a>
+<!-- Header with School Branding -->
+<header class="school-gradient text-white shadow-lg">
+  <div class="container mx-auto px-6 py-4">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <img src="../images/Logo.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+        <div>
+          <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+          <p class="text-blue-200 text-sm">Registrar Portal</p>
         </div>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <div class="text-right">
+          <p class="text-sm text-blue-200">Welcome,</p>
+          <p class="font-semibold"><?= htmlspecialchars($_SESSION['registrar_name'] ?? 'Registrar') ?></p>
+        </div>
+        <div class="relative">
+          <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
+            <a href="logout.php" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
+              <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+              </svg>
+              Logout
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
+</header>
 
 <!-- Search Bar -->
-<div class="bg-white px-6 py-3 border-b">
-  <div class="flex gap-2 items-center">
-    <div class="relative">
-      <span class="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1110.5 3a7.5 7.5 0 016.15 13.65z" />
-        </svg>
-      </span>
-      <input
-        type="text"
-        id="searchInput"
-        placeholder="Search by name or ID..."
-        class="w-64 border border-gray-400 rounded pl-8 pr-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black"
-      />
+<div class="bg-white shadow-sm border-b">
+  <div class="container mx-auto px-6 py-4">
+    <div class="flex gap-4 items-center">
+      <div class="relative flex-1 max-w-md">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </span>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search students by name or ID..."
+          class="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+        />
+      </div>
+      <p id="searchError" class="text-red-600 text-sm"></p>
     </div>
-    <p id="searchError" class="text-red-600 text-sm ml-3"></p>
+    <div id="searchResults" class="mt-4 space-y-2"></div>
   </div>
-  <div id="searchResults" class="mt-3 space-y-1"></div>
 </div>
 
 <!-- Content Layout -->
-<div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="container mx-auto px-6 py-8">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     <!-- LEFT SIDE -->
     <div class="space-y-6">
-        <!-- Registrar Info -->
-        <div class="bg-white card p-6 shadow">
-            <div class="flex items-center mb-4">
-                <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-2xl">👤</div>
-                <div class="ml-3">
-                    <div class="font-medium text-gray-700"><?= htmlspecialchars($_SESSION['registrar_name'] ?? 'Employee Name') ?></div>
-                    <p class="text-xs text-gray-500">ID: <?= htmlspecialchars($_SESSION['registrar_id']) ?></p>
-                </div>
+        <!-- Registrar Profile -->
+        <div class="bg-white rounded-2xl card-shadow p-6">
+          <div class="text-center mb-6">
+            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-4">
+              <?= strtoupper(substr($_SESSION['first_name'] ?? 'R', 0, 1) . substr($_SESSION['last_name'] ?? 'E', 0, 1)) ?>
             </div>
+            <h2 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($_SESSION['registrar_name'] ?? 'Registrar') ?></h2>
+            <p class="text-blue-600 font-medium">Staff ID: <?= htmlspecialchars($_SESSION['id_number'] ?? 'N/A') ?></p>
+          </div>
+          
+          <div class="bg-blue-50 rounded-lg p-4">
+            <h3 class="font-semibold text-gray-700 mb-2">Quick Actions</h3>
+            <button onclick="window.location.href='AccountList.php'" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors mb-2">
+              Manage Accounts
+            </button>
+          </div>
         </div>
 
         <!-- Recent Student Requests -->
-        <div class="bg-white card p-6 shadow">
-            <div class="flex justify-between items-center mb-2 cursor-pointer" id="recentToggle">
+        <div class="bg-white rounded-2xl card-shadow p-6">
+            <div class="flex justify-between items-center mb-4 cursor-pointer" id="recentToggle">
                 <h2 class="text-lg font-semibold flex items-center gap-2">
-                    Recent Student Requests
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Recent Requests
                     <?php 
                     $unreadCount = $conn->query("SELECT COUNT(*) AS c FROM document_requests WHERE is_read=0")->fetch_assoc()['c'];
                     if($unreadCount > 0): ?>
-                        <span id="notifBadge" class="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full"><?= $unreadCount ?></span>
+                        <span id="notifBadge" class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full"><?= $unreadCount ?></span>
                     <?php endif; ?>
                 </h2>
                 <span id="recentArrow" class="transform transition-transform">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </span>
             </div>
-            <div id="recentContent" class="hidden">
+            <div id="recentContent" class="hidden space-y-3">
             <?php if ($recent && $recent->num_rows > 0): ?>
                 <?php while ($row = $recent->fetch_assoc()): ?>
                     <div class="bg-gray-50 p-4 rounded border mb-3 flex justify-between items-start" 
@@ -138,18 +182,12 @@ function timeAgo($time) {
             <?php endif; ?>
             </div>
         </div>
-        <!-- Add Account button  -->
-        <div class="bg-white card p-6 shadow flex flex-col gap-3 mt-4">
-            <button 
-                onclick="window.location.href='AccountList.php'" 
-                class="w-full text-sm px-4 py-2 bg-black text-white font-medium rounded-lg hover:bg-white hover:text-black border border-black transition-all duration-200">
-                Account List
-            </button>
+            </div>
         </div>
 
     </div>
-    <div class="md:col-span-2">
-        <div class="bg-white card p-6 shadow">
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-2xl card-shadow p-6">
             <!-- Filter Dropdown -->
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold">All Student Requests</h2>
@@ -165,42 +203,47 @@ function timeAgo($time) {
             </div>
 
             <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded shadow-md text-sm">
-                    <thead class="bg-black text-white text-left">
+                <table class="min-w-full bg-white rounded-xl overflow-hidden text-sm">
+                    <thead class="school-gradient text-white">
                         <tr>
-                            <th class="px-4 py-2">Student No</th>
-                            <th class="px-4 py-2">Document Name</th>
-                            <th class="px-4 py-2">Date Submitted</th>
-                            <th class="px-4 py-2">Claimed At</th>
-                            <th class="px-4 py-2">Status</th>
+                            <th class="px-6 py-4 text-left font-semibold">Student No</th>
+                            <th class="px-6 py-4 text-left font-semibold">Document Name</th>
+                            <th class="px-6 py-4 text-left font-semibold">Date Submitted</th>
+                            <th class="px-6 py-4 text-left font-semibold">Claimed At</th>
+                            <th class="px-6 py-4 text-left font-semibold">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="text-gray-800">
+                    <tbody class="text-gray-800 divide-y divide-gray-200">
                         <?php if ($result && $result->num_rows > 0): ?>
                             <?php while ($r = $result->fetch_assoc()): ?>
-                                <tr class="<?= ($r['status'] === 'Pending') ? '' : 'bg-gray-100' ?>">
-                                    <td class="px-4 py-2"><?= htmlspecialchars($r['student_id']) ?></td>
-                                    <td class="px-4 py-2"><?= htmlspecialchars($r['document_type']) ?></td>
-                                    <td class="px-4 py-2"><?= htmlspecialchars($r['date_requested']) ?></td>
-                                    <td class="px-4 py-2">
+                                <tr class="hover:bg-blue-50 transition-colors <?= ($r['status'] === 'Pending') ? 'bg-yellow-50' : '' ?>">
+                                    <td class="px-6 py-4 font-medium"><?= htmlspecialchars($r['student_id']) ?></td>
+                                    <td class="px-6 py-4"><?= htmlspecialchars($r['document_type']) ?></td>
+                                    <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($r['date_requested']) ?></td>
+                                    <td class="px-6 py-4 text-gray-600">
                                         <?= ($r['status'] === 'Claimed' && $r['date_claimed']) ? htmlspecialchars($r['date_claimed']) : '---' ?>
                                     </td>
-                                    <td class="px-4 py-2">
+                                    <td class="px-6 py-4">
                                         <?php if ($r['status'] === 'Pending'): ?>
-                                            <span class="text-yellow-600 font-medium">Pending</span>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
                                         <?php elseif ($r['status'] === 'Ready to Claim' || $r['status'] === 'Ready for Claiming'): ?>
-                                            <span class="text-green-600 font-medium">Ready to Claim</span>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ready to Claim</span>
                                         <?php elseif ($r['status'] === 'Claimed'): ?>
-                                            <span class="text-blue-600 font-medium">Claimed</span>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Claimed</span>
                                         <?php else: ?>
-                                            <?= htmlspecialchars($r['status']) ?>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800"><?= htmlspecialchars($r['status']) ?></span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="5" class="px-4 py-6 text-center text-gray-500">No requests found.</td>
+                                <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                    <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    No document requests found.
+                                </td>
                             </tr>
                         <?php endif; ?>
                     </tbody>

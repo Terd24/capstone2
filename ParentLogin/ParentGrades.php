@@ -2,8 +2,8 @@
 session_start();
 include '../StudentLogin/db_conn.php';
 
-if (!isset($_SESSION['child_id'])) {
-    header("Location: ParentLogin.html");
+if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
+    header("Location: ../StudentLogin/login.php");
     exit();
 }
 
@@ -35,7 +35,7 @@ while ($row = $result->fetch_assoc()) {
     $grades[] = $row;
 }
 
-$name_stmt = $conn->prepare("SELECT full_name FROM student_account WHERE id_number = ?");
+$name_stmt = $conn->prepare("SELECT CONCAT(first_name, ' ', last_name) as full_name FROM student_account WHERE id_number = ?");
 $name_stmt->bind_param("s", $child_id);
 $name_stmt->execute();
 $name_result = $name_stmt->get_result();

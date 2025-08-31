@@ -3,7 +3,7 @@ session_start();
 include '../StudentLogin/db_conn.php';
 
 if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
-    header("Location: ParentLogin.html");
+    header("Location: ../StudentLogin/login.php");
     exit();
 }
 

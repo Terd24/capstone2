@@ -17,66 +17,129 @@ header("Expires: 0");
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Guidance Record System</title>
+  <title>Guidance Dashboard - Cornerstone College Inc.</title>
+  <link rel="icon" href="../images/Logo.png" type="image/png">
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
+    .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen p-6">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
-<div class="max-w-4xl mx-auto mb-6">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-4 relative">
-    <h2 class="text-2xl font-semibold">Guidance Dashboard</h2>
-
-    <!-- Burger Menu -->
-    <div class="relative z-50">
-      <button id="burgerBtn" class="text-2xl focus:outline-none">&#9776;</button>
-      <div id="burgerMenu" 
-           class="hidden absolute right-0 mt-2 w-40 bg-white border rounded shadow-lg z-50">
-        <a href="logout.php" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Logout</a>
+<!-- Header with School Branding -->
+<header class="school-gradient text-white shadow-lg">
+  <div class="container mx-auto px-6 py-4">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <img src="../images/Logo.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+        <div>
+          <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+          <p class="text-blue-200 text-sm">Guidance Portal</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <div class="text-right">
+          <p class="text-sm text-blue-200">Welcome,</p>
+          <p class="font-semibold"><?= htmlspecialchars($_SESSION['guidance_name'] ?? 'Guidance Counselor') ?></p>
+        </div>
+        <div class="relative z-50">
+          <button id="burgerBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <div id="burgerMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
+            <a href="logout.php" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
+              <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+              </svg>
+              Logout
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+</header>
 
-  <!-- Search Bar -->
-  <div class="flex gap-1 items-center relative">
-    <input
-      type="text"
-      id="searchInput"
-      placeholder="Search by name or ID..."
-      autocomplete="off"
-      class="flex-grow border border-gray-300 rounded px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-      aria-describedby="searchError"
-    />
+<!-- Search Bar -->
+<div class="bg-white shadow-sm border-b">
+  <div class="container mx-auto px-6 py-4">
+    <div class="flex gap-4 items-center">
+      <div class="relative flex-1 max-w-md">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </span>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search students by name or ID..."
+          autocomplete="off"
+          class="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          aria-describedby="searchError"
+        />
+      </div>
+      <p id="searchError" class="text-red-600 text-sm"></p>
+    </div>
   </div>
-  <p id="searchError" class="text-red-600 text-sm mt-1 min-h-[1.25rem]"></p>
 </div>
 
 
-<!--Notification-->
-<div id="notif" class="bg-green-400 text-white px-3 py-1 rounded shadow hidden mt-1 w-fit" style="margin-left: 1034px;">
-  Saved successfully
+<!-- Success Notification -->
+<div id="notif" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg hidden z-50">
+  <div class="flex items-center space-x-2">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </svg>
+    <span>Saved successfully</span>
+  </div>
 </div>
 
-<!-- Student List -->
-<div id="studentList" class="max-w-4xl mx-auto space-y-4">
-  <p class="text-center text-gray-500">No student data loaded. Tap RFID card or search to load a student.</p>
-</div>
-
-<!-- Violation Form -->
-<div id="formView" class="hidden max-w-md mx-auto mt-10 p-6 border rounded-md shadow bg-white">
-  <button onclick="closeForm()" class="mb-4 text-2xl">&#8592;</button>
-
-  <div class="mb-4">
-    <label class="block mb-1 text-sm">Date of Violation:</label>
-    <input type="date" id="violationDate" class="w-full border px-2 py-1 rounded text-sm" />
+<!-- Main Content -->
+<div class="container mx-auto px-6 py-8">
+  <!-- Student List -->
+  <div id="studentList" class="space-y-6">
+    <div class="bg-white rounded-2xl card-shadow p-8 text-center text-gray-500">
+      <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+      </svg>
+      <p class="text-sm italic">Scan RFID card or search to load student guidance records</p>
+    </div>
   </div>
 
-  <div class="mb-4">
-    <label class="block mb-1 text-sm">Violation Type:</label>
-    <select id="violationType" class="w-full border px-2 py-1 rounded text-sm"></select>
-  </div>
+  <!-- Violation Form -->
+  <div id="formView" class="hidden max-w-lg mx-auto mt-8">
+    <div class="bg-white rounded-2xl card-shadow p-8">
+      <div class="flex items-center mb-6">
+        <button onclick="closeForm()" class="mr-4 p-2 hover:bg-gray-100 rounded-lg transition">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+        </button>
+        <h3 class="text-xl font-bold text-gray-800">Add Violation Record</h3>
+      </div>
 
-  <button onclick="saveViolation()" class="bg-black text-white px-4 py-2 rounded text-sm">Save</button>
+      <div class="space-y-4">
+        <div>
+          <label class="block mb-2 text-sm font-medium text-gray-700">Date of Violation:</label>
+          <input type="date" id="violationDate" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        </div>
+
+        <div>
+          <label class="block mb-2 text-sm font-medium text-gray-700">Violation Type:</label>
+          <select id="violationType" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
+        </div>
+
+        <button onclick="saveViolation()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium transition-colors">
+          Save Violation Record
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
   // ===== BURGER MENU =====
@@ -111,35 +174,67 @@ header("Expires: 0");
   function renderStudents() {
     const list = document.getElementById('studentList');
     if (!students.length) {
-      list.innerHTML = '<p class="text-center text-gray-500">No student data loaded. Tap RFID card or search to load a student.</p>';
+      list.innerHTML = `
+        <div class="bg-white rounded-2xl card-shadow p-8 text-center text-gray-500">
+          <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+          <p class="text-sm italic">Scan RFID card or search to load student guidance records</p>
+        </div>
+      `;
       return;
     }
     list.innerHTML = students.map((student, i) => {
       const inEdit = student.editMode || false;
+      const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
       return `
-      <div class="flex gap-4 p-4 border rounded-md shadow bg-white student-card" data-index="${i}">
-        <div class="w-1/3 text-center border-r pr-4">
-          <div class="text-3xl">👤</div>
-          <p class="text-sm mt-2">Name: ${student.name}</p>
-          <p class="text-sm">ID: ${student.id}</p>
-          <p class="text-sm">Program: ${student.program}</p>
-          <p class="text-sm">Year & Section: ${student.section}</p>
-        </div>
-        <div class="w-2/3 pl-4">
-          <div class="flex justify-between items-center">
-            <h3 class="font-semibold text-md">Student Guidance Record</h3>
-            <button onclick="toggleEdit(${i})" class="text-blue-600 text-sm">${inEdit ? "Cancel" : "Edit"}</button>
+      <div class="bg-white rounded-2xl card-shadow p-6 student-card" data-index="${i}">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Student Profile -->
+          <div class="text-center lg:border-r lg:pr-6">
+            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold mb-4">
+              ${initials}
+            </div>
+            <h4 class="font-bold text-lg text-gray-800 mb-2">${student.name}</h4>
+            <div class="space-y-1 text-sm text-gray-600">
+              <p><span class="font-medium">ID:</span> ${student.id}</p>
+              <p><span class="font-medium">Program:</span> ${student.program}</p>
+              <p><span class="font-medium">Year & Section:</span> ${student.section}</p>
+            </div>
           </div>
-          <div class="mt-2 text-sm">
-            ${inEdit ? renderEditableViolations(student, i) : renderReadOnlyViolations(student)}
-          </div>
-          <div class="mt-4 flex gap-2">
-            ${inEdit ? `
-              <button onclick="deleteSelected(${i})" class="bg-red-600 text-white py-1 px-3 rounded text-sm">Delete</button>
-              <button onclick="saveEdited(${i})" class="bg-green-600 text-white py-1 px-3 rounded text-sm">Save</button>
-            ` : `
-              <button onclick="openForm(${i})" class="bg-black text-white py-1 px-4 rounded text-sm">Add Student Violation</button>
-            `}
+          
+          <!-- Guidance Records -->
+          <div class="lg:col-span-2">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-semibold text-lg text-gray-800 flex items-center gap-2">
+                <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Guidance Records
+              </h3>
+              <button onclick="toggleEdit(${i})" class="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
+                ${inEdit ? "Cancel" : "Edit Records"}
+              </button>
+            </div>
+            
+            <div class="bg-gray-50 rounded-lg p-4 mb-4 min-h-[120px]">
+              ${inEdit ? renderEditableViolations(student, i) : renderReadOnlyViolations(student)}
+            </div>
+            
+            <div class="flex gap-3">
+              ${inEdit ? `
+                <button onclick="deleteSelected(${i})" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+                  Delete Selected
+                </button>
+                <button onclick="saveEdited(${i})" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+                  Save Changes
+                </button>
+              ` : `
+                <button onclick="openForm(${i})" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+                  Add Violation Record
+                </button>
+              `}
+            </div>
           </div>
         </div>
       </div>
@@ -148,20 +243,45 @@ header("Expires: 0");
   }
 
   function renderReadOnlyViolations(student) {
+    if (!student.violations.length) {
+      return `
+        <div class="text-center py-4">
+          <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <p class="text-gray-500 text-sm">No violation records found</p>
+        </div>
+      `;
+    }
     return `
-      <ul class="list-disc list-inside">
-        ${student.violations.length ? student.violations.map(v => `<li>${v}</li>`).join('') : '<li>No records yet</li>'}
-      </ul>`;
+      <div class="space-y-2">
+        ${student.violations.map(v => `
+          <div class="bg-white rounded-lg p-3 border-l-4 border-orange-400">
+            <p class="text-sm text-gray-700">${v}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   function renderEditableViolations(student, i) {
-    if (!student.violations.length) return "<p>No records yet</p>";
-    return student.violations.map((v, idx) => `
-      <label class="flex items-center gap-2">
-        <input type="checkbox" data-violation-index="${idx}" class="violation-checkbox-${i}" />
-        <span>${v}</span>
-      </label>
-    `).join('');
+    if (!student.violations.length) {
+      return `
+        <div class="text-center py-4">
+          <p class="text-gray-500 text-sm">No records to edit</p>
+        </div>
+      `;
+    }
+    return `
+      <div class="space-y-2">
+        ${student.violations.map((v, idx) => `
+          <label class="flex items-center gap-3 bg-white rounded-lg p-3 border hover:bg-blue-50 transition-colors cursor-pointer">
+            <input type="checkbox" data-violation-index="${idx}" class="violation-checkbox-${i} w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+            <span class="text-sm text-gray-700">${v}</span>
+          </label>
+        `).join('')}
+      </div>
+    `;
   }
 
   function toggleEdit(i) {
@@ -308,7 +428,7 @@ header("Expires: 0");
 
   const searchBtn = document.createElement('button');
   searchBtn.textContent = 'Search';
-  searchBtn.className = 'ml-2 bg-black text-white px-4 py-2 rounded text-sm';
+  searchBtn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors';
   searchInput.parentNode.appendChild(searchBtn);
 
   searchBtn.addEventListener('click', () => {

@@ -12,7 +12,7 @@ $student_id = $_GET['id'] ?? '';
 $student_data = null;
 
 if (!empty($student_id)) {
-    $stmt = $conn->prepare("SELECT * FROM students WHERE id_number = ?");
+    $stmt = $conn->prepare("SELECT * FROM student_account WHERE id_number = ?");
     $stmt->bind_param("s", $student_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -53,35 +53,67 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     $last_school_year = $_POST['last_school_year'] ?? '';
     $id_number = $_POST['id_number'] ?? '';
     $rfid_uid = $_POST['rfid_uid'] ?? '';
+    $password = $_POST['password'] ?? '';
 
     // Update student record
-    $update_sql = "UPDATE students SET 
-        lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
-        last_name = ?, first_name = ?, middle_name = ?, 
-        school_year = ?, grade_level = ?, semester = ?,
-        dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
-        payment_mode = ?, address = ?,
-        father_name = ?, father_occupation = ?, father_contact = ?,
-        mother_name = ?, mother_occupation = ?, mother_contact = ?,
-        guardian_name = ?, guardian_occupation = ?, guardian_contact = ?,
-        last_school = ?, last_school_year = ?,
-        id_number = ?, rfid_uid = ?
-        WHERE id_number = ?";
-
-    $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param(
-        "sssssssssssssssssssssssssssssss",
-        $lrn, $academic_track, $enrollment_status, $school_type,
-        $last_name, $first_name, $middle_name,
-        $school_year, $grade_level, $semester,
-        $dob, $birthplace, $gender, $religion, $credentials,
-        $payment_mode, $address,
-        $father_name, $father_occupation, $father_contact,
-        $mother_name, $mother_occupation, $mother_contact,
-        $guardian_name, $guardian_occupation, $guardian_contact,
-        $last_school, $last_school_year,
-        $id_number, $rfid_uid, $student_id
-    );
+    if (!empty($password)) {
+        // Update with new password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $update_sql = "UPDATE student_account SET 
+            lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
+            last_name = ?, first_name = ?, middle_name = ?, 
+            school_year = ?, grade_level = ?, semester = ?,
+            dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
+            payment_mode = ?, address = ?,
+            father_name = ?, father_occupation = ?, father_contact = ?,
+            mother_name = ?, mother_occupation = ?, mother_contact = ?,
+            guardian_name = ?, guardian_occupation = ?, guardian_contact = ?,
+            last_school = ?, last_school_year = ?,
+            id_number = ?, rfid_uid = ?, password = ?
+            WHERE id_number = ?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param(
+            "ssssssssssssssssssssssssssssssss",
+            $lrn, $academic_track, $enrollment_status, $school_type,
+            $last_name, $first_name, $middle_name,
+            $school_year, $grade_level, $semester,
+            $dob, $birthplace, $gender, $religion, $credentials,
+            $payment_mode, $address,
+            $father_name, $father_occupation, $father_contact,
+            $mother_name, $mother_occupation, $mother_contact,
+            $guardian_name, $guardian_occupation, $guardian_contact,
+            $last_school, $last_school_year,
+            $id_number, $rfid_uid, $hashed_password, $student_id
+        );
+    } else {
+        // Update without changing password
+        $update_sql = "UPDATE student_account SET 
+            lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
+            last_name = ?, first_name = ?, middle_name = ?, 
+            school_year = ?, grade_level = ?, semester = ?,
+            dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
+            payment_mode = ?, address = ?,
+            father_name = ?, father_occupation = ?, father_contact = ?,
+            mother_name = ?, mother_occupation = ?, mother_contact = ?,
+            guardian_name = ?, guardian_occupation = ?, guardian_contact = ?,
+            last_school = ?, last_school_year = ?,
+            id_number = ?, rfid_uid = ?
+            WHERE id_number = ?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param(
+            "sssssssssssssssssssssssssssssss",
+            $lrn, $academic_track, $enrollment_status, $school_type,
+            $last_name, $first_name, $middle_name,
+            $school_year, $grade_level, $semester,
+            $dob, $birthplace, $gender, $religion, $credentials,
+            $payment_mode, $address,
+            $father_name, $father_occupation, $father_contact,
+            $mother_name, $mother_occupation, $mother_contact,
+            $guardian_name, $guardian_occupation, $guardian_contact,
+            $last_school, $last_school_year,
+            $id_number, $rfid_uid, $student_id
+        );
+    }
 
     if ($update_stmt->execute()) {
         $_SESSION['success_msg'] = "Student information updated successfully!";
@@ -347,9 +379,8 @@ input[type=number] { -moz-appearance: textfield; }
                 <!-- Password -->
                 <div>
                     <label class="block text-sm font-semibold mb-1">Password</label>
-                    <div class="relative">
-                        <input type="password" value="••••••••" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50">
-                    </div>
+                    <input type="text" name="password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                    <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
                 </div>
 
                 <!-- RFID Number -->

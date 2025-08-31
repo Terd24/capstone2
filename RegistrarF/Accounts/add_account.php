@@ -82,7 +82,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Check duplicates - only if values are not empty
         if (!empty($id_number)) {
-            $check_id = $conn->prepare("SELECT id_number FROM students WHERE id_number=?");
+            $check_id = $conn->prepare("SELECT id_number FROM student_account WHERE id_number=?");
             $check_id->bind_param("s", $id_number);
             $check_id->execute();
             $check_id->store_result();
@@ -94,7 +94,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Check username duplicates
         if (!empty($username)) {
-            $check_username = $conn->prepare("SELECT username FROM students WHERE username=?");
+            $check_username = $conn->prepare("SELECT username FROM student_account WHERE username=?");
             $check_username->bind_param("s", $username);
             $check_username->execute();
             $check_username->store_result();
@@ -105,7 +105,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         if (!empty($rfid_uid)) {
-            $check_rfid = $conn->prepare("SELECT rfid_uid FROM students WHERE rfid_uid=?");
+            $check_rfid = $conn->prepare("SELECT rfid_uid FROM student_account WHERE rfid_uid=?");
             $check_rfid->bind_param("s", $rfid_uid);
             $check_rfid->execute();
             $check_rfid->store_result();
@@ -232,7 +232,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Only insert if no validation errors and no duplicate errors
         if (empty($error_id) && empty($error_rfid) && empty($validation_errors)) {
-            $sql = "INSERT INTO students (
+            $sql = "INSERT INTO student_account (
                 lrn, academic_track, enrollment_status, school_type,
                 last_name, first_name, middle_name, 
                 school_year, grade_level, semester,
@@ -301,7 +301,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         // Check if ID already exists
-        $check_stmt = $conn->prepare("SELECT registrar_id FROM registrar WHERE id_number = ?");
+        $check_stmt = $conn->prepare("SELECT registrar_id FROM registrar_account WHERE id_number = ?");
         $check_stmt->bind_param("s", $id_number);
         $check_stmt->execute();
         $check_result = $check_stmt->get_result();
@@ -313,7 +313,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         // Check if username already exists
-        $check_username_stmt = $conn->prepare("SELECT registrar_id FROM registrar WHERE username = ?");
+        $check_username_stmt = $conn->prepare("SELECT registrar_id FROM registrar_account WHERE username = ?");
         $check_username_stmt->bind_param("s", $username);
         $check_username_stmt->execute();
         $check_username_result = $check_username_stmt->get_result();
@@ -328,13 +328,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Hash password
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         
-        // Insert registrar account
-        $insert_sql = "INSERT INTO registrar (last_name, first_name, middle_name, dob, birthplace, gender, address, id_number, password, username) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $insert_stmt = $conn->prepare($insert_sql);
-        $insert_stmt->bind_param("ssssssssss", $last_name, $first_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
+        // Insert into registrar_account table
+        $stmt = $conn->prepare("INSERT INTO registrar_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
         
-        if ($insert_stmt->execute()) {
+        if ($stmt->execute()) {
             $_SESSION['success_msg'] = "Registrar account created successfully!";
             header("Location: AccountList.php?type=registrar");
             exit;
@@ -345,7 +343,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // Don't redirect - stay on current page to show error
         }
         
-        $insert_stmt->close();
+        $stmt->close();
         $check_stmt->close();
     } elseif ($account_type === 'cashier') {
         // Handle cashier account creation
@@ -397,12 +395,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         
         // Insert cashier account
-        $insert_sql = "INSERT INTO cashier_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $insert_stmt = $conn->prepare($insert_sql);
-        $insert_stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
+        $stmt = $conn->prepare("INSERT INTO cashier_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
         
-        if ($insert_stmt->execute()) {
+        if ($stmt->execute()) {
             $_SESSION['success_msg'] = "Cashier account created successfully!";
             header("Location: AccountList.php?type=cashier");
             exit;
@@ -412,7 +408,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $show_modal = true;
         }
         
-        $insert_stmt->close();
+        $stmt->close();
         $check_stmt->close();
     } elseif ($account_type === 'guidance') {
         // Handle guidance account creation
@@ -481,6 +477,99 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         $insert_stmt->close();
         $check_stmt->close();
+    } elseif ($account_type === 'parent') {
+        // Handle parent account creation
+        $first_name = trim($_POST['first_name'] ?? '');
+        $last_name = trim($_POST['last_name'] ?? '');
+        $middle_name = trim($_POST['middle_name'] ?? '');
+        $child_id = trim($_POST['child_id'] ?? '');
+        $child_name = trim($_POST['child_name'] ?? '');
+        $id_number = trim($_POST['id_number'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $username = trim($_POST['username'] ?? '');
+        
+        // Validation
+        if (empty($first_name) || empty($last_name) || empty($child_id) || 
+            empty($id_number) || empty($password) || empty($username)) {
+            $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Check if child ID exists in students table
+        $check_child_stmt = $conn->prepare("SELECT CONCAT(first_name, ' ', last_name) as full_name FROM student_account WHERE id_number = ?");
+        $check_child_stmt->bind_param("s", $child_id);
+        $check_child_stmt->execute();
+        $check_child_result = $check_child_stmt->get_result();
+        
+        if ($check_child_result->num_rows === 0) {
+            $error_msg = "Student with ID $child_id not found. Please verify the student ID.";
+            $form_data = $_POST;
+            $show_modal = true;
+        } else {
+            // Get child's full name
+            $child_data = $check_child_result->fetch_assoc();
+            $child_name = $child_data['full_name'];
+        }
+        $check_child_stmt->close();
+        
+        // Check if parent already exists for this child
+        $check_parent_stmt = $conn->prepare("SELECT parent_id FROM parent_account WHERE child_id = ?");
+        $check_parent_stmt->bind_param("s", $child_id);
+        $check_parent_stmt->execute();
+        $check_parent_result = $check_parent_stmt->get_result();
+        
+        if ($check_parent_result->num_rows > 0) {
+            $error_msg = "A parent account already exists for this student. Each student can only have one parent account.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        $check_parent_stmt->close();
+        
+        // Check if ID already exists
+        $check_stmt = $conn->prepare("SELECT parent_id FROM parent_account WHERE id_number = ?");
+        $check_stmt->bind_param("s", $id_number);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            $error_msg = "ID number already exists. Please use a different ID number.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Check if username already exists
+        $check_username_stmt = $conn->prepare("SELECT parent_id FROM parent_account WHERE username = ?");
+        $check_username_stmt->bind_param("s", $username);
+        $check_username_stmt->execute();
+        $check_username_result = $check_username_stmt->get_result();
+        
+        if ($check_username_result->num_rows > 0) {
+            $error_msg = "Username already exists. Please use a different username.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        $check_username_stmt->close();
+        
+        // Hash password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        
+        // Insert into parent_account table
+        $stmt = $conn->prepare("INSERT INTO parent_account (first_name, last_name, middle_name, child_id, child_name, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssss", $first_name, $last_name, $middle_name, $child_id, $child_name, $id_number, $hashed_password, $username);
+        
+        if ($stmt->execute()) {
+            $_SESSION['success_msg'] = "Parent account created successfully!";
+            header("Location: AccountList.php?type=parent");
+            exit;
+        } else {
+            $error_msg = "Error creating parent account. Please try again.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        $insert_stmt->close();
+        $check_stmt->close();
     }
 }
 
@@ -512,8 +601,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <option value="registrar">Registrar Account</option>
                 <option value="cashier">Cashier Account</option>
                 <option value="guidance">Guidance Account</option>
+                <option value="parent">Parent Account</option>
             </select>
-            <p class="text-sm text-gray-600 mt-1">Please select the type of account you want to create</p>
         </div>
 
         <!-- No Selection Message -->
@@ -539,6 +628,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <?php include("add_registrar_form.php"); ?>
         <?php include("add_cashier_form.php"); ?>
         <?php include("add_guidance_form.php"); ?>
+        <?php include("add_parent_form.php"); ?>
 
     </div>
 </div>
@@ -583,13 +673,15 @@ function handleModalAccountTypeChange() {
         showCashierForm();
     } else if (accountType === 'guidance') {
         showGuidanceForm();
+    } else if (accountType === 'parent') {
+        showParentForm();
     } else {
         showSelectionMessage();
     }
 }
 
 function hideAllForms() {
-    const forms = ['studentForm', 'registrarForm', 'cashierForm', 'guidanceForm', 'noSelectionMessage'];
+    const forms = ['studentForm', 'registrarForm', 'cashierForm', 'guidanceForm', 'parentForm', 'noSelectionMessage'];
     forms.forEach(formId => {
         const form = document.getElementById(formId);
         if (form) {
@@ -622,6 +714,12 @@ function showGuidanceForm() {
     console.log('✅ GUIDANCE FORM DISPLAYED');
 }
 
+function showParentForm() {
+    hideAllForms();
+    document.getElementById('parentForm').style.display = 'block';
+    console.log('✅ PARENT FORM DISPLAYED');
+}
+
 function showSelectionMessage() {
     hideAllForms();
     document.getElementById('noSelectionMessage').style.display = 'block';
@@ -647,6 +745,8 @@ function openModal(){
             showCashierForm();
         } else if (savedAccountType === 'guidance') {
             showGuidanceForm();
+        } else if (savedAccountType === 'parent') {
+            showParentForm();
         }
         console.log('Restored form for account type:', savedAccountType);
     } else {
@@ -682,6 +782,8 @@ function showAccountForm(selectedType = null) {
         showCashierForm();
     } else if (accountType === 'guidance') {
         showGuidanceForm();
+    } else if (accountType === 'parent') {
+        showParentForm();
     } else {
         showSelectionMessage();
     }
