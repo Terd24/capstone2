@@ -20,9 +20,6 @@ $error_msg = $_SESSION['error_msg'] ?? "";
 $form_data = $_SESSION['form_data'] ?? [];
 $show_modal = $_SESSION['show_modal'] ?? false;
 
-// Clear session errors after retrieving them
-unset($_SESSION['error_id'], $_SESSION['error_rfid'], $_SESSION['old_id'], $_SESSION['old_rfid'], $_SESSION['success_msg'], $_SESSION['error_msg'], $_SESSION['form_data'], $_SESSION['show_modal']);
-
 // Check if DB connection exists
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
@@ -75,6 +72,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $raw_password = $_POST['password'] ?? '';
         $password = password_hash($raw_password, PASSWORD_DEFAULT);
         $rfid_uid = $_POST['rfid_uid'] ?? '';
+        $username = $_POST['username'] ?? '';
 
         // Store all form data for repopulation
         $form_data = $_POST;
@@ -94,6 +92,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $check_id->close();
         }
 
+        // Check username duplicates
+        if (!empty($username)) {
+            $check_username = $conn->prepare("SELECT username FROM students WHERE username=?");
+            $check_username->bind_param("s", $username);
+            $check_username->execute();
+            $check_username->store_result();
+            if ($check_username->num_rows > 0) {
+                $error_msg = "Username already in use!";
+            }
+            $check_username->close();
+        }
+
         if (!empty($rfid_uid)) {
             $check_rfid = $conn->prepare("SELECT rfid_uid FROM students WHERE rfid_uid=?");
             $check_rfid->bind_param("s", $rfid_uid);
@@ -110,13 +120,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             empty($birthplace) || empty($gender) || empty($religion) || empty($academic_track) || 
             empty($grade_level) || empty($semester) || empty($school_year) || empty($enrollment_status) || 
             empty($payment_mode) || empty($father_name) || empty($mother_name) || 
-            empty($id_number) || empty($raw_password) || empty($rfid_uid)) {
+            empty($id_number) || empty($raw_password) || empty($rfid_uid) || empty($username)) {
             
-            $_SESSION['error_msg'] = "All required fields must be filled. (Middle name is optional)";
-            $_SESSION['form_data'] = $form_data;
-            $_SESSION['show_modal'] = true;
-            header("Location: ../AccountList.php");
-            exit();
+            $error_msg = "All required fields must be filled. (Middle name is optional)";
+            $form_data = $_POST;
+            $show_modal = true;
+            // Don't redirect - stay on current page to show error
         }
 
         // Server-side validation for data types
@@ -208,13 +217,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $validation_errors[] = "RFID must contain numbers only.";
         }
 
+        // Validate username (letters, numbers, underscores only)
+        if (!preg_match('/^[A-Za-z0-9_]+$/', $username)) {
+            $validation_errors[] = "Username can only contain letters, numbers, and underscores.";
+        }
+
         // If there are validation errors, return them
         if (!empty($validation_errors)) {
-            $_SESSION['error_msg'] = implode('<br>', $validation_errors);
-            $_SESSION['form_data'] = $form_data;
-            $_SESSION['show_modal'] = true;
-            header("Location: ../AccountList.php");
-            exit();
+            $error_msg = implode('<br>', $validation_errors);
+            $form_data = $_POST;
+            $show_modal = true;
+            // Don't redirect - stay on current page to show error
         }
 
         // Only insert if no validation errors and no duplicate errors
@@ -229,12 +242,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 mother_name, mother_occupation, mother_contact,
                 guardian_name, guardian_occupation, guardian_contact,
                 last_school, last_school_year,
-                id_number, password, rfid_uid
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+                id_number, password, rfid_uid, username
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
             $stmt = $conn->prepare($sql);
             $stmt->bind_param(
-                "sssssssssssssssssssssssssssssss",
+                "ssssssssssssssssssssssssssssssss",
                 $lrn, $academic_track, $enrollment_status, $school_type,
                 $last_name, $first_name, $middle_name,
                 $school_year, $grade_level, $semester,
@@ -244,32 +257,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $mother_name, $mother_occupation, $mother_contact,
                 $guardian_name, $guardian_occupation, $guardian_contact,
                 $last_school, $last_school_year,
-                $id_number, $password, $rfid_uid
+                $id_number, $password, $rfid_uid, $username
             );
 
             if ($stmt->execute()) {
                 $_SESSION['success_msg'] = "Student account created successfully!";
-                header("Location: ../AccountList.php?type=student");
+                header("Location: AccountList.php?type=student");
                 exit;
             } else {
                 echo "<div class='bg-red-500 text-white px-4 py-2 rounded mb-4'>Database error: " . $stmt->error . "</div>";
             }
         }
         
-        // If there are duplicate errors, store them in session for display
+        // If there are duplicate errors, show them inline
         if (!empty($error_id) || !empty($error_rfid)) {
-            if (!empty($error_id)) {
-                $_SESSION['error_id'] = $error_id;
-            }
-            if (!empty($error_rfid)) {
-                $_SESSION['error_rfid'] = $error_rfid;
-            }
-            $_SESSION['form_data'] = $form_data;
-            $_SESSION['old_id'] = $old_id;
-            $_SESSION['old_rfid'] = $old_rfid;
-            $_SESSION['show_modal'] = true;
-            header("Location: ../AccountList.php");
-            exit();
+            $form_data = $_POST;
+            $old_id = $id_number;
+            $old_rfid = $rfid_uid;
+            $show_modal = true;
+            // Don't redirect - stay on current page to show error
         }
     } elseif ($account_type === 'registrar') {
         // Handle registrar account creation
@@ -283,50 +289,194 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $id_number = trim($_POST['id_number'] ?? '');
         $password = $_POST['password'] ?? '';
         $rfid_uid = trim($_POST['rfid_uid'] ?? '');
+        $username = trim($_POST['username'] ?? '');
         
         // Validation
-        if (empty($last_name) || empty($first_name) || empty($dob) || empty($birthplace) || 
-            empty($gender) || empty($address) || empty($id_number) || empty($password) || empty($rfid_uid)) {
-            $_SESSION['error_msg'] = "Please fill in all required fields.";
-            $_SESSION['form_data'] = $_POST;
-            $_SESSION['show_modal'] = true;
-            header("Location: ../AccountList.php");
-            exit;
+        if (empty($last_name) || empty($first_name) || empty($dob) || empty($birthplace) || empty($gender) || 
+            empty($address) || empty($id_number) || empty($password) || empty($username)) {
+            $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+            // Don't redirect - stay on current page to show error
         }
         
-        // Check if ID or RFID already exists
-        $check_stmt = $conn->prepare("SELECT registrar_id FROM registrar WHERE id_number = ? OR rfid_uid = ?");
-        $check_stmt->bind_param("ss", $id_number, $rfid_uid);
+        // Check if ID already exists
+        $check_stmt = $conn->prepare("SELECT registrar_id FROM registrar WHERE id_number = ?");
+        $check_stmt->bind_param("s", $id_number);
         $check_stmt->execute();
         $check_result = $check_stmt->get_result();
         
         if ($check_result->num_rows > 0) {
-            $_SESSION['error_msg'] = "ID number or RFID already exists. Please use different values.";
-            $_SESSION['form_data'] = $_POST;
-            $_SESSION['show_modal'] = true;
-            header("Location: ../AccountList.php");
-            exit;
+            $error_msg = "ID number already exists. Please use a different value.";
+            $form_data = $_POST;
+            $show_modal = true;
         }
+        
+        // Check if username already exists
+        $check_username_stmt = $conn->prepare("SELECT registrar_id FROM registrar WHERE username = ?");
+        $check_username_stmt->bind_param("s", $username);
+        $check_username_stmt->execute();
+        $check_username_result = $check_username_stmt->get_result();
+        
+        if ($check_username_result->num_rows > 0) {
+            $error_msg = "Username already exists. Please use a different username.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        $check_username_stmt->close();
         
         // Hash password
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         
         // Insert registrar account
-        $insert_sql = "INSERT INTO registrar (last_name, first_name, middle_name, dob, birthplace, gender, address, id_number, password, rfid_uid) 
+        $insert_sql = "INSERT INTO registrar (last_name, first_name, middle_name, dob, birthplace, gender, address, id_number, password, username) 
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $insert_stmt = $conn->prepare($insert_sql);
-        $insert_stmt->bind_param("ssssssssss", $last_name, $first_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $rfid_uid);
+        $insert_stmt->bind_param("ssssssssss", $last_name, $first_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
         
         if ($insert_stmt->execute()) {
             $_SESSION['success_msg'] = "Registrar account created successfully!";
-            header("Location: ../AccountList.php?type=registrar");
+            header("Location: AccountList.php?type=registrar");
             exit;
         } else {
-            $_SESSION['error_msg'] = "Error creating registrar account. Please try again.";
-            $_SESSION['form_data'] = $_POST;
-            $_SESSION['show_modal'] = true;
-            header("Location: ../AccountList.php");
+            $error_msg = "Error creating registrar account. Please try again.";
+            $form_data = $_POST;
+            $show_modal = true;
+            // Don't redirect - stay on current page to show error
+        }
+        
+        $insert_stmt->close();
+        $check_stmt->close();
+    } elseif ($account_type === 'cashier') {
+        // Handle cashier account creation
+        $first_name = trim($_POST['first_name'] ?? '');
+        $last_name = trim($_POST['last_name'] ?? '');
+        $middle_name = trim($_POST['middle_name'] ?? '');
+        $dob = $_POST['dob'] ?? '';
+        $birthplace = trim($_POST['birthplace'] ?? '');
+        $gender = $_POST['gender'] ?? '';
+        $address = trim($_POST['address'] ?? '');
+        $id_number = trim($_POST['id_number'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $username = trim($_POST['username'] ?? '');
+        
+        // Validation
+        if (empty($first_name) || empty($last_name) || empty($dob) || empty($birthplace) || empty($gender) || 
+            empty($address) || empty($id_number) || empty($password) || empty($username)) {
+            $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Check if ID already exists
+        $check_stmt = $conn->prepare("SELECT id FROM cashier_account WHERE id_number = ?");
+        $check_stmt->bind_param("s", $id_number);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            $error_msg = "ID number already exists. Please use a different ID number.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Check if username already exists
+        $check_username_stmt = $conn->prepare("SELECT id FROM cashier_account WHERE username = ?");
+        $check_username_stmt->bind_param("s", $username);
+        $check_username_stmt->execute();
+        $check_username_result = $check_username_stmt->get_result();
+        
+        if ($check_username_result->num_rows > 0) {
+            $error_msg = "Username already exists. Please use a different username.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        $check_username_stmt->close();
+        
+        // Hash password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        
+        // Insert cashier account
+        $insert_sql = "INSERT INTO cashier_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) 
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $insert_stmt = $conn->prepare($insert_sql);
+        $insert_stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
+        
+        if ($insert_stmt->execute()) {
+            $_SESSION['success_msg'] = "Cashier account created successfully!";
+            header("Location: AccountList.php?type=cashier");
             exit;
+        } else {
+            $error_msg = "Error creating cashier account. Please try again.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        $insert_stmt->close();
+        $check_stmt->close();
+    } elseif ($account_type === 'guidance') {
+        // Handle guidance account creation
+        $first_name = trim($_POST['first_name'] ?? '');
+        $last_name = trim($_POST['last_name'] ?? '');
+        $middle_name = trim($_POST['middle_name'] ?? '');
+        $dob = $_POST['dob'] ?? '';
+        $birthplace = trim($_POST['birthplace'] ?? '');
+        $gender = $_POST['gender'] ?? '';
+        $address = trim($_POST['address'] ?? '');
+        $id_number = trim($_POST['id_number'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $username = trim($_POST['username'] ?? '');
+        
+        // Validation
+        if (empty($first_name) || empty($last_name) || empty($dob) || empty($birthplace) || empty($gender) || 
+            empty($address) || empty($id_number) || empty($password) || empty($username)) {
+            $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Check if ID already exists
+        $check_stmt = $conn->prepare("SELECT id FROM guidance_account WHERE id_number = ?");
+        $check_stmt->bind_param("s", $id_number);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            $error_msg = "ID number already exists. Please use a different ID number.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Check if username already exists
+        $check_username_stmt = $conn->prepare("SELECT id FROM guidance_account WHERE username = ?");
+        $check_username_stmt->bind_param("s", $username);
+        $check_username_stmt->execute();
+        $check_username_result = $check_username_stmt->get_result();
+        
+        if ($check_username_result->num_rows > 0) {
+            $error_msg = "Username already exists. Please use a different username.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        $check_username_stmt->close();
+        
+        // Hash password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        
+        // Insert guidance account
+        $insert_sql = "INSERT INTO guidance_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) 
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $insert_stmt = $conn->prepare($insert_sql);
+        $insert_stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
+        
+        if ($insert_stmt->execute()) {
+            $_SESSION['success_msg'] = "Guidance account created successfully!";
+            header("Location: AccountList.php?type=guidance");
+            exit;
+        } else {
+            $error_msg = "Error creating guidance account. Please try again.";
+            $form_data = $_POST;
+            $show_modal = true;
         }
         
         $insert_stmt->close();
@@ -334,6 +484,213 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
-// Include the form
-include("add_student_form.php");
+?>
+
+<!-- Success notification -->
+<?php if (!empty($success_msg)): ?>
+<div id="notif" class="bg-green-400 text-white px-3 py-2 rounded shadow mt-4 w-fit ml-auto mr-auto text-center">
+    <?= htmlspecialchars($success_msg) ?>
+</div>
+<?php endif; ?>
+
+<!-- Add Account Modal -->
+<div id="addAccountModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-gray-200 transform transition-all scale-95" id="modalContent">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#1E4D92] text-white">
+            <h2 class="text-lg font-semibold">Add New Account</h2>
+            <button onclick="closeModal()" class="text-2xl font-bold hover:text-gray-300">&times;</button>
+        </div>
+
+        <!-- Account Type Selection -->
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <label class="block text-sm font-semibold mb-2">Select Account Type *</label>
+            <select id="modalAccountType" onchange="handleModalAccountTypeChange()" class="w-full max-w-md border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" required>
+                <option value="">-- Choose Account Type to Create --</option>
+                <option value="student">Student Account</option>
+                <option value="registrar">Registrar Account</option>
+                <option value="cashier">Cashier Account</option>
+                <option value="guidance">Guidance Account</option>
+            </select>
+            <p class="text-sm text-gray-600 mt-1">Please select the type of account you want to create</p>
+        </div>
+
+        <!-- No Selection Message -->
+        <div id="noSelectionMessage" class="px-6 py-12 text-center" style="display: block;">
+            <div class="max-w-md mx-auto">
+                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">Select Account Type</h3>
+                <p class="text-gray-500">Choose the type of account you want to create from the dropdown above to get started.</p>
+            </div>
+        </div>
+
+        <!-- Error Messages -->
+        <?php if (!empty($error_msg)): ?>
+            <div class="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <?= $error_msg ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Include Form Files -->
+        <?php include("add_student_form.php"); ?>
+        <?php include("add_registrar_form.php"); ?>
+        <?php include("add_cashier_form.php"); ?>
+        <?php include("add_guidance_form.php"); ?>
+
+    </div>
+</div>
+
+<!-- Hide Scrollbar -->
+<style>
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+
+<script>
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, checking for forms...');
+    
+    // Force check after a delay to ensure includes are loaded
+    setTimeout(() => {
+        const studentForm = document.getElementById('studentForm');
+        const registrarForm = document.getElementById('registrarForm');
+        console.log('Student form exists:', !!studentForm);
+        console.log('Registrar form exists:', !!registrarForm);
+        
+        if (studentForm) console.log('Student form HTML:', studentForm.outerHTML.substring(0, 100));
+        if (registrarForm) console.log('Registrar form HTML:', registrarForm.outerHTML.substring(0, 100));
+    }, 500);
+});
+
+// Handle modal account type change
+function handleModalAccountTypeChange() {
+    const selectElement = document.getElementById('modalAccountType');
+    const accountType = selectElement.value;
+    console.log('=== MODAL ACCOUNT TYPE CHANGE ===');
+    console.log('Selected value:', accountType);
+    console.log('Select element:', selectElement);
+    
+    // Force show the form immediately
+    if (accountType === 'student') {
+        showStudentForm();
+    } else if (accountType === 'registrar') {
+        showRegistrarForm();
+    } else if (accountType === 'cashier') {
+        showCashierForm();
+    } else if (accountType === 'guidance') {
+        showGuidanceForm();
+    } else {
+        showSelectionMessage();
+    }
+}
+
+function hideAllForms() {
+    const forms = ['studentForm', 'registrarForm', 'cashierForm', 'guidanceForm', 'noSelectionMessage'];
+    forms.forEach(formId => {
+        const form = document.getElementById(formId);
+        if (form) {
+            form.style.display = 'none';
+        }
+    });
+}
+
+function showStudentForm() {
+    hideAllForms();
+    document.getElementById('studentForm').style.display = 'block';
+    console.log('✅ STUDENT FORM DISPLAYED');
+}
+
+function showRegistrarForm() {
+    hideAllForms();
+    document.getElementById('registrarForm').style.display = 'block';
+    console.log('✅ REGISTRAR FORM DISPLAYED');
+}
+
+function showCashierForm() {
+    hideAllForms();
+    document.getElementById('cashierForm').style.display = 'block';
+    console.log('✅ CASHIER FORM DISPLAYED');
+}
+
+function showGuidanceForm() {
+    hideAllForms();
+    document.getElementById('guidanceForm').style.display = 'block';
+    console.log('✅ GUIDANCE FORM DISPLAYED');
+}
+
+function showSelectionMessage() {
+    hideAllForms();
+    document.getElementById('noSelectionMessage').style.display = 'block';
+    console.log('✅ SELECTION MESSAGE DISPLAYED');
+}
+
+function openModal(){ 
+    document.getElementById('addAccountModal').classList.remove('hidden'); 
+    document.getElementById('modalContent').classList.remove('scale-95');
+    document.getElementById('modalContent').classList.add('scale-100');
+    
+    // Check if there's a saved account type from form data (for error cases)
+    const savedAccountType = '<?= htmlspecialchars($form_data['account_type'] ?? '') ?>';
+    
+    if (savedAccountType) {
+        // Show the form that had errors
+        document.getElementById('modalAccountType').value = savedAccountType;
+        if (savedAccountType === 'student') {
+            showStudentForm();
+        } else if (savedAccountType === 'registrar') {
+            showRegistrarForm();
+        } else if (savedAccountType === 'cashier') {
+            showCashierForm();
+        } else if (savedAccountType === 'guidance') {
+            showGuidanceForm();
+        }
+        console.log('Restored form for account type:', savedAccountType);
+    } else {
+        // Reset to show selection message when modal opens normally
+        document.getElementById('modalAccountType').value = '';
+        showSelectionMessage();
+    }
+}
+
+// Auto-open modal if there are errors from form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const hasErrors = '<?= !empty($error_msg) || !empty($error_id) || !empty($error_rfid) ? "true" : "false" ?>';
+    const showModal = '<?= $show_modal ? "true" : "false" ?>';
+    
+    if (hasErrors === 'true' && showModal === 'true') {
+        console.log('Auto-opening modal due to form errors');
+        openModal();
+    }
+});
+
+function closeModal(){ 
+    document.getElementById('addAccountModal').classList.add('hidden'); 
+}
+
+// Legacy function for compatibility
+function showAccountForm(selectedType = null) {
+    const accountType = selectedType || document.getElementById('accountType').value;
+    if (accountType === 'student') {
+        showStudentForm();
+    } else if (accountType === 'registrar') {
+        showRegistrarForm();
+    } else if (accountType === 'cashier') {
+        showCashierForm();
+    } else if (accountType === 'guidance') {
+        showGuidanceForm();
+    } else {
+        showSelectionMessage();
+    }
+}
+</script>
+
+<?php
+// Clear session errors after JavaScript has read them
+if (!($_SERVER["REQUEST_METHOD"] == "POST")) {
+    unset($_SESSION['error_id'], $_SESSION['error_rfid'], $_SESSION['old_id'], $_SESSION['old_rfid'], $_SESSION['success_msg'], $_SESSION['error_msg'], $_SESSION['form_data'], $_SESSION['show_modal']);
+}
 ?>

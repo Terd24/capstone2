@@ -2,6 +2,11 @@
 session_start();
 $conn = new mysqli("localhost", "root", "", "onecci_db");
 
+// Check database connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
 // 🚫 If already logged in, redirect directly to dashboard
 if (isset($_SESSION['role'])) {
     switch ($_SESSION['role']) {
@@ -28,71 +33,113 @@ header("Expires: 0");
 // 🔑 Handle login submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     header('Content-Type: application/json');
-    $id_number = $_POST['id_number'];
-    $password = $_POST['password'];
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-    $id_number = $conn->real_escape_string($id_number);
-
-    // 1️⃣ Check guidance account
-    $sql = "SELECT * FROM guidance_account WHERE username = '$id_number'";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $_SESSION['guidance_username'] = $row['username'];
-            $_SESSION['guidance_name'] = $row['full_name'] ?? '';
-            $_SESSION['role'] = 'guidance';
-            echo json_encode(['status' => 'success','redirect' => '../GuidanceF/GuidanceDashboard.php']);
-            exit;
-        } else { echo json_encode(['status'=>'error','message'=>'Incorrect password.']); exit; }
+    if (empty($username) || empty($password)) {
+        echo json_encode(['status'=>'error','message'=>'Please enter both username and password.']);
+        exit;
     }
 
-    // 2️⃣ Check student account
-    $sql = "SELECT * FROM student_account WHERE id_number = '$id_number'";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
+    // Use prepared statements for security
+    // 1️⃣ Check student account
+    $stmt = $conn->prepare("SELECT * FROM students WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         if (password_verify($password, $row['password'])) {
+            $_SESSION['student_id'] = $row['id'];
             $_SESSION['id_number'] = $row['id_number'];
-            $_SESSION['full_name'] = $row['full_name'];
-            $_SESSION['program'] = $row['program'];
-            $_SESSION['year_section'] = $row['year_section'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['student_name'] = $row['first_name'] . ' ' . $row['last_name'];
+            $_SESSION['first_name'] = $row['first_name'];
+            $_SESSION['last_name'] = $row['last_name'];
+            $_SESSION['grade_level'] = $row['grade_level'];
             $_SESSION['role'] = 'student';
             echo json_encode(['status'=>'success','redirect'=>'studentDashboard.php']);
             exit;
-        } else { echo json_encode(['status'=>'error','message'=>'Incorrect password.']); exit; }
+        } else { 
+            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
+            exit; 
+        }
     }
 
-    // 3️⃣ Check cashier account
-    $sql = "SELECT * FROM cashier_account WHERE username = '$id_number'";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
+    // 2️⃣ Check registrar account
+    $stmt = $conn->prepare("SELECT * FROM registrar WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         if (password_verify($password, $row['password'])) {
-            $_SESSION['cashier_username'] = $row['username'];
-            $_SESSION['cashier_name'] = $row['full_name'];
-            $_SESSION['role'] = 'cashier';
-            echo json_encode(['status'=>'success','redirect'=>'../CashierF/Dashboard.php']);
-            exit;
-        } else { echo json_encode(['status'=>'error','message'=>'Incorrect password.']); exit; }
-    }
-
-    // 4️⃣ Check registrar account
-    $sql = "SELECT * FROM registrar_account WHERE username = '$id_number'";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $_SESSION['registrar_username'] = $row['username'];
-            $_SESSION['registrar_name'] = $row['registrar_name'];
-            $_SESSION['registrar_id'] = $row['registrar_id'] ?? '';
+            $_SESSION['registrar_id'] = $row['registrar_id'];
+            $_SESSION['id_number'] = $row['id_number'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['registrar_name'] = $row['first_name'] . ' ' . $row['last_name'];
+            $_SESSION['first_name'] = $row['first_name'];
+            $_SESSION['last_name'] = $row['last_name'];
             $_SESSION['role'] = 'registrar';
             echo json_encode(['status'=>'success','redirect'=>'../RegistrarF/RegistrarDashboard.php']);
             exit;
-        } else { echo json_encode(['status'=>'error','message'=>'Incorrect password.']); exit; }
+        } else { 
+            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
+            exit; 
+        }
     }
 
-    echo json_encode(['status'=>'error','message'=>'User not found.']);
+    // 3️⃣ Check cashier account
+    $stmt = $conn->prepare("SELECT * FROM cashier_account WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        if (password_verify($password, $row['password'])) {
+            $_SESSION['cashier_id'] = $row['id'];
+            $_SESSION['id_number'] = $row['id_number'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['cashier_name'] = $row['first_name'] . ' ' . $row['last_name'];
+            $_SESSION['first_name'] = $row['first_name'];
+            $_SESSION['last_name'] = $row['last_name'];
+            $_SESSION['role'] = 'cashier';
+            echo json_encode(['status'=>'success','redirect'=>'../CashierF/Dashboard.php']);
+            exit;
+        } else { 
+            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
+            exit; 
+        }
+    }
+
+    // 4️⃣ Check guidance account
+    $stmt = $conn->prepare("SELECT * FROM guidance_account WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        if (password_verify($password, $row['password'])) {
+            $_SESSION['guidance_id'] = $row['id'];
+            $_SESSION['id_number'] = $row['id_number'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['guidance_name'] = $row['first_name'] . ' ' . $row['last_name'];
+            $_SESSION['first_name'] = $row['first_name'];
+            $_SESSION['last_name'] = $row['last_name'];
+            $_SESSION['role'] = 'guidance';
+            echo json_encode(['status' => 'success','redirect' => '../GuidanceF/GuidanceDashboard.php']);
+            exit;
+        } else { 
+            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
+            exit; 
+        }
+    }
+
+    echo json_encode(['status'=>'error','message'=>'Username not found.']);
     exit;
 }
 ?>
@@ -119,7 +166,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
       <img src="../images/Logo.png" alt="CHED Logo" class="w-30 mb-4">
       <form id="loginForm" class="space-y-4 w-full">
         <div>
-          <input id="idInput" type="text" placeholder="Id number" class="w-full px-4 py-2 border border-gray-300 rounded" required>
+          <input id="usernameInput" type="text" placeholder="Username" class="w-full px-4 py-2 border border-gray-300 rounded" required>
         </div>
         <div class="relative">
           <input id="passwordInput" type="password" placeholder="Password" class="w-full px-4 py-2 border border-gray-300 rounded pr-10" required>
@@ -149,13 +196,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     document.getElementById("loginForm").addEventListener("submit", function(e) {
       e.preventDefault();
-      const id = document.getElementById("idInput").value;
+      const username = document.getElementById("usernameInput").value;
       const password = document.getElementById("passwordInput").value;
 
       fetch('login.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `id_number=${encodeURIComponent(id)}&password=${encodeURIComponent(password)}`
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
       })
       .then(res => res.json())
       .then(data => {

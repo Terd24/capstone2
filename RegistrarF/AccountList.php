@@ -29,16 +29,16 @@ $accountType = $_GET['type'] ?? 'student';
 // Fetch accounts based on type
 switch ($accountType) {
     case 'registrar':
-        $result = $conn->query("SELECT registrar_id, registrar_name, username FROM registrar_account ORDER BY registrar_name ASC");
-        $columns = ['Registrar ID', 'Registrar Name', 'Username'];
+        $result = $conn->query("SELECT registrar_id, CONCAT(first_name, ' ', last_name) as full_name, username FROM registrar ORDER BY last_name ASC");
+        $columns = ['Registrar ID', 'Full Name', 'Username'];
         break;
     case 'cashier':
-        $result = $conn->query("SELECT full_name, username FROM cashier_account ORDER BY full_name ASC");
-        $columns = ['Full Name', 'Username'];
+        $result = $conn->query("SELECT id, CONCAT(first_name, ' ', last_name) as full_name, username FROM cashier_account ORDER BY last_name ASC");
+        $columns = ['Cashier ID', 'Full Name', 'Username'];
         break;
     case 'guidance':
-        $result = $conn->query("SELECT username FROM guidance_account ORDER BY username ASC");
-        $columns = ['Username'];
+        $result = $conn->query("SELECT id, CONCAT(first_name, ' ', last_name) as full_name, username FROM guidance_account ORDER BY last_name ASC");
+        $columns = ['Guidance ID', 'Full Name', 'Username'];
         break;
     case 'parent':
         $result = $conn->query("SELECT parent_id, parent_name, child_id FROM parent_account ORDER BY parent_name ASC");
@@ -115,7 +115,27 @@ input[type=number] { -moz-appearance: textfield; }
             <tbody id="accountTable" class="divide-y divide-gray-200">
                 <?php if ($result && $result->num_rows > 0): ?>
                     <?php while ($row = $result->fetch_assoc()): ?>
-                        <tr class="hover:bg-[#FBB917]/20 transition <?= $accountType === 'student' ? 'cursor-pointer' : '' ?>" <?= $accountType === 'student' ? 'onclick="viewStudent(\'' . htmlspecialchars($row['id_number']) . '\');"' : '' ?>>
+                        <?php
+                        $clickable = true;
+                        $onclick = '';
+                        switch($accountType) {
+                            case 'student':
+                                $onclick = 'onclick="viewStudent(\'' . htmlspecialchars($row['id_number']) . '\');"';
+                                break;
+                            case 'registrar':
+                                $onclick = 'onclick="viewRegistrar(\'' . htmlspecialchars($row['registrar_id']) . '\');"';
+                                break;
+                            case 'cashier':
+                                $onclick = 'onclick="viewCashier(\'' . htmlspecialchars($row['id']) . '\');"';
+                                break;
+                            case 'guidance':
+                                $onclick = 'onclick="viewGuidance(\'' . htmlspecialchars($row['id']) . '\');"';
+                                break;
+                            default:
+                                $clickable = false;
+                        }
+                        ?>
+                        <tr class="hover:bg-[#FBB917]/20 transition <?= $clickable ? 'cursor-pointer' : '' ?>" <?= $clickable ? $onclick : '' ?>>
                             <?php foreach ($row as $value): ?>
                                 <td class="px-4 py-3"><?= htmlspecialchars($value) ?></td>
                             <?php endforeach; ?>
@@ -142,11 +162,29 @@ input[type=number] { -moz-appearance: textfield; }
 <?php include("Accounts/add_account.php"); ?>
 
 <script>
-// Define viewStudent function at global scope immediately
+// Define view functions at global scope immediately
 window.viewStudent = function(studentId) {
     console.log('Clicked student ID:', studentId);
     console.log('Navigating to:', `Accounts/view_student.php?id=${studentId}`);
     window.location.href = `Accounts/view_student.php?id=${studentId}`;
+};
+
+window.viewRegistrar = function(registrarId) {
+    console.log('Clicked registrar ID:', registrarId);
+    console.log('Navigating to:', `Accounts/view_registrar.php?id=${registrarId}`);
+    window.location.href = `Accounts/view_registrar.php?id=${registrarId}`;
+};
+
+window.viewCashier = function(cashierId) {
+    console.log('Clicked cashier ID:', cashierId);
+    console.log('Navigating to:', `Accounts/view_cashier.php?id=${cashierId}`);
+    window.location.href = `Accounts/view_cashier.php?id=${cashierId}`;
+};
+
+window.viewGuidance = function(guidanceId) {
+    console.log('Clicked guidance ID:', guidanceId);
+    console.log('Navigating to:', `Accounts/view_guidance.php?id=${guidanceId}`);
+    window.location.href = `Accounts/view_guidance.php?id=${guidanceId}`;
 };
 
 // Show success notification with animation
