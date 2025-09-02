@@ -39,7 +39,7 @@ if (!$student_id) {
 }
 
 $stmt = $conn->prepare("
-    SELECT id_number, full_name, program, year_section, rfid_uid 
+    SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track as program, grade_level as year_section, rfid_uid 
     FROM student_account 
     WHERE id_number=? OR rfid_uid=?"
 );

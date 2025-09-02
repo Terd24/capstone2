@@ -47,128 +47,186 @@ $sched_stmt->execute();
 $sched_result = $sched_stmt->get_result();
 $sched_total = 0;
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Balances</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
+    .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+  </style>
 </head>
-<body class="bg-gray-50 font-sans flex justify-center min-h-screen p-4">
-  <div class="bg-white shadow-lg rounded-lg max-w-3xl w-full p-6 space-y-6">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
+
+<!-- Header -->
+<header class="bg-blue-600 text-white shadow-lg">
+  <div class="container mx-auto px-6 py-4">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <button onclick="window.location.href='studentDashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+        </button>
+        <div class="text-left">
+          <p class="text-sm text-blue-200">Welcome,</p>
+          <p class="font-semibold"><?= $_SESSION['student_name'] ?></p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+        <div class="text-right">
+          <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+          <p class="text-blue-200 text-sm">Account Balance</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<div class="container mx-auto px-6 py-8">
+  <!-- Term Selection -->
+  <div class="bg-white rounded-2xl card-shadow p-6 mb-8">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-gray-800">Academic Term</h2>
+      <form method="GET" class="flex items-center space-x-3">
+        <select name="term" onchange="this.form.submit()" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <?php while ($term_row = $term_result->fetch_assoc()): ?>
+            <option value="<?= htmlspecialchars($term_row['school_year_term']) ?>" 
+                    <?= $term_row['school_year_term'] === $selected_term ? 'selected' : '' ?>>
+              <?= htmlspecialchars($term_row['school_year_term']) ?>
+            </option>
+          <?php endwhile; ?>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <!-- Balance Summary -->
+  <div class="bg-white rounded-2xl card-shadow p-6 mb-8">
+    <div class="flex items-center mb-6">
+      <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-gray-800">Balance Summary</h2>
+    </div>
     
-    <button onclick="location.href='studentDashboard.php'" class="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
-      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
-      <span>Back</span>
-    </button>
+    <div class="space-y-4">
+      <div class="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
+        <span class="font-medium text-gray-700">Tuition Fee</span>
+        <span class="font-semibold text-gray-900">₱<?= number_format($tuition_fee, 2) ?></span>
+      </div>
+      <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+        <span class="font-medium text-gray-700">Other School Fees</span>
+        <span class="font-semibold text-gray-900">₱<?= number_format($other_fees, 2) ?></span>
+      </div>
+      <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+        <span class="font-medium text-gray-700">Student Activity Fees</span>
+        <span class="font-semibold text-gray-900">₱<?= number_format($student_fees, 2) ?></span>
+      </div>
+      <div class="flex justify-between items-center p-4 bg-red-50 rounded-lg border-2 border-red-200">
+        <span class="font-bold text-red-700">Total Outstanding Balance</span>
+        <span class="font-bold text-red-700 text-lg">₱<?= number_format($gross_total, 2) ?></span>
+      </div>
+    </div>
+  </div>
 
-    <form method="get">
-      <label for="termSelect" class="block mb-1 font-semibold text-gray-700">School Year & Term:</label>
-      <select name="term" id="termSelect" class="border border-gray-300 rounded px-3 py-2 w-full max-w-xs" onchange="this.form.submit()">
-        <?php while ($row = $term_result->fetch_assoc()): 
-          $term_value = $row['school_year_term'];
-          $is_selected = ($term_value == $selected_term) ? 'selected' : '';
+  <!-- Payment Schedule -->
+  <div class="bg-white rounded-2xl card-shadow p-6 mb-8">
+    <div class="flex items-center mb-6">
+      <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-gray-800">Payment Schedule</h2>
+    </div>
+    
+    <?php if ($sched_result->num_rows > 0): ?>
+      <div class="space-y-3">
+        <?php while ($sched = $sched_result->fetch_assoc()):
+          $sched_total += $sched['amount'];
         ?>
-          <option value="<?= htmlspecialchars($term_value) ?>" <?= $is_selected ?>>
-            <?= htmlspecialchars($term_value) ?>
-          </option>
+          <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p class="font-medium text-gray-900"><?= date('F j, Y', strtotime($sched['due_date'])) ?></p>
+              <?php if (!empty($sched['description'])): ?>
+                <p class="text-sm text-gray-600"><?= htmlspecialchars($sched['description']) ?></p>
+              <?php endif; ?>
+            </div>
+            <span class="font-semibold text-gray-900">₱<?= number_format($sched['amount'], 2) ?></span>
+          </div>
         <?php endwhile; ?>
-      </select>
-    </form>
-
-    <!-- Gross Assessment -->
-    <section class="bg-gray-100 rounded p-4 space-y-2">
-      <h2 class="font-semibold text-lg border-b border-gray-300 pb-1">Total Balance</h2>
-      <div class="flex justify-between">
-        <span>Tuition Fee</span>
-        <span>₱<?= number_format($tuition_fee, 2) ?></span>
+        <div class="flex justify-between items-center p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+          <span class="font-bold text-blue-700">Total Scheduled</span>
+          <span class="font-bold text-blue-700 text-lg">₱<?= number_format($sched_total, 2) ?></span>
+        </div>
       </div>
-      <div class="flex justify-between">
-        <span class="text-sm text-gray-600">(Registration Fee, Other School Fees)</span>
-        <span>₱<?= number_format($other_fees, 2) ?></span>
+    <?php else: ?>
+      <div class="text-center py-8">
+        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        <p class="text-gray-500">No payment schedule available for this term</p>
       </div>
-      <div class="flex justify-between">
-        <span class="text-sm text-gray-600">(Student Related Activities, ...)</span>
-        <span>₱<?= number_format($student_fees, 2) ?></span>
+    <?php endif; ?>
+  </div>
+
+  <!-- Payment History -->
+  <div class="bg-white rounded-2xl card-shadow p-6">
+    <div class="flex items-center mb-6">
+      <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+        </svg>
       </div>
-      <div class="flex justify-between border-t border-gray-400 font-semibold pt-1 text-red-700">
-        <span>Balance</span>
-        <span>₱<?= number_format($gross_total, 2) ?></span>
-      </div>
-    </section>
+      <h2 class="text-xl font-bold text-gray-800">Payment History</h2>
+    </div>
 
-    <!-- Payment Schedule -->
-<section>
-  <h2 class="font-semibold text-lg mb-2 border-b border-gray-300 pb-1">Payment Schedule</h2>
-  <?php if ($sched_result->num_rows > 0): ?>
-  <ul class="bg-gray-100 rounded p-4 space-y-2 w-full overflow-x-auto">
-    <?php while ($sched = $sched_result->fetch_assoc()):
-      $sched_total += $sched['amount'];
-    ?>
-      <li class="flex flex-wrap md:flex-nowrap justify-between gap-2">
-        <span class="min-w-[120px]"><?= date('d M, Y', strtotime($sched['due_date'])) ?></span>
-        <?php if (!empty($sched['description'])): ?>
-          <span class="text-sm text-gray-600 flex-1 overflow-x-auto whitespace-nowrap">
-            (<?= htmlspecialchars($sched['description']) ?>)
-          </span>
-        <?php else: ?>
-          <span class="flex-1"></span>
-        <?php endif; ?>
-        <span class="min-w-[100px] text-right">₱<?= number_format($sched['amount'], 2) ?></span>
-      </li>
-    <?php endwhile; ?>
-    <li class="flex justify-between font-semibold text-gray-700 border-t border-gray-400 pt-2">
-      <span>Total</span>
-      <span>₱<?= number_format($sched_total, 2) ?></span>
-    </li>
-  </ul>
-  <?php else: ?>
-    <p class="text-gray-500 italic">No payment schedule available for this term.</p>
-  <?php endif; ?>
-</section>
-
-
-    <!-- Payment Section -->
-    <section>
-      <h2 class="font-semibold text-lg mb-4 border-b border-gray-300 pb-1">
-        Payments and Adjustments for <?= htmlspecialchars($selected_term) ?>
-      </h2>
-
-      <?php if ($pay_result->num_rows > 0): ?>
+    <?php if ($pay_result->num_rows > 0): ?>
+      <div class="space-y-4">
         <?php while ($row = $pay_result->fetch_assoc()):
           $total = $row['misc_fee'] + $row['other_school_fee'] + $row['tuition_fee'];
         ?>
-          <div class="mb-6 p-4 bg-gray-50 rounded shadow-inner border border-gray-200">
-            <div class="mb-2 font-semibold">
-              <?= date('d M, Y', strtotime($row['date'])) ?> | OR #<?= htmlspecialchars($row['or_number']) ?>
+          <div class="border border-gray-200 rounded-lg p-4">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <p class="font-semibold text-gray-900"><?= date('F j, Y', strtotime($row['date'])) ?></p>
+                <p class="text-sm text-gray-600">OR #<?= htmlspecialchars($row['or_number']) ?></p>
+              </div>
+              <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Paid</span>
             </div>
-            <div class="flex justify-between py-1 border-b border-gray-200">
-              <span>Miscellaneous Fee</span>
-              <span>₱<?= number_format($row['misc_fee'], 2) ?></span>
-            </div>
-            <div class="flex justify-between py-1 border-b border-gray-200">
-              <span>Other School Fees</span>
-              <span>₱<?= number_format($row['other_school_fee'], 2) ?></span>
-            </div>
-            <div class="flex justify-between py-1 border-b border-gray-200">
-              <span>Tuition Fees</span>
-              <span>₱<?= number_format($row['tuition_fee'], 2) ?></span>
-            </div>
-            <div class="flex justify-between pt-2 font-semibold text-red-700 text-right">
-              <span>Total</span>
-              <span>₱<?= number_format($total, 2) ?></span>
+            
+            <div class="space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Miscellaneous Fee</span>
+                <span class="text-gray-900">₱<?= number_format($row['misc_fee'], 2) ?></span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Other School Fees</span>
+                <span class="text-gray-900">₱<?= number_format($row['other_school_fee'], 2) ?></span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Tuition Fees</span>
+                <span class="text-gray-900">₱<?= number_format($row['tuition_fee'], 2) ?></span>
+              </div>
+              <div class="flex justify-between pt-2 border-t border-gray-200">
+                <span class="font-semibold text-gray-900">Total Payment</span>
+                <span class="font-semibold text-green-600">₱<?= number_format($total, 2) ?></span>
+              </div>
             </div>
           </div>
         <?php endwhile; ?>
-      <?php else: ?>
-        <p class="text-gray-500 italic">No payment records found for this term.</p>
-      <?php endif; ?>
-    </section>
-
+      </div>
+    <?php else: ?>
+      <div class="text-center py-8">
+        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+        </svg>
+        <p class="text-gray-500">No payment records found for this term</p>
+      </div>
+    <?php endif; ?>
   </div>
+</div>
+
 </body>
 </html>

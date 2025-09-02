@@ -31,17 +31,17 @@ $result = $stmt->get_result();
     <div class="bg-white p-4 rounded-lg shadow overflow-x-auto">
       <table class="w-full table-auto text-left border border-gray-200">
         <thead>
-  <tr class="bg-black text-white text-sm">
+  <tr class="bg-[#0B2C62] text-white text-sm">
     <th class="py-2 px-4 border">Document Name</th>
     <th class="py-2 px-4 border">Date Requested</th>
     <th class="py-2 px-4 border">Claimed At</th>
     <th class="py-2 px-4 border">Status</th>
   </tr>
 </thead>
-<tbody class="text-sm bg-gray-100">
+<tbody class="text-sm">
   <?php if ($result->num_rows > 0): ?>
     <?php while ($row = $result->fetch_assoc()): ?>
-      <tr>
+      <tr class="bg-white hover:bg-[#FBB917]/20 transition cursor-pointer" onclick="viewDocument('<?= htmlspecialchars($row['document_type']) ?>', '<?= $row['date_requested'] ?>', '<?= $row['status'] ?>')">
         <td class="py-2 px-4 border"><?= htmlspecialchars($row['document_type']) ?></td>
         <td class="py-2 px-4 border"><?= $row['date_requested'] ?: '---' ?></td>
         <td class="py-2 px-4 border">
@@ -61,7 +61,7 @@ $result = $stmt->get_result();
       </tr>
     <?php endwhile; ?>
   <?php else: ?>
-    <tr>
+    <tr class="bg-white">
       <td colspan="4" class="py-4 px-4 text-center border text-gray-500">
         No requested documents.
       </td>
@@ -71,6 +71,16 @@ $result = $stmt->get_result();
       </table>
     </div>
   </div>
+
+  <script>
+    function viewDocument(documentType, dateRequested, status) {
+      // You can customize this function to show document details or navigate to a detail page
+      alert(`Document: ${documentType}\nDate Requested: ${dateRequested}\nStatus: ${status}`);
+      
+      // Example: Navigate to a document detail page
+      // window.location.href = `document-detail.php?type=${encodeURIComponent(documentType)}&date=${encodeURIComponent(dateRequested)}`;
+    }
+  </script>
 
 </body>
 </html>

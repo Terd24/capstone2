@@ -10,7 +10,7 @@ if (!isset($_GET['rfid_uid'])) {
 $rfid_uid = strtoupper(trim($_GET['rfid_uid']));
 
 // ✅ Get student basic info
-$stmt = $conn->prepare("SELECT id_number, full_name, program, year_section FROM student_account WHERE UPPER(rfid_uid) = ?");
+$stmt = $conn->prepare("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track as program, grade_level as year_section FROM student_account WHERE UPPER(rfid_uid) = ?");
 $stmt->bind_param("s", $rfid_uid);
 $stmt->execute();
 $res = $stmt->get_result();

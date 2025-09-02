@@ -13,7 +13,7 @@ if (!$query) {
 $query_like = "%$query%";
 
 // Search students by id_number or full_name (case-insensitive)
-$sql = "SELECT * FROM student_account WHERE id_number LIKE ? OR full_name LIKE ?";
+$sql = "SELECT *, CONCAT(first_name, ' ', last_name) as full_name, academic_track as program, grade_level as year_section FROM student_account WHERE id_number LIKE ? OR CONCAT(first_name, ' ', last_name) LIKE ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("ss", $query_like, $query_like);
 $stmt->execute();

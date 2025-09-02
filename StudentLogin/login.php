@@ -182,69 +182,61 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login - Cornerstone College Inc.</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="icon" type="image/png" href="../images/Logo.png">
+  <link rel="icon" type="image/png" href="../images/LogoCCI.png">
   <style>
     .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
     .card-shadow { box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
     .logo-glow { filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3)); }
   </style>
 </head>
-<body class="school-gradient min-h-screen flex items-center justify-center p-4">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
 
-  <div class="w-full max-w-5xl bg-white rounded-3xl card-shadow overflow-hidden">
-    <div class="md:flex">
-      <!-- Left Side - Branding -->
-      <div class="md:w-1/2 school-gradient text-white p-12 flex flex-col justify-center items-center text-center">
-        <img src="../images/Logo.png" alt="Cornerstone College Inc." class="w-32 h-32 mb-6 logo-glow">
-        <h1 class="text-3xl font-bold mb-2">Cornerstone College Inc.</h1>
-        <p class="text-blue-200 text-lg mb-4">Student & Staff Portal</p>
-        <p class="text-blue-100 text-sm">Established 2004</p>
-        <div class="mt-8">
-          <img src="../images/Leftpic.png" alt="Students" class="w-64 opacity-90">
-        </div>
-      </div>
-
-      <!-- Right Side - Login Form -->
-      <div class="md:w-1/2 p-12 flex flex-col justify-center">
-        <div class="text-center mb-8">
-          <h2 class="text-2xl font-bold text-gray-800 mb-2">Welcome Back</h2>
-          <p class="text-gray-600">Sign in to access your account</p>
-        </div>
-        <form id="loginForm" class="space-y-6 w-full">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
-            <input id="usernameInput" type="text" placeholder="Enter your username" 
-                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
-          </div>
-          <div class="relative">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
-            <input id="passwordInput" type="password" placeholder="Enter your password" 
-                   class="w-full px-4 py-3 border border-gray-300 rounded-xl pr-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
-            <button type="button" onclick="togglePassword()" class="absolute right-4 top-10 text-gray-500 hover:text-gray-700">
-              <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-              </svg>
-            </button>
-          </div>
-          
-          <div id="errorMessage" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm"></div>
-          
-          <button type="submit" class="w-full school-gradient text-white py-3 rounded-xl font-semibold hover:opacity-90 transition-all transform hover:scale-[1.02]">
-            Sign In
-          </button>
-        </form>
-        
-        <div class="text-center mt-6 pt-6 border-t border-gray-200">
-          <p class="text-gray-600 text-sm mb-2">Are you a parent or guardian?</p>
-          <button onclick="location.href='../ParentLogin/ParentLogin.html'" 
-                  class="text-blue-600 hover:text-blue-800 font-medium text-sm hover:underline">
-            Parent/Guardian Portal →
-          </button>
-        </div>
-      </div>
+  <div class="w-full max-w-md">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="w-20 h-20 mx-auto mb-4">
+      <h1 class="text-2xl font-bold text-gray-800">Cornerstone College Inc.</h1>
+      <p class="text-gray-600 text-sm">Student & Staff Portal</p>
     </div>
-  </div>
+
+    <!-- Login Card -->
+    <div class="bg-white rounded-2xl card-shadow p-8">
+      <div class="text-center mb-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Welcome Back</h2>
+        <p class="text-gray-600 text-sm">Sign in to access your account</p>
+      </div>
+      <form id="loginForm" class="space-y-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+          <input id="usernameInput" type="text" placeholder="Enter your username" 
+                 class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+        </div>
+        <div class="relative">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+          <input id="passwordInput" type="password" placeholder="Enter your password" 
+                 class="w-full px-4 py-3 border border-gray-300 rounded-xl pr-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
+          <button type="button" onclick="togglePassword()" class="absolute right-4 top-10 text-gray-500 hover:text-gray-700">
+            <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div id="errorMessage" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm"></div>
+        
+        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition-all transform hover:scale-[1.02]">
+          Sign In
+        </button>
+      </form>
+      
+      <div class="text-center mt-6 pt-6 border-t border-gray-200">
+        <p class="text-gray-600 text-sm mb-2">Are you a parent or guardian?</p>
+        <button onclick="location.href='../ParentLogin/ParentLogin.html'" 
+                class="text-blue-600 hover:text-blue-600 font-medium text-sm hover:underline">
+          Parent/Guardian Portal
+        </button>
+      </div>
     </div>
   </div>
 

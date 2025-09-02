@@ -11,7 +11,7 @@ if (!isset($_GET['rfid_uid'])) {
 $rfid_uid = strtoupper(trim($_GET['rfid_uid']));
 
 
-$sql1 = "SELECT id_number, full_name, program, year_section FROM student_account WHERE UPPER(rfid_uid) = ?";
+$sql1 = "SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track as program, grade_level as year_section FROM student_account WHERE UPPER(rfid_uid) = ?";
 $stmt1 = $conn->prepare($sql1);
 $stmt1->bind_param("s", $rfid_uid);
 $stmt1->execute();

@@ -18,7 +18,7 @@ header("Expires: 0");
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cashier Dashboard - Cornerstone College Inc.</title>
-  <link rel="icon" href="../images/Logo.png" type="image/png">
+  <link rel="icon" href="../images/LogoCCI.png" type="image/png">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes shake {
@@ -43,7 +43,7 @@ header("Expires: 0");
     <div class="container mx-auto px-6 py-4">
       <div class="flex justify-between items-center">
         <div class="flex items-center space-x-4">
-          <img src="../images/Logo.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
           <div>
             <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
             <p class="text-blue-200 text-sm">Cashier Portal</p>
@@ -117,34 +117,70 @@ header("Expires: 0");
   <!-- Content -->
   <div class="container mx-auto px-6 py-8">
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-      <!-- Student Info -->
-      <div id="student-info" class="bg-white rounded-2xl card-shadow p-6">
-        <div class="text-center text-gray-500">
-          <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-          </svg>
-          <p class="text-sm italic">Scan RFID or search to display student information</p>
+      
+      <!-- Cashier Profile -->
+      <div class="lg:col-span-1">
+        <div class="bg-white rounded-2xl card-shadow p-6">
+          <div class="text-center">
+            <div class="w-20 h-20 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
+              <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($_SESSION['cashier_name'] ?? 'Cashier') ?></h3>
+            <p class="text-gray-600 text-sm">ID: <?= htmlspecialchars($_SESSION['id_number'] ?? 'N/A') ?></p>
+          </div>
+          
+          <div class="mt-6 pt-6 border-t">
+            <div class="space-y-3 text-sm">
+              <div>
+                <span class="text-gray-500 font-medium">Role:</span>
+                <p class="text-gray-800">Cashier</p>
+              </div>
+              <div>
+                <span class="text-gray-500 font-medium">Department:</span>
+                <p class="text-gray-800">Finance Office</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Tabs content -->
+      <!-- Main Content -->
       <div class="lg:col-span-3 space-y-6">
+        <!-- Student Info -->
+        <div id="student-info" class="bg-white rounded-2xl card-shadow p-6">
+          <div class="text-center text-gray-500">
+            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+            <p class="text-sm italic">Scan RFID or search to display student information</p>
+          </div>
+        </div>
+
         <!-- Balance Tab -->
         <div id="tab-balance" class="bg-white rounded-2xl card-shadow p-6">
           <div class="text-center text-gray-500 py-12">
-            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-            </svg>
-            <p class="text-sm italic">No balance data loaded yet</p>
+            <div class="w-16 h-16 mx-auto school-gradient rounded-lg flex items-center justify-center mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No Balance Data</h3>
+            <p class="text-sm text-gray-500">Search for a student or scan RFID to view balance information</p>
           </div>
         </div>
+        
         <!-- History Tab -->
         <div id="tab-history" class="hidden bg-white rounded-2xl card-shadow p-6">
           <div class="text-center text-gray-500 py-12">
-            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-            </svg>
-            <p class="text-sm italic">No transaction history loaded</p>
+            <div class="w-16 h-16 mx-auto school-gradient rounded-lg flex items-center justify-center mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No Transaction History</h3>
+            <p class="text-sm text-gray-500">Search for a student or scan RFID to view transaction history</p>
           </div>
         </div>
       </div>
@@ -310,21 +346,19 @@ const items = slice.map(s => {
       searchResults.innerHTML = '';
       const query = document.getElementById('searchInput').value.trim();
       if (!query) {
-        showError('Please enter a name or ID');
+        showError('Please enter a search term');
         return;
       }
-      fetch(`SearchBalance.php?query=${encodeURIComponent(query)}`)
+      
+      fetch(`SearchStudent.php?query=${encodeURIComponent(query)}`)
         .then(res => res.json())
         .then(data => {
           if (data.error) {
             showError(data.error);
             return;
           }
+          
           const students = data.students || [];
-          if (students.length === 0) {
-            showError(`No student found for "${query}"`);
-            return;
-          }
           if (students.length === 1) {
             const s = students[0];
             if (s.rfid_uid) {
@@ -332,14 +366,14 @@ const items = slice.map(s => {
               searchResults.innerHTML = '';
             } else {
               renderSearchResults(students, true);
-              showError('Student has no RFID on file. Please scan or update RFID.');
             }
-            return;
+          } else {
+            renderSearchResults(students, true);
           }
-          renderSearchResults(students, true);
         })
-        .catch(() => {
-          showError("Failed to fetch student data");
+        .catch(err => {
+          console.error('Search error:', err);
+          showError('Search failed. Please try again.');
         });
     }
 
@@ -348,15 +382,23 @@ const items = slice.map(s => {
   fetch(`GetBalance.php?rfid_uid=${encodeURIComponent(rfid)}`)
     .then(res => res.json())
     .then(data => {
-      // ✅ Always render student info (never "Unknown Student")
+      // ✅ Always render student info with simple gray avatar
       document.getElementById('student-info').innerHTML = `
-        <div class="flex items-center mb-3">
-          <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-xl">👤</div>
-          <div class="ml-3 font-medium">${data.full_name || ''}</div>
+        <div class="flex items-center space-x-4">
+          <div class="w-16 h-16 bg-gray-400 rounded-full flex items-center justify-center">
+            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-xl font-bold text-gray-800">${data.full_name || 'Unknown Student'}</h3>
+            <div class="space-y-1 text-sm text-gray-600">
+              <p><span class="font-medium">ID:</span> ${data.id_number || 'N/A'}</p>
+              <p><span class="font-medium">Program:</span> ${data.program || 'N/A'}</p>
+              <p><span class="font-medium">Year & Section:</span> ${data.year_section || 'N/A'}</p>
+            </div>
+          </div>
         </div>
-        <p class="text-sm text-gray-600">ID: ${data.id_number || ''}</p>
-        <p class="text-sm text-gray-600">Program: ${data.program || ''}</p>
-        <p class="text-sm text-gray-600">Year & Section: ${data.year_section || ''}</p>
       `;
 
       // ✅ If no balance record, just fill in zeros
@@ -369,103 +411,127 @@ const items = slice.map(s => {
       const gross_total = Number(data.gross_total ?? 0);
       const term = data.school_year_term || "No balance record";
 
-      document.getElementById('tab-balance').innerHTML = `
-  <div class="flex justify-between items-center">
-    <label class="font-medium">${term}</label>
-  </div>
-  <div class="overflow-x-auto mt-4">
-    <table class="min-w-full bg-white rounded shadow text-sm table-fixed">
-      <thead class="bg-black text-white">
-        <tr>
-          <th class="px-4 py-2 w-12 text-center">#</th>
-          <th class="px-4 py-2 w-48">Fee Type</th>
-          <th class="px-4 py-2 w-32 text-right">Amount Due</th>
-          <th class="px-4 py-2 w-32 text-right">Paid</th>
-          <th class="px-4 py-2 w-32 text-right">Balance</th>
-        </tr>
-      </thead>
-      <tbody class="text-gray-800">
-        <tr class="text-center">
-          <td class="px-4 py-2">1</td>
-          <td class="px-4 py-2 text-left">Tuition Fee</td>
-          <td class="px-4 py-2 text-right">₱${tuition_fee.toFixed(2)}</td>
-          <td class="px-4 py-2 text-right">₱${tuition_paid.toFixed(2)}</td>
-          <td class="px-4 py-2 text-right">₱${(tuition_fee - tuition_paid).toFixed(2)}</td>
-        </tr>
-        <tr class="text-center">
-          <td class="px-4 py-2">2</td>
-          <td class="px-4 py-2 text-left">Other Fees</td>
-          <td class="px-4 py-2 text-right">₱${other_fees.toFixed(2)}</td>
-          <td class="px-4 py-2 text-right">₱${other_paid.toFixed(2)}</td>
-          <td class="px-4 py-2 text-right">₱${(other_fees - other_paid).toFixed(2)}</td>
-        </tr>
-        <tr class="text-center">
-          <td class="px-4 py-2">3</td>
-          <td class="px-4 py-2 text-left">Student Fees</td>
-          <td class="px-4 py-2 text-right">₱${student_fees.toFixed(2)}</td>
-          <td class="px-4 py-2 text-right">₱${student_paid.toFixed(2)}</td>
-          <td class="px-4 py-2 text-right">₱${(student_fees - student_paid).toFixed(2)}</td>
-        </tr>
-      </tbody>
-    </table>
-    <p class="text-right text-sm mt-2 font-medium">Total: ₱${gross_total.toFixed(2)}</p>
-
-    <!-- ✅ Add Fee Section -->
-    <div class="mt-4 border-t pt-4">
-      <h3 class="text-sm font-medium mb-2">Add New Fee</h3>
-      <div class="flex flex-col gap-2">
-        <input type="text" id="feeType" placeholder="Fee Type" 
-          class="border rounded px-3 py-1 text-sm w-60"/>
-        <input type="number" id="feeAmount" placeholder="Amount Due" 
-          class="border rounded px-3 py-1 text-sm w-60"/>
-        <input type="number" id="feePaid" placeholder="Amount Paid" 
-          class="border rounded px-3 py-1 text-sm w-60"/>
-        <button onclick="addFee('${rfid}')" 
-          class="bg-black text-white px-4 py-2 rounded text-sm hover:bg-gray-800 w-32">
-          Add Fee
-        </button>
-      </div>
-    </div>
-  </div>
-`;
-
-
-      // ✅ History stays empty if none
-      let historyHTML = '';
-      if (data.history && data.history.length > 0) {
-        data.history.forEach((row, index) => {
-          historyHTML += `
-            <tr>
-              <td class="px-4 py-2">${index + 1}</td>
-              <td class="px-4 py-2">${row.date}</td>
-              <td class="px-4 py-2">Tuition fee</td>
-              <td class="px-4 py-2">₱${row.amount}</td>
-              <td class="px-4 py-2">Cash</td>
-            </tr>
-          `;
-        });
+      if (term === "No balance record") {
+        document.getElementById('tab-balance').innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 mx-auto bg-blue-500 rounded-lg flex items-center justify-center mb-4">
+              <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No Balance Record</h3>
+            <p class="text-sm text-gray-500">This student has no balance information on file</p>
+          </div>
+        `;
       } else {
-        historyHTML = `<tr><td colspan="5" class="px-4 py-2">No history available</td></tr>`;
+        document.getElementById('tab-balance').innerHTML = `
+          <div class="flex items-center mb-6">
+            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+              </svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800">Balance Information</h2>
+          </div>
+          
+          <div class="bg-blue-50 rounded-lg p-4 mb-6">
+            <p class="text-sm font-medium text-blue-800">Academic Term: ${term}</p>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="min-w-full bg-white rounded-lg shadow-sm border border-gray-200">
+              <thead class="bg-gray-800 text-white">
+                <tr>
+                  <th class="px-4 py-3 text-center text-sm font-semibold">#</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold">Fee Type</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">Amount Due</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">Paid</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">Balance</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-800">
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <td class="px-4 py-3 text-center">1</td>
+                  <td class="px-4 py-3 font-medium">Tuition Fee</td>
+                  <td class="px-4 py-3 text-right">₱${tuition_fee.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right">₱${tuition_paid.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right font-semibold">₱${(tuition_fee - tuition_paid).toFixed(2)}</td>
+                </tr>
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <td class="px-4 py-3 text-center">2</td>
+                  <td class="px-4 py-3 font-medium">Other Fees</td>
+                  <td class="px-4 py-3 text-right">₱${other_fees.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right">₱${other_paid.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right font-semibold">₱${(other_fees - other_paid).toFixed(2)}</td>
+                </tr>
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <td class="px-4 py-3 text-center">3</td>
+                  <td class="px-4 py-3 font-medium">Student Fees</td>
+                  <td class="px-4 py-3 text-right">₱${student_fees.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right">₱${student_paid.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right font-semibold">₱${(student_fees - student_paid).toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div class="flex justify-between items-center">
+                <span class="text-lg font-bold text-gray-800">Total Outstanding Balance:</span>
+                <span class="text-xl font-bold text-gray-900">₱${gross_total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        `;
       }
 
-      document.getElementById('tab-history').innerHTML = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full bg-white rounded shadow text-sm">
-            <thead class="bg-black text-white">
-              <tr>
-                <th class="px-4 py-2">#</th>
-                <th class="px-4 py-2">Date</th>
-                <th class="px-4 py-2">Description</th>
-                <th class="px-4 py-2">Amount</th>
-                <th class="px-4 py-2">Method</th>
-              </tr>
-            </thead>
-            <tbody class="text-gray-800 text-center">
-              ${historyHTML}
-            </tbody>
-          </table>
-        </div>
-      `;
+
+      // ✅ Enhanced History UI
+      if (data.history && data.history.length > 0) {
+        let historyHTML = '';
+        data.history.forEach((row, index) => {
+          historyHTML += `
+            <div class="border border-gray-200 rounded-lg p-4 mb-3">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <p class="font-semibold text-gray-900">${row.date}</p>
+                  <p class="text-sm text-gray-600">${row.description || 'Payment'}</p>
+                </div>
+                <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">Paid</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Payment Method: ${row.method || 'Cash'}</span>
+                <span class="font-semibold text-gray-900">₱${row.amount}</span>
+              </div>
+            </div>
+          `;
+        });
+        
+        document.getElementById('tab-history').innerHTML = `
+          <div class="flex items-center mb-6">
+            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800">Transaction History</h2>
+          </div>
+          <div class="space-y-3">
+            ${historyHTML}
+          </div>
+        `;
+      } else {
+        document.getElementById('tab-history').innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 mx-auto school-gradient rounded-lg flex items-center justify-center mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">No Transaction History</h3>
+            <p class="text-sm text-gray-500">This student has no payment records on file</p>
+          </div>
+        `;
+      }
 
       rfidInput.value = '';
       focusRFID();
@@ -478,79 +544,39 @@ const items = slice.map(s => {
 }
 
 
-    // ====== AUTOCOMPLETE SEARCH ======
-function addFee(rfid) {
-  const feeType = document.getElementById('feeType').value.trim();
-  const feeAmount = document.getElementById('feeAmount').value.trim();
-  const feePaid = document.getElementById('feePaid').value.trim();
-
-  if (!feeType || !feeAmount) {
-    alert("Please enter fee type and amount due.");
-    return;
-  }
-
-  fetch("AddFee.php", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `rfid_uid=${encodeURIComponent(rfid)}&fee_type=${encodeURIComponent(feeType)}&amount=${encodeURIComponent(feeAmount)}&paid=${encodeURIComponent(feePaid)}`
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      alert("Fee added successfully!");
-      handleRFID(rfid); // ✅ refresh student balance
-    } else {
-      alert("Failed to add fee: " + (data.error || "Unknown error"));
-    }
-  })
-  .catch(err => {
-    console.error(err);
-    alert("Error adding fee");
-  });
-}
-
-// debounce helper (wait before firing fetch)
-function debounce(func, delay) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), delay);
-  };
-}
-
-// hook input event for live search
-const searchInput = document.getElementById('searchInput');
-searchInput.addEventListener('input', debounce(() => {
-  const query = searchInput.value.trim();
-  if (!query) {
-    searchResults.innerHTML = ''; // clear results if empty
-    return;
-  }
-
-  fetch(`SearchBalance.php?query=${encodeURIComponent(query)}`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.error) {
-        searchResults.innerHTML = `<p class="text-sm text-red-500">${data.error}</p>`;
+    // ====== LIVE SEARCH FUNCTIONALITY ======
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim();
+      clearError();
+      clearTimeout(searchTimeout);
+      if (!query.length) {
+        searchResults.innerHTML = '';
         return;
       }
-
-      const students = data.students || [];
-      if (students.length === 0) {
-        searchResults.innerHTML = `<p class="text-sm text-gray-500 italic">No matches for "${query}"</p>`;
-        return;
-      }
-
-      // ✅ show results live while typing
-      renderSearchResults(students, true);
-    })
-    .catch(() => {
-      searchResults.innerHTML = `<p class="text-sm text-red-500">Failed to fetch</p>`;
+      searchTimeout = setTimeout(() => fetchStudents(query), 300);
     });
-}, 300)); // 300ms delay before triggering search
+
+    function fetchStudents(query) {
+      clearError();
+      fetch(`SearchStudent.php?query=${encodeURIComponent(query)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error || !data.students || !data.students.length) {
+            searchResults.innerHTML = `<p class="text-sm text-gray-500 italic">No matches for "${query}"</p>`;
+            return;
+          }
+          renderSearchResults(data.students, true);
+        })
+        .catch(err => {
+          console.error('Search error:', err);
+          searchResults.innerHTML = `<p class="text-sm text-red-500">Failed to fetch student data</p>`;
+        });
+    }
 
 
-    // ✅ Focus RFID when page loads
+    // Focus RFID when page loads
     window.onload = focusRFID;
   </script>
 

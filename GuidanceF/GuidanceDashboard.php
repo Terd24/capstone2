@@ -18,7 +18,7 @@ header("Expires: 0");
 <head>
   <meta charset="UTF-8" />
   <title>Guidance Dashboard - Cornerstone College Inc.</title>
-  <link rel="icon" href="../images/Logo.png" type="image/png">
+  <link rel="icon" href="../images/LogoCCI.png" type="image/png">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
@@ -32,7 +32,7 @@ header("Expires: 0");
   <div class="container mx-auto px-6 py-4">
     <div class="flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <img src="../images/Logo.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+        <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
         <div>
           <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
           <p class="text-blue-200 text-sm">Guidance Portal</p>
@@ -83,6 +83,9 @@ header("Expires: 0");
           aria-describedby="searchError"
         />
       </div>
+      <button onclick="searchStudents()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors">
+        Search
+      </button>
       <p id="searchError" class="text-red-600 text-sm"></p>
     </div>
   </div>
@@ -101,13 +104,46 @@ header("Expires: 0");
 
 <!-- Main Content -->
 <div class="container mx-auto px-6 py-8">
-  <!-- Student List -->
-  <div id="studentList" class="space-y-6">
-    <div class="bg-white rounded-2xl card-shadow p-8 text-center text-gray-500">
-      <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-      </svg>
-      <p class="text-sm italic">Scan RFID card or search to load student guidance records</p>
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+    
+    <!-- Guidance Profile -->
+    <div class="lg:col-span-1">
+      <div class="bg-white rounded-2xl card-shadow p-6">
+        <div class="text-center">
+          <div class="w-20 h-20 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($_SESSION['guidance_name'] ?? 'Guidance Counselor') ?></h3>
+          <p class="text-gray-600 text-sm">ID: <?= htmlspecialchars($_SESSION['id_number'] ?? 'N/A') ?></p>
+        </div>
+        
+        <div class="mt-6 pt-6 border-t">
+          <div class="space-y-3 text-sm">
+            <div>
+              <span class="text-gray-500 font-medium">Role:</span>
+              <p class="text-gray-800">Guidance Counselor</p>
+            </div>
+            <div>
+              <span class="text-gray-500 font-medium">Department:</span>
+              <p class="text-gray-800">Student Affairs</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student List -->
+    <div class="lg:col-span-3">
+      <div id="studentList" class="space-y-6">
+        <div class="bg-white rounded-2xl card-shadow p-8 text-center text-gray-500">
+          <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+          <p class="text-sm italic">Scan RFID card or search to load student guidance records</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -426,16 +462,11 @@ header("Expires: 0");
     searchTimeout = setTimeout(() => fetchStudents(query), 300);
   });
 
-  const searchBtn = document.createElement('button');
-  searchBtn.textContent = 'Search';
-  searchBtn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors';
-  searchInput.parentNode.appendChild(searchBtn);
-
-  searchBtn.addEventListener('click', () => {
+  function searchStudents() {
     const query = searchInput.value.trim();
     if (!query) { showError('Please enter a name or ID to search'); return; }
     fetchStudents(query);
-  });
+  }
 
   function fetchStudents(query) {
     clearError();

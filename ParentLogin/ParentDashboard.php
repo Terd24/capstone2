@@ -35,7 +35,7 @@ if ($child_result->num_rows === 1) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Dashboard - Cornerstone College Inc.</title>
-  <link rel="icon" href="../images/Logo.png" type="image/png">
+  <link rel="icon" href="../images/LogoCCI.png" type="image/png">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
@@ -44,12 +44,17 @@ if ($child_result->num_rows === 1) {
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
+  <!-- RFID Form -->
+  <form id="rfidForm" method="get" action="ParentBalances.php">
+    <input type="hidden" id="rfid_input" name="student_id" autocomplete="off">
+  </form>
+
   <!-- Header with School Branding -->
   <header class="school-gradient text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
       <div class="flex justify-between items-center">
         <div class="flex items-center space-x-4">
-          <img src="../images/Logo.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
           <div>
             <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
             <p class="text-blue-200 text-sm">Parent Portal</p>
@@ -88,8 +93,10 @@ if ($child_result->num_rows === 1) {
       <!-- Child Profile Card -->
       <div class="bg-white rounded-2xl card-shadow p-8">
         <div class="text-center mb-6">
-          <div class="w-24 h-24 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-3xl font-bold mb-4">
-            <?= strtoupper(substr(explode(' ', $child_name)[0] ?? 'S', 0, 1) . substr(explode(' ', $child_name)[1] ?? 'T', 0, 1)) ?>
+          <div class="w-24 h-24 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
           </div>
           <h2 class="text-2xl font-bold text-gray-800 mb-2"><?= htmlspecialchars($child_name) ?></h2>
           <p class="text-blue-600 font-medium">Student ID: <?= htmlspecialchars($child_id) ?></p>
@@ -189,6 +196,31 @@ if ($child_result->num_rows === 1) {
       if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
         menuDropdown.classList.add('hidden');
       }
+    });
+
+    // ===== RFID Scanner Logic =====
+    let rfidBuffer = "";
+    let lastKeyTime = Date.now();
+    const rfidInput = document.getElementById("rfid_input");
+    const rfidForm = document.getElementById("rfidForm");
+
+    document.addEventListener('keydown', (e) => {
+        const currentTime = Date.now();
+        if (currentTime - lastKeyTime > 100) rfidBuffer = "";
+        lastKeyTime = currentTime;
+
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+        if (e.key === 'Enter') {
+            if (rfidBuffer.length >= 5) {
+                rfidInput.value = rfidBuffer.trim();
+                rfidForm.submit();
+            }
+            rfidBuffer = "";
+            e.preventDefault();
+        } else if (e.key.length === 1) {
+            rfidBuffer += e.key;
+        }
     });
   </script>
 

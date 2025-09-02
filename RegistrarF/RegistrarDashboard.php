@@ -50,21 +50,21 @@ function timeAgo($time) {
 </form>
 
 <!-- Header with School Branding -->
-<header class="school-gradient text-white shadow-lg">
+<header class="bg-blue-600 text-white shadow-lg">
   <div class="container mx-auto px-6 py-4">
     <div class="flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <img src="../images/Logo.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-        <div>
-          <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-          <p class="text-blue-200 text-sm">Registrar Portal</p>
+        <div class="text-left">
+          <p class="text-sm text-blue-200">Welcome,</p>
+          <p class="font-semibold"><?= htmlspecialchars($_SESSION['registrar_name'] ?? 'Registrar') ?></p>
         </div>
       </div>
       
       <div class="flex items-center space-x-4">
+        <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
         <div class="text-right">
-          <p class="text-sm text-blue-200">Welcome,</p>
-          <p class="font-semibold"><?= htmlspecialchars($_SESSION['registrar_name'] ?? 'Registrar') ?></p>
+          <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+          <p class="text-blue-200 text-sm">Registrar Portal</p>
         </div>
         <div class="relative">
           <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
@@ -103,6 +103,9 @@ function timeAgo($time) {
           class="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
         />
       </div>
+      <button onclick="fetchStudents(document.getElementById('searchInput').value.trim())" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors">
+        Search
+      </button>
       <p id="searchError" class="text-red-600 text-sm"></p>
     </div>
     <div id="searchResults" class="mt-4 space-y-2"></div>
@@ -111,28 +114,50 @@ function timeAgo($time) {
 
 <!-- Content Layout -->
 <div class="container mx-auto px-6 py-8">
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- LEFT SIDE -->
-    <div class="space-y-6">
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+    <!-- LEFT SIDE - Registrar Profile -->
+    <div class="lg:col-span-1">
         <!-- Registrar Profile -->
         <div class="bg-white rounded-2xl card-shadow p-6">
-          <div class="text-center mb-6">
-            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-4">
-              <?= strtoupper(substr($_SESSION['first_name'] ?? 'R', 0, 1) . substr($_SESSION['last_name'] ?? 'E', 0, 1)) ?>
+          <div class="text-center">
+            <div class="w-20 h-20 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
+              <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
             </div>
-            <h2 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($_SESSION['registrar_name'] ?? 'Registrar') ?></h2>
-            <p class="text-blue-600 font-medium">Staff ID: <?= htmlspecialchars($_SESSION['id_number'] ?? 'N/A') ?></p>
+            <h3 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($_SESSION['registrar_name'] ?? 'Registrar') ?></h3>
+            <p class="text-gray-600 text-sm">ID: <?= htmlspecialchars($_SESSION['id_number'] ?? 'N/A') ?></p>
           </div>
           
-          <div class="bg-blue-50 rounded-lg p-4">
-            <h3 class="font-semibold text-gray-700 mb-2">Quick Actions</h3>
-            <button onclick="window.location.href='AccountList.php'" 
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors mb-2">
-              Manage Accounts
-            </button>
+          <div class="mt-6 pt-6 border-t">
+            <div class="space-y-3 text-sm">
+              <div>
+                <span class="text-gray-500 font-medium">Role:</span>
+                <p class="text-gray-800">Registrar</p>
+              </div>
+              <div>
+                <span class="text-gray-500 font-medium">Department:</span>
+                <p class="text-gray-800">Student Records</p>
+              </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t">
+              <button onclick="window.location.href='AccountList.php'" 
+                      class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
+                Manage Accounts
+              </button>
+              <button onclick="window.location.href='ManageGrades.php'" 
+                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm">
+                Manage Grades
+              </button>
+            </div>
           </div>
         </div>
+    </div>
 
+    <!-- RIGHT SIDE - All Student Requests -->
+    <div class="lg:col-span-3">
+    <div class="space-y-6">
         <!-- Recent Student Requests -->
         <div class="bg-white rounded-2xl card-shadow p-6">
             <div class="flex justify-between items-center mb-4 cursor-pointer" id="recentToggle">
@@ -182,11 +207,7 @@ function timeAgo($time) {
             <?php endif; ?>
             </div>
         </div>
-            </div>
-        </div>
 
-    </div>
-    <div class="lg:col-span-2">
         <div class="bg-white rounded-2xl card-shadow p-6">
             <!-- Filter Dropdown -->
             <div class="flex items-center justify-between mb-4">
@@ -204,7 +225,7 @@ function timeAgo($time) {
 
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white rounded-xl overflow-hidden text-sm">
-                    <thead class="school-gradient text-white">
+                    <thead class="bg-blue-600 text-white">
                         <tr>
                             <th class="px-6 py-4 text-left font-semibold">Student No</th>
                             <th class="px-6 py-4 text-left font-semibold">Document Name</th>
@@ -216,7 +237,7 @@ function timeAgo($time) {
                     <tbody class="text-gray-800 divide-y divide-gray-200">
                         <?php if ($result && $result->num_rows > 0): ?>
                             <?php while ($r = $result->fetch_assoc()): ?>
-                                <tr class="hover:bg-blue-50 transition-colors <?= ($r['status'] === 'Pending') ? 'bg-yellow-50' : '' ?>">
+                                <tr class="bg-white hover:bg-[#FBB917]/20 transition cursor-pointer" onclick="viewRequest('<?= htmlspecialchars($r['student_id']) ?>', '<?= htmlspecialchars($r['document_type']) ?>', '<?= $r['status'] ?>')">
                                     <td class="px-6 py-4 font-medium"><?= htmlspecialchars($r['student_id']) ?></td>
                                     <td class="px-6 py-4"><?= htmlspecialchars($r['document_type']) ?></td>
                                     <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($r['date_requested']) ?></td>
@@ -409,7 +430,11 @@ function fetchStudents(query) {
         if(data.error) { searchResults.innerHTML=''; showError(data.error); return; }
         renderSearchResults(data.students || [], true);
     })
-    .catch(()=>{ searchResults.innerHTML=''; showError('Failed to fetch student data'); });
+    .catch((err)=>{ 
+        console.error('Search error:', err);
+        searchResults.innerHTML=''; 
+        showError('Failed to fetch student data'); 
+    });
 }
 
 searchInput.addEventListener('input', () => {
@@ -433,6 +458,14 @@ statusFilter.addEventListener('change', () => {
             row.style.display = '';
         } else row.style.display = 'none';
     });
+
+    renderStudents();
+
+    // Add viewRequest function for clickable table rows
+    function viewRequest(studentId, documentType, status) {
+        alert(`Student: ${studentId}\nDocument: ${documentType}\nStatus: ${status}`);
+        // You can customize this to navigate to a request detail page
+    }
 });
 </script>
 </body>
