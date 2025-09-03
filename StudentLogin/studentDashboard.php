@@ -26,12 +26,23 @@ $notif_result = $notif_stmt->get_result();
 $unread_count = $notif_result->fetch_assoc()['unread_count'];
 $notif_stmt->close();
 
-// Get recent notifications
-$recent_stmt = $conn->prepare("SELECT message, date_sent FROM notifications WHERE student_id = ? ORDER BY date_sent DESC LIMIT 3");
+// Get recent notifications (limited for dropdown initially)
+$recent_stmt = $conn->prepare("SELECT id, message, date_sent, is_read FROM notifications WHERE student_id = ? ORDER BY date_sent DESC LIMIT 5");
 $recent_stmt->bind_param("s", $student_id);
 $recent_stmt->execute();
 $recent_notifications = $recent_stmt->get_result();
 $recent_stmt->close();
+
+// Get all notifications for AJAX loading
+$all_stmt = $conn->prepare("SELECT id, message, date_sent, is_read FROM notifications WHERE student_id = ? ORDER BY date_sent DESC");
+$all_stmt->bind_param("s", $student_id);
+$all_stmt->execute();
+$all_notifications = $all_stmt->get_result();
+$all_notifications_array = [];
+while ($row = $all_notifications->fetch_assoc()) {
+    $all_notifications_array[] = $row;
+}
+$all_stmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -58,10 +69,18 @@ $recent_stmt->close();
             <p class="text-sm text-blue-200">Welcome,</p>
             <p class="font-semibold"><?= htmlspecialchars($_SESSION['student_name'] ?? 'Student') ?></p>
           </div>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+          <div class="text-right">
+            <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+            <p class="text-blue-200 text-sm">Student Portal</p>
+          </div>
           
           <!-- Notifications Bell -->
           <div class="relative">
-            <button onclick="toggleNotifications()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition relative">
+            <button id="notificationBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition relative cursor-pointer">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
               </svg>
@@ -73,40 +92,80 @@ $recent_stmt->close();
             </button>
             
             <!-- Notifications Dropdown -->
-            <div id="notificationsDropdown" class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 hidden">
-              <div class="p-4 border-b border-gray-200">
-                <h3 class="font-semibold text-gray-900">Notifications</h3>
-                <p class="text-sm text-gray-500"><?= $unread_count ?> unread</p>
+            <div id="notificationsDropdown" class="fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] hidden w-80" style="max-width: 90vw;">
+              <!-- Header -->
+              <div class="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-bold text-gray-900 flex items-center">
+                    <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                    Notifications
+                  </h3>
+                  <?php if ($unread_count > 0): ?>
+                    <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      <?= $unread_count ?>
+                    </span>
+                  <?php endif; ?>
+                </div>
               </div>
-              <div class="max-h-64 overflow-y-auto">
+              
+              <!-- Notifications List -->
+              <div id="notificationsList" class="max-h-80 overflow-y-auto">
                 <?php if ($recent_notifications->num_rows > 0): ?>
-                  <?php while ($notification = $recent_notifications->fetch_assoc()): ?>
-                    <div class="p-4 border-b border-gray-100 hover:bg-gray-50">
-                      <p class="text-sm text-gray-800"><?= htmlspecialchars($notification['message']) ?></p>
-                      <p class="text-xs text-gray-500 mt-1"><?= date('M d, Y g:i A', strtotime($notification['date_sent'])) ?></p>
+                  <?php 
+                  $recent_notifications->data_seek(0); // Reset pointer
+                  $count = 0;
+                  while ($notification = $recent_notifications->fetch_assoc()): 
+                    $count++;
+                  ?>
+                    <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer <?= $notification['is_read'] ? 'opacity-75' : 'bg-blue-25' ?>" data-initial="<?= $count <= 5 ? 'true' : 'false' ?>">
+                      <div class="flex items-start space-x-3">
+                        <div class="flex-shrink-0">
+                          <?php if (!$notification['is_read']): ?>
+                            <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                          <?php else: ?>
+                            <div class="w-2 h-2 bg-gray-300 rounded-full mt-2"></div>
+                          <?php endif; ?>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <p class="text-sm text-gray-800 <?= !$notification['is_read'] ? 'font-semibold' : '' ?>">
+                            <?= htmlspecialchars($notification['message']) ?>
+                          </p>
+                          <p class="text-xs text-gray-500 mt-1">
+                            <?= date('M d, Y g:i A', strtotime($notification['date_sent'])) ?>
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   <?php endwhile; ?>
-                  <div class="p-4 text-center">
-                    <button onclick="markAllAsRead()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                      Mark all as read
-                    </button>
-                  </div>
                 <?php else: ?>
-                  <div class="p-4 text-center text-gray-500">
-                    <p class="text-sm">No notifications</p>
+                  <div class="p-8 text-center text-gray-500">
+                    <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                    <p class="text-sm font-medium">No notifications</p>
+                    <p class="text-xs mt-1">You're all caught up!</p>
                   </div>
                 <?php endif; ?>
               </div>
+              
+              <!-- Footer Actions -->
+              <?php if ($recent_notifications->num_rows > 0): ?>
+                <div class="p-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+                  <div class="flex justify-between items-center">
+                    <button onclick="markAllAsRead()" class="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                      Mark all as read
+                    </button>
+                    <button id="viewMoreBtn" onclick="loadMoreNotifications()" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg font-medium transition-colors">
+                      View More
+                    </button>
+                  </div>
+                </div>
+              <?php endif; ?>
             </div>
           </div>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-          <div class="text-right">
-            <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-            <p class="text-blue-200 text-sm">Student Portal</p>
-          </div>
+          
           <div class="relative">
             <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,7 +194,7 @@ $recent_stmt->close();
       <div class="lg:col-span-1">
         <div class="bg-white rounded-2xl card-shadow p-6">
           <div class="text-center">
-            <div class="w-20 h-20 mx-auto bg-gray-600 rounded-full flex items-center justify-center mb-4">
+            <div class="w-20 h-20 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
               <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
               </svg>
@@ -307,7 +366,40 @@ $recent_stmt->close();
   // Notifications functions
   function toggleNotifications() {
     const dropdown = document.getElementById('notificationsDropdown');
+    const button = document.getElementById('notificationBtn');
+    
+    if (dropdown.classList.contains('hidden')) {
+      // Get button position relative to viewport
+      const rect = button.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const dropdownWidth = 320;
+      
+      // Position dropdown using fixed positioning
+      dropdown.style.top = (rect.bottom + 8) + 'px';
+      
+      // Calculate horizontal position - align dropdown right edge with button right edge
+      let rightPos = viewportWidth - rect.right;
+      
+      // Ensure dropdown doesn't go off-screen on the left
+      if (rect.right - dropdownWidth < 10) {
+        rightPos = 10;
+      }
+      
+      // Use right positioning for better alignment
+      dropdown.style.right = rightPos + 'px';
+      dropdown.style.left = 'auto';
+      
+      // Adjust width for very small screens
+      if (viewportWidth < 350) {
+        dropdown.style.width = (viewportWidth - 20) + 'px';
+        dropdown.style.right = '10px';
+      } else {
+        dropdown.style.width = dropdownWidth + 'px';
+      }
+    }
+    
     dropdown.classList.toggle('hidden');
+    console.log('Dropdown positioned at right:', dropdown.style.right, 'top:', dropdown.style.top);
   }
   
   function markAllAsRead() {
@@ -326,13 +418,84 @@ $recent_stmt->close();
     .catch(error => console.error('Error:', error));
   }
   
-  // Close notifications dropdown when clicking outside
-  document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('notificationsDropdown');
-    const button = event.target.closest('button');
+  // Store all notifications data
+  const allNotifications = <?= json_encode($all_notifications_array) ?>;
+  let currentlyShowing = 5;
+  
+  function loadMoreNotifications() {
+    const notificationsList = document.getElementById('notificationsList');
+    const viewMoreBtn = document.getElementById('viewMoreBtn');
     
-    if (!button || button.onclick !== toggleNotifications) {
-      dropdown.classList.add('hidden');
+    // Show more notifications (next 5)
+    const nextBatch = allNotifications.slice(currentlyShowing, currentlyShowing + 5);
+    
+    nextBatch.forEach(notification => {
+      const notificationHTML = `
+        <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${notification.is_read == '0' ? 'bg-blue-25' : 'opacity-75'}">
+          <div class="flex items-start space-x-3">
+            <div class="flex-shrink-0">
+              ${notification.is_read == '0' ? 
+                '<div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>' : 
+                '<div class="w-2 h-2 bg-gray-300 rounded-full mt-2"></div>'
+              }
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-gray-800 ${notification.is_read == '0' ? 'font-semibold' : ''}">
+                ${notification.message}
+              </p>
+              <p class="text-xs text-gray-500 mt-1">
+                ${new Date(notification.date_sent).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+      notificationsList.insertAdjacentHTML('beforeend', notificationHTML);
+    });
+    
+    currentlyShowing += 5;
+    
+    // Hide "View More" button if all notifications are shown
+    if (currentlyShowing >= allNotifications.length) {
+      viewMoreBtn.style.display = 'none';
+    }
+    
+    // Update dropdown height if needed
+    const dropdown = document.getElementById('notificationsDropdown');
+    dropdown.style.maxHeight = '90vh';
+  }
+  
+  // Add click event listener to notification button
+  document.addEventListener('DOMContentLoaded', function() {
+    const notificationBtn = document.getElementById('notificationBtn');
+    const dropdown = document.getElementById('notificationsDropdown');
+    
+    console.log('DOM loaded, notification button:', notificationBtn);
+    console.log('Dropdown element:', dropdown);
+    
+    if (notificationBtn && dropdown) {
+      notificationBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Notification button clicked');
+        toggleNotifications();
+      });
+      
+      // Close notifications dropdown when clicking outside
+      document.addEventListener('click', function(event) {
+        if (!notificationBtn.contains(event.target) && !dropdown.contains(event.target)) {
+          dropdown.classList.add('hidden');
+        }
+      });
+    } else {
+      console.error('Notification elements not found');
     }
   });
 </script>

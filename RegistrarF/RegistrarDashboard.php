@@ -2,6 +2,9 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
+// Set correct timezone for Philippines
+date_default_timezone_set('Asia/Manila');
+
 // Prevent access if not logged in
 if (!isset($_SESSION['registrar_id'])) {
     header("Location: ../StudentLogin/login.html");
@@ -16,19 +19,40 @@ header("Expires: 0");
 // Ensure column exists for read/unread
 $conn->query("ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS is_read TINYINT(1) DEFAULT 0");
 
-// Fetch all requests
-$result = $conn->query("SELECT * FROM document_requests ORDER BY date_requested DESC");
+// Fetch all requests - prioritize oldest pending first, then other statuses, claimed last
+$result = $conn->query("SELECT * FROM document_requests ORDER BY 
+    CASE 
+        WHEN status = 'Pending' THEN 1
+        WHEN status = 'Ready to Claim' OR status = 'Ready for Claiming' THEN 2
+        WHEN status = 'Claimed' THEN 3
+        ELSE 4
+    END ASC,
+    date_requested ASC");
 
-// Fetch only top 3 recent requests
-$recent = $conn->query("SELECT * FROM document_requests ORDER BY date_requested ASC LIMIT 3");
+// Fetch recent requests - prioritize unread first, then oldest, exclude claimed
+$recent = $conn->query("SELECT * FROM document_requests WHERE status != 'Claimed' ORDER BY is_read ASC, date_requested ASC LIMIT 10");
 
 // Helper function for PHP fallback time ago (optional)
 function timeAgo($time) {
+    // Use MySQL timestamp directly to avoid timezone conversion issues
     $diff = time() - strtotime($time);
-    if ($diff < 60) return $diff . " seconds ago";
-    elseif ($diff < 3600) return floor($diff/60) . " minutes ago";
-    elseif ($diff < 86400) return floor($diff/3600) . " hours ago";
-    else return floor($diff/86400) . " days ago";
+    
+    // Handle both positive and negative differences
+    $absDiff = abs($diff);
+    
+    if ($absDiff < 60) return "Just now";
+    elseif ($absDiff < 3600) {
+        $minutes = floor($absDiff/60);
+        return $minutes . ($minutes === 1 ? " minute ago" : " minutes ago");
+    }
+    elseif ($absDiff < 86400) {
+        $hours = floor($absDiff/3600);
+        return $hours . ($hours === 1 ? " hour ago" : " hours ago");
+    }
+    else {
+        $days = floor($absDiff/86400);
+        return $days . ($days === 1 ? " day ago" : " days ago");
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -187,9 +211,10 @@ function timeAgo($time) {
                 <?php while ($row = $recent->fetch_assoc()): ?>
                     <div class="bg-gray-50 p-4 rounded border mb-3 flex justify-between items-start" 
                          id="req-<?= $row['id'] ?>"
-                         data-timestamp="<?= strtotime($row['date_requested']) ?>">
+                         data-timestamp="<?= strtotime($row['date_requested']) ?>"
+                         data-date="<?= $row['date_requested'] ?>">
                         <div class="flex flex-col gap-1">
-                            <p class="text-xs text-gray-400 font-medium time-ago">Just now</p>
+                            <p class="text-xs text-gray-400 font-medium time-ago" data-time="<?= strtotime($row['date_requested']) ?>" data-debug="<?= $row['date_requested'] ?>"><?= timeAgo($row['date_requested']) ?></p>
                             <p class="font-medium text-gray-700"><?= htmlspecialchars($row['document_type']) ?></p>
                             <p class="text-xs text-gray-500">
                                 By: <?= htmlspecialchars($row['student_name']) ?> (<?= htmlspecialchars($row['student_id']) ?>)
@@ -233,8 +258,8 @@ function timeAgo($time) {
                         <tr>
                             <th class="px-6 py-4 text-left font-semibold">Student No</th>
                             <th class="px-6 py-4 text-left font-semibold">Document Name</th>
-                            <th class="px-6 py-4 text-left font-semibold">Date Submitted</th>
-                            <th class="px-6 py-4 text-left font-semibold">Claimed At</th>
+                            <th class="px-6 py-4 text-left font-semibold">Date Requested</th>
+                            <th class="px-6 py-4 text-left font-semibold">Date Claimed</th>
                             <th class="px-6 py-4 text-left font-semibold">Status</th>
                         </tr>
                     </thead>
@@ -244,9 +269,9 @@ function timeAgo($time) {
                                 <tr class="bg-white hover:bg-[#FBB917]/20 transition cursor-pointer" onclick="viewRequest('<?= htmlspecialchars($r['student_id']) ?>', '<?= htmlspecialchars($r['document_type']) ?>', '<?= $r['status'] ?>')">
                                     <td class="px-6 py-4 font-medium"><?= htmlspecialchars($r['student_id']) ?></td>
                                     <td class="px-6 py-4"><?= htmlspecialchars($r['document_type']) ?></td>
-                                    <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($r['date_requested']) ?></td>
+                                    <td class="px-6 py-4 text-gray-600"><?= date('M j, Y g:i:s A', strtotime($r['date_requested'])) ?></td>
                                     <td class="px-6 py-4 text-gray-600">
-                                        <?= ($r['status'] === 'Claimed' && $r['date_claimed']) ? htmlspecialchars($r['date_claimed']) : '---' ?>
+                                        <?= ($r['status'] === 'Claimed' && $r['date_claimed']) ? date('M j, Y g:i:s A', strtotime($r['date_claimed'])) : '---' ?>
                                     </td>
                                     <td class="px-6 py-4">
                                         <?php if ($r['status'] === 'Pending'): ?>
@@ -320,29 +345,68 @@ const recentArrow = document.getElementById("recentArrow");
 recentToggle.addEventListener("click", () => {
     recentContent.classList.toggle("hidden");
     recentArrow.classList.toggle("rotate-180");
+    
+    // Reset the view more functionality when reopening
+    if (!recentContent.classList.contains("hidden")) {
+        shownRecent = 3;
+        renderRecent();
+    }
 });
 
 // ===== Live Time Ago Function =====
 function updateTimeAgo() {
-    const now = Date.now();
-    document.querySelectorAll('#recentContent [data-timestamp]').forEach(el => {
-        const timestamp = parseInt(el.getAttribute('data-timestamp')) * 1000; // convert to ms
-        const diff = Math.floor((now - timestamp)/1000);
-
-        let text = '';
-        if (diff < 60) text = 'Just now';
-        else if (diff < 3600) text = Math.floor(diff/60) + (Math.floor(diff/60) === 1 ? ' minute ago' : ' minutes ago');
-        else if (diff < 86400) text = Math.floor(diff/3600) + (Math.floor(diff/3600) === 1 ? ' hour ago' : ' hours ago');
-        else text = Math.floor(diff/86400) + (Math.floor(diff/86400) === 1 ? ' day ago' : ' days ago');
-
-        const p = el.querySelector('.time-ago');
-        if (p) p.textContent = text;
+    // Find all time elements in recent content
+    const timeElements = document.querySelectorAll('#recentContent .time-ago[data-time]');
+    
+    timeElements.forEach(element => {
+        const timestamp = parseInt(element.getAttribute('data-time'));
+        
+        // Create a date object from the timestamp and get current time
+        const requestDate = new Date(timestamp * 1000);
+        const now = new Date();
+        
+        // Calculate difference in milliseconds, then convert to seconds
+        const diffMs = now.getTime() - requestDate.getTime();
+        const diffSeconds = Math.floor(diffMs / 1000);
+        
+        let timeText = '';
+        
+        // Handle both positive and negative differences (past and future dates)
+        const absDiff = Math.abs(diffSeconds);
+        
+        if (absDiff < 60) {
+            timeText = 'Just now';
+        } else if (absDiff < 3600) {
+            const minutes = Math.floor(absDiff / 60);
+            timeText = minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        } else if (absDiff < 86400) {
+            const hours = Math.floor(absDiff / 3600);
+            timeText = hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        } else {
+            const days = Math.floor(absDiff / 86400);
+            timeText = days === 1 ? '1 day ago' : `${days} days ago`;
+        }
+        
+        element.textContent = timeText;
     });
 }
 
-// Run every 30 seconds
-updateTimeAgo();
-setInterval(updateTimeAgo, 30000);
+// Wait for DOM to be ready, then start updating
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM ready, starting time updates');
+    updateTimeAgo();
+    setInterval(updateTimeAgo, 5000);
+});
+
+// Also run immediately in case DOM is already loaded
+if (document.readyState === 'loading') {
+    // DOM is still loading
+} else {
+    // DOM is already loaded
+    console.log('DOM already loaded, starting time updates immediately');
+    updateTimeAgo();
+    setInterval(updateTimeAgo, 5000);
+}
 
 // ===== Render Recent Requests with View More =====
 let recentRequests = Array.from(document.querySelectorAll('#recentContent > div'));
@@ -464,13 +528,12 @@ statusFilter.addEventListener('change', () => {
     });
 
     renderStudents();
-
-    // Add viewRequest function for clickable table rows
-    function viewRequest(studentId, documentType, status) {
-        alert(`Student: ${studentId}\nDocument: ${documentType}\nStatus: ${status}`);
-        // You can customize this to navigate to a request detail page
-    }
 });
+
+// Add viewRequest function for clickable table rows
+function viewRequest(studentId, documentType, status) {
+    window.location.href = `ViewStudentInfo.php?student_id=${encodeURIComponent(studentId)}&type=requested`;
+}
 </script>
 </body>
 </html>

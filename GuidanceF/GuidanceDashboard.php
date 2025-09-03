@@ -28,7 +28,7 @@ header("Expires: 0");
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
 <!-- Header with School Branding -->
-<header class="school-gradient text-white shadow-lg">
+<header class="bg-[#0B2C62] text-white shadow-lg">
   <div class="container mx-auto px-6 py-4">
     <div class="flex justify-between items-center">
       <div class="flex items-center space-x-4">
@@ -83,7 +83,7 @@ header("Expires: 0");
           aria-describedby="searchError"
         />
       </div>
-      <button onclick="searchStudents()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors">
+      <button onclick="searchStudents()" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors">
         Search
       </button>
       <p id="searchError" class="text-red-600 text-sm"></p>
@@ -147,9 +147,9 @@ header("Expires: 0");
     </div>
   </div>
 
-  <!-- Violation Form -->
-  <div id="formView" class="hidden max-w-lg mx-auto mt-8">
-    <div class="bg-white rounded-2xl card-shadow p-8">
+  <!-- Violation Form Modal -->
+  <div id="formView" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl card-shadow p-8 max-w-lg w-full mx-4">
       <div class="flex items-center mb-6">
         <button onclick="closeForm()" class="mr-4 p-2 hover:bg-gray-100 rounded-lg transition">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,7 +170,7 @@ header("Expires: 0");
           <select id="violationType" class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"></select>
         </div>
 
-        <button onclick="saveViolation()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium transition-colors">
+        <button onclick="saveViolation()" class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-3 rounded-xl font-medium transition-colors">
           Save Violation Record
         </button>
       </div>
@@ -228,8 +228,10 @@ header("Expires: 0");
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Student Profile -->
           <div class="text-center lg:border-r lg:pr-6">
-            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold mb-4">
-              ${initials}
+            <div class="w-20 h-20 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
+              <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
             </div>
             <h4 class="font-bold text-lg text-gray-800 mb-2">${student.name}</h4>
             <div class="space-y-1 text-sm text-gray-600">
@@ -266,7 +268,7 @@ header("Expires: 0");
                   Save Changes
                 </button>
               ` : `
-                <button onclick="openForm(${i})" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+                <button onclick="openForm(${i})" class="bg-[#0B2C62] hover:bg-blue-900 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
                   Add Violation Record
                 </button>
               `}
@@ -289,10 +291,11 @@ header("Expires: 0");
         </div>
       `;
     }
+    
     return `
       <div class="space-y-2">
         ${student.violations.map(v => `
-          <div class="bg-white rounded-lg p-3 border-l-4 border-orange-400">
+          <div class="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
             <p class="text-sm text-gray-700">${v}</p>
           </div>
         `).join('')}
@@ -368,13 +371,11 @@ header("Expires: 0");
     document.getElementById("violationDate").value = today;
 
     document.getElementById('formView').classList.remove('hidden');
-    document.getElementById('studentList').classList.add('hidden');
   }
 
   function closeForm() {
     selectedStudentIndex = null;
     document.getElementById('formView').classList.add('hidden');
-    document.getElementById('studentList').classList.remove('hidden');
   }
 
   // ===== ADD WARNING LEVEL =====
