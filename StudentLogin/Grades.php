@@ -48,7 +48,7 @@ while ($row = $result->fetch_assoc()) {
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
   <!-- Header -->
-  <header class="bg-blue-600 text-white shadow-lg">
+  <header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
       <div class="flex items-center space-x-4">
         <button onclick="window.location.href='studentDashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">

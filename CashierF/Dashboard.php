@@ -39,22 +39,22 @@ header("Expires: 0");
   <input type="text" id="rfidInput" autofocus class="absolute opacity-0">
 
   <!-- Header with School Branding -->
-  <header class="school-gradient text-white shadow-lg">
+  <header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
       <div class="flex justify-between items-center">
-        <div class="flex items-center space-x-4">
-          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-          <div>
-            <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-            <p class="text-blue-200 text-sm">Cashier Portal</p>
-          </div>
+      <div class="flex items-center space-x-4">
+        <div class="text-left">
+          <p class="text-sm text-blue-200">Welcome,</p>
+          <p class="font-semibold"><?= htmlspecialchars($_SESSION['cashier_name'] ?? 'Cashier') ?></p>
         </div>
-        
-        <div class="flex items-center space-x-4">
-          <div class="text-right">
-            <p class="text-sm text-blue-200">Welcome,</p>
-            <p class="font-semibold"><?= htmlspecialchars($_SESSION['cashier_name'] ?? 'Cashier') ?></p>
-          </div>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+        <div class="text-right">
+          <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+          <p class="text-blue-200 text-sm">Registrar Portal</p>
+        </div>
           <div class="relative">
             <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,7 +96,7 @@ header("Expires: 0");
         <button
           id="searchBtn"
           onclick="searchStudent()"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+          class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors"
         >Search</button>
         <p id="searchError" class="text-red-600 text-sm"></p>
       </div>

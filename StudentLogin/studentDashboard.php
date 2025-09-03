@@ -1,5 +1,6 @@
 <?php
 session_start();
+include("db_conn.php");
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'student') {
     header("Location: login.php");
@@ -15,6 +16,22 @@ if (!isset($_SESSION['id_number'])) {
     header("Location: login.php");
     exit();
 }
+
+// Get unread notifications count
+$student_id = $_SESSION['id_number'];
+$notif_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE student_id = ? AND is_read = 0");
+$notif_stmt->bind_param("s", $student_id);
+$notif_stmt->execute();
+$notif_result = $notif_stmt->get_result();
+$unread_count = $notif_result->fetch_assoc()['unread_count'];
+$notif_stmt->close();
+
+// Get recent notifications
+$recent_stmt = $conn->prepare("SELECT message, date_sent FROM notifications WHERE student_id = ? ORDER BY date_sent DESC LIMIT 3");
+$recent_stmt->bind_param("s", $student_id);
+$recent_stmt->execute();
+$recent_notifications = $recent_stmt->get_result();
+$recent_stmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -33,13 +50,54 @@ if (!isset($_SESSION['id_number'])) {
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
   <!-- Header with School Branding -->
-  <header class="bg-blue-600 text-white shadow-lg">
+  <header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
       <div class="flex justify-between items-center">
         <div class="flex items-center space-x-4">
           <div class="text-left">
             <p class="text-sm text-blue-200">Welcome,</p>
             <p class="font-semibold"><?= htmlspecialchars($_SESSION['student_name'] ?? 'Student') ?></p>
+          </div>
+          
+          <!-- Notifications Bell -->
+          <div class="relative">
+            <button onclick="toggleNotifications()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition relative">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+              </svg>
+              <?php if ($unread_count > 0): ?>
+                <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  <?= $unread_count > 9 ? '9+' : $unread_count ?>
+                </span>
+              <?php endif; ?>
+            </button>
+            
+            <!-- Notifications Dropdown -->
+            <div id="notificationsDropdown" class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 hidden">
+              <div class="p-4 border-b border-gray-200">
+                <h3 class="font-semibold text-gray-900">Notifications</h3>
+                <p class="text-sm text-gray-500"><?= $unread_count ?> unread</p>
+              </div>
+              <div class="max-h-64 overflow-y-auto">
+                <?php if ($recent_notifications->num_rows > 0): ?>
+                  <?php while ($notification = $recent_notifications->fetch_assoc()): ?>
+                    <div class="p-4 border-b border-gray-100 hover:bg-gray-50">
+                      <p class="text-sm text-gray-800"><?= htmlspecialchars($notification['message']) ?></p>
+                      <p class="text-xs text-gray-500 mt-1"><?= date('M d, Y g:i A', strtotime($notification['date_sent'])) ?></p>
+                    </div>
+                  <?php endwhile; ?>
+                  <div class="p-4 text-center">
+                    <button onclick="markAllAsRead()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                      Mark all as read
+                    </button>
+                  </div>
+                <?php else: ?>
+                  <div class="p-4 text-center text-gray-500">
+                    <p class="text-sm">No notifications</p>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -135,6 +193,7 @@ if (!isset($_SESSION['id_number'])) {
             </div>
           </div>
 
+
           <!-- Attendance Card -->
           <div onclick="location.href='attendance/Attendance.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
             <div class="flex items-center space-x-4">
@@ -196,7 +255,7 @@ if (!isset($_SESSION['id_number'])) {
           </div>
 
           <!-- Requested Documents Card -->
-          <div onclick="location.href='requested-document.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+          <div onclick="location.href='requested_document.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
             <div class="flex items-center space-x-4">
               <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                 <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,6 +293,46 @@ if (!isset($_SESSION['id_number'])) {
   window.addEventListener("pageshow", function (event) {
     if (event.persisted) {
       window.location.reload();
+    }
+  });
+</script>
+<script>
+  // Logout function
+  function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+      window.location.href = 'logout.php';
+    }
+  }
+  
+  // Notifications functions
+  function toggleNotifications() {
+    const dropdown = document.getElementById('notificationsDropdown');
+    dropdown.classList.toggle('hidden');
+  }
+  
+  function markAllAsRead() {
+    fetch('mark_notifications_read.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        location.reload();
+      }
+    })
+    .catch(error => console.error('Error:', error));
+  }
+  
+  // Close notifications dropdown when clicking outside
+  document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('notificationsDropdown');
+    const button = event.target.closest('button');
+    
+    if (!button || button.onclick !== toggleNotifications) {
+      dropdown.classList.add('hidden');
     }
   });
 </script>

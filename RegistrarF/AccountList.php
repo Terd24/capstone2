@@ -62,11 +62,29 @@ input[type=number] { -moz-appearance: textfield; }
 </head>
 <body class="bg-gradient-to-br from-[#f3f6fb] to-[#e6ecf7] font-sans min-h-screen text-gray-900">
 
-<!-- Header -->
-<div class="bg-[#0B2C62] text-white px-6 py-4 flex items-center shadow-lg">
-    <button onclick="window.location.href='registrardashboard.php'" class="text-2xl mr-4 hover:text-[#FBB917] transition">←</button>
-    <h1 class="text-xl font-bold tracking-wide">Account List</h1>
-</div>
+<header class="bg-[#0B2C62] text-white shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+        <button onclick="window.location.href='registrardashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+        </button>
+        <div>
+                <h1 class="text-xl font-bold">Account Management</h1>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+                <div class="text-right">
+                    <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+                    <p class="text-blue-200 text-sm">Grade Management System</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
 
 <div class="max-w-7xl mx-auto mt-8 p-6">
 
@@ -74,7 +92,7 @@ input[type=number] { -moz-appearance: textfield; }
     <div class="flex flex-col md:flex-row gap-4 md:items-center justify-between mb-8 bg-white p-6 rounded-2xl shadow-md border border-[#0B2C62]/20">
         <div class="flex items-center gap-3">
             <label class="font-medium text-[#0B2C62]">Select Account:</label>
-            <select id="accountType" class="border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#C41E3A]" onchange="changeType(this.value)">
+            <select id="accountType" class="border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" onchange="changeType(this.value)">
                 <option value="student" <?= $accountType==='student' ? 'selected' : '' ?>>Student</option>
                 <option value="registrar" <?= $accountType==='registrar' ? 'selected' : '' ?>>Registrar</option>
                 <option value="guidance" <?= $accountType==='guidance' ? 'selected' : '' ?>>Guidance</option>
@@ -85,11 +103,11 @@ input[type=number] { -moz-appearance: textfield; }
 
         <div class="flex items-center gap-3">
             <label class="font-medium text-[#0B2C62]">Show entries:</label>
-            <input type="number" id="showEntries" min="1" value="10" class="w-20 border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#C41E3A]"/>
+            <input type="number" id="showEntries" min="1" value="10" class="w-20 border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
         </div>
 
         <div class="flex items-center gap-3">
-            <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-64 border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#C41E3A]"/>
+            <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-64 border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
             <button onclick="openModal()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg shadow hover:bg-[#256f37] transition flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>

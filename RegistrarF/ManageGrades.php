@@ -98,7 +98,7 @@ $grades_result = $conn->query($grades_query);
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
 
 <!-- Header -->
-<header class="bg-blue-600 text-white shadow-lg">
+<header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
         <div class="flex justify-between items-center">
         <div class="flex items-center space-x-4">
@@ -108,6 +108,7 @@ $grades_result = $conn->query($grades_query);
           </svg>
         </button>
         <div>
+        <h1 class="text-xl font-bold">Grades Management</h1>
                 
                 </div>
             </div>
@@ -125,20 +126,20 @@ $grades_result = $conn->query($grades_query);
 <!-- Main Content -->
 <div class="container mx-auto px-6 py-8">
     <!-- Student Search Section -->
-    <div id="student-search-section" class="mb-8">
-        <div class="bg-white rounded-2xl card-shadow p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Search Students</h2>
-            <div class="flex gap-4 mb-4">
+    <div id="student-search-section" class="mb-6">
+        <div class="bg-white rounded-xl card-shadow p-4">
+            <h2 class="text-lg font-bold text-gray-800 mb-3">Search Students</h2>
+            <div class="flex gap-3 mb-3">
                 <div class="flex-1">
                     <input type="text" id="studentSearchInput" placeholder="Search by student name or ID..." 
-                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
                 </div>
-                <button onclick="searchStudents()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium">
+                <button onclick="searchStudents()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium text-sm">
                     Search
                 </button>
             </div>
-            <div id="student-results" class="space-y-2">
-                <p class="text-gray-400 text-center py-4">Enter a student name or ID to search...</p>
+            <div id="student-results" class="space-y-2 max-h-60 overflow-y-auto">
+                <p class="text-gray-400 text-center py-3 text-sm">Enter a student name or ID to search...</p>
             </div>
         </div>
     </div>

@@ -30,6 +30,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     $last_name = $_POST['last_name'] ?? '';
     $first_name = $_POST['first_name'] ?? '';
     $middle_name = $_POST['middle_name'] ?? '';
+    $username = $_POST['username'] ?? '';
     $school_year = $_POST['school_year'] ?? '';
     $grade_level = $_POST['grade_level'] ?? '';
     $semester = $_POST['semester'] ?? '';
@@ -61,7 +62,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         $update_sql = "UPDATE student_account SET 
             lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
-            last_name = ?, first_name = ?, middle_name = ?, 
+            last_name = ?, first_name = ?, middle_name = ?, username = ?,
             school_year = ?, grade_level = ?, semester = ?,
             dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
             payment_mode = ?, address = ?,
@@ -73,9 +74,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             WHERE id_number = ?";
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bind_param(
-            "ssssssssssssssssssssssssssssssss",
+            "sssssssssssssssssssssssssssssssss",
             $lrn, $academic_track, $enrollment_status, $school_type,
-            $last_name, $first_name, $middle_name,
+            $last_name, $first_name, $middle_name, $username,
             $school_year, $grade_level, $semester,
             $dob, $birthplace, $gender, $religion, $credentials,
             $payment_mode, $address,
@@ -89,7 +90,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         // Update without changing password
         $update_sql = "UPDATE student_account SET 
             lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
-            last_name = ?, first_name = ?, middle_name = ?, 
+            last_name = ?, first_name = ?, middle_name = ?, username = ?,
             school_year = ?, grade_level = ?, semester = ?,
             dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
             payment_mode = ?, address = ?,
@@ -101,9 +102,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             WHERE id_number = ?";
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bind_param(
-            "sssssssssssssssssssssssssssssss",
+            "ssssssssssssssssssssssssssssssss",
             $lrn, $academic_track, $enrollment_status, $school_type,
-            $last_name, $first_name, $middle_name,
+            $last_name, $first_name, $middle_name, $username,
             $school_year, $grade_level, $semester,
             $dob, $birthplace, $gender, $religion, $credentials,
             $payment_mode, $address,
@@ -158,11 +159,11 @@ input[type=number] { -moz-appearance: textfield; }
     <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-gray-200 transform transition-all scale-100" id="modalContent">
         
         <!-- Header -->
-        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#1E4D92] text-white">
-            <h2 class="text-lg font-semibold">Student Information</h2>
+        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <h2 class="text-lg font-semibold text-gray-800">Student Information</h2>
             <div class="flex gap-3">
-                <button id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
-                <button onclick="window.location.href='../AccountList.php?type=student'" class="text-2xl font-bold hover:text-gray-300">&times;</button>
+                <button id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg hover:bg-blue-900 transition">Edit</button>
+                <button onclick="window.location.href='../AccountList.php?type=student'" class="text-2xl font-bold text-gray-600 hover:text-gray-800">&times;</button>
             </div>
         </div>
 
@@ -364,16 +365,23 @@ input[type=number] { -moz-appearance: textfield; }
 
             <!-- Personal Account Section -->
             <div class="w-full flex justify-center mt-6">
-                <div class="w-full max-w-3xl flex justify-center items-center border-b border-gray-200 px-6 py-2 bg-[#1E4D92] text-white">
-                    <h2 class="text-lg font-semibold">PERSONAL ACCOUNT</h2>
+                <div class="w-full max-w-3xl flex justify-center items-center border-b border-gray-200 px-6 py-2 bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <h2 class="text-lg font-semibold text-gray-800">PERSONAL ACCOUNT</h2>
                 </div>
             </div>
+
 
             <div class="col-span-3 grid grid-cols-3 gap-6 mt-6">
                 <!-- Student ID -->
                 <div>
                     <label class="block text-sm font-semibold mb-1">Student ID</label>
                     <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                </div>
+
+                <!-- Username -->
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Username</label>
+                    <input type="text" name="username" value="<?= htmlspecialchars($student_data['username'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
                 </div>
 
                 <!-- Password -->
@@ -392,8 +400,8 @@ input[type=number] { -moz-appearance: textfield; }
 
             <!-- Submit Buttons -->
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
-                <button type="button" onclick="window.location.href='../AccountList.php?type=student'" class="px-5 py-2 border border-[#1E4D92] text-[#1E4D92] rounded-xl hover:bg-[#1E4D92] hover:text-white transition">Back to List</button>
-                <button type="submit" id="saveBtn" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition hidden">
+                <button type="button" onclick="window.location.href='../AccountList.php?type=student'" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Back to List</button>
+                <button type="submit" id="saveBtn" class="px-5 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700 transition hidden">
                     Save Changes
                 </button>
             </div>
@@ -462,7 +470,7 @@ function toggleEdit() {
     if (isEditing) {
         // Cancel editing
         editBtn.textContent = 'Edit';
-        editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
+        editBtn.className = 'px-4 py-2 bg-[#0B2C62] text-white rounded-lg hover:bg-blue-900 transition';
         saveBtn.classList.add('hidden');
         
         // Make fields readonly

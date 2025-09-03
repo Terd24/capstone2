@@ -50,7 +50,7 @@ function timeAgo($time) {
 </form>
 
 <!-- Header with School Branding -->
-<header class="bg-blue-600 text-white shadow-lg">
+<header class="bg-[#0B2C62] text-white shadow-lg">
   <div class="container mx-auto px-6 py-4">
     <div class="flex justify-between items-center">
       <div class="flex items-center space-x-4">
@@ -103,7 +103,7 @@ function timeAgo($time) {
           class="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
         />
       </div>
-      <button onclick="fetchStudents(document.getElementById('searchInput').value.trim())" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors">
+      <button onclick="fetchStudents(document.getElementById('searchInput').value.trim())" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium transition-colors">
         Search
       </button>
       <p id="searchError" class="text-red-600 text-sm"></p>
@@ -143,12 +143,16 @@ function timeAgo($time) {
             
             <div class="mt-4 pt-4 border-t">
               <button onclick="window.location.href='AccountList.php'" 
-                      class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
+                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
                 Manage Accounts
               </button>
               <button onclick="window.location.href='ManageGrades.php'" 
-                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm">
+                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
                 Manage Grades
+              </button>
+              <button onclick="window.location.href='ManageSchedule.php'" 
+                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm">
+                Manage Schedule
               </button>
             </div>
           </div>
@@ -225,7 +229,7 @@ function timeAgo($time) {
 
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white rounded-xl overflow-hidden text-sm">
-                    <thead class="bg-blue-600 text-white">
+                    <thead class="bg-[#0B2C62] text-white">
                         <tr>
                             <th class="px-6 py-4 text-left font-semibold">Student No</th>
                             <th class="px-6 py-4 text-left font-semibold">Document Name</th>
