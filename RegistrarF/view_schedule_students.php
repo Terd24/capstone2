@@ -82,7 +82,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
 
 <!-- Header -->
-<header class="bg-blue-600 text-white shadow-lg">
+<header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
         <div class="flex justify-between items-center">
             <div class="flex items-center space-x-4">
@@ -130,7 +130,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-800">Assigned Students</h2>
             <div class="text-sm text-gray-600">
-                Total: <?= $students_result->num_rows ?> student(s)
+                Total: <span id="totalCount"><?= $students_result->num_rows ?></span> student(s)
+            </div>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="mb-6">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input type="text" id="searchInput" placeholder="Search students by name, ID number, or program..." 
+                       class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
             </div>
         </div>
         
@@ -149,11 +162,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php while ($student = $students_result->fetch_assoc()): ?>
-                            <tr class="hover:bg-gray-50">
+                            <tr class="bg-blue-50 hover:bg-blue-100 transition-colors duration-150">
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
-                                        <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
-                                            <?= strtoupper(substr($student['full_name'], 0, 1)) ?>
+                                        <div class="w-10 h-10 bg-gray-400 rounded-full flex items-center justify-center text-white">
+                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                                            </svg>
                                         </div>
                                         <div class="ml-4">
                                             <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($student['full_name']) ?></div>
@@ -232,6 +247,35 @@ function removeStudent(studentId, studentName) {
 function hideRemoveModal() {
     document.getElementById('removeModal').classList.add('hidden');
 }
+
+// Search functionality
+document.getElementById('searchInput').addEventListener('input', function() {
+    const searchTerm = this.value.toLowerCase();
+    const tableRows = document.querySelectorAll('tbody tr');
+    let visibleCount = 0;
+    
+    tableRows.forEach(row => {
+        const studentName = row.querySelector('td:nth-child(1) .text-sm').textContent.toLowerCase();
+        const idNumber = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+        const program = row.querySelector('td:nth-child(3)').textContent.toLowerCase();
+        const yearSection = row.querySelector('td:nth-child(4)').textContent.toLowerCase();
+        
+        const isVisible = studentName.includes(searchTerm) || 
+                         idNumber.includes(searchTerm) || 
+                         program.includes(searchTerm) ||
+                         yearSection.includes(searchTerm);
+        
+        if (isVisible) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Update count
+    document.getElementById('totalCount').textContent = visibleCount;
+});
 </script>
 
 </body>

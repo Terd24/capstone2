@@ -180,171 +180,248 @@ $result = $stmt->get_result();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Attendance Dashboard</title>
+<title>Student Attendance - Cornerstone College Inc.</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          'cci-blue': '#1e3a8a',
+          'cci-light-blue': '#3b82f6',
+          'cci-accent': '#1e40af'
+        }
+      }
+    }
+  }
+</script>
 </head>
-<body class="bg-gray-100 font-sans min-h-screen p-6">
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
 
-  <header class="mb-6">
-    <div class="bg-white p-4 flex items-center shadow-md">
-      <button onclick="window.location.replace('../studentdashboard.php')" class="text-2xl mr-4">←</button>
-      <h1 class="text-xl font-semibold text-gray-800">Attendance</h1>
+  <!-- Header with School Branding -->
+  <header class="bg-[#0B2C62] text-white shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+          <button onclick="window.location.replace('../studentdashboard.php')" 
+                  class="bg-white bg-opacity-20 hover:bg-opacity-30 p-3 rounded-xl transition-all duration-200 text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+          <div class="text-left">
+            <p class="text-sm text-blue-200">Student Portal</p>
+            <p class="font-semibold">Attendance Records</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+          <img src="../../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+          <div class="text-right">
+            <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+            <p class="text-blue-200 text-sm">Student Portal</p>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
-<!-- Today's Schedule Card -->
-<?php if ($has_class_today): ?>
-<div class="bg-white rounded-lg shadow-md p-6 mb-6">
-  <h2 class="text-lg font-semibold text-gray-800 mb-4">Today's Schedule</h2>
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div>
-      <p class="text-sm text-gray-600">Date</p>
-      <p class="font-semibold"><?= date('F j, Y') ?></p>
-    </div>
-    <div>
-      <p class="text-sm text-gray-600">Day</p>
-      <p class="font-semibold"><?= $current_day ?></p>
-    </div>
-    <div>
-      <p class="text-sm text-gray-600">Class Schedule</p>
-      <p class="font-semibold">
-        <?= date('g:i A', strtotime($effective_start_time)) ?> - <?= date('g:i A', strtotime($effective_end_time)) ?>
-      </p>
-    </div>
-    <div>
-      <p class="text-sm text-gray-600">Section</p>
-      <p class="font-semibold"><?= htmlspecialchars($schedule_info['section_name'] ?? 'N/A') ?></p>
-    </div>
-  </div>
-  
-  <div class="grid grid-cols-4 gap-4 mt-4">
-    <div>
-      <p class="text-sm text-gray-600">Time In</p>
-      <p class="font-semibold">
-        <?= $today_attendance && $today_attendance['time_in'] ? date('g:i A', strtotime($today_attendance['time_in'])) : '--' ?>
-      </p>
-    </div>
-    <div>
-      <p class="text-sm text-gray-600">Time Out</p>
-      <p class="font-semibold">
-        <?= $today_attendance && $today_attendance['time_out'] ? date('g:i A', strtotime($today_attendance['time_out'])) : '--' ?>
-      </p>
-    </div>
-    <div>
-      <p class="text-sm text-gray-600">Status</p>
-      <p class="font-semibold <?= $today_attendance ? ($today_attendance['status'] == 'Present' ? 'text-green-600' : 'text-red-600') : 'text-gray-500' ?>">
-        <?= $today_attendance ? $today_attendance['status'] : '--' ?>
-      </p>
-    </div>
-  </div>
-</div>
-<?php else: ?>
-<div class="bg-gray-50 rounded-lg shadow-md p-6 mb-6 text-center">
-  <h2 class="text-lg font-semibold text-gray-600 mb-2">No Class Today</h2>
-  <p class="text-gray-500"><?= date('F j, Y') ?> - <?= $current_day ?></p>
-</div>
-<?php endif; ?>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-<?php if (isset($_SESSION['error'])): ?>
-  <div class="bg-green-100 text-green-800 p-3 rounded mb-4">
-    <?= htmlspecialchars($_SESSION['error']) ?>
-  </div>
-  <?php unset($_SESSION['error']); ?>
-<?php endif; ?>
-
-<!-- Hidden RFID form (optional) -->
-<form method="POST" id="rfidForm" class="hidden">
-  <input type="text" name="rfid" id="rfidInput">
-</form>
-
-<div class="bg-white rounded-lg shadow-md p-6">
-  <form method="get" class="flex flex-col md:flex-row gap-4 mb-6">
-    <div class="flex-1">
-      <label for="start-date" class="text-sm text-gray-700 block mb-1">Select Start Date:</label>
-      <input type="date" id="start-date" name="start_date" value="<?= htmlspecialchars($startDate) ?>" class="w-full border border-gray-300 rounded px-3 py-2">
+    <!-- Today's Schedule Card -->
+    <?php if ($has_class_today): ?>
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
+      <div class="flex items-center mb-6">
+        <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>
+        <h2 class="text-xl font-bold text-gray-800">Today's Schedule</h2>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <p class="text-sm text-gray-600 mb-1">Date</p>
+          <p class="text-lg font-bold text-gray-800"><?= date('F j, Y') ?></p>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <p class="text-sm text-gray-600 mb-1">Day</p>
+          <p class="text-lg font-bold text-gray-800"><?= $current_day ?></p>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <p class="text-sm text-gray-600 mb-1">Class Schedule</p>
+          <p class="text-lg font-bold text-gray-800">
+            <?= date('g:i A', strtotime($effective_start_time)) ?> - <?= date('g:i A', strtotime($effective_end_time)) ?>
+          </p>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <p class="text-sm text-gray-600 mb-1">Section</p>
+          <p class="text-lg font-bold text-gray-800"><?= htmlspecialchars($schedule_info['section_name'] ?? 'N/A') ?></p>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <p class="text-sm text-gray-600 mb-1">Time In</p>
+          <p class="text-xl font-bold text-gray-800">
+            <?= $today_attendance && $today_attendance['time_in'] ? date('g:i A', strtotime($today_attendance['time_in'])) : '--' ?>
+          </p>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <p class="text-sm text-gray-600 mb-1">Time Out</p>
+          <p class="text-xl font-bold text-gray-800">
+            <?= $today_attendance && $today_attendance['time_out'] ? date('g:i A', strtotime($today_attendance['time_out'])) : '--' ?>
+          </p>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <p class="text-sm text-gray-600 mb-1">Status</p>
+          <p class="text-xl font-bold <?= $today_attendance ? ($today_attendance['status'] == 'Present' ? 'text-green-600' : 'text-red-600') : 'text-gray-500' ?>">
+            <?= $today_attendance ? $today_attendance['status'] : '--' ?>
+          </p>
+        </div>
+      </div>
     </div>
-    <div class="flex-1">
-      <label for="end-date" class="text-sm text-gray-700 block mb-1">Select End Date:</label>
-      <input type="date" id="end-date" name="end_date" value="<?= htmlspecialchars($endDate) ?>" class="w-full border border-gray-300 rounded px-3 py-2">
+    <?php else: ?>
+    <div class="bg-white rounded-2xl shadow-lg p-8 mb-8 text-center">
+      <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-gray-600 mb-2">No Class Today</h2>
+      <p class="text-gray-500"><?= date('F j, Y') ?> - <?= $current_day ?></p>
     </div>
-    <div class="flex items-end">
-      <button type="submit" class="bg-black text-white px-4 py-2 rounded hover:bg-gray-800">Generate</button>
-    </div>
-  </form>
+    <?php endif; ?>
 
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm text-left border border-gray-300">
-      <thead class="bg-black text-white">
-        <tr>
-          <th class="px-4 py-2">Date</th>
-          <th class="px-4 py-2">Day</th>
-          <th class="px-4 py-2">Class Schedule</th>
-          <th class="px-4 py-2">Time In</th>
-          <th class="px-4 py-2">Time Out</th>
-          <th class="px-4 py-2">Status</th>
-        </tr>
-      </thead>
-      <tbody class="bg-gray-100">
-        <?php if ($result->num_rows > 0): ?>
-          <?php while($row = $result->fetch_assoc()): ?>
-            <tr class="border-t border-gray-300">
-              <td class="px-4 py-2"><?= htmlspecialchars(date('F j, Y', strtotime($row['date']))) ?></td>
-              <td class="px-4 py-2"><?= htmlspecialchars($row['day']) ?></td>
-              <td class="px-4 py-2">
-                <?php 
-                // Check if student has class on this day
-                $record_day = $row['day'];
-                $has_class_on_day = false;
-                $display_start_time = $row['start_time'];
-                $display_end_time = $row['end_time'];
-                
-                if ($row['days']) {
-                    $class_days = explode(',', $row['days']);
-                    $has_class_on_day = in_array($record_day, array_map('trim', $class_days));
-                }
-                
-                // Check for day-specific schedule times
-                if ($has_class_on_day && $row['schedule_id']) {
-                    $day_schedule_query = $conn->prepare("SELECT start_time, end_time FROM day_schedules WHERE schedule_id = ? AND day_name = ?");
-                    $day_schedule_query->bind_param("is", $row['schedule_id'], $record_day);
-                    $day_schedule_query->execute();
-                    $day_schedule_result = $day_schedule_query->get_result();
-                    
-                    if ($day_schedule_result->num_rows > 0) {
-                        $day_schedule = $day_schedule_result->fetch_assoc();
-                        $display_start_time = $day_schedule['start_time'];
-                        $display_end_time = $day_schedule['end_time'];
-                    }
-                }
-                
-                if ($has_class_on_day && $display_start_time && $display_end_time) {
-                    echo date('g:i A', strtotime($display_start_time)) . ' - ' . date('g:i A', strtotime($display_end_time));
-                } else {
-                    echo 'No Class Schedule';
-                }
-                ?>
-              </td>
-              <td class="px-4 py-2"><?= $row['time_in'] ? date("h:i A", strtotime($row['time_in'])) : '--' ?></td>
-              <td class="px-4 py-2"><?= $row['time_out'] ? date("h:i A", strtotime($row['time_out'])) : '--' ?></td>
-              <td class="px-4 py-2">
-                <?php 
-                // Show NO CLASS status for days without scheduled classes
-                if (!$has_class_on_day) {
-                    echo 'No Schedule';
-                } else {
-                    echo htmlspecialchars($row['status']);
-                }
-                ?>
-              </td>
+    <?php if (isset($_SESSION['error'])): ?>
+      <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-800 px-6 py-4 rounded-xl mb-6 shadow-sm">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="font-medium"><?= htmlspecialchars($_SESSION['error']) ?></span>
+        </div>
+      </div>
+      <?php unset($_SESSION['error']); ?>
+    <?php endif; ?>
+
+    <!-- Hidden RFID form (optional) -->
+    <form method="POST" id="rfidForm" class="hidden">
+      <input type="text" name="rfid" id="rfidInput">
+    </form>
+
+    <!-- Attendance Records -->
+    <div class="bg-white rounded-2xl shadow-lg">
+      <div class="p-6 border-b border-gray-100">
+        <div class="flex items-center mb-6">
+          <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>
+          <h2 class="text-xl font-bold text-gray-800">Attendance Records</h2>
+        </div>
+        
+        <form method="get" class="flex flex-col md:flex-row gap-4 items-end">
+          <div class="flex-1">
+            <label for="start-date" class="text-sm font-medium text-gray-700 block mb-2">Start Date</label>
+            <input type="date" id="start-date" name="start_date" value="<?= htmlspecialchars($startDate) ?>" 
+                   class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
+          </div>
+          <div class="flex-1">
+            <label for="end-date" class="text-sm font-medium text-gray-700 block mb-2">End Date</label>
+            <input type="date" id="end-date" name="end_date" value="<?= htmlspecialchars($endDate) ?>" 
+                   class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
+          </div>
+          <div>
+            <button type="submit" class="bg-[#0B2C62] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-all duration-200 font-medium">
+              Generate Report
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-[#0B2C62] text-white">
+            <tr>
+              <th class="px-6 py-4 text-left font-semibold">Date</th>
+              <th class="px-6 py-4 text-left font-semibold">Day</th>
+              <th class="px-6 py-4 text-left font-semibold">Class Schedule</th>
+              <th class="px-6 py-4 text-left font-semibold">Time In</th>
+              <th class="px-6 py-4 text-left font-semibold">Time Out</th>
+              <th class="px-6 py-4 text-left font-semibold">Status</th>
             </tr>
-          <?php endwhile; ?>
-        <?php else: ?>
-          <tr><td colspan="6" class="px-4 py-2 text-center text-gray-500">No records found.</td></tr>
-        <?php endif; ?>
-      </tbody>
-    </table>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <?php if ($result->num_rows > 0): ?>
+              <?php while($row = $result->fetch_assoc()): ?>
+                <tr class="bg-blue-50 hover:bg-blue-100 transition-colors duration-150">
+                  <td class="px-6 py-4 font-medium text-gray-900"><?= htmlspecialchars(date('F j, Y', strtotime($row['date']))) ?></td>
+                  <td class="px-6 py-4 text-gray-700"><?= htmlspecialchars($row['day']) ?></td>
+                  <td class="px-6 py-4 text-gray-700">
+                    <?php 
+                    // Check if student has class on this day
+                    $record_day = $row['day'];
+                    $has_class_on_day = false;
+                    $display_start_time = $row['start_time'];
+                    $display_end_time = $row['end_time'];
+                    
+                    if ($row['days']) {
+                        $class_days = explode(',', $row['days']);
+                        $has_class_on_day = in_array($record_day, array_map('trim', $class_days));
+                    }
+                    
+                    // Check for day-specific schedule times
+                    if ($has_class_on_day && $row['schedule_id']) {
+                        $day_schedule_query = $conn->prepare("SELECT start_time, end_time FROM day_schedules WHERE schedule_id = ? AND day_name = ?");
+                        $day_schedule_query->bind_param("is", $row['schedule_id'], $record_day);
+                        $day_schedule_query->execute();
+                        $day_schedule_result = $day_schedule_query->get_result();
+                        
+                        if ($day_schedule_result->num_rows > 0) {
+                            $day_schedule = $day_schedule_result->fetch_assoc();
+                            $display_start_time = $day_schedule['start_time'];
+                            $display_end_time = $day_schedule['end_time'];
+                        }
+                    }
+                    
+                    if ($has_class_on_day && $display_start_time && $display_end_time) {
+                        echo date('g:i A', strtotime($display_start_time)) . ' - ' . date('g:i A', strtotime($display_end_time));
+                    } else {
+                        echo 'No Class Schedule';
+                    }
+                    ?>
+                  </td>
+                  <td class="px-6 py-4 text-gray-700">
+                    <?= $row['time_in'] ? date("h:i A", strtotime($row['time_in'])) : '--' ?>
+                  </td>
+                  <td class="px-6 py-4 text-gray-700">
+                    <?= $row['time_out'] ? date("h:i A", strtotime($row['time_out'])) : '--' ?>
+                  </td>
+                  <td class="px-6 py-4 text-gray-700">
+                    <?php 
+                    // Show status with plain text
+                    if (!$has_class_on_day) {
+                        echo 'No Schedule';
+                    } else {
+                        echo htmlspecialchars($row['status']);
+                    }
+                    ?>
+                  </td>
+                </tr>
+              <?php endwhile; ?>
+            <?php else: ?>
+              <tr>
+                <td colspan="6" class="px-6 py-12 text-center">
+                  <div class="flex flex-col items-center">
+                    <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <p class="text-gray-500 font-medium">No attendance records found</p>
+                    <p class="text-gray-400 text-sm mt-1">Try adjusting your date range</p>
+                  </div>
+                </td>
+              </tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
-</div>
 
 <script>
 let rfidBuffer = '';
