@@ -1,9 +1,0 @@
--- Create fee_types table for onecci_db database
-CREATE TABLE fee_types (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    fee_name VARCHAR(100) NOT NULL UNIQUE,
-    default_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);

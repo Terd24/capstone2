@@ -49,7 +49,7 @@ if (!$school_year_term) {
     $hist_stmt = $conn->prepare("SELECT date, or_number, fee_type, amount, payment_method 
                                  FROM student_payments 
                                  WHERE id_number = ? 
-                                 ORDER BY date DESC");
+                                 ORDER BY date DESC, id DESC");
     $hist_stmt->bind_param("s", $id_number);
     $hist_stmt->execute();
     $hist_res = $hist_stmt->get_result();
@@ -83,11 +83,20 @@ $item_res = $item_stmt->get_result();
 $fee_items = [];
 $gross_total = 0;
 $total_paid = 0;
+$unpaid_total = 0;
 
 while ($row = $item_res->fetch_assoc()) {
     $fee_items[] = $row;
-    $gross_total += floatval($row['amount']);
-    $total_paid += floatval($row['paid']);
+    $amount = floatval($row['amount']);
+    $paid = floatval($row['paid']);
+    
+    $gross_total += $amount;
+    $total_paid += $paid;
+    
+    // Only add to unpaid total if there's a remaining balance
+    if ($amount > $paid) {
+        $unpaid_total += ($amount - $paid);
+    }
 }
 $item_stmt->close();
 
@@ -97,7 +106,7 @@ $remaining_balance = $gross_total - $total_paid;
 $hist_stmt = $conn->prepare("SELECT date, or_number, fee_type, amount, payment_method 
                              FROM student_payments 
                              WHERE id_number = ? AND school_year_term = ? 
-                             ORDER BY date DESC");
+                             ORDER BY date DESC, id DESC");
 $hist_stmt->bind_param("ss", $id_number, $school_year_term);
 $hist_stmt->execute();
 $hist_res = $hist_stmt->get_result();

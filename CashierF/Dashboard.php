@@ -108,7 +108,7 @@ header("Expires: 0");
           class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors"
         >Search</button>
         <button onclick="showFeeTypeModal()" 
-                class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-medium transition-colors">
+                class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors">
           Manage Fee Types
         </button>
       </div>
@@ -218,6 +218,7 @@ header("Expires: 0");
             <label class="block text-sm font-medium text-gray-700 mb-2">Fee Type</label>
             <input type="text" id="editFeeType" readonly class="w-full border border-gray-300 rounded-lg px-4 py-3 bg-gray-50 text-gray-600">
             <input type="hidden" id="editFeeId" name="fee_id">
+            <input type="hidden" id="editAmountDueHidden" name="amount_due">
           </div>
           
           <div>
@@ -240,14 +241,20 @@ header("Expires: 0");
           
           <div id="paymentMethodDiv" class="hidden">
             <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-            <select id="editPaymentMethod" name="payment_method" 
-                    class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-              <option value="Cash">Cash</option>
-              <option value="GCash">GCash</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="Check">Check</option>
-              <option value="Credit Card">Credit Card</option>
-            </select>
+            <div class="space-y-2">
+              <select id="editPaymentMethod" name="payment_method" 
+                      class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onchange="handleEditPaymentMethodChange(this)">
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Check">Check</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Other">Other (Manual Input)</option>
+              </select>
+              <input type="text" id="editManualPaymentInput" placeholder="Enter payment method" 
+                     class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent hidden">
+            </div>
           </div>
         </div>
         
@@ -339,22 +346,56 @@ header("Expires: 0");
           
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">School Year & Term</label>
-            <input type="text" id="schoolTerm" name="school_year_term" placeholder="e.g., 2024-2025 1st Semester" 
-                   class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Academic Year</label>
+                <select id="schoolYear" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                  <option value="">Select Year</option>
+                  <!-- Years will be populated dynamically by JavaScript -->
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Semester</label>
+                <select id="schoolSemester" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                  <option value="">Select Semester</option>
+                  <option value="1st Semester">1st Semester</option>
+                  <option value="2nd Semester">2nd Semester</option>
+                </select>
+              </div>
+            </div>
+            <input type="hidden" id="schoolTerm" name="school_year_term">
           </div>
           
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Student Fees</label>
             <div id="feeItemsContainer" class="space-y-3">
               <div class="space-y-2">
-                <div class="flex gap-2">
-                  <select onchange="handleFeeTypeChange(this)" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Fee Type</label>
+                  <select id="mainFeeTypeSelect" onchange="handleFeeTypeChange(this)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                     <option value="">Select Fee Type...</option>
                   </select>
                 </div>
                 <div class="flex gap-2">
-                  <input type="number" placeholder="Amount Due" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                  <input type="number" placeholder="Paid" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <input type="number" placeholder="Amount Due" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="checkMainFormPayment(this)" oninput="checkMainFormPayment(this)">
+                  <input type="number" placeholder="Paid" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="checkMainFormPayment(this)" oninput="checkMainFormPayment(this)">
+                </div>
+                <div id="addBalancePaymentMethodDiv" class="hidden">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                  <div class="space-y-2">
+                    <select id="addBalancePaymentMethod" name="payment_method" 
+                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            onchange="handleAddBalancePaymentMethodChange(this)">
+                      <option value="Cash">Cash</option>
+                      <option value="GCash">GCash</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Check">Check</option>
+                      <option value="Credit Card">Credit Card</option>
+                      <option value="Other">Other (Manual Input)</option>
+                    </select>
+                    <input type="text" id="addBalanceManualPaymentInput" placeholder="Enter payment method" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent hidden">
+                  </div>
                 </div>
               </div>
             </div>
@@ -441,15 +482,15 @@ header("Expires: 0");
     function clearError() {
       searchError.textContent = '';
       searchBtn.classList.remove('bg-red-600', 'shake');
-      searchBtn.classList.add('bg-blue-600');
+      searchBtn.classList.add('bg-[#0B2C62]');
     }
     function showError(msg) {
       searchError.textContent = msg;
-      searchBtn.classList.remove('bg-blue-600');
+      searchBtn.classList.remove('bg-[#0B2C62]');
       searchBtn.classList.add('bg-red-600', 'shake');
       setTimeout(() => {
         searchBtn.classList.remove('shake');
-        searchBtn.classList.add('bg-blue-600');
+        searchBtn.classList.add('bg-[#0B2C62]');
       }, 600);
     }
 
@@ -636,9 +677,9 @@ const items = slice.map(s => {
           <div class="flex items-center justify-between mb-4">
             <div class="relative">
               <button id="termSelector" onclick="toggleTermDropdown('${data.id_number}')" 
-                      class="text-lg font-semibold text-gray-800 hover:text-blue-600 flex items-center gap-2 transition-colors">
-                ${defaultTerm}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      class="w-full text-left bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-800 hover:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between transition-all">
+                <span class="font-medium">${defaultTerm}</span>
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
               </button>
@@ -648,7 +689,7 @@ const items = slice.map(s => {
             </div>
             <div class="flex gap-2">
               <button onclick="showAddBalanceFormAndRefresh('${data.id_number}', '${data.full_name}')" 
-                      class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                      class="bg-[#0B2C62] hover:bg-blue-900 text-white px-3 py-1 rounded text-sm">
                 Add More Fees
               </button>
             </div>
@@ -711,10 +752,6 @@ const items = slice.map(s => {
                       class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
                 Add More Fees
               </button>
-              <button onclick="showPaymentSchedule('${data.id_number}', '${data.school_year_term}')" 
-                      class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">
-                Payment Schedule
-              </button>
             </div>
           </div>
           
@@ -731,26 +768,31 @@ const items = slice.map(s => {
                 </tr>
               </thead>
               <tbody class="text-gray-800 text-sm">
-                ${data.fee_items && data.fee_items.length > 0 ? data.fee_items.map((fee, index) => {
+                ${data.fee_items && data.fee_items.length > 0 ? data.fee_items.filter(fee => {
+                  const amountDue = parseFloat(fee.amount || 0);
+                  const paid = parseFloat(fee.paid || 0);
+                  const isPaid = amountDue <= paid;
+                  // Show unpaid items OR recently paid items (marked with temporary flag)
+                  return amountDue > paid || (isPaid && window.temporarilyVisibleFees && window.temporarilyVisibleFees.has(fee.id));
+                }).map((fee, index) => {
                   const amountDue = parseFloat(fee.amount || 0);
                   const paid = parseFloat(fee.paid || 0);
                   const balance = amountDue - paid;
+                  const isPaid = balance <= 0;
+                  
                   return `
-                  <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors ${isPaid ? 'bg-green-50' : ''}">
                     <td class="px-4 py-3 text-center font-medium">${index + 1}</td>
-                    <td class="px-4 py-3 font-medium">${fee.fee_type}</td>
+                    <td class="px-4 py-3 font-medium">${fee.fee_type} ${isPaid ? '<span class="text-xs text-green-600 font-semibold">(PAID)</span>' : ''}</td>
                     <td class="px-4 py-3 text-right font-semibold">₱${amountDue.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-right ${paid > 0 ? 'text-green-600 font-semibold' : 'text-gray-500'}">₱${paid.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
-                    <td class="px-4 py-3 text-right font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}">₱${balance.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right font-bold ${isPaid ? 'text-green-600' : 'text-red-600'}">₱${Math.abs(balance).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-center">
-                      <button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" 
-                              class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors">
-                        Edit
-                      </button>
+                      ${isPaid ? '<span class="text-green-600 text-xs font-semibold">✓ PAID</span>' : `<button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors">Edit</button>`}
                     </td>
                   </tr>
                   `;
-                }).join('') : '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No fee items found</td></tr>'}
+                }).join('') : '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No unpaid fees</td></tr>'}
               </tbody>
             </table>
             
@@ -773,74 +815,14 @@ const items = slice.map(s => {
       }
 
 
-      // ✅ Enhanced History UI - Table Format
-      if (data.history && data.history.length > 0) {
-        let historyHTML = '';
-        data.history.forEach((row, index) => {
-          const formattedDate = new Date(row.date).toLocaleDateString('en-US', {
-            month: '2-digit',
-            day: '2-digit',
-            year: '2-digit'
-          });
-          
-          historyHTML += `
-            <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
-              <td class="px-4 py-3 text-sm text-gray-900">${index + 1}</td>
-              <td class="px-4 py-3 text-sm text-gray-900">${formattedDate}</td>
-              <td class="px-4 py-3 text-sm text-gray-900">${row.fee_type || 'Payment'}</td>
-              <td class="px-4 py-3 text-sm font-semibold text-gray-900">₱${parseFloat(row.amount).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">${row.payment_method || 'Cash'}</td>
-            </tr>
-          `;
-        });
-        
-        document.getElementById('tab-history').innerHTML = `
-          <div class="flex items-center mb-6">
-            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-              </svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-800">Transaction History</h2>
-          </div>
-          <div class="overflow-hidden rounded-lg border border-gray-200">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-900">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">#</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Date</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Description</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Amount</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Method</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${historyHTML}
-              </tbody>
-            </table>
-          </div>
-        `;
-      } else {
-        document.getElementById('tab-history').innerHTML = `
-          <div class="text-center py-12">
-            <div class="w-16 h-16 mx-auto school-gradient rounded-lg flex items-center justify-center mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-              </svg>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-800 mb-2">No Transaction History</h3>
-            <p class="text-sm text-gray-500">This student has no payment records on file</p>
-          </div>
-        `;
-      }
+      // Use the reusable history display function
+      updateHistoryDisplay(data);
 
-      rfidInput.value = '';
-      focusRFID();
+      clearRFIDAndFocus();
     })
     .catch(err => {
       console.error(err);
-      rfidInput.value = '';
-      focusRFID();
+      clearRFIDAndFocus();
     });
 }
 
@@ -878,28 +860,19 @@ const items = slice.map(s => {
 
 
     // ===== ADD BALANCE MODAL FUNCTIONS =====
-    function showAddBalanceForm(idNumber, fullName, currentData = null) {
-      document.getElementById('studentId').value = idNumber;
-      document.getElementById('studentDisplay').value = fullName + ' (' + idNumber + ')';
-      document.getElementById('addBalanceModal').classList.remove('hidden');
+    function resetAddBalanceForm() {
+      // Reset the main fee type dropdown
+      document.getElementById('mainFeeTypeSelect').selectedIndex = 0;
       
-      // Clear form first
-      document.getElementById('addBalanceForm').reset();
-      document.getElementById('studentId').value = idNumber;
-      document.getElementById('studentDisplay').value = fullName + ' (' + idNumber + ')';
+      // Clear amount inputs
+      const amountInputs = document.querySelectorAll('#feeItemsContainer input[type="number"]');
+      amountInputs.forEach(input => input.value = '');
       
-      // Pre-populate with current data if updating
-      if (currentData) {
-        document.getElementById('schoolTerm').value = currentData.school_year_term || '';
-        document.getElementById('tuitionFee').value = currentData.tuition_fee || '';
-        document.getElementById('otherFees').value = currentData.other_fees || '';
-        document.getElementById('studentFees').value = currentData.student_fees || '';
-      } else {
-        // Set default current academic year for new balances
-        const currentYear = new Date().getFullYear();
-        const nextYear = currentYear + 1;
-        document.getElementById('schoolTerm').value = `${currentYear}-${nextYear} 1st Semester`;
-      }
+      // Reset payment method dropdown and hide manual input
+      document.getElementById('addBalancePaymentMethod').selectedIndex = 0;
+      document.getElementById('addBalanceManualPaymentInput').value = '';
+      document.getElementById('addBalanceManualPaymentInput').classList.add('hidden');
+      document.getElementById('addBalancePaymentMethodDiv').classList.add('hidden');
       
       // Hide error/success messages
       document.getElementById('balanceError').classList.add('hidden');
@@ -907,18 +880,33 @@ const items = slice.map(s => {
     }
 
     function showAddBalanceForm(studentId, studentName) {
+      // Reset form completely
+      resetAddBalanceForm();
+      
       // Populate the form with student data
       document.getElementById('studentDisplay').value = studentName;
       document.getElementById('studentId').value = studentId;
       
-      // Set default term
-      const currentYear = new Date().getFullYear();
-      const nextYear = currentYear + 1;
-      document.getElementById('schoolTerm').value = `${currentYear}-${nextYear} 1st Semester`;
-      
-      // Reset form messages
-      document.getElementById('balanceError').classList.add('hidden');
-      document.getElementById('balanceSuccess').classList.add('hidden');
+      // Get latest term from database and set as default
+      fetch('GetLatestTerm.php')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setSchoolYearAndSemester(data.latest_term);
+          } else {
+            // Fallback to current year 1st semester
+            const currentYear = new Date().getFullYear();
+            const nextYear = currentYear + 1;
+            setSchoolYearAndSemester(`${currentYear}-${nextYear} 1st Semester`);
+          }
+        })
+        .catch(err => {
+          console.error('Error getting latest term:', err);
+          // Fallback to current year 1st semester
+          const currentYear = new Date().getFullYear();
+          const nextYear = currentYear + 1;
+          setSchoolYearAndSemester(`${currentYear}-${nextYear} 1st Semester`);
+        });
       
       // Load fee types and update dropdowns
       loadFeeTypes().then(() => {
@@ -942,6 +930,96 @@ const items = slice.map(s => {
       focusRFID();
     }
 
+    // Function to check payment method for main form
+    function checkMainFormPayment(input) {
+      const container = document.getElementById('feeItemsContainer');
+      const mainFeeItem = container.querySelector('.space-y-2');
+      const amountInputs = mainFeeItem.querySelectorAll('input[type="number"]');
+      const amountDue = parseFloat(amountInputs[0].value) || 0;
+      const paid = parseFloat(amountInputs[1].value) || 0;
+      const paymentMethodDiv = document.getElementById('addBalancePaymentMethodDiv');
+      
+      console.log('checkMainFormPayment - Amount Due:', amountDue, 'Paid:', paid);
+      
+      if (paid > 0 && paid >= amountDue && amountDue > 0) {
+        console.log('Showing main payment method section');
+        paymentMethodDiv.classList.remove('hidden');
+      } else {
+        console.log('Hiding main payment method section');
+        paymentMethodDiv.classList.add('hidden');
+      }
+    }
+
+    // Function to check payment method for dynamic fee items
+    function checkAddBalancePayment(input) {
+      const row = input.closest('.space-y-2');
+      const amountInputs = row.querySelectorAll('input[type="number"]');
+      const amountDue = parseFloat(amountInputs[0].value) || 0;
+      const paid = parseFloat(amountInputs[1].value) || 0;
+      const paymentMethodSection = row.querySelector('.payment-method-section');
+      
+      console.log('checkAddBalancePayment (dynamic) - Amount Due:', amountDue, 'Paid:', paid);
+      
+      if (paid > 0 && paid >= amountDue && amountDue > 0) {
+        console.log('Showing dynamic payment method section');
+        paymentMethodSection.classList.remove('hidden');
+      } else {
+        console.log('Hiding dynamic payment method section');
+        paymentMethodSection.classList.add('hidden');
+      }
+    }
+
+    // Function to handle payment method dropdown change in Add Balance form (copied from Edit Payment logic)
+    function handleAddBalancePaymentMethodChange(select) {
+      const manualInput = document.getElementById('addBalanceManualPaymentInput');
+      
+      if (select.value === 'Other') {
+        manualInput.classList.remove('hidden');
+        manualInput.required = true;
+        manualInput.name = 'payment_method';
+        select.name = '';
+      } else {
+        manualInput.classList.add('hidden');
+        manualInput.required = false;
+        manualInput.value = '';
+        manualInput.name = '';
+        select.name = 'payment_method';
+      }
+    }
+
+    // Function to handle payment method dropdown change for dynamic fee items
+    function handleDynamicPaymentMethodChange(select) {
+      const row = select.closest('.space-y-2');
+      const manualInput = row.querySelector('.manual-payment-input');
+      
+      if (select.value === 'Other') {
+        manualInput.classList.remove('hidden');
+        manualInput.required = true;
+      } else {
+        manualInput.classList.add('hidden');
+        manualInput.required = false;
+        manualInput.value = '';
+      }
+    }
+
+    // Function to handle payment method dropdown change in Edit Payment modal
+    function handleEditPaymentMethodChange(select) {
+      const manualInput = document.getElementById('editManualPaymentInput');
+      
+      if (select.value === 'Other') {
+        manualInput.classList.remove('hidden');
+        manualInput.required = true;
+        manualInput.name = 'payment_method';
+        select.name = '';
+      } else {
+        manualInput.classList.add('hidden');
+        manualInput.required = false;
+        manualInput.value = '';
+        manualInput.name = '';
+        select.name = 'payment_method';
+      }
+    }
+
     function submitBalance(event) {
       if (event) event.preventDefault();
       
@@ -950,20 +1028,22 @@ const items = slice.map(s => {
       const form = document.getElementById('addBalanceForm');
       const formData = new FormData(form);
       
-      // Collect fee items with new structure
+      // Collect fee items with correct structure
       const feeItems = [];
       const feeItemsContainer = document.getElementById('feeItemsContainer');
-      const feeItemRows = feeItemsContainer.querySelectorAll('.grid.grid-cols-3');
+      const feeItemRows = feeItemsContainer.querySelectorAll('.space-y-2');
       
       console.log('Found fee item rows:', feeItemRows.length);
       
       feeItemRows.forEach(row => {
         const selectElement = row.querySelector('select');
         const textInput = row.querySelector('input[type="text"]');
-        const amountDueInput = row.querySelector('input[type="number"]:nth-of-type(1)');
-        const paidInput = row.querySelector('input[type="number"]:nth-of-type(2)');
+        const amountInputs = row.querySelectorAll('input[type="number"]');
+        const amountDueInput = amountInputs[0]; // First number input is amount due
+        const paidInput = amountInputs[1]; // Second number input is paid amount
         
         let feeTypeName = '';
+        let paymentMethod = 'Cash'; // Default payment method
         
         // Determine fee type name
         if (selectElement && selectElement.value && selectElement.value !== 'custom') {
@@ -973,11 +1053,38 @@ const items = slice.map(s => {
           feeTypeName = textInput.value.trim();
         }
         
+        // Get payment method if payment section is visible (check both main form and dynamic sections)
+        const paymentMethodDiv = document.getElementById('addBalancePaymentMethodDiv');
+        const paymentMethodSection = row.querySelector('.payment-method-section');
+        
+        if (paymentMethodDiv && !paymentMethodDiv.classList.contains('hidden')) {
+          // Main form payment method
+          const paymentSelect = document.getElementById('addBalancePaymentMethod');
+          const manualInput = document.getElementById('addBalanceManualPaymentInput');
+          
+          if (paymentSelect.value === 'Other' && manualInput && manualInput.value.trim()) {
+            paymentMethod = manualInput.value.trim();
+          } else {
+            paymentMethod = paymentSelect.value;
+          }
+        } else if (paymentMethodSection && !paymentMethodSection.classList.contains('hidden')) {
+          // Dynamic fee item payment method
+          const paymentSelect = paymentMethodSection.querySelector('select');
+          const manualInput = paymentMethodSection.querySelector('.manual-payment-input');
+          
+          if (paymentSelect.value === 'Other' && manualInput && manualInput.value.trim()) {
+            paymentMethod = manualInput.value.trim();
+          } else {
+            paymentMethod = paymentSelect.value;
+          }
+        }
+        
         if (feeTypeName && amountDueInput && amountDueInput.value) {
           const feeItem = {
             fee_type: feeTypeName,
             amount_due: parseFloat(amountDueInput.value) || 0,
-            paid: parseFloat(paidInput.value) || 0
+            paid: parseFloat(paidInput ? paidInput.value : 0) || 0,
+            payment_method: paymentMethod
           };
           feeItems.push(feeItem);
           console.log('Added fee item:', feeItem);
@@ -1023,6 +1130,18 @@ const items = slice.map(s => {
         if (data.success) {
           successDiv.textContent = data.message;
           successDiv.classList.remove('hidden');
+          
+          // Mark newly added fees as temporarily visible if they are fully paid
+          if (data.added_fees) {
+            window.temporarilyVisibleFees = window.temporarilyVisibleFees || new Set();
+            data.added_fees.forEach(fee => {
+              const amountDue = parseFloat(fee.amount_due || 0);
+              const paid = parseFloat(fee.paid || 0);
+              if (paid >= amountDue && fee.id) {
+                window.temporarilyVisibleFees.add(fee.id);
+              }
+            });
+          }
           
           // Store current student RFID globally for refresh
           let currentStudentRFID = window.currentStudentRFID;
@@ -1085,8 +1204,22 @@ const items = slice.map(s => {
             <option value="">Select Fee Type...</option>
           </select>
           <div class="flex gap-2">
-            <input type="number" placeholder="Amount Due" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <input type="number" placeholder="Paid" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <input type="number" placeholder="Amount Due" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="checkAddBalancePayment(this)" oninput="checkAddBalancePayment(this)">
+            <input type="number" placeholder="Paid" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="checkAddBalancePayment(this)" oninput="checkAddBalancePayment(this)">
+          </div>
+          <div class="payment-method-section hidden">
+            <label class="block text-sm font-medium text-gray-700 mb-2 mt-2">Payment Method</label>
+            <div class="flex gap-2">
+              <select class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="handleDynamicPaymentMethodChange(this)">
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Check">Check</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Other">Other (Manual Input)</option>
+              </select>
+              <input type="text" placeholder="Enter payment method" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm hidden manual-payment-input">
+            </div>
           </div>
         </div>
         <button type="button" onclick="this.parentElement.remove()" class="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center">×</button>
@@ -1096,7 +1229,7 @@ const items = slice.map(s => {
     }
 
     function updateFeeTypeDropdowns() {
-      const dropdowns = document.querySelectorAll('#feeItemsContainer select');
+      const dropdowns = document.querySelectorAll('#feeItemsContainer select:not(#addBalancePaymentMethod)');
       dropdowns.forEach(dropdown => {
         const currentValue = dropdown.value;
         dropdown.innerHTML = '<option value="">Select Fee Type...</option>';
@@ -1165,12 +1298,20 @@ const items = slice.map(s => {
       const container = document.getElementById('feeItemsContainer');
       const feeItems = container.querySelectorAll('.space-y-2');
       
-      feeItems.forEach(item => {
+      feeItems.forEach((item, index) => {
         const amountDueInput = item.querySelector('input[placeholder="Amount Due"]');
         const paidInput = item.querySelector('input[placeholder="Paid"]');
         
         if (amountDueInput && paidInput && amountDueInput.value) {
           paidInput.value = amountDueInput.value;
+          // Trigger payment method check after setting the value
+          if (index === 0) {
+            // First item is main form
+            checkMainFormPayment(paidInput);
+          } else {
+            // Other items are dynamic
+            checkAddBalancePayment(paidInput);
+          }
         }
       });
     }
@@ -1180,6 +1321,7 @@ const items = slice.map(s => {
       document.getElementById('editFeeId').value = feeId;
       document.getElementById('editFeeType').value = feeType;
       document.getElementById('editAmountDue').value = amountDue.toFixed(2);
+      document.getElementById('editAmountDueHidden').value = amountDue.toFixed(2);
       document.getElementById('editPaidAmount').value = currentPaid.toFixed(2);
       
       // Reset messages
@@ -1467,6 +1609,132 @@ const items = slice.map(s => {
       });
     }
     
+    // Function to update a balance row to show as paid immediately
+    function updateBalanceRowToPaid(feeId, paidAmount) {
+      console.log('updateBalanceRowToPaid called with feeId:', feeId, 'paidAmount:', paidAmount);
+      
+      // Find the row with the specific fee ID
+      const balanceTable = document.querySelector('#balance-display table tbody');
+      console.log('Balance table found:', balanceTable);
+      if (!balanceTable) {
+        console.log('No balance table found');
+        return;
+      }
+      
+      const rows = balanceTable.querySelectorAll('tr');
+      console.log('Found rows:', rows.length);
+      
+      rows.forEach((row, index) => {
+        console.log('Checking row', index);
+        const editButton = row.querySelector('button[onclick*="editFeePayment"]');
+        if (editButton) {
+          const onclickAttr = editButton.getAttribute('onclick');
+          console.log('Found edit button with onclick:', onclickAttr);
+          const feeIdMatch = onclickAttr.match(/editFeePayment\((\d+),/);
+          if (feeIdMatch && parseInt(feeIdMatch[1]) === feeId) {
+            console.log('Found matching row for fee ID:', feeId);
+            
+            // Update the row to show as paid
+            row.className = 'bg-green-50 border-green-200';
+            
+            // Update fee type cell to show (PAID)
+            const feeTypeCell = row.cells[1];
+            if (feeTypeCell && !feeTypeCell.textContent.includes('(PAID)')) {
+              feeTypeCell.innerHTML = feeTypeCell.textContent + ' <span class="text-green-600 font-semibold">(PAID)</span>';
+            }
+            
+            // Update paid amount cell
+            const paidCell = row.cells[3];
+            if (paidCell) {
+              paidCell.innerHTML = `<span class="text-green-600 font-semibold">₱${paidAmount.toFixed(2)}</span>`;
+            }
+            
+            // Update balance cell to show 0.00
+            const balanceCell = row.cells[4];
+            if (balanceCell) {
+              balanceCell.innerHTML = `<span class="text-green-600 font-semibold">₱0.00</span>`;
+            }
+            
+            // Update action cell to show PAID status
+            const actionCell = row.cells[5];
+            if (actionCell) {
+              actionCell.innerHTML = '<span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">✓ PAID</span>';
+            }
+            
+            console.log('Row updated successfully');
+          }
+        }
+      });
+    }
+
+    function submitPaymentEdit(event) {
+      if (event) event.preventDefault();
+      
+      const form = document.getElementById('editPaymentForm');
+      const formData = new FormData(form);
+      
+      // Debug: Log form data
+      console.log('Form data being sent:');
+      for (let [key, value] of formData.entries()) {
+        console.log(key + ': ' + value);
+      }
+      
+      fetch('UpdatePayment.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log('Response data:', data);
+        if (data.success) {
+          closeEditPaymentModal();
+          
+          // Update the UI immediately for paid fees
+          const feeId = parseInt(formData.get('fee_id'));
+          const paidAmount = parseFloat(formData.get('paid_amount'));
+          const amountDue = parseFloat(formData.get('amount_due'));
+          
+          if (paidAmount >= amountDue) {
+            // Mark this fee as temporarily visible and update UI immediately
+            window.temporarilyVisibleFees = window.temporarilyVisibleFees || new Set();
+            window.temporarilyVisibleFees.add(feeId);
+            
+            console.log('Calling updateBalanceRowToPaid for fee ID:', feeId, 'with amount:', paidAmount);
+            // Update the specific row in the balance table immediately
+            updateBalanceRowToPaid(feeId, paidAmount);
+          } else {
+            console.log('Payment not full amount - paid:', paidAmount, 'due:', amountDue);
+          }
+          
+          // Don't refresh immediately - let the UI update show first
+          // Refresh after a short delay to update totals
+          setTimeout(() => {
+            if (window.currentStudentRFID) {
+              handleRFID(window.currentStudentRFID);
+            }
+          }, 500);
+        } else {
+          // Show error in modal instead of alert
+          const errorDiv = document.getElementById('editPaymentError');
+          errorDiv.textContent = data.message || 'Failed to update payment';
+          errorDiv.classList.remove('hidden');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        // Show error in modal instead of alert
+        const errorDiv = document.getElementById('editPaymentError');
+        errorDiv.textContent = 'An error occurred while updating the payment';
+        errorDiv.classList.remove('hidden');
+      });
+    }
+    
 
     // Term dropdown functionality
     let currentStudentId = null;
@@ -1568,9 +1836,9 @@ const items = slice.map(s => {
           <div class="flex items-center justify-between mb-4">
             <div class="relative">
               <button id="termSelector" onclick="toggleTermDropdown('${data.id_number}')" 
-                      class="text-lg font-semibold text-gray-800 hover:text-blue-600 flex items-center gap-2 transition-colors">
-                ${defaultTerm}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      class="w-full text-left bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-800 hover:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between transition-all">
+                <span class="font-medium">${defaultTerm}</span>
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
               </button>
@@ -1640,10 +1908,6 @@ const items = slice.map(s => {
                       class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
                 Add More Fees
               </button>
-              <button onclick="showPaymentSchedule('${data.id_number}', '${data.school_year_term}')" 
-                      class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">
-                Payment Schedule
-              </button>
             </div>
           </div>
           
@@ -1660,26 +1924,31 @@ const items = slice.map(s => {
                 </tr>
               </thead>
               <tbody class="text-gray-800 text-sm">
-                ${data.fee_items && data.fee_items.length > 0 ? data.fee_items.map((fee, index) => {
+                ${data.fee_items && data.fee_items.length > 0 ? data.fee_items.filter(fee => {
+                  const amountDue = parseFloat(fee.amount || 0);
+                  const paid = parseFloat(fee.paid || 0);
+                  const isPaid = amountDue <= paid;
+                  // Show unpaid items OR recently paid items (marked with temporary flag)
+                  return amountDue > paid || (isPaid && window.temporarilyVisibleFees && window.temporarilyVisibleFees.has(fee.id));
+                }).map((fee, index) => {
                   const amountDue = parseFloat(fee.amount || 0);
                   const paid = parseFloat(fee.paid || 0);
                   const balance = amountDue - paid;
+                  const isPaid = balance <= 0;
+                  
                   return `
-                  <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors ${isPaid ? 'bg-green-50' : ''}">
                     <td class="px-4 py-3 text-center font-medium">${index + 1}</td>
-                    <td class="px-4 py-3 font-medium">${fee.fee_type}</td>
+                    <td class="px-4 py-3 font-medium">${fee.fee_type} ${isPaid ? '<span class="text-xs text-green-600 font-semibold">(PAID)</span>' : ''}</td>
                     <td class="px-4 py-3 text-right font-semibold">₱${amountDue.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-right ${paid > 0 ? 'text-green-600 font-semibold' : 'text-gray-500'}">₱${paid.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
-                    <td class="px-4 py-3 text-right font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}">₱${balance.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right font-bold ${isPaid ? 'text-green-600' : 'text-red-600'}">₱${Math.abs(balance).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-center">
-                      <button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" 
-                              class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors">
-                        Edit
-                      </button>
+                      ${isPaid ? '<span class="text-green-600 text-xs font-semibold">✓ PAID</span>' : `<button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors">Edit</button>`}
                     </td>
                   </tr>
                   `;
-                }).join('') : '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No fee items found</td></tr>'}
+                }).join('') : '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No unpaid fees</td></tr>'}
               </tbody>
             </table>
             
@@ -1724,13 +1993,18 @@ const items = slice.map(s => {
         });
         
         document.getElementById('tab-history').innerHTML = `
-          <div class="flex items-center mb-6">
-            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-              </svg>
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-gray-800">Transaction History</h2>
+                <p class="text-sm text-gray-600">${data.school_year_term || 'All Terms'}</p>
+              </div>
             </div>
-            <h2 class="text-xl font-bold text-gray-800">Transaction History</h2>
           </div>
           <div class="overflow-hidden rounded-lg border border-gray-200">
             <table class="min-w-full divide-y divide-gray-200">
@@ -1776,6 +2050,75 @@ const items = slice.map(s => {
       }
     });
     
+    // Function to set school year and semester dropdowns from combined string
+    function setSchoolYearAndSemester(termString) {
+      // Parse the term string (e.g., "2025-2026 2nd Semester")
+      const parts = termString.split(' ');
+      if (parts.length >= 2) {
+        const year = parts[0];
+        const semester = parts.slice(1).join(' ');
+        
+        // Set the dropdowns
+        document.getElementById('schoolYear').value = year;
+        document.getElementById('schoolSemester').value = semester;
+        
+        // Update the hidden field
+        updateSchoolTermHidden();
+      }
+    }
+    
+    // Function to update the hidden field when dropdowns change
+    function updateSchoolTermHidden() {
+      const year = document.getElementById('schoolYear').value;
+      const semester = document.getElementById('schoolSemester').value;
+      
+      if (year && semester) {
+        document.getElementById('schoolTerm').value = `${year} ${semester}`;
+      } else {
+        document.getElementById('schoolTerm').value = '';
+      }
+    }
+    
+    // Function to populate academic years dynamically
+    function populateAcademicYears() {
+      const currentYear = new Date().getFullYear();
+      const startYear = currentYear - 2; // Show 2 years back
+      const endYear = currentYear + 2;   // Show 1 year forward
+      
+      const schoolYearSelect = document.getElementById('schoolYear');
+      
+      // Clear existing options except the first one
+      while (schoolYearSelect.children.length > 1) {
+        schoolYearSelect.removeChild(schoolYearSelect.lastChild);
+      }
+      
+      // Generate academic years
+      for (let year = startYear; year <= endYear; year++) {
+        const nextYear = year + 1;
+        const academicYear = `${year}-${nextYear}`;
+        
+        const option = document.createElement('option');
+        option.value = academicYear;
+        option.textContent = academicYear;
+        schoolYearSelect.appendChild(option);
+      }
+    }
+    
+    // Add event listeners to the dropdowns
+    document.addEventListener('DOMContentLoaded', function() {
+      // Populate years when page loads
+      populateAcademicYears();
+      
+      document.getElementById('schoolYear').addEventListener('change', updateSchoolTermHidden);
+      document.getElementById('schoolSemester').addEventListener('change', updateSchoolTermHidden);
+    });
+    
+    // Utility function to clear RFID input and refocus
+    function clearRFIDAndFocus() {
+      rfidInput.value = '';
+      focusRFID();
+    }
+    
     // Clear student data function
     function clearStudentData() {
       // Clear student info
@@ -1784,33 +2127,34 @@ const items = slice.map(s => {
           <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
           </svg>
-          <p class="text-sm italic">Scan RFID or search to display student information</p>
+          <p class="text-lg font-medium">No Student Selected</p>
+          <p class="text-sm">Scan RFID or search for a student</p>
         </div>
       `;
       
       // Clear balance tab
       document.getElementById('tab-balance').innerHTML = `
-        <div class="text-center text-gray-500 py-12">
-          <div class="w-16 h-16 mx-auto school-gradient rounded-lg flex items-center justify-center mb-4">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="text-center py-12">
+          <div class="w-16 h-16 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
             </svg>
           </div>
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">No Balance Data</h3>
-          <p class="text-sm text-gray-500">Search for a student or scan RFID to view balance information</p>
+          <h3 class="text-lg font-semibold text-gray-800 mb-2">No Balance Information</h3>
+          <p class="text-sm text-gray-500">Select a student to view their balance details</p>
         </div>
       `;
       
       // Clear history tab
       document.getElementById('tab-history').innerHTML = `
-        <div class="text-center text-gray-500 py-12">
-          <div class="w-16 h-16 mx-auto school-gradient rounded-lg flex items-center justify-center mb-4">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="text-center py-12">
+          <div class="w-16 h-16 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
             </svg>
           </div>
           <h3 class="text-lg font-semibold text-gray-800 mb-2">No Transaction History</h3>
-          <p class="text-sm text-gray-500">Search for a student or scan RFID to view transaction history</p>
+          <p class="text-sm text-gray-500">Select a student to view their payment history</p>
         </div>
       `;
       
@@ -1820,9 +2164,6 @@ const items = slice.map(s => {
       
       // Clear stored RFID
       window.currentStudentRFID = null;
-      
-      // Focus back to RFID input
-      focusRFID();
     }
     
     // Focus RFID when page loads

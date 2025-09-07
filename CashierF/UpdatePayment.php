@@ -2,6 +2,9 @@
 session_start();
 require_once '../StudentLogin/db_conn.php';
 
+// Enable error logging for debugging
+error_log("UpdatePayment.php called with POST data: " . print_r($_POST, true));
+
 // Check if user is logged in and has cashier role
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'cashier') {
     http_response_code(403);
@@ -18,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Validate required fields
 if (!isset($_POST['fee_id']) || !isset($_POST['paid_amount']) || !isset($_POST['payment_method'])) {
+    error_log("Missing required fields. POST data: " . print_r($_POST, true));
     echo json_encode(['success' => false, 'message' => 'Missing required fields']);
     exit;
 }
@@ -26,9 +30,17 @@ $fee_id = intval($_POST['fee_id']);
 $paid_amount = floatval($_POST['paid_amount']);
 $payment_method = trim($_POST['payment_method']);
 
+error_log("Processing payment update - Fee ID: $fee_id, Paid Amount: $paid_amount, Payment Method: $payment_method");
+
 // Validate paid amount
 if ($paid_amount < 0) {
     echo json_encode(['success' => false, 'message' => 'Paid amount cannot be negative']);
+    exit;
+}
+
+// Validate fee_id
+if ($fee_id <= 0) {
+    echo json_encode(['success' => false, 'message' => 'Invalid fee ID']);
     exit;
 }
 
@@ -68,7 +80,7 @@ try {
         throw new Exception('Failed to update payment');
     }
     
-    // If fully paid, create payment record and delete fee item
+    // If fully paid, create payment record but keep fee item for temporary display
     if ($paid_amount == $amount_due && $paid_amount > 0) {
         // Generate OR number
         $or_number = 'OR' . date('Ymd') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
@@ -81,13 +93,8 @@ try {
             throw new Exception('Failed to create payment record');
         }
         
-        // Delete the fee item since it's fully paid
-        $stmt = $conn->prepare("DELETE FROM student_fee_items WHERE id = ?");
-        $stmt->bind_param("i", $fee_id);
-        
-        if (!$stmt->execute()) {
-            throw new Exception('Failed to remove paid fee item');
-        }
+        // Keep the fee item in student_fee_items for temporary display
+        // It will be filtered out in the frontend display logic
     }
     
     // Commit transaction
@@ -101,6 +108,9 @@ try {
 } catch (Exception $e) {
     // Rollback transaction on error
     $conn->rollback();
+    
+    error_log("UpdatePayment Exception: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
     
     echo json_encode([
         'success' => false, 

@@ -36,20 +36,11 @@ $remaining_balance = $gross_total - $total_paid;
 
 // Get payments
 $pay_query = "SELECT fee_type, amount, or_number, date FROM student_payments 
-              WHERE id_number = ? AND school_year_term = ? ORDER BY date ASC";
+              WHERE id_number = ? AND school_year_term = ? ORDER BY date DESC";
 $pay_stmt = $conn->prepare($pay_query);
 $pay_stmt->bind_param("ss", $id_number, $school_year_term);
 $pay_stmt->execute();
 $pay_result = $pay_stmt->get_result();
-
-// Get payment schedule
-$sched_query = "SELECT * FROM payment_schedule 
-                WHERE id_number = ? AND school_year_term = ? ORDER BY due_date ASC";
-$sched_stmt = $conn->prepare($sched_query);
-$sched_stmt->bind_param("ss", $id_number, $school_year_term);
-$sched_stmt->execute();
-$sched_result = $sched_stmt->get_result();
-$sched_total = 0;
 ?>
 
 <!DOCTYPE html>
@@ -169,46 +160,6 @@ $sched_total = 0;
     <?php endif; ?>
   </div>
 
-  <!-- Payment Schedule -->
-  <div class="bg-white rounded-2xl card-shadow p-6 mb-8">
-    <div class="flex items-center mb-6">
-      <div class="w-10 h-10 bg-[#0B2C62] rounded-lg flex items-center justify-center mr-3">
-        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-        </svg>
-      </div>
-      <h2 class="text-xl font-bold text-gray-800">Payment Schedule</h2>
-    </div>
-    
-    <?php if ($sched_result->num_rows > 0): ?>
-      <div class="space-y-3">
-        <?php while ($sched = $sched_result->fetch_assoc()):
-          $sched_total += $sched['amount'];
-        ?>
-          <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-            <div>
-              <p class="font-medium text-gray-900"><?= date('F j, Y', strtotime($sched['due_date'])) ?></p>
-              <?php if (!empty($sched['description'])): ?>
-                <p class="text-sm text-gray-600"><?= htmlspecialchars($sched['description']) ?></p>
-              <?php endif; ?>
-            </div>
-            <span class="font-semibold text-gray-900">₱<?= number_format($sched['amount'], 2) ?></span>
-          </div>
-        <?php endwhile; ?>
-        <div class="flex justify-between items-center p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-          <span class="font-bold text-blue-700">Total Scheduled</span>
-          <span class="font-bold text-blue-700 text-lg">₱<?= number_format($sched_total, 2) ?></span>
-        </div>
-      </div>
-    <?php else: ?>
-      <div class="text-center py-8">
-        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-        </svg>
-        <p class="text-gray-500">No payment schedule available for this term</p>
-      </div>
-    <?php endif; ?>
-  </div>
 
   <!-- Payment History -->
   <div class="bg-white rounded-lg card-shadow">
@@ -221,8 +172,18 @@ $sched_total = 0;
 
     <?php if ($pay_result->num_rows > 0): ?>
       <div class="p-4 space-y-4">
-        <?php while ($row = $pay_result->fetch_assoc()): ?>
-          <div class="border border-gray-200 rounded p-3">
+        <?php 
+        $payment_records = [];
+        while ($row = $pay_result->fetch_assoc()) {
+          $payment_records[] = $row;
+        }
+        $total_records = count($payment_records);
+        $initial_display = 3; // Show only 3 records initially
+        
+        for ($i = 0; $i < min($initial_display, $total_records); $i++): 
+          $row = $payment_records[$i];
+        ?>
+          <div class="payment-record border border-gray-200 rounded p-3">
             <div class="flex justify-between items-start mb-3">
               <div>
                 <div class="font-medium text-gray-800"><?= date('F j, Y', strtotime($row['date'])) ?></div>
@@ -241,7 +202,49 @@ $sched_total = 0;
               <span class="font-semibold text-green-600">₱<?= number_format($row['amount'], 2) ?></span>
             </div>
           </div>
-        <?php endwhile; ?>
+        <?php endfor; ?>
+        
+        <?php if ($total_records > $initial_display): ?>
+          <!-- Hidden records -->
+          <div id="hiddenRecords" style="display: none;">
+            <?php for ($i = $initial_display; $i < $total_records; $i++): 
+              $row = $payment_records[$i];
+            ?>
+              <div class="payment-record border border-gray-200 rounded p-3">
+                <div class="flex justify-between items-start mb-3">
+                  <div>
+                    <div class="font-medium text-gray-800"><?= date('F j, Y', strtotime($row['date'])) ?></div>
+                    <div class="text-sm text-gray-600">OR #<?= htmlspecialchars($row['or_number']) ?></div>
+                  </div>
+                  <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">Paid</span>
+                </div>
+                
+                <div class="flex justify-between text-sm py-1">
+                  <span class="text-gray-600"><?= htmlspecialchars($row['fee_type']) ?></span>
+                  <span class="text-gray-900">₱<?= number_format($row['amount'], 2) ?></span>
+                </div>
+                
+                <div class="flex justify-between pt-2 mt-2 border-t border-gray-200">
+                  <span class="font-semibold text-gray-800">Total Payment</span>
+                  <span class="font-semibold text-green-600">₱<?= number_format($row['amount'], 2) ?></span>
+                </div>
+              </div>
+            <?php endfor; ?>
+          </div>
+          
+          <!-- View More/View Less buttons -->
+          <div class="text-center pt-4 border-t border-gray-200">
+            <button id="viewMoreBtn" onclick="togglePaymentHistory()" 
+                    class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">
+              View More (<?= $total_records - $initial_display ?> more)
+            </button>
+            <button id="viewLessBtn" onclick="togglePaymentHistory()" 
+                    class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors" 
+                    style="display: none;">
+              View Less
+            </button>
+          </div>
+        <?php endif; ?>
       </div>
     <?php else: ?>
       <div class="p-6 text-center">
@@ -250,6 +253,26 @@ $sched_total = 0;
     <?php endif; ?>
   </div>
 </div>
+
+<script>
+function togglePaymentHistory() {
+  const hiddenRecords = document.getElementById('hiddenRecords');
+  const viewMoreBtn = document.getElementById('viewMoreBtn');
+  const viewLessBtn = document.getElementById('viewLessBtn');
+  
+  if (hiddenRecords.style.display === 'none') {
+    // Show hidden records
+    hiddenRecords.style.display = 'block';
+    viewMoreBtn.style.display = 'none';
+    viewLessBtn.style.display = 'inline-block';
+  } else {
+    // Hide records
+    hiddenRecords.style.display = 'none';
+    viewMoreBtn.style.display = 'inline-block';
+    viewLessBtn.style.display = 'none';
+  }
+}
+</script>
 
 </body>
 </html>
