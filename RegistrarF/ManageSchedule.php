@@ -841,15 +841,18 @@ function toggleScheduleType() {
     const differentTimeDiv = document.getElementById('differentTimeSchedule');
     const startTimeInput = document.getElementById('startTime');
     const endTimeInput = document.getElementById('endTime');
+    const timeFieldsDiv = startTimeInput.closest('.grid'); // Get the parent div containing both time fields
     
     if (scheduleType === 'same') {
         sameTimeDiv.classList.remove('hidden');
         differentTimeDiv.classList.add('hidden');
+        timeFieldsDiv.classList.remove('hidden'); // Show time fields
         startTimeInput.required = true;
         endTimeInput.required = true;
     } else {
         sameTimeDiv.classList.add('hidden');
         differentTimeDiv.classList.remove('hidden');
+        timeFieldsDiv.classList.add('hidden'); // Hide time fields
         startTimeInput.required = false;
         endTimeInput.required = false;
     }
