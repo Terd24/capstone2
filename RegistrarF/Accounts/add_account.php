@@ -570,6 +570,58 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         $insert_stmt->close();
         $check_stmt->close();
+    } elseif ($account_type === 'attendance') {
+        // Handle attendance account creation
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        
+        // Validation
+        if (empty($username) || empty($password)) {
+            $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Validate username (letters, numbers, underscores only)
+        if (!empty($username) && !preg_match('/^[A-Za-z0-9_]+$/', $username)) {
+            $error_msg = "Username can only contain letters, numbers, and underscores.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+        
+        // Check if username already exists
+        if (empty($error_msg)) {
+            $check_stmt = $conn->prepare("SELECT id FROM attendance_account WHERE username = ?");
+            $check_stmt->bind_param("s", $username);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                $error_msg = "Username already exists. Please use a different username.";
+                $form_data = $_POST;
+                $show_modal = true;
+            }
+            $check_stmt->close();
+        }
+        
+        // Hash password and insert if no errors
+        if (empty($error_msg)) {
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
+            $insert_stmt = $conn->prepare("INSERT INTO attendance_account (username, password) VALUES (?, ?)");
+            $insert_stmt->bind_param("ss", $username, $hashed_password);
+            
+            if ($insert_stmt->execute()) {
+                $_SESSION['success_msg'] = "Attendance account created successfully!";
+                header("Location: AccountList.php?type=attendance");
+                exit;
+            } else {
+                $error_msg = "Error creating attendance account. Please try again.";
+                $form_data = $_POST;
+                $show_modal = true;
+            }
+            $insert_stmt->close();
+        }
     }
 }
 
@@ -602,6 +654,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <option value="cashier">Cashier Account</option>
                 <option value="guidance">Guidance Account</option>
                 <option value="parent">Parent Account</option>
+                <option value="attendance">Attendance Account</option>
             </select>
         </div>
 
@@ -628,6 +681,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <?php include("add_registrar_form.php"); ?>
         <?php include("add_cashier_form.php"); ?>
         <?php include("add_guidance_form.php"); ?>
+        <?php include("add_attendance_form.php"); ?>
         <?php include("add_parent_form.php"); ?>
 
     </div>
@@ -673,6 +727,8 @@ function handleModalAccountTypeChange() {
         showCashierForm();
     } else if (accountType === 'guidance') {
         showGuidanceForm();
+    } else if (accountType === 'attendance') {
+        showAttendanceForm();
     } else if (accountType === 'parent') {
         showParentForm();
     } else {
@@ -681,7 +737,7 @@ function handleModalAccountTypeChange() {
 }
 
 function hideAllForms() {
-    const forms = ['studentForm', 'registrarForm', 'cashierForm', 'guidanceForm', 'parentForm', 'noSelectionMessage'];
+    const forms = ['studentForm', 'registrarForm', 'cashierForm', 'guidanceForm', 'attendanceForm', 'parentForm', 'noSelectionMessage'];
     forms.forEach(formId => {
         const form = document.getElementById(formId);
         if (form) {
@@ -712,6 +768,12 @@ function showGuidanceForm() {
     hideAllForms();
     document.getElementById('guidanceForm').style.display = 'block';
     console.log('✅ GUIDANCE FORM DISPLAYED');
+}
+
+function showAttendanceForm() {
+    hideAllForms();
+    document.getElementById('attendanceForm').style.display = 'block';
+    console.log('✅ ATTENDANCE FORM DISPLAYED');
 }
 
 function showParentForm() {
@@ -745,6 +807,8 @@ function openModal(){
             showCashierForm();
         } else if (savedAccountType === 'guidance') {
             showGuidanceForm();
+        } else if (savedAccountType === 'attendance') {
+            showAttendanceForm();
         } else if (savedAccountType === 'parent') {
             showParentForm();
         }
@@ -782,6 +846,8 @@ function showAccountForm(selectedType = null) {
         showCashierForm();
     } else if (accountType === 'guidance') {
         showGuidanceForm();
+    } else if (accountType === 'attendance') {
+        showAttendanceForm();
     } else if (accountType === 'parent') {
         showParentForm();
     } else {

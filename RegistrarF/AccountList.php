@@ -37,6 +37,10 @@ switch ($accountType) {
         $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, username FROM guidance_account ORDER BY last_name ASC");
         $columns = ['ID Number', 'Full Name', 'Username'];
         break;
+    case 'attendance':
+        $result = $conn->query("SELECT id, username FROM attendance_account ORDER BY username ASC");
+        $columns = ['ID', 'Username'];
+        break;
     case 'parent':
         $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, child_name FROM parent_account ORDER BY last_name ASC");
         $columns = ['ID Number', 'Full Name', 'Child Name'];
@@ -98,6 +102,7 @@ input[type=number] { -moz-appearance: textfield; }
                 <option value="guidance" <?= $accountType==='guidance' ? 'selected' : '' ?>>Guidance</option>
                 <option value="cashier" <?= $accountType==='cashier' ? 'selected' : '' ?>>Cashier</option>
                 <option value="parent" <?= $accountType==='parent' ? 'selected' : '' ?>>Parent</option>
+                <option value="attendance" <?= $accountType==='attendance' ? 'selected' : '' ?>>Attendance</option>
             </select>
         </div>
 
@@ -148,6 +153,9 @@ input[type=number] { -moz-appearance: textfield; }
                                 break;
                             case 'parent':
                                 $onclick = 'onclick="viewParent(\'' . htmlspecialchars($row['id_number']) . '\');"';
+                                break;
+                            case 'attendance':
+                                $onclick = 'onclick="viewAttendance(\'' . htmlspecialchars($row['id']) . '\');"';
                                 break;
                             default:
                                 $clickable = false;
@@ -209,6 +217,12 @@ window.viewParent = function(parentId) {
     console.log('Clicked parent ID:', parentId);
     console.log('Navigating to:', `Accounts/view_parent.php?id=${parentId}`);
     window.location.href = `Accounts/view_parent.php?id=${parentId}`;
+};
+
+window.viewAttendance = function(attendanceId) {
+    console.log('Clicked attendance ID:', attendanceId);
+    console.log('Navigating to:', `Accounts/view_attendance.php?id=${attendanceId}`);
+    window.location.href = `Accounts/view_attendance.php?id=${attendanceId}`;
 };
 
 // Show success notification with animation

@@ -22,6 +22,9 @@ if (isset($_SESSION['role'])) {
         case 'registrar':
             header("Location: ../RegistrarF/RegistrarDashboard.php");
             exit;
+        case 'attendance':
+            header("Location: ../AttendanceF/Dashboard.php");
+            exit;
         case 'parent':
             header("Location: ../ParentLogin/ParentDashboard.php");
             exit;
@@ -164,6 +167,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['child_name'] = $row['child_name'];
             $_SESSION['role'] = 'parent';
             echo json_encode(['status' => 'success','redirect' => '../ParentLogin/ParentDashboard.php']);
+            exit;
+        } else { 
+            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
+            exit; 
+        }
+    }
+
+    // 6️⃣ Check attendance account
+    $stmt = $conn->prepare("SELECT * FROM attendance_account WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        if (password_verify($password, $row['password'])) {
+            $_SESSION['attendance_id'] = $row['id'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['attendance_name'] = $row['username']; // Use username as display name
+            $_SESSION['role'] = 'attendance';
+            echo json_encode(['status' => 'success','redirect' => '../AttendanceF/Dashboard.php']);
             exit;
         } else { 
             echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 

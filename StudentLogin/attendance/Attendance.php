@@ -9,73 +9,7 @@ if (!isset($_SESSION['id_number'])) {
 
 $id_number = $_SESSION['id_number'];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
-    $rfid = strtoupper(trim($_POST['rfid']));
-
-    $verify = $conn->prepare("
-        SELECT id_number, TRIM(UPPER(rfid_uid)) AS db_rfid 
-        FROM student_account 
-        WHERE id_number = ?
-    ");
-    $verify->bind_param("s", $id_number);
-    $verify->execute();
-    $verifyResult = $verify->get_result();
-
-    if ($verifyResult->num_rows === 0) {
-        $_SESSION['error'] = "Student not found.";
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit();
-    }
-
-    $row = $verifyResult->fetch_assoc();
-    $storedRFID = trim($row['db_rfid']);
-    $inputRFID = trim($rfid);
-
-    if ($storedRFID !== $inputRFID) {
-        $_SESSION['error'] = "Card not registered to this account.";
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit();
-    }
-
-    date_default_timezone_set('Asia/Manila');
-    $today = date("Y-m-d");
-    $time = date("H:i:s");
-    $day = date("l");
-    $status = "Present";
-
-    // Get student's assigned schedule
-    $schedule_query = $conn->prepare("SELECT class_schedule FROM student_account WHERE id_number = ?");
-    $schedule_query->bind_param("s", $id_number);
-    $schedule_query->execute();
-    $schedule_result = $schedule_query->get_result();
-    $student_schedule = null;
-    
-    if ($schedule_result->num_rows > 0) {
-        $schedule_row = $schedule_result->fetch_assoc();
-        $student_schedule = $schedule_row['class_schedule'];
-    }
-
-    $check = $conn->prepare("SELECT * FROM attendance_record WHERE id_number = ? AND date = ?");
-    $check->bind_param("ss", $id_number, $today);
-    $check->execute();
-    $res = $check->get_result();
-
-    if ($res->num_rows === 0) {
-        $insert = $conn->prepare("INSERT INTO attendance_record (id_number, date, day, time_in, status, schedule) VALUES (?, ?, ?, ?, ?, ?)");
-        $insert->bind_param("ssssss", $id_number, $today, $day, $time, $status, $student_schedule);
-        $insert->execute();
-        $_SESSION['error'] = "Time In recorded.";
-    } else {
-        $record = $res->fetch_assoc();
-        $update = $conn->prepare("UPDATE attendance_record SET time_out = ?, schedule = ? WHERE id = ?");
-        $update->bind_param("ssi", $time, $student_schedule, $record['id']);
-        $update->execute();
-        $_SESSION['error'] = "Time Out updated.";
-    }
-
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit();
-}
+// RFID functionality removed - attendance is now managed centrally
 
 // Get student's schedule information including day-specific schedules
 date_default_timezone_set('Asia/Manila');
@@ -272,8 +206,31 @@ $result = $stmt->get_result();
         </div>
         <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
           <p class="text-sm text-gray-600 mb-1">Status</p>
-          <p class="text-xl font-bold <?= $today_attendance ? ($today_attendance['status'] == 'Present' ? 'text-green-600' : 'text-red-600') : 'text-gray-500' ?>">
-            <?= $today_attendance ? $today_attendance['status'] : '--' ?>
+          <p class="text-xl font-bold <?php 
+            if ($today_attendance) {
+                $status = $today_attendance['status'];
+                if ($status === 'Present') {
+                    echo 'text-green-600';
+                } elseif ($status === 'Time In Only' || $status === 'Time In On') {
+                    echo 'text-blue-600';
+                } elseif ($status === 'Absent') {
+                    echo 'text-red-600';
+                } else {
+                    echo 'text-gray-600';
+                }
+            } else {
+                echo 'text-gray-500';
+            }
+            ?>">
+            <?php 
+            if ($today_attendance) {
+                // Always use the database status, don't calculate it
+                $status = $today_attendance['status'];
+                echo htmlspecialchars($status);
+            } else {
+                echo '--';
+            }
+            ?>
           </p>
         </div>
       </div>
@@ -289,23 +246,8 @@ $result = $stmt->get_result();
       <p class="text-gray-500"><?= date('F j, Y') ?> - <?= $current_day ?></p>
     </div>
     <?php endif; ?>
+    
 
-    <?php if (isset($_SESSION['error'])): ?>
-      <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-800 px-6 py-4 rounded-xl mb-6 shadow-sm">
-        <div class="flex items-center">
-          <svg class="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span class="font-medium"><?= htmlspecialchars($_SESSION['error']) ?></span>
-        </div>
-      </div>
-      <?php unset($_SESSION['error']); ?>
-    <?php endif; ?>
-
-    <!-- Hidden RFID form (optional) -->
-    <form method="POST" id="rfidForm" class="hidden">
-      <input type="text" name="rfid" id="rfidInput">
-    </form>
 
     <!-- Attendance Records -->
     <div class="bg-white rounded-2xl shadow-lg">
@@ -394,11 +336,22 @@ $result = $stmt->get_result();
                   </td>
                   <td class="px-6 py-4 text-gray-700">
                     <?php 
-                    // Show status with plain text
+                    // Show status with color coding
                     if (!$has_class_on_day) {
-                        echo 'No Schedule';
+                        echo '<span class="text-gray-600">No Schedule</span>';
                     } else {
-                        echo htmlspecialchars($row['status']);
+                        // Always use the database status, don't calculate it
+                        $status = $row['status'];
+                        if ($status === 'Present') {
+                            echo '<span class="text-green-600 font-medium">Present</span>';
+                        } elseif ($status === 'Time In Only' || $status === 'Time In On') {
+                            echo '<span class="text-blue-600 font-medium">' . htmlspecialchars($status) . '</span>';
+                        } elseif ($status === 'Absent') {
+                            echo '<span class="text-red-600 font-medium">Absent</span>';
+                        } else {
+                            // Fallback for any other status
+                            echo '<span class="text-gray-600 font-medium">' . htmlspecialchars($status) . '</span>';
+                        }
                     }
                     ?>
                   </td>
@@ -424,38 +377,8 @@ $result = $stmt->get_result();
   </div>
 
 <script>
-let rfidBuffer = '';
-let rfidTimer;
-
-// Global listener for RFID scanner input
-window.addEventListener('keydown', function(e) {
-  // Ignore key presses when user is typing in date fields
-  const active = document.activeElement;
-  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-    return;
-  }
-
-  if (/^[a-zA-Z0-9]$/.test(e.key)) {
-    rfidBuffer += e.key;
-  }
-
-  if (e.key === 'Enter') {
-    if (rfidBuffer.length > 0) {
-      submitRFID(rfidBuffer.trim());
-      rfidBuffer = '';
-    }
-  }
-
-  if (rfidTimer) clearTimeout(rfidTimer);
-  rfidTimer = setTimeout(()=> rfidBuffer='', 400);
-});
-
-function submitRFID(rfid) {
-  const form = document.getElementById('rfidForm');
-  const input = document.getElementById('rfidInput');
-  input.value = rfid;
-  form.submit();
-}
+// Read-only attendance view - no RFID functionality
+console.log('Student attendance view loaded - read-only mode');
 </script>
 
 </body>

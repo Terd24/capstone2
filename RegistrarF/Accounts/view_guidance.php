@@ -20,6 +20,21 @@ if (!empty($guidance_id)) {
     $stmt->close();
 }
 
+// Handle delete request
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_guidance'])) {
+    $delete_stmt = $conn->prepare("DELETE FROM guidance_account WHERE id_number = ?");
+    $delete_stmt->bind_param("s", $guidance_id);
+    
+    if ($delete_stmt->execute()) {
+        $_SESSION['success_msg'] = "Guidance account deleted successfully!";
+        header("Location: ../AccountList.php?type=guidance");
+        exit;
+    } else {
+        $error_msg = "Error deleting guidance account.";
+    }
+    $delete_stmt->close();
+}
+
 // Handle edit form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_guidance'])) {
     $first_name = $_POST['first_name'] ?? '';
@@ -112,6 +127,7 @@ input[type=number] { -moz-appearance: textfield; }
             <h2 class="text-lg font-semibold">Guidance Information</h2>
             <div class="flex gap-3">
                 <button id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
+                <button id="deleteBtn" onclick="confirmDelete()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>
                 <button onclick="window.location.href='../AccountList.php?type=guidance'" class="text-2xl font-bold hover:text-gray-300">&times;</button>
             </div>
         </div>
@@ -237,6 +253,54 @@ function toggleEdit() {
             }
         });
     }
+}
+
+// Delete confirmation function
+function confirmDelete() {
+    showDeleteModal();
+}
+
+function showDeleteModal() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]';
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+            <div class="p-6">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Delete Guidance Account</h3>
+                <p class="text-gray-600 text-center mb-6">Are you sure you want to delete this guidance account? This action cannot be undone.</p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="closeDeleteModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button onclick="proceedDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition">
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeDeleteModal() {
+    const modal = document.querySelector('[class*="z-[60]"]');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function proceedDelete() {
+    // Create a form to submit the delete request
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.innerHTML = '<input type="hidden" name="delete_guidance" value="1">';
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 
