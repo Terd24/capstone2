@@ -3,13 +3,13 @@ session_start();
 include '../StudentLogin/db_conn.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $parent_id = $_POST['parent_id'] ?? '';
-    $parent_password = $_POST['parent_password'] ?? '';
+    $username = $_POST['parent_id'] ?? '';
+    $password = $_POST['parent_password'] ?? '';
 
     // Prepare and execute SQL securely
-    $query = "SELECT * FROM parent_account WHERE parent_id = ?";
+    $query = "SELECT * FROM parent_account WHERE username = ?";
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("s", $parent_id);
+    $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -18,20 +18,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $row = $result->fetch_assoc();
 
         // Verify hashed password
-        if (password_verify($parent_password, $row['parent_password'])) {
+        if (password_verify($password, $row['password'])) {
             // Set session variables
             $_SESSION['parent_id'] = $row['parent_id'];
-            $_SESSION['full_name'] = $row['full_name'];
-            $_SESSION['child_id'] = $row['child_id']; // optional, if child info is needed
+            $_SESSION['parent_name'] = $row['first_name'] . ' ' . $row['last_name'];
+            $_SESSION['child_id'] = $row['child_id'];
+            $_SESSION['child_name'] = $row['child_name'];
 
             // Redirect to parent dashboard
             header("Location: ParentDashboard.php");
             exit();
         } else {
-            echo "<script>alert('Incorrect password.'); window.location.href='parentlogin.html';</script>";
+            echo "<script>alert('Incorrect password.'); window.location.href='ParentLogin.html';</script>";
         }
     } else {
-        echo "<script>alert('Account not found.'); window.location.href='parentlogin.html';</script>";
+        echo "<script>alert('Account not found.'); window.location.href='ParentLogin.html';</script>";
     }
 
     $stmt->close();

@@ -1,18 +1,19 @@
 <?php
 session_start();
-include '../StudentLogin/db_conn.php';
-
 if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
-    header("Location: ../StudentLogin/login.php");
+    header("Location: ParentLogin.html");
     exit();
 }
 
-$child_id = $_SESSION['child_id'];
+include '../StudentLogin/db_conn.php';
+
+$id_number = $_SESSION['child_id'];
 
 $selected_term = isset($_GET['term']) ? $_GET['term'] : null;
 
+// Fetch all available terms for the dropdown
 $term_query = $conn->prepare("SELECT DISTINCT school_year_term FROM grades_record WHERE id_number = ? ORDER BY school_year_term DESC");
-$term_query->bind_param("s", $child_id);
+$term_query->bind_param("s", $id_number);
 $term_query->execute();
 $term_result = $term_query->get_result();
 
@@ -26,7 +27,7 @@ if (!$selected_term && count($terms) > 0) {
 }
 
 $stmt = $conn->prepare("SELECT subject, teacher_name, prelim, midterm, pre_finals, finals FROM grades_record WHERE id_number = ? AND school_year_term = ?");
-$stmt->bind_param("ss", $child_id, $selected_term);
+$stmt->bind_param("ss", $id_number, $selected_term);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -34,12 +35,6 @@ $grades = [];
 while ($row = $result->fetch_assoc()) {
     $grades[] = $row;
 }
-
-$name_stmt = $conn->prepare("SELECT CONCAT(first_name, ' ', last_name) as full_name FROM student_account WHERE id_number = ?");
-$name_stmt->bind_param("s", $child_id);
-$name_stmt->execute();
-$name_result = $name_stmt->get_result();
-$student_name = $name_result->num_rows > 0 ? $name_result->fetch_assoc()['full_name'] : 'Your Child';
 ?>
 
 <!DOCTYPE html>
@@ -50,53 +45,120 @@ $student_name = $name_result->num_rows > 0 ? $name_result->fetch_assoc()['full_n
   <title>Student Grades</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
-  <div class="bg-white p-4 flex items-center shadow-md">
-    <button onclick="window.location.href='ParentDashboard.php'" class="text-2xl mr-4">←</button>
-    <h1 class="text-xl font-semibold">Grades</h1>
-  </div>
-
-  <div class="bg-gray-100 px-6 py-4">
-    <form method="get" class="flex flex-col md:flex-row md:items-center gap-3">
-      <label class="font-semibold text-lg" for="term">School Year & Term:</label>
-      <select name="term" id="term" class="mt-1 block w-full md:w-80 p-2 border rounded shadow" onchange="this.form.submit()">
-        <?php foreach ($terms as $term): ?>
-          <option value="<?= htmlspecialchars($term) ?>" <?= $term == $selected_term ? 'selected' : '' ?>>
-            <?= htmlspecialchars($term) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </form>
-  </div>
-
-  <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-    <?php if (count($grades) > 0): ?>
-      <?php foreach ($grades as $grade): ?>
-      <div class="bg-white p-4 rounded shadow">
-        <div class="mb-2">
-          <p class="font-semibold"><?= htmlspecialchars($student_name) ?></p>
-          <p class="text-sm text-gray-500"><?= htmlspecialchars($grade['subject']) ?></p>
-        </div>
-        <div class="border-t mt-2 pt-2">
-          <div class="grid grid-cols-4 text-sm font-semibold bg-gray-100 p-2 rounded">
-            <div>PRELIM</div>
-            <div>MIDTERM</div>
-            <div>PRE FINALS</div>
-            <div>FINALS</div>
-          </div>
-          <div class="grid grid-cols-4 text-center mt-2 text-sm">
-            <div><?= htmlspecialchars($grade['prelim']) ?></div>
-            <div><?= htmlspecialchars($grade['midterm']) ?></div>
-            <div><?= htmlspecialchars($grade['pre_finals']) ?></div>
-            <div><?= htmlspecialchars($grade['finals']) ?></div>
-          </div>
+  <!-- Header -->
+  <header class="bg-[#0B2C62] text-white shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex items-center space-x-4">
+        <button onclick="window.location.href='ParentDashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+        </button>
+        <div>
+          <h1 class="text-xl font-bold">Student Grades</h1>
+          <p class="text-blue-200 text-sm">Academic Performance Overview</p>
         </div>
       </div>
-      <?php endforeach; ?>
-    <?php else: ?>
-      <p class="text-center text-gray-500 col-span-2">No grades found for the selected term.</p>
-    <?php endif; ?>
+    </div>
+  </header>
+
+  <!-- Term Selection -->
+  <div class="container mx-auto px-6 py-6">
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+      <form method="get" class="flex flex-col md:flex-row md:items-center gap-4">
+        <label class="font-semibold text-gray-700" for="term">School Year & Term:</label>
+        <select name="term" id="term" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="this.form.submit()">
+          <?php if (empty($terms)): ?>
+            <option value="">No grades available</option>
+          <?php else: ?>
+            <?php foreach ($terms as $term): ?>
+              <option value="<?= htmlspecialchars($term) ?>" <?= $term == $selected_term ? 'selected' : '' ?>>
+                <?= htmlspecialchars($term) ?>
+              </option>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </select>
+      </form>
+    </div>
+
+    <!-- Grades Display -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <?php if (count($grades) > 0): ?>
+        <?php foreach ($grades as $grade): ?>
+        <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <div class="mb-4">
+            <h3 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($grade['subject']) ?></h3>
+            <p class="text-sm text-gray-600">Teacher: <?= htmlspecialchars($grade['teacher_name']) ?></p>
+          </div>
+          
+          <div class="border-t pt-4">
+            <div class="grid grid-cols-4 gap-2 mb-3">
+              <div class="text-center">
+                <div class="text-xs font-medium text-gray-500 mb-1">PRELIM</div>
+                <div class="bg-gray-50 rounded-lg py-2 px-1">
+                  <span class="text-lg font-bold text-black"><?= $grade['prelim'] ?? '-' ?></span>
+                </div>
+              </div>
+              <div class="text-center">
+                <div class="text-xs font-medium text-gray-500 mb-1">MIDTERM</div>
+                <div class="bg-gray-50 rounded-lg py-2 px-1">
+                  <span class="text-lg font-bold text-black"><?= $grade['midterm'] ?? '-' ?></span>
+                </div>
+              </div>
+              <div class="text-center">
+                <div class="text-xs font-medium text-gray-500 mb-1">PRE-FINALS</div>
+                <div class="bg-gray-50 rounded-lg py-2 px-1">
+                  <span class="text-lg font-bold text-black"><?= $grade['pre_finals'] ?? '-' ?></span>
+                </div>
+              </div>
+              <div class="text-center">
+                <div class="text-xs font-medium text-gray-500 mb-1">FINALS</div>
+                <div class="bg-gray-50 rounded-lg py-2 px-1">
+                  <span class="text-lg font-bold text-black"><?= $grade['finals'] ?? '-' ?></span>
+                </div>
+              </div>
+            </div>
+            
+            <?php 
+            $total_grades = 0;
+            $grade_count = 0;
+            foreach (['prelim', 'midterm', 'pre_finals', 'finals'] as $period) {
+              if (!empty($grade[$period]) && is_numeric($grade[$period])) {
+                $total_grades += $grade[$period];
+                $grade_count++;
+              }
+            }
+            $average = $grade_count > 0 ? round($total_grades / $grade_count, 2) : 0;
+            ?>
+            
+            <?php if ($grade_count > 0): ?>
+            <div class="mt-4 pt-3 border-t">
+              <div class="flex justify-between items-center">
+                <span class="text-sm font-medium text-gray-600">Current Average:</span>
+                <span class="text-xl font-bold <?= $average >= 75 ? 'text-green-600' : 'text-red-600' ?>">
+                  <?= $average ?>%
+                </span>
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                <?= $average >= 75 ? 'Passing' : 'Needs Improvement' ?>
+              </div>
+            </div>
+            <?php endif; ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      <?php else: ?>
+        <div class="col-span-2 bg-white rounded-2xl shadow-lg p-8 text-center">
+          <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <h3 class="text-lg font-medium text-gray-600 mb-2">No Grades Available</h3>
+          <p class="text-gray-500">No grades found for the selected term. Please check back later or contact your registrar.</p>
+        </div>
+      <?php endif; ?>
+    </div>
   </div>
 
 </body>
