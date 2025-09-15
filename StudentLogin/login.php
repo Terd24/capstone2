@@ -28,6 +28,9 @@ if (isset($_SESSION['role'])) {
         case 'parent':
             header("Location: ../ParentLogin/ParentDashboard.php");
             exit;
+        case 'hr':
+            header("Location: ../HRF/Dashboard.php");
+            exit;
     }
 }
 
@@ -188,6 +191,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['attendance_name'] = $row['username']; // Use username as display name
             $_SESSION['role'] = 'attendance';
             echo json_encode(['status' => 'success','redirect' => '../AttendanceF/Dashboard.php']);
+            exit;
+        } else { 
+            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
+            exit; 
+        }
+    }
+
+    // 7️⃣ Check HR account
+    $stmt = $conn->prepare("SELECT * FROM hr_account WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        if (password_verify($password, $row['password'])) {
+            $_SESSION['hr_id'] = $row['id'];
+            $_SESSION['id_number'] = $row['id_number'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['hr_name'] = $row['first_name'] . ' ' . $row['last_name'];
+            $_SESSION['first_name'] = $row['first_name'];
+            $_SESSION['last_name'] = $row['last_name'];
+            $_SESSION['role'] = 'hr';
+            echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
             exit;
         } else { 
             echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 

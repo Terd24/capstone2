@@ -25,18 +25,6 @@ $accountType = $_GET['type'] ?? 'student';
 
 // Fetch accounts based on type
 switch ($accountType) {
-    case 'registrar':
-        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, username FROM registrar_account ORDER BY last_name ASC");
-        $columns = ['ID Number', 'Full Name', 'Username'];
-        break;
-    case 'cashier':
-        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, username FROM cashier_account ORDER BY last_name ASC");
-        $columns = ['ID Number', 'Full Name', 'Username'];
-        break;
-    case 'guidance':
-        $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, username FROM guidance_account ORDER BY last_name ASC");
-        $columns = ['ID Number', 'Full Name', 'Username'];
-        break;
     case 'attendance':
         $result = $conn->query("SELECT id, username FROM attendance_account ORDER BY username ASC");
         $columns = ['ID', 'Username'];
@@ -98,9 +86,6 @@ input[type=number] { -moz-appearance: textfield; }
             <label class="font-medium text-[#0B2C62]">Select Account:</label>
             <select id="accountType" class="border border-[#0B2C62]/40 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" onchange="changeType(this.value)">
                 <option value="student" <?= $accountType==='student' ? 'selected' : '' ?>>Student</option>
-                <option value="registrar" <?= $accountType==='registrar' ? 'selected' : '' ?>>Registrar</option>
-                <option value="guidance" <?= $accountType==='guidance' ? 'selected' : '' ?>>Guidance</option>
-                <option value="cashier" <?= $accountType==='cashier' ? 'selected' : '' ?>>Cashier</option>
                 <option value="parent" <?= $accountType==='parent' ? 'selected' : '' ?>>Parent</option>
                 <option value="attendance" <?= $accountType==='attendance' ? 'selected' : '' ?>>Attendance</option>
             </select>
@@ -141,15 +126,6 @@ input[type=number] { -moz-appearance: textfield; }
                         switch($accountType) {
                             case 'student':
                                 $onclick = 'onclick="viewStudent(\'' . htmlspecialchars($row['id_number']) . '\');"';
-                                break;
-                            case 'registrar':
-                                $onclick = 'onclick="viewRegistrar(\'' . htmlspecialchars($row['id_number']) . '\');"';
-                                break;
-                            case 'cashier':
-                                $onclick = 'onclick="viewCashier(\'' . htmlspecialchars($row['id_number']) . '\');"';
-                                break;
-                            case 'guidance':
-                                $onclick = 'onclick="viewGuidance(\'' . htmlspecialchars($row['id_number']) . '\');"';
                                 break;
                             case 'parent':
                                 $onclick = 'onclick="viewParent(\'' . htmlspecialchars($row['id_number']) . '\');"';
@@ -193,24 +169,6 @@ window.viewStudent = function(studentId) {
     console.log('Clicked student ID:', studentId);
     console.log('Navigating to:', `Accounts/view_student.php?id=${studentId}`);
     window.location.href = `Accounts/view_student.php?id=${studentId}`;
-};
-
-window.viewRegistrar = function(registrarId) {
-    console.log('Clicked registrar ID:', registrarId);
-    console.log('Navigating to:', `Accounts/view_registrar.php?id=${registrarId}`);
-    window.location.href = `Accounts/view_registrar.php?id=${registrarId}`;
-};
-
-window.viewCashier = function(cashierId) {
-    console.log('Clicked cashier ID:', cashierId);
-    console.log('Navigating to:', `Accounts/view_cashier.php?id=${cashierId}`);
-    window.location.href = `Accounts/view_cashier.php?id=${cashierId}`;
-};
-
-window.viewGuidance = function(guidanceId) {
-    console.log('Clicked guidance ID:', guidanceId);
-    console.log('Navigating to:', `Accounts/view_guidance.php?id=${guidanceId}`);
-    window.location.href = `Accounts/view_guidance.php?id=${guidanceId}`;
 };
 
 window.viewParent = function(parentId) {
