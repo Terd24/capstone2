@@ -118,18 +118,37 @@ input[type=number] { -moz-appearance: textfield; }
 <body class="bg-gradient-to-br from-[#f3f6fb] to-[#e6ecf7] font-sans min-h-screen text-gray-900">
 
 <!-- Header -->
-<div class="bg-[#0B2C62] text-white px-6 py-4 flex items-center shadow-lg">
-    <button onclick="window.location.href='../AccountList.php?type=parent'" class="text-2xl mr-4 hover:text-[#FBB917] transition">←</button>
-    <h1 class="text-xl font-bold tracking-wide">Parent Information</h1>
-</div>
+<header class="bg-[#0B2C62] text-white shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+        <button onclick="window.location.href='registrardashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+        </button>
+        <div>
+                <h1 class="text-xl font-bold">Account Management</h1>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <img src="../../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+                <div class="text-right">
+                    <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+                    <p class="text-blue-200 text-sm">Grade Management System</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
 
 <!-- Parent Info Modal -->
 <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-gray-200 transform transition-all scale-100" id="modalContent">
+    <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border-2 border-[#0B2C62] transform transition-all scale-100" id="modalContent">
         
         <!-- Header -->
-        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#1E4D92] text-white">
-            <h2 class="text-lg font-semibold">Parent Information</h2>
+        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <h2 class="text-lg font-semibold text-gray-800">Parent Information</h2>
             <div class="flex gap-3">
                 <button id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
                 <button id="deleteBtn" onclick="confirmDelete()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>

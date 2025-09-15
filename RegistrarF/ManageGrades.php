@@ -201,7 +201,7 @@ $grades_result = $conn->query($grades_query);
                     <input type="text" name="teacher" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">School Year & Term (Optional)</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">School Year & Term</label>
                     <input type="text" name="school_year_term" placeholder="e.g., 2024-2025 1st Term" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
                     <p class="text-xs text-gray-500 mt-1">Leave blank to use current term</p>
                 </div>

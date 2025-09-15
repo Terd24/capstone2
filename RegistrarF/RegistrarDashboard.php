@@ -167,15 +167,15 @@ function timeAgo($time) {
             
             <div class="mt-4 pt-4 border-t">
               <button onclick="window.location.href='AccountList.php'" 
-                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
                 Manage Accounts
               </button>
               <button onclick="window.location.href='ManageGrades.php'" 
-                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
                 Manage Grades
               </button>
               <button onclick="window.location.href='ManageSchedule.php'" 
-                      class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium transition-colors text-sm">
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm">
                 Manage Schedule
               </button>
             </div>
