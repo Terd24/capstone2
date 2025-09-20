@@ -56,46 +56,21 @@ if ($result->num_rows > 0) {
     exit;
 }
 
-// Hash password
-$hashed_password = password_hash($password, PASSWORD_DEFAULT);
-
-// Create account based on role
-$table_map = [
-    'registrar' => 'registrar_account',
-    'cashier' => 'cashier_account',
-    'guidance' => 'guidance_account',
-    'hr' => 'hr_account'
-];
-
-if (!isset($table_map[$role])) {
+// Validate role
+$valid_roles = ['registrar', 'cashier', 'guidance', 'attendance', 'hr'];
+if (!in_array($role, $valid_roles)) {
     echo json_encode(['success' => false, 'message' => 'Invalid role']);
     exit;
 }
 
-$table = $table_map[$role];
+// Hash password
+$hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-// Get employee details for account creation
-$stmt = $conn->prepare("SELECT full_name FROM employees WHERE id_number = ?");
-$stmt->bind_param("s", $employee_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$employee = $result->fetch_assoc();
-
-// Split full name
-$name_parts = explode(' ', $employee['full_name'], 2);
-$first_name = $name_parts[0];
-$last_name = isset($name_parts[1]) ? $name_parts[1] : '';
-
-// Insert into appropriate role table
-$stmt = $conn->prepare("INSERT INTO $table (id_number, username, password, first_name, last_name) VALUES (?, ?, ?, ?, ?)");
-$stmt->bind_param("sssss", $employee_id, $username, $hashed_password, $first_name, $last_name);
+// Insert into employee_accounts table only
+$stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
+$stmt->bind_param("ssss", $employee_id, $username, $hashed_password, $role);
 
 if ($stmt->execute()) {
-    // Also insert into employee_accounts for tracking
-    $stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, role) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $employee_id, $username, $role);
-    $stmt->execute();
-    
     echo json_encode(['success' => true, 'message' => 'Account created successfully']);
 } else {
     echo json_encode(['success' => false, 'message' => 'Error creating account: ' . $conn->error]);

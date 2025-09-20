@@ -8,26 +8,52 @@ if (!isset($_SESSION['registrar_id'])) {
     exit;
 }
 
-$student_id = $_GET['id'] ?? '';
+$student_id = isset($_GET['id']) ? trim($_GET['id']) : '';
+$embed = isset($_GET['embed']) && $_GET['embed'] === '1';
 $student_data = null;
+// Parent account info
+$parent_username = '';
 
 if (!empty($student_id)) {
-    $stmt = $conn->prepare("SELECT * FROM student_account WHERE id_number = ?");
+    // Fetch student plus any linked parent username in one query
+    $stmt = $conn->prepare("SELECT s.*, p.username AS parent_username
+                            FROM student_account s
+                            LEFT JOIN parent_account p ON p.child_id = s.id_number
+                            WHERE s.id_number = ?");
     $stmt->bind_param("s", $student_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $student_data = $result->fetch_assoc();
     $stmt->close();
+
+    if ($student_data && !empty($student_data['parent_username'])) {
+        $parent_username = $student_data['parent_username'];
+    }
+
+    // Fallback direct lookup (in case multiple rows or join failed to populate)
+    if (empty($parent_username)) {
+        $pstmt = $conn->prepare("SELECT username FROM parent_account WHERE child_id = ? LIMIT 1");
+        $pstmt->bind_param("s", $student_id);
+        $pstmt->execute();
+        $pres = $pstmt->get_result();
+        if ($pres && $pres->num_rows >= 1) {
+            $prow = $pres->fetch_assoc();
+            $parent_username = $prow['username'] ?? '';
+        }
+        $pstmt->close();
+    }
 }
 
 // Handle delete request
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_student'])) {
+    // Prefer POSTed id_number; fallback to the id from query string if necessary
+    $target_id = $_POST['id_number'] ?? $student_id;
     $delete_stmt = $conn->prepare("DELETE FROM student_account WHERE id_number = ?");
-    $delete_stmt->bind_param("s", $student_id);
+    $delete_stmt->bind_param("s", $target_id);
     
     if ($delete_stmt->execute()) {
         $_SESSION['success_msg'] = "Student account deleted successfully!";
-        header("Location: ../AccountList.php?type=student");
+        header("Location: /onecci/RegistrarF/AccountList.php?type=student");
         exit;
     } else {
         $error_msg = "Error deleting student account.";
@@ -70,6 +96,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     $id_number = $_POST['id_number'] ?? '';
     $rfid_uid = $_POST['rfid_uid'] ?? '';
     $password = $_POST['password'] ?? '';
+    $parent_password = $_POST['parent_password'] ?? '';
 
     // Update student record
     if (!empty($password)) {
@@ -132,8 +159,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     }
 
     if ($update_stmt->execute()) {
+        // Update parent password if provided
+        if (!empty($parent_password)) {
+            $parent_hashed = password_hash($parent_password, PASSWORD_DEFAULT);
+            $up_parent = $conn->prepare("UPDATE parent_account SET password = ? WHERE child_id = ?");
+            $up_parent->bind_param("ss", $parent_hashed, $student_id);
+            $up_parent->execute();
+            $up_parent->close();
+        }
         $_SESSION['success_msg'] = "Student information updated successfully!";
-        header("Location: ../AccountList.php?type=student");
+        header("Location: /onecci/RegistrarF/AccountList.php?type=student");
         exit;
     } else {
         $error_msg = "Error updating student information.";
@@ -142,17 +177,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
 }
 
 if (!$student_data) {
-    header("Location: ../AccountList.php?type=student");
+    header("Location: /onecci/RegistrarF/AccountList.php?type=student");
     exit;
 }
 ?>
-
+<?php if (!$embed): ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Student Information - CCI</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com">\n</script>
 <style>
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -162,43 +197,21 @@ input[type=number] { -moz-appearance: textfield; }
 </style>
 </head>
 <body class="bg-gradient-to-br from-[#f3f6fb] to-[#e6ecf7] font-sans min-h-screen text-gray-900">
+<?php endif; ?>
 
-<!-- Header -->
-<header class="bg-[#0B2C62] text-white shadow-lg">
-    <div class="container mx-auto px-6 py-4">
-        <div class="flex justify-between items-center">
-        <div class="flex items-center space-x-4">
-        <button onclick="window.location.href='registrardashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-          </svg>
-        </button>
-        <div>
-                <h1 class="text-xl font-bold">Account Management</h1>
-                </div>
-            </div>
-            <div class="flex items-center space-x-4">
-                <img src="../../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-                <div class="text-right">
-                    <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-                    <p class="text-blue-200 text-sm">Grade Management System</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</header>
+
 
 <!-- Student Info Modal -->
-<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border-2 border-[#0B2C62] transform transition-all scale-100" id="modalContent">
+<div class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center pointer-events-none" style="z-index:2147483647;">
+    <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border-2 border-[#0B2C62] transform transition-all scale-100 pointer-events-auto" id="modalContent" style="z-index:2147483647;">
         
         <!-- Header -->
-        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <h2 class="text-lg font-semibold text-gray-800">Student Information</h2>
+        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#0B2C62] rounded-t-2xl">
+            <h2 class="text-lg font-semibold text-white">Student Information</h2>
             <div class="flex gap-3">
-                <button id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
-                <button id="deleteBtn" onclick="confirmDelete()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>
-                <button onclick="window.location.href='../AccountList.php?type=student'" class="text-2xl font-bold hover:text-gray-300">&times;</button>
+                <button type="button" id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
+                <button type="button" id="deleteBtn" onclick="confirmDelete()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>
+                <button type="button" onclick="closeModal()" class="text-2xl font-bold text-white hover:text-gray-300">&times;</button>
             </div>
         </div>
 
@@ -206,236 +219,304 @@ input[type=number] { -moz-appearance: textfield; }
         <form id="studentForm" method="POST" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
             <input type="hidden" name="update_student" value="1">
 
-            <!-- Row: LRN and Academic Track -->
-            <div class="col-span-3 grid grid-cols-3 gap-6">
-                <div>
-                    <label class="block text-sm font-semibold mb-1">LRN</label>
-                    <input type="number" name="lrn" value="<?= htmlspecialchars($student_data['lrn'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Academic Track / Course</label>
-                    <select name="academic_track" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                        <option value="">-- Select Academic Track / Course --</option>
-                        <optgroup label="Elementary">
-                            <option value="Elementary" <?= ($student_data['academic_track'] ?? '') === 'Elementary' ? 'selected' : '' ?>>Elementary</option>
-                        </optgroup>
-                        <optgroup label="Junior High School">
-                            <option value="Junior High School" <?= ($student_data['academic_track'] ?? '') === 'Junior High School' ? 'selected' : '' ?>>Junior High School</option>
-                        </optgroup>
-                        <optgroup label="Senior High School Strands">
-                            <option value="STEM" <?= ($student_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
-                            <option value="ABM" <?= ($student_data['academic_track'] ?? '') === 'ABM' ? 'selected' : '' ?>>ABM (Accountancy, Business & Management)</option>
-                            <option value="HUMSS" <?= ($student_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
-                            <option value="GAS" <?= ($student_data['academic_track'] ?? '') === 'GAS' ? 'selected' : '' ?>>GAS (General Academic Strand)</option>
-                            <option value="TVL" <?= ($student_data['academic_track'] ?? '') === 'TVL' ? 'selected' : '' ?>>TVL (Technical-Vocational-Livelihood)</option>
-                            <option value="Arts and Design" <?= ($student_data['academic_track'] ?? '') === 'Arts and Design' ? 'selected' : '' ?>>Arts and Design</option>
-                        </optgroup>
-                        <optgroup label="College Courses">
-                            <option value="BS Information Technology" <?= ($student_data['academic_track'] ?? '') === 'BS Information Technology' ? 'selected' : '' ?>>BS Information Technology</option>
-                            <option value="BS Computer Science" <?= ($student_data['academic_track'] ?? '') === 'BS Computer Science' ? 'selected' : '' ?>>BS Computer Science</option>
-                            <option value="BS Business Administration" <?= ($student_data['academic_track'] ?? '') === 'BS Business Administration' ? 'selected' : '' ?>>BS Business Administration</option>
-                            <option value="BS Accountancy" <?= ($student_data['academic_track'] ?? '') === 'BS Accountancy' ? 'selected' : '' ?>>BS Accountancy</option>
-                            <option value="BS Hospitality Management" <?= ($student_data['academic_track'] ?? '') === 'BS Hospitality Management' ? 'selected' : '' ?>>BS Hospitality Management</option>
-                            <option value="BS Education" <?= ($student_data['academic_track'] ?? '') === 'BS Education' ? 'selected' : '' ?>>BS Education</option>
-                        </optgroup>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Enrollment Status</label>
-                    <div class="flex items-center gap-6 mt-1">
-                        <label class="flex items-center gap-2">
-                            <input type="radio" name="enrollment_status" value="OLD" <?= ($student_data['enrollment_status'] ?? '') === 'OLD' ? 'checked' : '' ?> disabled class="student-field"> OLD
-                        </label>
-                        <label class="flex items-center gap-2">
-                            <input type="radio" name="enrollment_status" value="NEW" <?= ($student_data['enrollment_status'] ?? '') === 'NEW' ? 'checked' : '' ?> disabled class="student-field"> NEW
-                        </label>
+            <!-- Personal Information Section -->
+            <div class="col-span-3 mb-6">
+                <div class="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        PERSONAL INFORMATION
+                    </h3>
+                    <div class="grid grid-cols-3 gap-6">
+                        <!-- Row: LRN, Academic Track, Enrollment Status -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">LRN</label>
+                            <input type="number" name="lrn" value="<?= htmlspecialchars($student_data['lrn'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Academic Track / Course</label>
+                            <select name="academic_track" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                <option value="">-- Select Academic Track / Course --</option>
+                                <optgroup label="Elementary">
+                                    <option value="Elementary" <?= ($student_data['academic_track'] ?? '') === 'Elementary' ? 'selected' : '' ?>>Elementary</option>
+                                </optgroup>
+                                <optgroup label="Junior High School">
+                                    <option value="Junior High School" <?= ($student_data['academic_track'] ?? '') === 'Junior High School' ? 'selected' : '' ?>>Junior High School</option>
+                                </optgroup>
+                                <optgroup label="Senior High School Strands">
+                                    <option value="STEM" <?= ($student_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
+                                    <option value="ABM" <?= ($student_data['academic_track'] ?? '') === 'ABM' ? 'selected' : '' ?>>ABM (Accountancy, Business & Management)</option>
+                                    <option value="HUMSS" <?= ($student_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
+                                    <option value="GAS" <?= ($student_data['academic_track'] ?? '') === 'GAS' ? 'selected' : '' ?>>GAS (General Academic Strand)</option>
+                                    <option value="TVL" <?= ($student_data['academic_track'] ?? '') === 'TVL' ? 'selected' : '' ?>>TVL (Technical-Vocational-Livelihood)</option>
+                                    <option value="Arts and Design" <?= ($student_data['academic_track'] ?? '') === 'Arts and Design' ? 'selected' : '' ?>>Arts and Design</option>
+                                </optgroup>
+                                <optgroup label="College Courses">
+                                    <option value="BS Information Technology" <?= ($student_data['academic_track'] ?? '') === 'BS Information Technology' ? 'selected' : '' ?>>BS Information Technology</option>
+                                    <option value="BS Computer Science" <?= ($student_data['academic_track'] ?? '') === 'BS Computer Science' ? 'selected' : '' ?>>BS Computer Science</option>
+                                    <option value="BS Business Administration" <?= ($student_data['academic_track'] ?? '') === 'BS Business Administration' ? 'selected' : '' ?>>BS Business Administration</option>
+                                    <option value="BS Accountancy" <?= ($student_data['academic_track'] ?? '') === 'BS Accountancy' ? 'selected' : '' ?>>BS Accountancy</option>
+                                    <option value="BS Hospitality Management" <?= ($student_data['academic_track'] ?? '') === 'BS Hospitality Management' ? 'selected' : '' ?>>BS Hospitality Management</option>
+                                    <option value="BS Education" <?= ($student_data['academic_track'] ?? '') === 'BS Education' ? 'selected' : '' ?>>BS Education</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Enrollment Status</label>
+                            <div class="flex items-center gap-6 mt-1">
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="enrollment_status" value="OLD" <?= ($student_data['enrollment_status'] ?? '') === 'OLD' ? 'checked' : '' ?> disabled class="student-field"> OLD
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="enrollment_status" value="NEW" <?= ($student_data['enrollment_status'] ?? '') === 'NEW' ? 'checked' : '' ?> disabled class="student-field"> NEW
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Row: Full Name -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Last Name</label>
+                            <input type="text" name="last_name" value="<?= htmlspecialchars($student_data['last_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">First Name</label>
+                            <input type="text" name="first_name" value="<?= htmlspecialchars($student_data['first_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <input type="text" name="middle_name" value="<?= htmlspecialchars($student_data['middle_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+
+                        <!-- Row: School Year, Grade Level, Semester -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">School Year</label>
+                            <input type="text" name="school_year" value="<?= htmlspecialchars($student_data['school_year'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Grade Level</label>
+                            <select id="gradeLevel" name="grade_level" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                <option value="">-- Select Grade Level --</option>
+                                <?php if (!empty($student_data['grade_level'])): ?>
+                                    <option value="<?= htmlspecialchars($student_data['grade_level']) ?>" selected><?= htmlspecialchars($student_data['grade_level']) ?></option>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Semester</label>
+                            <select name="semester" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                <option value="">Select Term</option>
+                                <option value="1st" <?= ($student_data['semester'] ?? '') === '1st' ? 'selected' : '' ?>>1st Term</option>
+                                <option value="2nd" <?= ($student_data['semester'] ?? '') === '2nd' ? 'selected' : '' ?>>2nd Term</option>
+                            </select>
+                        </div>
+
+                        <!-- Row: Date of Birth, Birthplace, Gender -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Date of Birth</label>
+                            <input type="date" name="dob" value="<?= htmlspecialchars($student_data['dob'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Birthplace</label>
+                            <input type="text" name="birthplace" value="<?= htmlspecialchars($student_data['birthplace'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Gender</label>
+                            <div class="flex items-center gap-6 mt-1">
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="gender" value="M" <?= ($student_data['gender'] ?? '') === 'M' ? 'checked' : '' ?> disabled class="student-field"> Male
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="gender" value="F" <?= ($student_data['gender'] ?? '') === 'F' ? 'checked' : '' ?> disabled class="student-field"> Female
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Row: Religion, Credentials, Payment Mode -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Religion</label>
+                            <input type="text" name="religion" value="<?= htmlspecialchars($student_data['religion'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Credentials Submitted</label>
+                            <div class="grid grid-cols-2 gap-y-2 text-sm ml-2">
+                                <?php $saved_credentials = explode(',', $student_data['credentials'] ?? ''); ?>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="credentials[]" value="F-138" <?= in_array('F-138', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
+                                    <span>F-138</span>
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="credentials[]" value="Good Moral" <?= in_array('Good Moral', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
+                                    <span>Good Moral</span>
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="credentials[]" value="PSA Birth" <?= in_array('PSA Birth', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
+                                    <span>PSA Birth</span>
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="credentials[]" value="ESC Certification" <?= in_array('ESC Certification', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
+                                    <span>ESC Certification</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Mode of Payment</label>
+                            <div class="flex items-center gap-6 mt-1">
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="payment_mode" value="Cash" <?= ($student_data['payment_mode'] ?? '') === 'Cash' ? 'checked' : '' ?> disabled class="student-field"> Cash
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="payment_mode" value="Installment" <?= ($student_data['payment_mode'] ?? '') === 'Installment' ? 'checked' : '' ?> disabled class="student-field"> Installment
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Complete Address -->
+                        <div class="col-span-3">
+                            <label class="block text-sm font-semibold mb-1">Complete Address</label>
+                            <textarea name="address" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field"><?= htmlspecialchars($student_data['address'] ?? '') ?></textarea>
+                        </div>
+
+                        <!-- Father's Information -->
+                        <div class="col-span-3 mt-6">
+                            <h4 class="font-semibold text-gray-700 mb-3">Father's Information</h4>
+                            <div class="grid grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Name</label>
+                                    <input type="text" name="father_name" value="<?= htmlspecialchars($student_data['father_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Occupation</label>
+                                    <input type="text" name="father_occupation" value="<?= htmlspecialchars($student_data['father_occupation'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Contact</label>
+                                    <input type="tel" name="father_contact" value="<?= htmlspecialchars($student_data['father_contact'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mother's Information -->
+                        <div class="col-span-3 mt-6">
+                            <h4 class="font-semibold text-gray-700 mb-3">Mother's Information</h4>
+                            <div class="grid grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Name</label>
+                                    <input type="text" name="mother_name" value="<?= htmlspecialchars($student_data['mother_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Occupation</label>
+                                    <input type="text" name="mother_occupation" value="<?= htmlspecialchars($student_data['mother_occupation'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Contact</label>
+                                    <input type="tel" name="mother_contact" value="<?= htmlspecialchars($student_data['mother_contact'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Guardian's Information -->
+                        <div class="col-span-3 mt-6">
+                            <h4 class="font-semibold text-gray-700 mb-3">Guardian's Information</h4>
+                            <div class="grid grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Name</label>
+                                    <input type="text" name="guardian_name" value="<?= htmlspecialchars($student_data['guardian_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Occupation</label>
+                                    <input type="text" name="guardian_occupation" value="<?= htmlspecialchars($student_data['guardian_occupation'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Contact</label>
+                                    <input type="tel" name="guardian_contact" value="<?= htmlspecialchars($student_data['guardian_contact'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Last School Attended -->
+                        <div class="col-span-3 mt-6">
+                            <h4 class="font-semibold text-gray-700 mb-3">Last School Attended</h4>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">School Name</label>
+                                    <input type="text" name="last_school" value="<?= htmlspecialchars($student_data['last_school'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">School Year</label>
+                                    <input type="text" name="last_school_year" value="<?= htmlspecialchars($student_data['last_school_year'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Row: Full Name -->
-            <div class="col-span-3 grid grid-cols-3 gap-6">
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Last Name</label>
-                    <input type="text" name="last_name" value="<?= htmlspecialchars($student_data['last_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold mb-1">First Name</label>
-                    <input type="text" name="first_name" value="<?= htmlspecialchars($student_data['first_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
-                    <input type="text" name="middle_name" value="<?= htmlspecialchars($student_data['middle_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-            </div>
-
-            <!-- Other Student Info -->
-            <div>
-                <label class="block text-sm font-semibold mb-1">School Year</label>
-                <input type="text" name="school_year" value="<?= htmlspecialchars($student_data['school_year'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-            </div>
-            <div>
-                <label class="block text-sm font-semibold mb-1">Grade Level</label>
-                <select id="gradeLevel" name="grade_level" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <option value="">-- Select Grade Level --</option>
-                    <?php if (!empty($student_data['grade_level'])): ?>
-                        <option value="<?= htmlspecialchars($student_data['grade_level']) ?>" selected><?= htmlspecialchars($student_data['grade_level']) ?></option>
-                    <?php endif; ?>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold mb-1">Semester</label>
-                <select name="semester" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <option value="">Select Term</option>
-                    <option value="1st" <?= ($student_data['semester'] ?? '') === '1st' ? 'selected' : '' ?>>1st Term</option>
-                    <option value="2nd" <?= ($student_data['semester'] ?? '') === '2nd' ? 'selected' : '' ?>>2nd Term</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold mb-1">Date of Birth</label>
-                <input type="date" name="dob" value="<?= htmlspecialchars($student_data['dob'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-            </div>
-            <div>
-                <label class="block text-sm font-semibold mb-1">Birthplace</label>
-                <input type="text" name="birthplace" value="<?= htmlspecialchars($student_data['birthplace'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-            </div>
-            <div>
-                <label class="block text-sm font-semibold mb-1">Gender</label>
-                <div class="flex items-center gap-6 mt-1">
-                    <label class="flex items-center gap-2">
-                        <input type="radio" name="gender" value="M" <?= ($student_data['gender'] ?? '') === 'M' ? 'checked' : '' ?> disabled class="student-field"> Male
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input type="radio" name="gender" value="F" <?= ($student_data['gender'] ?? '') === 'F' ? 'checked' : '' ?> disabled class="student-field"> Female
-                    </label>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold mb-1">Religion</label>
-                <input type="text" name="religion" value="<?= htmlspecialchars($student_data['religion'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-            </div>
-
-            <!-- Credentials -->
-            <div>
-                <label class="block text-sm font-semibold mb-1">Credentials Submitted</label>
-                <div class="grid grid-cols-2 gap-y-2 text-sm ml-2">
-                    <?php $saved_credentials = explode(',', $student_data['credentials'] ?? ''); ?>
-                    <label class="flex items-center gap-2">
-                        <input type="checkbox" name="credentials[]" value="F-138" <?= in_array('F-138', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
-                        <span>F-138</span>
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input type="checkbox" name="credentials[]" value="Good Moral" <?= in_array('Good Moral', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
-                        <span>Good Moral</span>
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input type="checkbox" name="credentials[]" value="PSA Birth" <?= in_array('PSA Birth', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
-                        <span>PSA Birth</span>
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input type="checkbox" name="credentials[]" value="ESC Certification" <?= in_array('ESC Certification', $saved_credentials) ? 'checked' : '' ?> disabled class="student-field"> 
-                        <span>ESC Certification</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Mode of Payment -->
-            <div>
-                <label class="block text-sm font-semibold mb-1">Mode of Payment</label>
-                <div class="flex items-center gap-6 mt-1">
-                    <label class="flex items-center gap-2">
-                        <input type="radio" name="payment_mode" value="Cash" <?= ($student_data['payment_mode'] ?? '') === 'Cash' ? 'checked' : '' ?> disabled class="student-field"> Cash
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input type="radio" name="payment_mode" value="Installment" <?= ($student_data['payment_mode'] ?? '') === 'Installment' ? 'checked' : '' ?> disabled class="student-field"> Installment
-                    </label>
-                </div>
-            </div>
-
-            <!-- Complete Address -->
-            <div class="col-span-3 grid grid-cols-2 gap-6">
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Complete Address</label>
-                    <textarea name="address" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field"><?= htmlspecialchars($student_data['address'] ?? '') ?></textarea>
-                </div>
-            </div>
-
-            <!-- Parents / Guardian Info -->
-            <div class="col-span-3 space-y-6">
-                <h3 class="font-semibold mt-4">Father's Info</h3>
-                <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="father_name" placeholder="Name" value="<?= htmlspecialchars($student_data['father_name'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($student_data['father_occupation'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($student_data['father_contact'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-
-                <h3 class="font-semibold mt-4">Mother's Info</h3>
-                <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="mother_name" placeholder="Name" value="<?= htmlspecialchars($student_data['mother_name'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($student_data['mother_occupation'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($student_data['mother_contact'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-
-                <h3 class="font-semibold mt-4">Guardian's Info</h3>
-                <div class="grid grid-cols-3 gap-6">
-                    <input type="text" name="guardian_name" placeholder="Name" value="<?= htmlspecialchars($student_data['guardian_name'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($student_data['guardian_occupation'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <input type="tel" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($student_data['guardian_contact'] ?? '') ?>" readonly class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-            </div>
-
-            <!-- Last School Attended -->
-            <div class="col-span-3 grid grid-cols-2 gap-6 mt-4">
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Last School Attended</label>
-                    <input type="text" name="last_school" placeholder="School Name" value="<?= htmlspecialchars($student_data['last_school'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold mb-1">School Year</label>
-                    <input type="text" name="last_school_year" placeholder="School Year" value="<?= htmlspecialchars($student_data['last_school_year'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+            <!-- Parent Personal Account Section -->
+            <div class="col-span-3 mb-6">
+                <div class="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        PARENT PERSONAL ACCOUNT
+                    </h3>
+                    
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Username</label>
+                            <input type="text" name="parent_username" value="<?= htmlspecialchars($parent_username) ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Password</label>
+                            <input type="text" name="parent_password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <small class="text-gray-500">Leave blank to keep current password</small>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Personal Account Section -->
-            <div class="w-full flex justify-center mt-6">
-                <div class="w-full max-w-3xl flex justify-center items-center border-b border-gray-200 px-6 py-2 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <h2 class="text-lg font-semibold text-gray-800">PERSONAL ACCOUNT</h2>
-                </div>
-            </div>
+            <div class="col-span-3 mb-6">
+                <div class="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        PERSONAL ACCOUNT
+                    </h3>
+                    <div class="grid grid-cols-3 gap-6">
+                        <!-- Student ID -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Student ID</label>
+                            <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
 
+                        <!-- Username -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Username</label>
+                            <input type="text" name="username" value="<?= htmlspecialchars($student_data['username'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
 
-            <div class="col-span-3 grid grid-cols-3 gap-6 mt-6">
-                <!-- Student ID -->
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Student ID</label>
-                    <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
+                        <!-- Password -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Password</label>
+                            <input type="text" name="password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <small class="text-gray-500">Leave blank to keep current password</small>
+                        </div>
 
-                <!-- Username -->
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Username</label>
-                    <input type="text" name="username" value="<?= htmlspecialchars($student_data['username'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                </div>
-
-                <!-- Password -->
-                <div>
-                    <label class="block text-sm font-semibold mb-1">Password</label>
-                    <input type="text" name="password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                    <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
-                </div>
-
-                <!-- RFID Number -->
-                <div>
-                    <label class="block text-sm font-semibold mb-1">RFID Number</label>
-                    <input type="number" name="rfid_uid" value="<?= htmlspecialchars($student_data['rfid_uid'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        <!-- RFID Number -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">RFID Number</label>
+                            <input type="number" name="rfid_uid" value="<?= htmlspecialchars($student_data['rfid_uid'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Submit Buttons -->
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
-                <button type="button" onclick="window.location.href='../AccountList.php?type=student'" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Back to List</button>
+                <a href="/onecci/RegistrarF/AccountList.php?type=student" onclick="return closeModalEmbedAware(event);" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition inline-flex items-center justify-center">Back to List</a>
                 <button type="submit" id="saveBtn" class="px-5 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700 transition hidden">
                     Save Changes
                 </button>
@@ -505,7 +586,7 @@ function toggleEdit() {
     if (isEditing) {
         // Cancel editing
         editBtn.textContent = 'Edit';
-        editBtn.className = 'px-4 py-2 bg-[#0B2C62] text-white rounded-lg hover:bg-blue-900 transition';
+        editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
         saveBtn.classList.add('hidden');
         
         // Make fields readonly
@@ -548,7 +629,46 @@ document.addEventListener('DOMContentLoaded', function() {
     if (academicTrack) {
         academicTrack.addEventListener('change', updateGradeLevels);
     }
+    // Reinforce click handlers to ensure they work in embedded contexts
+    const editBtn = document.getElementById('editBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const backLink = document.querySelector('a[href*="AccountList.php"][onclick]');
+    if (editBtn) {
+        editBtn.addEventListener('click', function(e){ e.stopPropagation(); toggleEdit(); });
+    }
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function(e){ e.stopPropagation(); confirmDelete(); });
+    }
+    if (backLink) {
+        backLink.addEventListener('click', function(e){ e.stopPropagation(); });
+    }
 });
+
+// Intercept Back link in embed mode; allow normal navigation otherwise
+function closeModalEmbedAware(e) {
+    const params = new URLSearchParams(window.location.search);
+    const isEmbed = params.get('embed') === '1';
+    if (isEmbed) {
+        e.preventDefault();
+        closeModal();
+        return false;
+    }
+    return true;
+}
+
+// Close student modal (handles embed and full page modes)
+function closeModal() {
+    const params = new URLSearchParams(window.location.search);
+    const isEmbed = params.get('embed') === '1';
+    if (isEmbed) {
+        // If embedded, just remove the modal overlay to reveal parent page
+        const overlay = document.querySelector('.fixed.inset-0');
+        if (overlay) overlay.remove();
+    } else {
+        // Standalone page: navigate back to account list (absolute path)
+        window.location.href = '/onecci/RegistrarF/AccountList.php?type=student';
+    }
+}
 
 // Delete confirmation function
 function confirmDelete() {
@@ -557,9 +677,11 @@ function confirmDelete() {
 
 function showDeleteModal() {
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]';
+    modal.id = 'confirmDeleteOverlay';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center pointer-events-none';
+    modal.style.zIndex = '2147483647';
     modal.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all pointer-events-auto" style="z-index:2147483647;">
             <div class="p-6">
                 <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
                     <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -583,7 +705,7 @@ function showDeleteModal() {
 }
 
 function closeDeleteModal() {
-    const modal = document.querySelector('[class*="z-[60]"]');
+    const modal = document.getElementById('confirmDeleteOverlay');
     if (modal) {
         modal.remove();
     }
@@ -593,11 +715,16 @@ function proceedDelete() {
     // Create a form to submit the delete request
     const form = document.createElement('form');
     form.method = 'POST';
-    form.innerHTML = '<input type="hidden" name="delete_student" value="1">';
+    // Submit the current student's id as well to ensure server has the correct target
+    const idField = document.querySelector('input[name="id_number"]');
+    const idVal = idField ? idField.value : '';
+    form.innerHTML = '<input type="hidden" name="delete_student" value="1">' +
+                     '<input type="hidden" name="id_number" value="' + idVal + '">';
     document.body.appendChild(form);
     form.submit();
 }
 </script>
-
+<?php if (!$embed): ?>
 </body>
 </html>
+<?php endif; ?>

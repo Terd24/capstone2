@@ -25,54 +25,67 @@ if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
+    define('ADD_ACCOUNT_HANDLED', true);
     $account_type = $_POST['account_type'] ?? '';
     
-    if ($account_type === 'student') {
-        // Handle student account creation
-        $lrn = $_POST['lrn'] ?? '';
-        $academic_track = $_POST['academic_track'] ?? '';
-        $enrollment_status = $_POST['enrollment_status'] ?? '';
-        $school_type = $_POST['school_type'] ?? '';
+    if ($account_type === 'unified_student_parent') {
+        // Reset error flags to avoid stale session values
+        $error_id = '';
+        $error_rfid = '';
+        $error_msg = '';
+        $_SESSION['error_id'] = '';
+        $_SESSION['error_rfid'] = '';
 
-        $last_name = $_POST['last_name'] ?? '';
-        $first_name = $_POST['first_name'] ?? '';
-        $middle_name = $_POST['middle_name'] ?? '';
+        // Handle unified student and parent account creation
+        $lrn = trim($_POST['lrn'] ?? '');
+        $academic_track = trim($_POST['academic_track'] ?? '');
+        $enrollment_status = trim($_POST['enrollment_status'] ?? '');
+        $school_type = trim($_POST['school_type'] ?? '');
 
-        $school_year = $_POST['school_year'] ?? '';
-        $grade_level = $_POST['grade_level'] ?? '';
-        $semester = $_POST['semester'] ?? '';
+        $last_name = trim($_POST['last_name'] ?? '');
+        $first_name = trim($_POST['first_name'] ?? '');
+        $middle_name = trim($_POST['middle_name'] ?? '');
+
+        $school_year = trim($_POST['school_year'] ?? '');
+        $grade_level = trim($_POST['grade_level'] ?? '');
+        $semester = trim($_POST['semester'] ?? '');
 
         $dob = $_POST['dob'] ?? '';
-        $birthplace = $_POST['birthplace'] ?? '';
-        $gender = $_POST['gender'] ?? '';
-        $religion = $_POST['religion'] ?? '';
+        $birthplace = trim($_POST['birthplace'] ?? '');
+        $gender = trim($_POST['gender'] ?? '');
+        $religion = trim($_POST['religion'] ?? '');
 
         $credentials = isset($_POST['credentials']) ? implode(",", $_POST['credentials']) : '';
 
-        $payment_mode = $_POST['payment_mode'] ?? '';
-        $address = $_POST['address'] ?? '';
+        $payment_mode = trim($_POST['payment_mode'] ?? '');
+        $address = trim($_POST['address'] ?? '');
 
-        $father_name = $_POST['father_name'] ?? '';
-        $father_occupation = $_POST['father_occupation'] ?? '';
-        $father_contact = $_POST['father_contact'] ?? '';
+        $father_name = trim($_POST['father_name'] ?? '');
+        $father_occupation = trim($_POST['father_occupation'] ?? '');
+        $father_contact = trim($_POST['father_contact'] ?? '');
 
-        $mother_name = $_POST['mother_name'] ?? '';
-        $mother_occupation = $_POST['mother_occupation'] ?? '';
-        $mother_contact = $_POST['mother_contact'] ?? '';
+        $mother_name = trim($_POST['mother_name'] ?? '');
+        $mother_occupation = trim($_POST['mother_occupation'] ?? '');
+        $mother_contact = trim($_POST['mother_contact'] ?? '');
 
-        $guardian_name = $_POST['guardian_name'] ?? '';
-        $guardian_occupation = $_POST['guardian_occupation'] ?? '';
-        $guardian_contact = $_POST['guardian_contact'] ?? '';
+        $guardian_name = trim($_POST['guardian_name'] ?? '');
+        $guardian_occupation = trim($_POST['guardian_occupation'] ?? '');
+        $guardian_contact = trim($_POST['guardian_contact'] ?? '');
 
-        $last_school = $_POST['last_school'] ?? '';
-        $last_school_year = $_POST['last_school_year'] ?? '';
+        $last_school = trim($_POST['last_school'] ?? '');
+        $last_school_year = trim($_POST['last_school_year'] ?? '');
 
-        $id_number = $_POST['id_number'] ?? '';
+        $id_number = trim($_POST['id_number'] ?? '');
         $raw_password = $_POST['password'] ?? '';
         $password = password_hash($raw_password, PASSWORD_DEFAULT);
-        $rfid_uid = $_POST['rfid_uid'] ?? '';
-        $username = $_POST['username'] ?? '';
+        $rfid_uid = trim($_POST['rfid_uid'] ?? '');
+        $username = trim($_POST['username'] ?? '');
+        
+        // Parent account fields (parent has their own username, but links to the child via student ID internally)
+        $parent_username = trim($_POST['parent_username'] ?? '');
+        $parent_password = $_POST['parent_password'] ?? '';
+        $parent_hashed_password = !empty($parent_password) ? password_hash($parent_password, PASSWORD_DEFAULT) : '';
 
         // Store all form data for repopulation
         $form_data = $_POST;
@@ -99,9 +112,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $check_username->execute();
             $check_username->store_result();
             if ($check_username->num_rows > 0) {
-                $error_msg = "Username already in use!";
+                $error_msg = "Student username already in use!";
             }
             $check_username->close();
+        }
+        
+        // Check parent username duplicates
+        if (!empty($parent_username)) {
+            $check_parent_username = $conn->prepare("SELECT username FROM parent_account WHERE username=?");
+            $check_parent_username->bind_param("s", $parent_username);
+            $check_parent_username->execute();
+            $check_parent_username->store_result();
+            if ($check_parent_username->num_rows > 0) {
+                $error_msg = "Parent username already in use!";
+            }
+            $check_parent_username->close();
         }
 
         if (!empty($rfid_uid)) {
@@ -120,11 +145,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             empty($birthplace) || empty($gender) || empty($religion) || empty($academic_track) || 
             empty($grade_level) || empty($semester) || empty($school_year) || empty($enrollment_status) || 
             empty($payment_mode) || empty($father_name) || empty($mother_name) || 
-            empty($id_number) || empty($raw_password) || empty($rfid_uid) || empty($username)) {
+            empty($id_number) || empty($raw_password) || empty($rfid_uid) || empty($username) ||
+            empty($parent_username) || empty($parent_password)) {
             
             $error_msg = "All required fields must be filled. (Middle name is optional)";
             $form_data = $_POST;
             $show_modal = true;
+            $_SESSION['error_msg'] = $error_msg;
+            $_SESSION['form_data'] = $form_data;
+            $_SESSION['show_modal'] = true;
             // Don't redirect - stay on current page to show error
         }
 
@@ -170,15 +199,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $validation_errors[] = "Mother's name must contain letters only.";
         }
 
-        // Validate contact numbers (numbers, spaces, dashes, parentheses, plus signs)
-        if (!empty($father_contact) && !preg_match('/^[0-9+\-\s()]+$/', $father_contact)) {
-            $validation_errors[] = "Father's contact must contain numbers only.";
+        // Validate contact numbers: digits only and exactly 11 if provided
+        if (!empty($father_contact)) {
+            if (!preg_match('/^[0-9]+$/', $father_contact)) {
+                $validation_errors[] = "Father's contact must contain digits only.";
+            } elseif (strlen($father_contact) !== 11) {
+                $validation_errors[] = "Father's contact must be exactly 11 digits.";
+            }
         }
-        if (!empty($mother_contact) && !preg_match('/^[0-9+\-\s()]+$/', $mother_contact)) {
-            $validation_errors[] = "Mother's contact must contain numbers only.";
+        if (!empty($mother_contact)) {
+            if (!preg_match('/^[0-9]+$/', $mother_contact)) {
+                $validation_errors[] = "Mother's contact must contain digits only.";
+            } elseif (strlen($mother_contact) !== 11) {
+                $validation_errors[] = "Mother's contact must be exactly 11 digits.";
+            }
         }
-        if (!empty($guardian_contact) && !preg_match('/^[0-9+\-\s()]*$/', $guardian_contact)) {
-            $validation_errors[] = "Guardian's contact must contain numbers only.";
+        if (!empty($guardian_contact)) {
+            if (!preg_match('/^[0-9]+$/', $guardian_contact)) {
+                $validation_errors[] = "Guardian's contact must contain digits only.";
+            } elseif (strlen($guardian_contact) !== 11) {
+                $validation_errors[] = "Guardian's contact must be exactly 11 digits.";
+            }
         }
 
         // Validate occupations (letters and spaces only, optional)
@@ -207,19 +248,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $validation_errors[] = "Last school year must be in format like 2023-2024.";
         }
 
-        // Validate student ID (numbers only)
+        // Validate student ID: numbers only, exactly 11 digits
         if (!preg_match('/^[0-9]+$/', $id_number)) {
-            $validation_errors[] = "Student ID must contain numbers only.";
+            $validation_errors[] = "Student ID must contain digits only.";
+        } elseif (strlen($id_number) !== 11) {
+            $validation_errors[] = "Student ID must be exactly 11 digits.";
         }
 
-        // Validate RFID (numbers only)
+        // Validate RFID: numbers only, exactly 10 digits
         if (!preg_match('/^[0-9]+$/', $rfid_uid)) {
-            $validation_errors[] = "RFID must contain numbers only.";
+            $validation_errors[] = "RFID must contain digits only.";
+        } elseif (strlen($rfid_uid) !== 10) {
+            $validation_errors[] = "RFID must be exactly 10 digits.";
         }
 
         // Validate username (letters, numbers, underscores only)
         if (!preg_match('/^[A-Za-z0-9_]+$/', $username)) {
-            $validation_errors[] = "Username can only contain letters, numbers, and underscores.";
+            $validation_errors[] = "Student username can only contain letters, numbers, and underscores.";
+        }
+        
+        // Validate parent username (letters, numbers, underscores only)
+        if (!empty($parent_username) && !preg_match('/^[A-Za-z0-9_]+$/', $parent_username)) {
+            $validation_errors[] = "Parent username can only contain letters, numbers, and underscores.";
         }
 
         // If there are validation errors, return them
@@ -227,11 +277,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $error_msg = implode('<br>', $validation_errors);
             $form_data = $_POST;
             $show_modal = true;
+            $_SESSION['error_msg'] = $error_msg;
+            $_SESSION['form_data'] = $form_data;
+            $_SESSION['show_modal'] = true;
             // Don't redirect - stay on current page to show error
         }
 
         // Only insert if no validation errors and no duplicate errors
         if (empty($error_id) && empty($error_rfid) && empty($validation_errors)) {
+            // Begin transaction to avoid partial inserts
+            $conn->begin_transaction();
+
             $sql = "INSERT INTO student_account (
                 lrn, academic_track, enrollment_status, school_type,
                 last_name, first_name, middle_name, 
@@ -260,11 +316,53 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $id_number, $password, $rfid_uid, $username
             );
 
-            if ($stmt->execute()) {
-                $_SESSION['success_msg'] = "Student account created successfully!";
-                header("Location: AccountList.php?type=student");
+            $student_ok = $stmt->execute();
+            if ($student_ok) {
+                // Get the student ID for parent account creation
+                $student_id = $id_number;
+                $student_full_name = $first_name . ' ' . $last_name;
+                
+                // Create parent account
+                if (!empty($parent_username) && !empty($parent_password)) {
+                    // Insert minimal parent record: username, password, and link to child via student ID
+                    $parent_sql = "INSERT INTO parent_account (username, password, child_id) VALUES (?, ?, ?)";
+                    $parent_stmt = $conn->prepare($parent_sql);
+                    $parent_stmt->bind_param(
+                        "sss",
+                        $parent_username,
+                        $parent_hashed_password,
+                        $student_id
+                    );
+                    
+                    $parent_ok = $parent_stmt->execute();
+                    $parent_stmt->close();
+
+                    if (!$parent_ok) {
+                        // Parent insert failed; rollback student to avoid duplicates on retry
+                        $conn->rollback();
+                        $error_msg = "Parent account creation failed. No data was saved. Please try again.";
+                        $_SESSION['error_msg'] = $error_msg;
+                        $_SESSION['form_data'] = $_POST;
+                        $_SESSION['show_modal'] = true;
+                        // Stop further processing
+                        return;
+                    }
+                }
+
+                // All good: commit
+                $conn->commit();
+                $_SESSION['success_msg'] = !empty($parent_username) ? "Student and parent accounts created successfully!" : "Student account created successfully!";
+                // Clear any lingering duplicate flags in session
+                $_SESSION['error_id'] = '';
+                $_SESSION['error_rfid'] = '';
+                $_SESSION['error_msg'] = '';
+                $_SESSION['form_data'] = [];
+                $_SESSION['show_modal'] = false;
+                header("Location: AccountList.php");
                 exit;
             } else {
+                // Student insert failed
+                $conn->rollback();
                 echo "<div class='bg-red-500 text-white px-4 py-2 rounded mb-4'>Database error: " . $stmt->error . "</div>";
             }
         }
@@ -475,7 +573,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $show_modal = true;
         }
         
-        $insert_stmt->close();
+        $stmt->close();
         $check_stmt->close();
     } elseif ($account_type === 'parent') {
         // Handle parent account creation
@@ -484,13 +582,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $middle_name = trim($_POST['middle_name'] ?? '');
         $child_id = trim($_POST['child_id'] ?? '');
         $child_name = trim($_POST['child_name'] ?? '');
-        $id_number = trim($_POST['id_number'] ?? '');
         $password = $_POST['password'] ?? '';
         $username = trim($_POST['username'] ?? '');
         
         // Validation
         if (empty($first_name) || empty($last_name) || empty($child_id) || 
-            empty($id_number) || empty($password) || empty($username)) {
+            empty($password) || empty($username)) {
             $error_msg = "Please fill in all required fields.";
             $form_data = $_POST;
             $show_modal = true;
@@ -526,18 +623,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         $check_parent_stmt->close();
         
-        // Check if ID already exists
-        $check_stmt = $conn->prepare("SELECT parent_id FROM parent_account WHERE id_number = ?");
-        $check_stmt->bind_param("s", $id_number);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-        
-        if ($check_result->num_rows > 0) {
-            $error_msg = "ID number already exists. Please use a different ID number.";
-            $form_data = $_POST;
-            $show_modal = true;
-        }
-        
         // Check if username already exists
         $check_username_stmt = $conn->prepare("SELECT parent_id FROM parent_account WHERE username = ?");
         $check_username_stmt->bind_param("s", $username);
@@ -554,13 +639,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Hash password
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         
-        // Insert into parent_account table
-        $stmt = $conn->prepare("INSERT INTO parent_account (first_name, last_name, middle_name, child_id, child_name, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssssss", $first_name, $last_name, $middle_name, $child_id, $child_name, $id_number, $hashed_password, $username);
+        // Insert into parent_account table (minimal fields)
+        $stmt = $conn->prepare("INSERT INTO parent_account (username, password, child_id) VALUES (?, ?, ?)");
+        $stmt->bind_param("sss", $username, $hashed_password, $child_id);
         
         if ($stmt->execute()) {
             $_SESSION['success_msg'] = "Parent account created successfully!";
-            header("Location: AccountList.php?type=parent");
+            header("Location: AccountList.php");
             exit;
         } else {
             $error_msg = "Error creating parent account. Please try again.";
@@ -568,8 +653,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $show_modal = true;
         }
         
-        $insert_stmt->close();
-        $check_stmt->close();
+        $stmt->close();
     } elseif ($account_type === 'attendance') {
         // Handle attendance account creation
         $username = trim($_POST['username'] ?? '');
@@ -639,35 +723,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-gray-200 transform transition-all scale-95" id="modalContent">
         
         <!-- Header -->
-        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#1E4D92] text-white">
+        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#0B2C62] text-white">
             <h2 class="text-lg font-semibold">Add New Account</h2>
             <button onclick="closeModal()" class="text-2xl font-bold hover:text-gray-300">&times;</button>
         </div>
 
-        <!-- Account Type Selection -->
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <label class="block text-sm font-semibold mb-2">Select Account Type *</label>
-            <select id="modalAccountType" onchange="handleModalAccountTypeChange()" class="w-full max-w-md border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" required>
-                <option value="">-- Choose Account Type to Create --</option>
-                <option value="student">Student Account</option>
-                <option value="registrar">Registrar Account</option>
-                <option value="cashier">Cashier Account</option>
-                <option value="guidance">Guidance Account</option>
-                <option value="parent">Parent Account</option>
-                <option value="attendance">Attendance Account</option>
-            </select>
-        </div>
-
-        <!-- No Selection Message -->
-        <div id="noSelectionMessage" class="px-6 py-12 text-center" style="display: block;">
-            <div class="max-w-md mx-auto">
-                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-                <h3 class="text-lg font-semibold text-gray-700 mb-2">Select Account Type</h3>
-                <p class="text-gray-500">Choose the type of account you want to create from the dropdown above to get started.</p>
-            </div>
-        </div>
 
         <!-- Error Messages -->
         <?php if (!empty($error_msg)): ?>
@@ -676,13 +736,267 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
         <?php endif; ?>
 
-        <!-- Include Form Files -->
-        <?php include("add_student_form.php"); ?>
-        <?php include("add_registrar_form.php"); ?>
-        <?php include("add_cashier_form.php"); ?>
-        <?php include("add_guidance_form.php"); ?>
-        <?php include("add_attendance_form.php"); ?>
-        <?php include("add_parent_form.php"); ?>
+        <!-- Unified Student and Parent Form -->
+        <div id="unifiedForm" class="account-form">
+            <form method="POST" action="AccountList.php" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+                <input type="hidden" name="account_type" value="unified_student_parent">
+                
+                <!-- Personal Information Section -->
+                <div class="col-span-3 bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="tracking-wide">PERSONAL INFORMATION</span>
+                    </h3>
+                    
+                    <!-- Row: LRN and Academic Track -->
+                    <div class="grid grid-cols-3 gap-6 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">LRN *</label>
+                            <input type="number" name="lrn" required value="<?= htmlspecialchars($form_data['lrn'] ?? '') ?>" pattern="[0-9]+" title="Please enter numbers only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Academic Track / Course *</label>
+                            <select name="academic_track" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                <option value="">-- Select Academic Track / Course --</option>
+                                <optgroup label="Elementary">
+                                    <option value="Elementary" <?= ($form_data['academic_track'] ?? '') === 'Elementary' ? 'selected' : '' ?>>Elementary</option>
+                                </optgroup>
+                                <optgroup label="Junior High School">
+                                    <option value="Junior High School" <?= ($form_data['academic_track'] ?? '') === 'Junior High School' ? 'selected' : '' ?>>Junior High School</option>
+                                </optgroup>
+                                <optgroup label="Senior High School Strands">
+                                    <option value="STEM" <?= ($form_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
+                                    <option value="ABM" <?= ($form_data['academic_track'] ?? '') === 'ABM' ? 'selected' : '' ?>>ABM (Accountancy, Business & Management)</option>
+                                    <option value="HUMSS" <?= ($form_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
+                                    <option value="GAS" <?= ($form_data['academic_track'] ?? '') === 'GAS' ? 'selected' : '' ?>>GAS (General Academic Strand)</option>
+                                    <option value="TVL" <?= ($form_data['academic_track'] ?? '') === 'TVL' ? 'selected' : '' ?>>TVL (Technical-Vocational-Livelihood)</option>
+                                    <option value="Arts and Design" <?= ($form_data['academic_track'] ?? '') === 'Arts and Design' ? 'selected' : '' ?>>Arts and Design</option>
+                                </optgroup>
+                                <optgroup label="College Courses">
+                                    <option value="BS Information Technology" <?= ($form_data['academic_track'] ?? '') === 'BS Information Technology' ? 'selected' : '' ?>>BS Information Technology</option>
+                                    <option value="BS Computer Science" <?= ($form_data['academic_track'] ?? '') === 'BS Computer Science' ? 'selected' : '' ?>>BS Computer Science</option>
+                                    <option value="BS Business Administration" <?= ($form_data['academic_track'] ?? '') === 'BS Business Administration' ? 'selected' : '' ?>>BS Business Administration</option>
+                                    <option value="BS Accountancy" <?= ($form_data['academic_track'] ?? '') === 'BS Accountancy' ? 'selected' : '' ?>>BS Accountancy</option>
+                                    <option value="BS Hospitality Management" <?= ($form_data['academic_track'] ?? '') === 'BS Hospitality Management' ? 'selected' : '' ?>>BS Hospitality Management</option>
+                                    <option value="BS Education" <?= ($form_data['academic_track'] ?? '') === 'BS Education' ? 'selected' : '' ?>>BS Education</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Enrollment Status *</label>
+                            <div class="flex items-center gap-6 mt-1">
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="enrollment_status" value="OLD" <?= ($form_data['enrollment_status'] ?? '') === 'OLD' ? 'checked' : '' ?> onchange="toggleNewOptions()"> OLD
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="enrollment_status" value="NEW" <?= ($form_data['enrollment_status'] ?? '') === 'NEW' ? 'checked' : '' ?> onchange="toggleNewOptions()"> NEW
+                                </label>
+                            </div>
+                            <div id="newOptions" class="flex items-center gap-6 mt-3 <?= ($form_data['enrollment_status'] ?? '') === 'NEW' ? '' : 'hidden' ?> ml-4">
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="school_type" value="PUBLIC" <?= ($form_data['school_type'] ?? '') === 'PUBLIC' ? 'checked' : '' ?>> Public
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="school_type" value="PRIVATE" <?= ($form_data['school_type'] ?? '') === 'PRIVATE' ? 'checked' : '' ?>> Private
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Row: Full Name -->
+                    <div class="grid grid-cols-3 gap-6 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">First Name *</label>
+                            <input type="text" name="first_name" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Last Name *</label>
+                            <input type="text" name="last_name" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <input type="text" name="middle_name" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                    </div>
+                    
+                    <!-- Academic Info Row -->
+                    <div class="grid grid-cols-3 gap-6 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">School Year *</label>
+                            <input type="text" name="school_year" required value="<?= htmlspecialchars($form_data['school_year'] ?? '') ?>" pattern="[0-9\-]+" title="Please enter numbers and dash only (e.g. 2024-2025)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Grade Level *</label>
+                            <select id="gradeLevel" name="grade_level" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                <option value="">-- Select Grade Level --</option>
+                                <?php if (!empty($form_data['grade_level'])): ?>
+                                    <option value="<?= htmlspecialchars($form_data['grade_level']) ?>" selected><?= htmlspecialchars($form_data['grade_level']) ?></option>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Semester *</label>
+                            <select name="semester" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                <option value="">Select Term</option>
+                                <option value="1st" <?= ($form_data['semester'] ?? '') === '1st' ? 'selected' : '' ?>>1st Term</option>
+                                <option value="2nd" <?= ($form_data['semester'] ?? '') === '2nd' ? 'selected' : '' ?>>2nd Term</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Personal Details Row -->
+                    <div class="grid grid-cols-3 gap-6 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Date of Birth *</label>
+                            <input type="date" name="dob" required value="<?= htmlspecialchars($form_data['dob'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Birthplace *</label>
+                            <input type="text" name="birthplace" required value="<?= htmlspecialchars($form_data['birthplace'] ?? '') ?>" pattern="[A-Za-z\s,.-]+" title="Please enter a valid location" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Gender *</label>
+                            <select name="gender" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                <option value="">Select Gender</option>
+                                <option value="Male" <?= ($form_data['gender'] ?? '') === 'Male' ? 'selected' : '' ?>>Male</option>
+                                <option value="Female" <?= ($form_data['gender'] ?? '') === 'Female' ? 'selected' : '' ?>>Female</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Religion and Payment Row -->
+                    <div class="grid grid-cols-3 gap-6 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Religion *</label>
+                            <input type="text" name="religion" required value="<?= htmlspecialchars($form_data['religion'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Mode of Payment *</label>
+                            <div class="flex items-center gap-6 mt-1">
+                                <label class="flex items-center gap-2"><input type="radio" name="payment_mode" value="Cash" <?= ($form_data['payment_mode'] ?? '') === 'Cash' ? 'checked' : '' ?> required> Cash</label>
+                                <label class="flex items-center gap-2"><input type="radio" name="payment_mode" value="Installment" <?= ($form_data['payment_mode'] ?? '') === 'Installment' ? 'checked' : '' ?> required> Installment</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Credentials Submitted</label>
+                            <div class="grid grid-cols-2 gap-y-2 text-sm">
+                                <?php $saved_credentials = $form_data['credentials'] ?? []; ?>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="F-138" <?= in_array('F-138', $saved_credentials) ? 'checked' : '' ?>> <span>F-138</span></label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="Good Moral" <?= in_array('Good Moral', $saved_credentials) ? 'checked' : '' ?>> <span>Good Moral</span></label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="PSA Birth" <?= in_array('PSA Birth', $saved_credentials) ? 'checked' : '' ?>> <span>PSA Birth</span></label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="credentials[]" value="ESC Certification" <?= in_array('ESC Certification', $saved_credentials) ? 'checked' : '' ?>> <span>ESC Certification</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Address -->
+                    <div class="grid grid-cols-2 gap-6 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Complete Address</label>
+                            <textarea name="address" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Family Information -->
+                    <div class="space-y-4">
+                        <h4 class="font-semibold text-gray-700">Father's Information</h4>
+                        <div class="grid grid-cols-3 gap-6">
+                            <input type="text" name="father_name" placeholder="Name *" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" pattern="[0-9+\-\s()]{11}" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" data-maxlen="11" inputmode="numeric" digits-only>
+                        </div>
+                        
+                        <h4 class="font-semibold text-gray-700">Mother's Information</h4>
+                        <div class="grid grid-cols-3 gap-6">
+                            <input type="text" name="mother_name" placeholder="Name *" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" pattern="[0-9+\-\s()]{11}" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" data-maxlen="11" inputmode="numeric" digits-only>
+                        </div>
+                        
+                        <h4 class="font-semibold text-gray-700">Guardian's Information</h4>
+                        <div class="grid grid-cols-3 gap-6">
+                            <input type="text" name="guardian_name" placeholder="Name" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="tel" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" pattern="[0-9+\-\s()]{11}" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" data-maxlen="11" inputmode="numeric" digits-only>
+                        </div>
+                    </div>
+                    
+                    <!-- Last School Attended -->
+                    <div class="grid grid-cols-2 gap-6 mt-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Last School Attended</label>
+                            <input type="text" name="last_school" placeholder="School Name" value="<?= htmlspecialchars($form_data['last_school'] ?? '') ?>" pattern="[A-Za-z\s.-]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">School Year</label>
+                            <input type="text" name="last_school_year" placeholder="School Year (e.g. 2023-2024)" value="<?= htmlspecialchars($form_data['last_school_year'] ?? '') ?>" pattern="[0-9\-]*" title="Please enter numbers and dash only (e.g. 2023-2024)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Parent Personal Account Section -->
+                <div class="col-span-3 bg-gray-50 border-2 border-gray-400 rounded-lg p-4 mt-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        <span class="tracking-wide">PARENT PERSONAL ACCOUNT</span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Parent Username *</label>
+                            <input type="text" name="parent_username" required value="<?= htmlspecialchars($form_data['parent_username'] ?? '') ?>" pattern="[A-Za-z0-9_]+" title="Username can only contain letters, numbers, and underscores" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Parent Password *</label>
+                            <input type="text" name="parent_password" required value="<?= htmlspecialchars($form_data['parent_password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Personal Account Section -->
+                <div class="col-span-3 bg-gray-50 border-2 border-gray-400 rounded-lg p-4 mt-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        <span class="tracking-wide">PERSONAL ACCOUNT</span>
+                    </h3>
+                    <div class="grid grid-cols-4 gap-6">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Username *</label>
+                            <input type="text" name="username" required value="<?= htmlspecialchars($form_data['username'] ?? '') ?>" pattern="[A-Za-z0-9_]+" title="Username can only contain letters, numbers, and underscores" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Student ID *</label>
+                            <input type="number" name="id_number" required value="<?= htmlspecialchars($old_id ?? '') ?>" pattern="[0-9]{11}" title="Please enter 11 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_id) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>" data-maxlen="11" inputmode="numeric" digits-only>
+                            <?php if (!empty($error_id)): ?>
+                                <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_id) ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Password *</label>
+                            <input type="text" name="password" required value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">RFID Number *</label>
+                            <input type="number" name="rfid_uid" required value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="[0-9]{10}" title="Please enter 10 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>" data-maxlen="10" inputmode="numeric" digits-only>
+                            <?php if (!empty($error_rfid)): ?>
+                                <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Submit Buttons -->
+                <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2 border border-[#0B2C62] text-[#0B2C62] rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">Create Student & Parent Accounts</button>
+                </div>
+            </form>
+        </div>
 
     </div>
 </div>
@@ -694,130 +1008,81 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </style>
 
 <script>
-// Wait for DOM to be fully loaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, checking for forms...');
-    
-    // Force check after a delay to ensure includes are loaded
-    setTimeout(() => {
-        const studentForm = document.getElementById('studentForm');
-        const registrarForm = document.getElementById('registrarForm');
-        console.log('Student form exists:', !!studentForm);
-        console.log('Registrar form exists:', !!registrarForm);
-        
-        if (studentForm) console.log('Student form HTML:', studentForm.outerHTML.substring(0, 100));
-        if (registrarForm) console.log('Registrar form HTML:', registrarForm.outerHTML.substring(0, 100));
-    }, 500);
-});
-
-// Handle modal account type change
-function handleModalAccountTypeChange() {
-    const selectElement = document.getElementById('modalAccountType');
-    const accountType = selectElement.value;
-    console.log('=== MODAL ACCOUNT TYPE CHANGE ===');
-    console.log('Selected value:', accountType);
-    console.log('Select element:', selectElement);
-    
-    // Force show the form immediately
-    if (accountType === 'student') {
-        showStudentForm();
-    } else if (accountType === 'registrar') {
-        showRegistrarForm();
-    } else if (accountType === 'cashier') {
-        showCashierForm();
-    } else if (accountType === 'guidance') {
-        showGuidanceForm();
-    } else if (accountType === 'attendance') {
-        showAttendanceForm();
-    } else if (accountType === 'parent') {
-        showParentForm();
-    } else {
-        showSelectionMessage();
-    }
+// Unified form functions
+function toggleNewOptions() {
+    const newOptions = document.getElementById("newOptions");
+    const isNew = document.querySelector('input[name="enrollment_status"]:checked')?.value === "NEW";
+    newOptions.classList.toggle("hidden", !isNew);
 }
 
-function hideAllForms() {
-    const forms = ['studentForm', 'registrarForm', 'cashierForm', 'guidanceForm', 'attendanceForm', 'parentForm', 'noSelectionMessage'];
-    forms.forEach(formId => {
-        const form = document.getElementById(formId);
-        if (form) {
-            form.style.display = 'none';
-        }
+// Grade level options mapping
+const gradeOptions = {
+    "Elementary": ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
+    "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
+    "Senior High School Strands": ["Grade 11", "Grade 12"],
+    "College Courses": ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+};
+
+// Function to populate grade levels
+function populateGradeLevels(selectedTrack, selectedGrade = '') {
+    const academicTrack = document.querySelector('select[name="academic_track"]');
+    const gradeLevel = document.getElementById('gradeLevel');
+    
+    if (!academicTrack || !gradeLevel) return;
+    
+    const selected = selectedTrack ? academicTrack.options[academicTrack.selectedIndex].parentNode.label : '';
+    const course = selectedTrack;
+
+    gradeLevel.innerHTML = '<option value="">-- Select Grade Level --</option>';
+
+    let levels = [];
+    if (gradeOptions[selected]) {
+        levels = gradeOptions[selected];
+    } else if (gradeOptions[course]) {
+        levels = gradeOptions[course];
+    }
+
+    levels.forEach(level => {
+        let option = document.createElement("option");
+        option.value = level;
+        option.textContent = level;
+        if (level === selectedGrade) option.selected = true;
+        gradeLevel.appendChild(option);
     });
 }
 
-function showStudentForm() {
-    hideAllForms();
-    document.getElementById('studentForm').style.display = 'block';
-    console.log('✅ STUDENT FORM DISPLAYED');
-}
-
-function showRegistrarForm() {
-    hideAllForms();
-    document.getElementById('registrarForm').style.display = 'block';
-    console.log('✅ REGISTRAR FORM DISPLAYED');
-}
-
-function showCashierForm() {
-    hideAllForms();
-    document.getElementById('cashierForm').style.display = 'block';
-    console.log('✅ CASHIER FORM DISPLAYED');
-}
-
-function showGuidanceForm() {
-    hideAllForms();
-    document.getElementById('guidanceForm').style.display = 'block';
-    console.log('✅ GUIDANCE FORM DISPLAYED');
-}
-
-function showAttendanceForm() {
-    hideAllForms();
-    document.getElementById('attendanceForm').style.display = 'block';
-    console.log('✅ ATTENDANCE FORM DISPLAYED');
-}
-
-function showParentForm() {
-    hideAllForms();
-    document.getElementById('parentForm').style.display = 'block';
-    console.log('✅ PARENT FORM DISPLAYED');
-}
-
-function showSelectionMessage() {
-    hideAllForms();
-    document.getElementById('noSelectionMessage').style.display = 'block';
-    console.log('✅ SELECTION MESSAGE DISPLAYED');
-}
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up academic track change listener
+    const academicTrack = document.querySelector('select[name="academic_track"]');
+    if (academicTrack) {
+        academicTrack.addEventListener('change', function() {
+            populateGradeLevels(academicTrack.value);
+        });
+    }
+    
+    // Initialize grade levels on page load if academic track is selected
+    const savedTrack = '<?= $form_data["academic_track"] ?? "" ?>';
+    const savedGrade = '<?= $form_data["grade_level"] ?? "" ?>';
+    if (savedTrack && academicTrack) {
+        populateGradeLevels(savedTrack, savedGrade);
+    }
+});
 
 function openModal(){ 
     document.getElementById('addAccountModal').classList.remove('hidden'); 
     document.getElementById('modalContent').classList.remove('scale-95');
     document.getElementById('modalContent').classList.add('scale-100');
     
-    // Check if there's a saved account type from form data (for error cases)
-    const savedAccountType = '<?= htmlspecialchars($form_data['account_type'] ?? '') ?>';
-    
-    if (savedAccountType) {
-        // Show the form that had errors
-        document.getElementById('modalAccountType').value = savedAccountType;
-        if (savedAccountType === 'student') {
-            showStudentForm();
-        } else if (savedAccountType === 'registrar') {
-            showRegistrarForm();
-        } else if (savedAccountType === 'cashier') {
-            showCashierForm();
-        } else if (savedAccountType === 'guidance') {
-            showGuidanceForm();
-        } else if (savedAccountType === 'attendance') {
-            showAttendanceForm();
-        } else if (savedAccountType === 'parent') {
-            showParentForm();
+    // Initialize grade levels if academic track is already selected
+    setTimeout(() => {
+        const academicTrack = document.querySelector('select[name="academic_track"]');
+        const savedTrack = '<?= $form_data["academic_track"] ?? "" ?>';
+        const savedGrade = '<?= $form_data["grade_level"] ?? "" ?>';
+        if (savedTrack && academicTrack) {
+            populateGradeLevels(savedTrack, savedGrade);
         }
-        console.log('Restored form for account type:', savedAccountType);
-    } else {
-        // Reset to show selection message when modal opens normally
-        document.getElementById('modalAccountType').value = '';
-        showSelectionMessage();
-    }
+    }, 100);
 }
 
 // Auto-open modal if there are errors from form submission
@@ -835,25 +1100,20 @@ function closeModal(){
     document.getElementById('addAccountModal').classList.add('hidden'); 
 }
 
-// Legacy function for compatibility
-function showAccountForm(selectedType = null) {
-    const accountType = selectedType || document.getElementById('accountType').value;
-    if (accountType === 'student') {
-        showStudentForm();
-    } else if (accountType === 'registrar') {
-        showRegistrarForm();
-    } else if (accountType === 'cashier') {
-        showCashierForm();
-    } else if (accountType === 'guidance') {
-        showGuidanceForm();
-    } else if (accountType === 'attendance') {
-        showAttendanceForm();
-    } else if (accountType === 'parent') {
-        showParentForm();
-    } else {
-        showSelectionMessage();
+// Enforce digits-only and max length on inputs with class 'digits-only'
+document.addEventListener('input', function(e){
+    const el = e.target;
+    if (el.classList && el.classList.contains('digits-only')) {
+        const max = parseInt(el.getAttribute('data-maxlen')) || 0;
+        // Strip non-digits
+        el.value = el.value.replace(/\D+/g, '');
+        // Enforce max length
+        if (max > 0 && el.value.length > max) {
+            el.value = el.value.slice(0, max);
+        }
     }
-}
+});
+
 </script>
 
 <?php

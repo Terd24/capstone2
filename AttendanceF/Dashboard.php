@@ -10,9 +10,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
     $ajax_request = false;
 }
 
-// Handle clearing the student display flag
+// Latest teacher for today (if someone just tapped)
+$latest_teacher = null;
+if (isset($_SESSION['show_latest_teacher']) && $_SESSION['show_latest_teacher']) {
+    $latest_teacher_query = $conn->prepare("\n        SELECT ta.*, e.first_name, e.last_name,\n               GREATEST(\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ta.date, ' ', ta.time_in)), 0),\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ta.date, ' ', ta.time_out)), 0)\n               ) as last_activity\n        FROM teacher_attendance ta\n        JOIN employees e ON ta.employee_id = e.id_number\n        WHERE ta.date = ? \n        ORDER BY last_activity DESC, ta.id DESC\n        LIMIT 1\n    ");
+    $latest_teacher_query->bind_param("s", $today);
+    $latest_teacher_query->execute();
+    $latest_teacher_result = $latest_teacher_query->get_result();
+    $latest_teacher = $latest_teacher_result->num_rows > 0 ? $latest_teacher_result->fetch_assoc() : null;
+}
+
+// Handle clearing the student/teacher display flags
 if (isset($_GET['clear_student'])) {
     unset($_SESSION['show_latest_student']);
+    unset($_SESSION['show_latest_teacher']);
+    unset($_SESSION['view_role']);
+    unset($_SESSION['last_teacher_id']);
     unset($_SESSION['success']);
     unset($_SESSION['error']);
     exit();
@@ -28,10 +41,64 @@ if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['registrar', 'adm
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
     $rfid = strtoupper(trim($_POST['rfid']));
     
-    // Find student by RFID
+    // First, try TEACHER by RFID
+    $teacher_query = $conn->prepare("
+        SELECT e.id_number, e.first_name, e.last_name, TRIM(UPPER(e.rfid_uid)) AS db_rfid
+        FROM employees e
+        JOIN employee_accounts ea ON ea.employee_id = e.id_number AND ea.role = 'teacher'
+        WHERE TRIM(UPPER(e.rfid_uid)) = ?
+    ");
+    $teacher_query->bind_param("s", $rfid);
+    $teacher_query->execute();
+    $teacher_result = $teacher_query->get_result();
+    if ($teacher_result && $teacher_result->num_rows > 0) {
+        $teacher = $teacher_result->fetch_assoc();
+        $emp_id = $teacher['id_number'];
+        $teacher_name = trim($teacher['first_name'] . ' ' . $teacher['last_name']);
+
+        date_default_timezone_set('Asia/Manila');
+        $today = date("Y-m-d");
+        $time = date("H:i:s");
+        $day = date("l");
+
+        // Time in/out for teacher_attendance
+        $t_check = $conn->prepare("SELECT * FROM teacher_attendance WHERE employee_id = ? AND date = ? LIMIT 1");
+        $t_check->bind_param("ss", $emp_id, $today);
+        $t_check->execute();
+        $t_res = $t_check->get_result();
+        if ($t_res && $t_res->num_rows === 1) {
+            $row = $t_res->fetch_assoc();
+            if (empty($row['time_in'])) {
+                $upd = $conn->prepare("UPDATE teacher_attendance SET time_in = ? WHERE id = ?");
+                $upd->bind_param("si", $time, $row['id']);
+                $upd->execute();
+                $_SESSION['success'] = "Time In recorded for $teacher_name at " . date('g:i A', strtotime($time));
+            } elseif (empty($row['time_out'])) {
+                $upd = $conn->prepare("UPDATE teacher_attendance SET time_out = ? WHERE id = ?");
+                $upd->bind_param("si", $time, $row['id']);
+                $upd->execute();
+                $_SESSION['success'] = "Time Out recorded for $teacher_name at " . date('g:i A', strtotime($time));
+            } else {
+                $_SESSION['success'] = "$teacher_name already timed in and out today.";
+            }
+        } else {
+            $ins = $conn->prepare("INSERT INTO teacher_attendance (employee_id, date, day, time_in) VALUES (?,?,?,?)");
+            $ins->bind_param("ssss", $emp_id, $today, $day, $time);
+            $ins->execute();
+            $_SESSION['success'] = "Time In recorded for $teacher_name at " . date('g:i A', strtotime($time));
+        }
+
+        $_SESSION['show_latest_teacher'] = true;
+        $_SESSION['view_role'] = 'teacher';
+        $_SESSION['last_teacher_id'] = $emp_id;
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+
+    // Otherwise, find STUDENT by RFID
     $student_query = $conn->prepare("
-        SELECT id_number, first_name, last_name, middle_name, TRIM(UPPER(rfid_uid)) AS db_rfid 
-        FROM student_account 
+        SELECT id_number, first_name, last_name, middle_name, TRIM(UPPER(rfid_uid)) AS db_rfid
+        FROM student_account
         WHERE TRIM(UPPER(rfid_uid)) = ?
     ");
     $student_query->bind_param("s", $rfid);
@@ -39,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
     $student_result = $student_query->get_result();
     
     if ($student_result->num_rows === 0) {
-        $_SESSION['error'] = "RFID card not registered to any student.";
+        $_SESSION['error'] = "RFID card not registered to any student or teacher.";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
@@ -80,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
         $insert->execute();
         $_SESSION['success'] = "Time In recorded for " . $student_name . " at " . date('g:i A', strtotime($time));
         $_SESSION['show_latest_student'] = true; // Flag to show student info
+        $_SESSION['view_role'] = 'student';
     } else {
         // Student already has a record - check if we need time_in or time_out
         $record = $res->fetch_assoc();
@@ -102,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
             $update->execute();
             $_SESSION['success'] = "Time In recorded for " . $student_name . " at " . date('g:i A', strtotime($time));
             $_SESSION['show_latest_student'] = true;
+            $_SESSION['view_role'] = 'student';
         } else {
             // Already has time_in - record this tap as time_out
             // Absent status is IMMUTABLE - never change it
@@ -119,6 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
             $update->execute();
             $_SESSION['success'] = "Time Out recorded for " . $student_name . " at " . date('g:i A', strtotime($time));
             $_SESSION['show_latest_student'] = true;
+            $_SESSION['view_role'] = 'student';
         }
     }
     
@@ -218,38 +288,54 @@ $search_name = $_GET['search_name'] ?? '';
 $start_date = $_GET['start_date'] ?? null;
 $end_date = $_GET['end_date'] ?? null;
 
-// Build query for attendance records (exclude absent records)
-$sql = "SELECT ar.*, sa.first_name, sa.last_name, sa.middle_name 
-        FROM attendance_record ar 
-        JOIN student_account sa ON ar.id_number = sa.id_number 
-        WHERE (ar.time_in IS NOT NULL OR ar.time_out IS NOT NULL)";
+// Determine view role (defaults to student if none)
+$view_role = $_SESSION['view_role'] ?? 'student';
+
+// Build query for attendance records depending on role (exclude absent records)
+if ($view_role === 'teacher') {
+    $sql = "SELECT ta.*, e.first_name, e.last_name 
+            FROM teacher_attendance ta
+            JOIN employees e ON ta.employee_id = e.id_number
+            WHERE (ta.time_in IS NOT NULL OR ta.time_out IS NOT NULL)";
+} else {
+    $sql = "SELECT ar.*, sa.first_name, sa.last_name, sa.middle_name 
+            FROM attendance_record ar 
+            JOIN student_account sa ON ar.id_number = sa.id_number 
+            WHERE (ar.time_in IS NOT NULL OR ar.time_out IS NOT NULL)";
+}
 $params = [];
 $param_types = "";
 
 // Add date filtering
 if ($start_date && $end_date) {
-    $sql .= " AND ar.date BETWEEN ? AND ?";
+    $sql .= ($view_role === 'teacher') ? " AND ta.date BETWEEN ? AND ?" : " AND ar.date BETWEEN ? AND ?";
     $params[] = $start_date;
     $params[] = $end_date;
     $param_types .= "ss";
 } else {
     // Default to today if no date range specified
-    $sql .= " AND ar.date = ?";
+    $sql .= ($view_role === 'teacher') ? " AND ta.date = ?" : " AND ar.date = ?";
     $params[] = $today;
     $param_types .= "s";
 }
 
 // Add name search filtering
 if ($search_name) {
-    $sql .= " AND (CONCAT(sa.first_name, ' ', sa.middle_name, ' ', sa.last_name) LIKE ? 
-              OR CONCAT(sa.first_name, ' ', sa.last_name) LIKE ?)";
+    if ($view_role === 'teacher') {
+        $sql .= " AND CONCAT(e.first_name, ' ', e.last_name) LIKE ?";
+    } else {
+        $sql .= " AND (CONCAT(sa.first_name, ' ', sa.middle_name, ' ', sa.last_name) LIKE ? 
+                  OR CONCAT(sa.first_name, ' ', sa.last_name) LIKE ?)";
+    }
     $search_param = "%" . $search_name . "%";
     $params[] = $search_param;
-    $params[] = $search_param;
-    $param_types .= "ss";
+    if ($view_role !== 'teacher') {
+        $params[] = $search_param;
+    }
+    $param_types .= ($view_role === 'teacher') ? "s" : "ss";
 }
 
-$sql .= " ORDER BY ar.date DESC, ar.id DESC";
+$sql .= ($view_role === 'teacher') ? " ORDER BY ta.date DESC, ta.id DESC" : " ORDER BY ar.date DESC, ar.id DESC";
 
 $attendance_query = $conn->prepare($sql);
 if (!empty($params)) {
@@ -508,187 +594,206 @@ $attendance_records = $attendance_query->get_result();
             <input type="text" name="rfid" id="rfidInput">
         </form>
 
-        <!-- Attendance Records -->
-        <div class="bg-white rounded-2xl shadow-lg">
-            <div class="p-6 border-b border-gray-100">
-                <div class="flex items-center mb-6">
-                    <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>
-                    <h2 class="text-xl font-bold text-gray-800">Attendance Records</h2>
-                </div>
-                
-                <!-- Search and Filter Form -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-6">
-                    <div>
-                        <label for="search-name" class="text-sm font-medium text-gray-700 block mb-2">Search Student</label>
-                        <input type="text" id="search-name" name="search_name" value="<?= htmlspecialchars($search_name) ?>" 
-                               placeholder="Enter student name..."
-                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
-                    </div>
-                    <div>
-                        <label for="start-date" class="text-sm font-medium text-gray-700 block mb-2">Start Date</label>
-                        <input type="date" id="start-date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" 
-                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
-                    </div>
-                    <div>
-                        <label for="end-date" class="text-sm font-medium text-gray-700 block mb-2">End Date</label>
-                        <input type="date" id="end-date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" 
-                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
-                    </div>
-                    <div class="flex gap-2">
-                        <button type="button" id="generateReport" class="bg-[#0B2C62] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-all duration-200 font-medium flex-1">
-                            Generate Report
-                        </button>
-                        <button type="button" id="clearFilters" class="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200 font-medium">
-                            Clear
-                        </button>
-                    </div>
-                </div>
-                
-                <p id="filterStatus" class="text-gray-600">
-                    <?php if ($start_date && $end_date): ?>
-                        Attendance records from <?= date('F j, Y', strtotime($start_date)) ?> to <?= date('F j, Y', strtotime($end_date)) ?>
-                    <?php elseif ($search_name): ?>
-                        Search results for "<?= htmlspecialchars($search_name) ?>" on <?= date('F j, Y') ?>
-                    <?php else: ?>
-                        Real-time attendance tracking for <?= date('F j, Y') ?>
-                    <?php endif; ?>
-                </p>
+    <!-- Attendance Records -->
+    <div class="bg-white rounded-2xl shadow-lg">
+        <div class="p-6 border-b border-gray-100">
+            <div class="flex items-center mb-6">
+                <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>
+                <h2 class="text-xl font-bold text-gray-800">Attendance Records</h2>
             </div>
+            
+            <!-- Search and Filter Form -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-6">
+                <div>
+                    <label for="search-name" class="text-sm font-medium text-gray-700 block mb-2"><?php echo ($view_role === 'teacher') ? 'Search Teacher' : 'Search Student'; ?></label>
+                    <input type="text" id="search-name" name="search_name" value="<?= htmlspecialchars($search_name) ?>" 
+                           placeholder="Enter student name..."
+                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
+                </div>
+                <div>
+                    <label for="start-date" class="text-sm font-medium text-gray-700 block mb-2">Start Date</label>
+                    <input type="date" id="start-date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
+                </div>
+                <div>
+                    <label for="end-date" class="text-sm font-medium text-gray-700 block mb-2">End Date</label>
+                    <input type="date" id="end-date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" id="generateReport" class="bg-[#0B2C62] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-all duration-200 font-medium flex-1">
+                        Generate Report
+                    </button>
+                    <button type="button" id="clearFilters" class="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200 font-medium">
+                        Clear
+                    </button>
+                </div>
+            </div>
+            
+            <p id="filterStatus" class="text-gray-600">
+                <?php if ($start_date && $end_date): ?>
+                    Attendance records from <?= date('F j, Y', strtotime($start_date)) ?> to <?= date('F j, Y', strtotime($end_date)) ?>
+                <?php elseif ($search_name): ?>
+                    Search results for "<?= htmlspecialchars($search_name) ?>" on <?= date('F j, Y') ?>
+                <?php else: ?>
+                    Real-time attendance tracking for <?= date('F j, Y') ?>
+                <?php endif; ?>
+            </p>
+        </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-[#0B2C62] text-white">
-                        <tr>
-                            <th class="px-6 py-4 text-left font-semibold">Name</th>
-                            <th class="px-6 py-4 text-left font-semibold">Date</th>
-                            <th class="px-6 py-4 text-left font-semibold">Day</th>
-                            <th class="px-6 py-4 text-left font-semibold">Section</th>
-                            <th class="px-6 py-4 text-left font-semibold">Class Schedule</th>
-                            <th class="px-6 py-4 text-left font-semibold">Time In</th>
-                            <th class="px-6 py-4 text-left font-semibold">Time Out</th>
-                            <th class="px-6 py-4 text-left font-semibold">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="attendanceTableBody" class="divide-y divide-gray-100">
-                        <?php if ($attendance_records->num_rows > 0): ?>
-                            <?php while($record = $attendance_records->fetch_assoc()): ?>
-                                <tr class="hover:bg-blue-50 transition-colors duration-150">
-                                    <td class="px-6 py-4 font-medium text-gray-900">
-                                        <?= htmlspecialchars(trim($record['first_name'] . ' ' . $record['middle_name'] . ' ' . $record['last_name'])) ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-700">
-                                        <?= htmlspecialchars(date('F j, Y', strtotime($record['date']))) ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-700">
-                                        <?= htmlspecialchars($record['day']) ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-700 whitespace-nowrap">
-                                        <?php 
-                                        $schedule = $record['schedule'] ?? 'No Section';
-                                        // Extract only section name, remove (Variable) part
-                                        if (preg_match('/^([^(]+)/', $schedule, $matches)) {
-                                            echo htmlspecialchars(trim($matches[1]));
-                                        } else {
-                                            echo htmlspecialchars($schedule);
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-[#0B2C62] text-white">
+                    <?php if ($view_role === 'teacher'): ?>
+                    <tr>
+                        <th class="px-6 py-4 text-left font-semibold">Name</th>
+                        <th class="px-6 py-4 text-left font-semibold">Date</th>
+                        <th class="px-6 py-4 text-left font-semibold">Day</th>
+                        <th class="px-6 py-4 text-left font-semibold">Shift Type</th>
+                        <th class="px-6 py-4 text-left font-semibold">Shift In</th>
+                        <th class="px-6 py-4 text-left font-semibold">Shift Out</th>
+                        <th class="px-6 py-4 text-left font-semibold">Time In</th>
+                        <th class="px-6 py-4 text-left font-semibold">Time Out</th>
+                        <th class="px-6 py-4 text-left font-semibold">Required Hours</th>
+                        <th class="px-6 py-4 text-left font-semibold">Tardiness</th>
+                        <th class="px-6 py-4 text-left font-semibold">Undertime</th>
+                        <th class="px-6 py-4 text-left font-semibold">OT</th>
+                        <th class="px-6 py-4 text-left font-semibold">OB</th>
+                    </tr>
+                    <?php else: ?>
+                    <tr>
+                        <th class="px-6 py-4 text-left font-semibold">Name</th>
+                        <th class="px-6 py-4 text-left font-semibold">Date</th>
+                        <th class="px-6 py-4 text-left font-semibold">Day</th>
+                        <th class="px-6 py-4 text-left font-semibold">Section</th>
+                        <th class="px-6 py-4 text-left font-semibold">Class Schedule</th>
+                        <th class="px-6 py-4 text-left font-semibold">Time In</th>
+                        <th class="px-6 py-4 text-left font-semibold">Time Out</th>
+                        <th class="px-6 py-4 text-left font-semibold">Status</th>
+                    </tr>
+                    <?php endif; ?>
+                </thead>
+                <tbody id="attendanceTableBody" class="divide-y divide-gray-100">
+                    <?php if ($attendance_records->num_rows > 0): ?>
+                        <?php while($record = $attendance_records->fetch_assoc()): ?>
+                            <?php if ($view_role === 'teacher'): ?>
+                            <tr class="hover:bg-blue-50 transition-colors duration-150">
+                                <td class="px-6 py-4 font-medium text-gray-900">
+                                    <?= htmlspecialchars(trim(($record['first_name'] ?? '') . ' ' . ($record['last_name'] ?? ''))) ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700"><?= htmlspecialchars(date('F j, Y', strtotime($record['date']))) ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= htmlspecialchars($record['day']) ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= htmlspecialchars($record['shift_type'] ?? 'Regular') ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= $record['shift_in'] ? date('h:i A', strtotime($record['shift_in'])) : '--' ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= $record['shift_out'] ? date('h:i A', strtotime($record['shift_out'])) : '--' ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= $record['time_in'] ? date('h:i A', strtotime($record['time_in'])) : '--' ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= $record['time_out'] ? date('h:i A', strtotime($record['time_out'])) : '--' ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= isset($record['required_hours']) ? htmlspecialchars($record['required_hours']) : '8.00' ?></td>
+                                <td class="px-6 py-4 text-gray-700"><?= (int)($record['tardiness_minutes'] ?? 0) ?> mins</td>
+                                <td class="px-6 py-4 text-gray-700"><?= (int)($record['undertime_minutes'] ?? 0) ?> mins</td>
+                                <td class="px-6 py-4 text-gray-700"><?= (int)($record['ot_minutes'] ?? 0) ?> mins</td>
+                                <td class="px-6 py-4 text-gray-700"><?= (int)($record['ob_minutes'] ?? 0) ?> mins</td>
+                            </tr>
+                            <?php else: ?>
+                            <tr class="hover:bg-blue-50 transition-colors duration-150">
+                                <td class="px-6 py-4 font-medium text-gray-900">
+                                    <?= htmlspecialchars(trim($record['first_name'] . ' ' . ($record['middle_name'] ?? '') . ' ' . $record['last_name'])) ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700">
+                                    <?= htmlspecialchars(date('F j, Y', strtotime($record['date']))) ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700">
+                                    <?= htmlspecialchars($record['day']) ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700 whitespace-nowrap">
+                                    <?php 
+                                    $schedule = $record['schedule'] ?? 'No Section';
+                                    if (preg_match('/^([^(]+)/', $schedule, $matches)) {
+                                        echo htmlspecialchars(trim($matches[1]));
+                                    } else {
+                                        echo htmlspecialchars($schedule);
+                                    }
+                                    ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700 whitespace-nowrap">
+                                    <?php 
+                                    $record_day = $record['day'];
+                                    $schedule_query = $conn->prepare("\n                                            SELECT cs.start_time, cs.end_time, cs.days, cs.id as schedule_id\n                                            FROM student_account sa\n                                            LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id\n                                            LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id\n                                            WHERE sa.id_number = ?\n                                        ");
+                                    $schedule_query->bind_param("s", $record['id_number']);
+                                    $schedule_query->execute();
+                                    $schedule_result = $schedule_query->get_result();
+                                    $schedule_data = $schedule_result->fetch_assoc();
+                                    $display_start_time = null;
+                                    $display_end_time = null;
+                                    $has_class_on_day = false;
+                                    if ($schedule_data) {
+                                        if ($schedule_data['days']) {
+                                            $class_days = explode(',', $schedule_data['days']);
+                                            $has_class_on_day = in_array($record_day, array_map('trim', $class_days));
                                         }
-                                        ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-700 whitespace-nowrap">
-                                        <?php 
-                                        // Get day-specific schedule for this record
-                                        $record_day = $record['day'];
-                                        $schedule_query = $conn->prepare("
-                                            SELECT cs.start_time, cs.end_time, cs.days, cs.id as schedule_id
-                                            FROM student_account sa
-                                            LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id
-                                            LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id
-                                            WHERE sa.id_number = ?
-                                        ");
-                                        $schedule_query->bind_param("s", $record['id_number']);
-                                        $schedule_query->execute();
-                                        $schedule_result = $schedule_query->get_result();
-                                        $schedule_data = $schedule_result->fetch_assoc();
-                                        
-                                        $display_start_time = null;
-                                        $display_end_time = null;
-                                        $has_class_on_day = false;
-                                        
-                                        if ($schedule_data) {
-                                            // Check if student has class on this day
-                                            if ($schedule_data['days']) {
-                                                $class_days = explode(',', $schedule_data['days']);
-                                                $has_class_on_day = in_array($record_day, array_map('trim', $class_days));
-                                            }
-                                            
-                                            if ($has_class_on_day) {
-                                                $display_start_time = $schedule_data['start_time'];
-                                                $display_end_time = $schedule_data['end_time'];
+                                        if ($has_class_on_day) {
+                                            $display_start_time = $schedule_data['start_time'];
+                                            $display_end_time = $schedule_data['end_time'];
+                                            if ($schedule_data['schedule_id']) {
+                                                $day_schedule_query = $conn->prepare("SELECT start_time, end_time FROM day_schedules WHERE schedule_id = ? AND day_name = ?");
+                                                $day_schedule_query->bind_param("is", $schedule_data['schedule_id'], $record_day);
+                                                $day_schedule_query->execute();
+                                                $day_schedule_result = $day_schedule_query->get_result();
                                                 
-                                                // Check for day-specific schedule override
-                                                if ($schedule_data['schedule_id']) {
-                                                    $day_schedule_query = $conn->prepare("SELECT start_time, end_time FROM day_schedules WHERE schedule_id = ? AND day_name = ?");
-                                                    $day_schedule_query->bind_param("is", $schedule_data['schedule_id'], $record_day);
-                                                    $day_schedule_query->execute();
-                                                    $day_schedule_result = $day_schedule_query->get_result();
-                                                    
-                                                    if ($day_schedule_result->num_rows > 0) {
-                                                        $day_schedule = $day_schedule_result->fetch_assoc();
-                                                        $display_start_time = $day_schedule['start_time'];
-                                                        $display_end_time = $day_schedule['end_time'];
-                                                    }
+                                                if ($day_schedule_result->num_rows > 0) {
+                                                    $day_schedule = $day_schedule_result->fetch_assoc();
+                                                    $display_start_time = $day_schedule['start_time'];
+                                                    $display_end_time = $day_schedule['end_time'];
                                                 }
                                             }
                                         }
-                                        
-                                        if ($has_class_on_day && $display_start_time && $display_end_time) {
-                                            echo date('g:i A', strtotime($display_start_time)) . ' - ' . date('g:i A', strtotime($display_end_time));
-                                        } else {
-                                            echo 'No Class Schedule';
-                                        }
-                                        ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-700">
-                                        <?= $record['time_in'] ? date("h:i A", strtotime($record['time_in'])) : '--' ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-700">
-                                        <?= $record['time_out'] ? date("h:i A", strtotime($record['time_out'])) : '--' ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-700">
-                                        <?php 
-                                        // Always use the database status, don't calculate it
-                                        $status = $record['status'];
-                                        if ($status === 'Present') {
-                                            echo '<span class="text-green-600 font-medium">Present</span>';
-                                        } elseif ($status === 'Time In Only') {
-                                            echo '<span class="text-blue-600 font-medium">Time In Only</span>';
-                                        } elseif ($status === 'Absent') {
-                                            echo '<span class="text-red-600 font-medium">Absent</span>';
-                                        } else {
-                                            // Fallback for any other status
-                                            echo '<span class="text-gray-600 font-medium">' . htmlspecialchars($status) . '</span>';
-                                        }
-                                        ?>
-                                    </td>
-                                </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="8" class="px-6 py-12 text-center">
-                                    <div class="flex flex-col items-center">
-                                        <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                        </svg>
-                                        <p class="text-gray-500 font-medium">No attendance records for today</p>
-                                        <p class="text-gray-400 text-sm mt-1">Students will appear here when they tap their RFID cards</p>
-                                    </div>
+                                    }
+                                    echo ($has_class_on_day && $display_start_time && $display_end_time)
+                                        ? date('g:i A', strtotime($display_start_time)) . ' - ' . date('g:i A', strtotime($display_end_time))
+                                        : 'No Class Schedule';
+                                    ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700">
+                                    <?= $record['time_in'] ? date("h:i A", strtotime($record['time_in'])) : '--' ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700">
+                                    <?= $record['time_out'] ? date("h:i A", strtotime($record['time_out'])) : '--' ?>
+                                </td>
+                                <td class="px-6 py-4 text-gray-700">
+                                    <?php 
+                                    $status = $record['status'];
+                                    if ($status === 'Present') {
+                                        echo '<span class="text-green-600 font-medium">Present</span>';
+                                    } elseif ($status === 'Time In Only') {
+                                        echo '<span class="text-blue-600 font-medium">Time In Only</span>';
+                                    } elseif ($status === 'Absent') {
+                                        echo '<span class="text-red-600 font-medium">Absent</span>';
+                                    } else {
+                                        echo '<span class="text-gray-600 font-medium">' . htmlspecialchars($status) . '</span>';
+                                    }
+                                    ?>
                                 </td>
                             </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+                            <?php endif; ?>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="<?= ($view_role === 'teacher') ? 13 : 8 ?>" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center">
+                                    <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <p class="text-gray-500 font-medium">No attendance records for today</p>
+                                    <p class="text-gray-400 text-sm mt-1"><?php echo ($view_role==='teacher') ? 'Teachers will appear here when they tap their RFID cards' : 'Students will appear here when they tap their RFID cards'; ?></p>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
 <script>
 // Update current time every second

@@ -79,8 +79,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
-    // 2️⃣ Check registrar account
-    $stmt = $conn->prepare("SELECT * FROM registrar_account WHERE username = ?");
+    // 2️⃣ Check employee accounts (registrar, cashier, guidance, attendance, hr)
+    $stmt = $conn->prepare("SELECT ea.*, e.first_name, e.last_name, e.id_number FROM employee_accounts ea 
+                           JOIN employees e ON ea.employee_id = e.id_number 
+                           WHERE ea.username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -88,14 +90,47 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         if (password_verify($password, $row['password'])) {
-            $_SESSION['registrar_id'] = $row['registrar_id'];
+            $role = $row['role'];
+            $full_name = $row['first_name'] . ' ' . $row['last_name'];
+            
+            // Set common session variables
+            $_SESSION['employee_id'] = $row['id'];
             $_SESSION['id_number'] = $row['id_number'];
             $_SESSION['username'] = $row['username'];
-            $_SESSION['registrar_name'] = $row['first_name'] . ' ' . $row['last_name'];
             $_SESSION['first_name'] = $row['first_name'];
             $_SESSION['last_name'] = $row['last_name'];
-            $_SESSION['role'] = 'registrar';
-            echo json_encode(['status'=>'success','redirect'=>'../RegistrarF/RegistrarDashboard.php']);
+            $_SESSION['role'] = $role;
+            
+            // Set role-specific session variables for backward compatibility
+            switch($role) {
+                case 'registrar':
+                    $_SESSION['registrar_id'] = $row['id'];
+                    $_SESSION['registrar_name'] = $full_name;
+                    echo json_encode(['status'=>'success','redirect'=>'../RegistrarF/RegistrarDashboard.php']);
+                    break;
+                case 'cashier':
+                    $_SESSION['cashier_id'] = $row['id'];
+                    $_SESSION['cashier_name'] = $full_name;
+                    echo json_encode(['status'=>'success','redirect'=>'../CashierF/Dashboard.php']);
+                    break;
+                case 'guidance':
+                    $_SESSION['guidance_id'] = $row['id'];
+                    $_SESSION['guidance_name'] = $full_name;
+                    echo json_encode(['status' => 'success','redirect' => '../GuidanceF/GuidanceDashboard.php']);
+                    break;
+                case 'attendance':
+                    $_SESSION['attendance_id'] = $row['id'];
+                    $_SESSION['attendance_name'] = $full_name;
+                    echo json_encode(['status' => 'success','redirect' => '../AttendanceF/Dashboard.php']);
+                    break;
+                case 'hr':
+                    $_SESSION['hr_id'] = $row['id'];
+                    $_SESSION['hr_name'] = $full_name;
+                    echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
+                    break;
+                default:
+                    echo json_encode(['status'=>'error','message'=>'Invalid role assigned.']);
+            }
             exit;
         } else { 
             echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
@@ -103,55 +138,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
-    // 3️⃣ Check cashier account
-    $stmt = $conn->prepare("SELECT * FROM cashier_account WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $_SESSION['cashier_id'] = $row['id'];
-            $_SESSION['id_number'] = $row['id_number'];
-            $_SESSION['username'] = $row['username'];
-            $_SESSION['cashier_name'] = $row['first_name'] . ' ' . $row['last_name'];
-            $_SESSION['first_name'] = $row['first_name'];
-            $_SESSION['last_name'] = $row['last_name'];
-            $_SESSION['role'] = 'cashier';
-            echo json_encode(['status'=>'success','redirect'=>'../CashierF/Dashboard.php']);
-            exit;
-        } else { 
-            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
-            exit; 
-        }
-    }
-
-    // 4️⃣ Check guidance account
-    $stmt = $conn->prepare("SELECT * FROM guidance_account WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $_SESSION['guidance_id'] = $row['id'];
-            $_SESSION['id_number'] = $row['id_number'];
-            $_SESSION['username'] = $row['username'];
-            $_SESSION['guidance_name'] = $row['first_name'] . ' ' . $row['last_name'];
-            $_SESSION['first_name'] = $row['first_name'];
-            $_SESSION['last_name'] = $row['last_name'];
-            $_SESSION['role'] = 'guidance';
-            echo json_encode(['status' => 'success','redirect' => '../GuidanceF/GuidanceDashboard.php']);
-            exit;
-        } else { 
-            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
-            exit; 
-        }
-    }
-
-    // 5️⃣ Check parent account
+    // 3️⃣ Check parent account
     $stmt = $conn->prepare("SELECT * FROM parent_account WHERE username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
@@ -170,51 +157,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['child_name'] = $row['child_name'];
             $_SESSION['role'] = 'parent';
             echo json_encode(['status' => 'success','redirect' => '../ParentLogin/ParentDashboard.php']);
-            exit;
-        } else { 
-            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
-            exit; 
-        }
-    }
-
-    // 6️⃣ Check attendance account
-    $stmt = $conn->prepare("SELECT * FROM attendance_account WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $_SESSION['attendance_id'] = $row['id'];
-            $_SESSION['username'] = $row['username'];
-            $_SESSION['attendance_name'] = $row['username']; // Use username as display name
-            $_SESSION['role'] = 'attendance';
-            echo json_encode(['status' => 'success','redirect' => '../AttendanceF/Dashboard.php']);
-            exit;
-        } else { 
-            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
-            exit; 
-        }
-    }
-
-    // 7️⃣ Check HR account
-    $stmt = $conn->prepare("SELECT * FROM hr_account WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $_SESSION['hr_id'] = $row['id'];
-            $_SESSION['id_number'] = $row['id_number'];
-            $_SESSION['username'] = $row['username'];
-            $_SESSION['hr_name'] = $row['first_name'] . ' ' . $row['last_name'];
-            $_SESSION['first_name'] = $row['first_name'];
-            $_SESSION['last_name'] = $row['last_name'];
-            $_SESSION['role'] = 'hr';
-            echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
             exit;
         } else { 
             echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 

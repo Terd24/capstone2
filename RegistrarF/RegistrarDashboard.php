@@ -176,7 +176,11 @@ function timeAgo($time) {
               </button>
               <button onclick="window.location.href='ManageSchedule.php'" 
                       class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm">
-                Manage Schedule
+                Manage Student Schedule
+              </button>
+              <button onclick="window.location.href='ManageEmployeeSchedule.php'" 
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mt-2">
+                Manage Employee Schedule
               </button>
             </div>
           </div>
