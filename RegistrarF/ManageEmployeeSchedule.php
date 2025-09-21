@@ -21,9 +21,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action'])) {
         $schedule_type = $_POST['schedule_type'] ?? 'same';
 
         if ($schedule_type === 'same') {
-            $start_time = $_POST['start_time'];
-            $end_time   = $_POST['end_time'];
-            $days       = isset($_POST['days']) ? implode(', ', $_POST['days']) : '';
+            $start_time = $_POST['start_time'] ?? '';
+            $end_time   = $_POST['end_time'] ?? '';
+            $days       = isset($_POST['days']) ? implode(', ', (array)$_POST['days']) : '';
+
+            // Validation: at least one day and both times
+            if (trim($days) === '' || trim($start_time) === '' || trim($end_time) === '') {
+                echo json_encode(['success' => false, 'message' => 'Please select at least one day and provide start and end times.']);
+                exit;
+            }
 
             $stmt = $conn->prepare("INSERT INTO employee_work_schedules (schedule_name, start_time, end_time, days, created_by) VALUES (?, ?, ?, ?, ?)");
             $stmt->bind_param("ssssi", $section_name, $start_time, $end_time, $days, $_SESSION['registrar_id']);
@@ -35,6 +41,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action'])) {
         } else {
             // Different times per day
             $day_schedules = $_POST['day_schedules'] ?? [];
+
+            // Validation: at least one enabled day AND all enabled days must have both times
+            $hasAnyEnabled = false; $allComplete = true;
+            foreach ($day_schedules as $day => $sched) {
+                if (!empty($sched['enabled'])) {
+                    $hasAnyEnabled = true;
+                    if (empty($sched['start_time']) || empty($sched['end_time'])) { $allComplete = false; }
+                }
+            }
+            if (!$hasAnyEnabled || !$allComplete) {
+                echo json_encode(['success' => false, 'message' => 'Please enable at least one day and provide start and end times for all enabled days.']);
+                exit;
+            }
+
             $stmt = $conn->prepare("INSERT INTO employee_work_schedules (schedule_name, start_time, end_time, days, created_by) VALUES (?, '00:00:00', '23:59:59', 'Variable', ?)");
             $stmt->bind_param("si", $section_name, $_SESSION['registrar_id']);
             if ($stmt->execute()) {
@@ -66,9 +86,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action'])) {
         $schedule_type = $_POST['schedule_type'] ?? 'same';
 
         if ($schedule_type === 'same') {
-            $start_time = $_POST['start_time'];
-            $end_time   = $_POST['end_time'];
-            $days       = isset($_POST['days']) ? implode(', ', $_POST['days']) : '';
+            $start_time = $_POST['start_time'] ?? '';
+            $end_time   = $_POST['end_time'] ?? '';
+            $days       = isset($_POST['days']) ? implode(', ', (array)$_POST['days']) : '';
+
+            // Validation
+            if (trim($days) === '' || trim($start_time) === '' || trim($end_time) === '') {
+                echo json_encode(['success' => false, 'message' => 'Please select at least one day and provide start and end times.']);
+                exit;
+            }
 
             // Clear any day-specific rows
             $clear = $conn->prepare("DELETE FROM employee_work_day_schedules WHERE schedule_id = ?");
@@ -80,6 +106,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action'])) {
             $stmt->execute();
         } else {
             $day_schedules = $_POST['day_schedules'] ?? [];
+
+            // Validation: at least one enabled day and all enabled days complete
+            $hasAnyEnabled = false; $allComplete = true;
+            foreach ($day_schedules as $day => $sched) {
+                if (!empty($sched['enabled'])) {
+                    $hasAnyEnabled = true;
+                    if (empty($sched['start_time']) || empty($sched['end_time'])) { $allComplete = false; }
+                }
+            }
+            if (!$hasAnyEnabled || !$allComplete) {
+                echo json_encode(['success' => false, 'message' => 'Please enable at least one day and provide start and end times for all enabled days.']);
+                exit;
+            }
+
             $clear = $conn->prepare("DELETE FROM employee_work_day_schedules WHERE schedule_id = ?");
             $clear->bind_param("i", $schedule_id);
             $clear->execute();
@@ -196,8 +236,11 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
 </header>
 
 <div class="container mx-auto px-6 py-8">
-    <div id="successMessage" class="hidden mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
+    <div id="successMessage" class="hidden mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
         <span id="successText"></span>
+    </div>
+    <div id="errorMessage" class="hidden mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+        <span id="errorText"></span>
     </div>
 
     <div class="mb-6 flex gap-4">
@@ -363,18 +406,19 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
             </div>
 
             <!-- Same Time Schedule -->
-            <div id="sameTimeSchedule">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Days</label>
-              <div class="grid grid-cols-2 gap-2 mb-4">
-                <label class="flex items-center"><input type="checkbox" name="days[]" value="Monday" class="mr-2">Monday</label>
-                <label class="flex items-center"><input type="checkbox" name="days[]" value="Tuesday" class="mr-2">Tuesday</label>
-                <label class="flex items-center"><input type="checkbox" name="days[]" value="Wednesday" class="mr-2">Wednesday</label>
-                <label class="flex items-center"><input type="checkbox" name="days[]" value="Thursday" class="mr-2">Thursday</label>
-                <label class="flex items-center"><input type="checkbox" name="days[]" value="Friday" class="mr-2">Friday</label>
-                <label class="flex items-center"><input type="checkbox" name="days[]" value="Saturday" class="mr-2">Saturday</label>
-                <label class="flex items-center"><input type="checkbox" name="days[]" value="Sunday" class="mr-2">Sunday</label>
-              </div>
+          <div id="sameTimeSchedule">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Days</label>
+            <div id="sameDaysGroup" class="grid grid-cols-2 gap-2 mb-2">
+              <label class="flex items-center"><input type="checkbox" name="days[]" value="Monday" class="mr-2">Monday</label>
+              <label class="flex items-center"><input type="checkbox" name="days[]" value="Tuesday" class="mr-2">Tuesday</label>
+              <label class="flex items-center"><input type="checkbox" name="days[]" value="Wednesday" class="mr-2">Wednesday</label>
+              <label class="flex items-center"><input type="checkbox" name="days[]" value="Thursday" class="mr-2">Thursday</label>
+              <label class="flex items-center"><input type="checkbox" name="days[]" value="Friday" class="mr-2">Friday</label>
+              <label class="flex items-center"><input type="checkbox" name="days[]" value="Saturday" class="mr-2">Saturday</label>
+              <label class="flex items-center"><input type="checkbox" name="days[]" value="Sunday" class="mr-2">Sunday</label>
             </div>
+            <p id="sameDaysError" class="hidden text-sm text-red-600 mb-4">Please select at least one day.</p>
+          </div>
 
             <!-- Different Time Schedule -->
             <div id="differentTimeSchedule" class="hidden">
@@ -386,14 +430,35 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                     <input type="time" name="day_schedules[<?= $d ?>][end_time]" class="border border-gray-300 rounded px-3 py-2">
                   </div>
                 <?php endforeach; ?>
-              </div>
+          <p id="diffDaysError" class="hidden text-sm text-red-600">Please enable at least one day and provide start and end times.</p>
             </div>
-          </div>
+          <!-- Inline form error (create/edit) -->
+          <p id="formError" class="hidden text-sm text-red-600"></p>
+        </div>
           <div class="flex gap-3 pt-4">
             <button type="button" onclick="hideCreateScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
             <button type="submit" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Create Schedule</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Reassign Confirmation Modal (Employees) -->
+    <div id="empReassignConfirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-lg font-bold text-gray-800">Confirm Assignment</h3>
+          <button onclick="hideEmpReassignConfirm()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div id="empReassignConfirmBody" class="text-sm text-gray-700 space-y-2">
+          <!-- dynamic content -->
+        </div>
+        <div class="flex gap-3 pt-4">
+          <button onclick="hideEmpReassignConfirm()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+          <button onclick="confirmProceedEmpReassign()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirm</button>
+        </div>
       </div>
     </div>
 
@@ -408,7 +473,7 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
         </div>
 
         <!-- Schedule Selection -->
-        <div class="mb-4">
+        <div class="mb-2">
           <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedule</label>
           <select id="scheduleSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
             <option value="">Choose a schedule...</option>
@@ -416,6 +481,7 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
               <option value="<?= (int)$s['id'] ?>"><?= htmlspecialchars($s['schedule_name']) ?> (<?= date('g:i A', strtotime($s['start_time'])) ?> - <?= date('g:i A', strtotime($s['end_time'])) ?>)</option>
             <?php endwhile; } ?>
           </select>
+          <p id="assignInlineError" class="hidden text-sm text-red-600 mt-1"></p>
         </div>
 
         <!-- Search Employees -->
@@ -429,6 +495,8 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
         <div id="employeesList" class="mb-4 max-h-60 overflow-y-auto border rounded-lg">
           <p class="text-gray-500 text-center py-4">Loading employees...</p>
         </div>
+        <!-- View More (replaced by infinite scroll) -->
+        <div id="employeesMoreContainer" class="mb-4 hidden text-center"></div>
 
         <!-- Selected Count -->
         <div class="mb-4 text-sm text-gray-700">Selected: <span id="selectedCount">0</span> employee(s)</div>
@@ -462,6 +530,15 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
 // State
 let selectedEmployees = [];
 let currentScheduleId = null;
+let pendingEmpAssignment = null; // { scheduleId }
+// Cache minimal info so selections survive search rerenders
+const employeesIndex = {}; // id -> { name, hasCurrent }
+// Pagination for employees
+let employeesLimit = 15;
+let employeesOffset = 0;
+let employeesQuery = '';
+let employeesHasMore = false;
+let employeesLoading = false;
 
 // Create/Edit Schedule modal controls
 function showCreateScheduleModal(){
@@ -471,9 +548,16 @@ function showCreateScheduleModal(){
   document.getElementById('createScheduleForm').reset();
   document.getElementById('differentTimeSchedule').classList.add('hidden');
   document.getElementById('sameTimeSchedule').classList.remove('hidden');
+  const fe = document.getElementById('formError'); if (fe){ fe.classList.add('hidden'); fe.textContent=''; }
   document.getElementById('createScheduleModal').classList.remove('hidden');
 }
-function hideCreateScheduleModal(){ document.getElementById('createScheduleModal').classList.add('hidden'); }
+function hideCreateScheduleModal(){
+  document.getElementById('createScheduleModal').classList.add('hidden');
+  // Reset inline errors
+  const se=document.getElementById('sameDaysError'); if(se) se.classList.add('hidden');
+  const de=document.getElementById('diffDaysError'); if(de) de.classList.add('hidden');
+  const fe=document.getElementById('formError'); if (fe){ fe.classList.add('hidden'); fe.textContent=''; }
+}
 function toggleScheduleType(){
   const type = document.querySelector('input[name="schedule_type"]:checked').value;
   document.getElementById('sameTimeSchedule').classList.toggle('hidden', type!=='same');
@@ -485,45 +569,94 @@ function toggleScheduleType(){
 // Submit create/edit schedule
 document.getElementById('createScheduleForm').addEventListener('submit', function(e){
   e.preventDefault();
+  // Client-side validation for day selection
+  const type = document.querySelector('input[name="schedule_type"]:checked')?.value || 'same';
+  let valid = true;
+  const formErrEl = document.getElementById('formError'); if(formErrEl){ formErrEl.classList.add('hidden'); formErrEl.textContent=''; }
+  if (type === 'same') {
+    const checks = Array.from(document.querySelectorAll('#sameDaysGroup input[type="checkbox"]:checked'));
+    const st = document.getElementById('startTime')?.value;
+    const et = document.getElementById('endTime')?.value;
+    const err = document.getElementById('sameDaysError');
+    if (checks.length === 0 || !st || !et) { valid = false; if(err){ err.textContent='Please select at least one day and provide start and end times.'; err.classList.remove('hidden'); } }
+    else { if(err) err.classList.add('hidden'); }
+  } else {
+    const enabled = Array.from(document.querySelectorAll('input[name^="day_schedules"][name$="[enabled]"]:checked'));
+    let hasAny = enabled.length>0; let allComplete = true;
+    enabled.forEach(cb=>{ const day=cb.name.match(/day_schedules\[(.+?)\]/)?.[1]; if(!day) return; const st=document.querySelector(`input[name="day_schedules[${day}][start_time]"]`)?.value; const et=document.querySelector(`input[name="day_schedules[${day}][end_time]"]`)?.value; if(!st||!et){ allComplete=false; } });
+    const err = document.getElementById('diffDaysError'); if(!hasAny || !allComplete){ valid=false; if(err){ err.textContent='Please enable at least one day and provide start and end times for all enabled days.'; err.classList.remove('hidden'); } } else { if(err) err.classList.add('hidden'); }
+  }
+  if(!valid){ if(formErrEl){ formErrEl.textContent='Please fix the highlighted fields.'; formErrEl.classList.remove('hidden'); } return; }
+
   const fd = new FormData(this);
   if(currentScheduleId){ fd.append('action','edit_schedule'); }
   else { fd.append('action','create_schedule'); }
   fetch('ManageEmployeeSchedule.php', { method:'POST', body: fd })
     .then(r=>r.json())
-    .then(d=>{ if(d.success){ hideCreateScheduleModal(); showSuccessMessage(d.message); location.reload(); } else { alert('Error: '+d.message); } })
-    .catch(()=>alert('Failed to save schedule.'));
+    .then(d=>{ if(d.success){
+        // persist success across reload
+        sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message }));
+        hideCreateScheduleModal();
+        location.reload();
+      } else { if(formErrEl){ formErrEl.textContent = d.message || 'Action failed.'; formErrEl.classList.remove('hidden'); } } })
+    .catch(()=>{ if(formErrEl){ formErrEl.textContent = 'Failed to save schedule.'; formErrEl.classList.remove('hidden'); } });
 });
 
 // Assign modal controls
-function showAssignScheduleModal(){ selectedEmployees=[]; updateSelectedCount(); loadAllEmployees(); document.getElementById('assignScheduleModal').classList.remove('hidden'); }
-function hideAssignScheduleModal(){ document.getElementById('assignScheduleModal').classList.add('hidden'); }
+function showAssignScheduleModal() {
+  document.getElementById('assignScheduleModal').classList.remove('hidden');
+  selectedEmployees = [];
+  updateSelectedCount();
+  employeesQuery = '';
+  employeesOffset = 0;
+  loadEmployeesPage(false);
+  // Attach infinite scroll listener
+  const listEl = document.getElementById('employeesList');
+  listEl.addEventListener('scroll', onEmployeesScroll);
+}
+function hideAssignScheduleModal() {
+  document.getElementById('assignScheduleModal').classList.add('hidden');
+  selectedEmployees = [];
+  document.getElementById('employeesList').innerHTML = '<p class="text-gray-500 text-center py-4">Loading employees...</p>';
+  const moreC = document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden');
+  // Detach scroll listener
+  const listEl = document.getElementById('employeesList');
+  listEl.removeEventListener('scroll', onEmployeesScroll);
+}
 
 // Load/Display Employees
-function loadAllEmployees(){
-  fetch('SearchEmployee.php?all=1')
-    .then(async r=>{
-      const text = await r.text();
-      try{ const d = JSON.parse(text); return { ok:true, data:d }; }
-      catch(e){ return { ok:false, text }; }
-    })
+function loadEmployeesPage(append){
+  if (employeesLoading) return;
+  employeesLoading = true;
+  const params = new URLSearchParams();
+  if (employeesQuery === '') params.set('all','1'); else params.set('query', employeesQuery);
+  params.set('limit', employeesLimit);
+  params.set('offset', employeesOffset);
+  fetch('SearchEmployee.php?' + params.toString())
+    .then(async r=>{ const text = await r.text(); try{ return { ok:true, data: JSON.parse(text) }; } catch(e){ return { ok:false, text }; } })
     .then(res=>{
       const c = document.getElementById('employeesList');
-      if(!res.ok){ c.innerHTML = `<pre class="text-red-500 text-xs whitespace-pre-wrap p-4">${res.text || 'Failed to load employees'}</pre>`; return; }
-      const d = res.data;
-      if(d.error){ c.innerHTML = `<p class="text-red-500 text-center py-4">${d.error}${d.details?': '+d.details:''}</p>`; return; }
-      displayEmployees(d.employees||[]);
+      if(!res.ok){ c.innerHTML = `<pre class=\"text-red-500 text-xs whitespace-pre-wrap p-4\">${res.text || 'Failed to load employees'}</pre>`; const moreC=document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden'); return; }
+      const d = res.data; if(d.error){ c.innerHTML = `<p class=\"text-red-500 text-center py-4\">${d.error}${d.details?': '+d.details:''}</p>`; const moreC=document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden'); return; }
+      if(!append) c.innerHTML='';
+      displayEmployees(d.employees||[], append===true);
+      employeesHasMore = !!d.has_more;
+      const moreC = document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.toggle('hidden', !employeesHasMore);
     })
-    .catch(err=>{ document.getElementById('employeesList').innerHTML = `<p class="text-red-500 text-center py-4">Failed to load employees</p>`; console.error('SearchEmployee fetch error', err); });
+    .catch(err=>{ document.getElementById('employeesList').innerHTML = `<p class=\"text-red-500 text-center py-4\">Failed to load employees</p>`; console.error('SearchEmployee fetch error', err); const moreC=document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden'); })
+    .finally(()=>{ employeesLoading = false; });
 }
-function displayEmployees(list){
+function displayEmployees(list, append=false){
   const c = document.getElementById('employeesList');
-  if(list.length===0){ c.innerHTML='<p class="text-gray-500 text-center py-4">No employees found</p>'; return; }
+  if(list.length===0){ if(!append){ c.innerHTML='<p class="text-gray-500 text-center py-4">No employees found</p>'; } return; }
   let html='';
   list.forEach(emp=>{
     const isSelected = selectedEmployees.includes(emp.id_number);
     const hasSchedule = !!emp.current_section;
     const scheduleInfo = hasSchedule ? `<span class=\"text-orange-600 font-medium\">Current: ${emp.current_section}</span>` : '<span class=\"text-green-600\">Available</span>';
     const fullName = emp.full_name || (emp.first_name + ' ' + emp.last_name);
+    // cache
+    employeesIndex[emp.id_number] = { name: fullName, hasCurrent: !!hasSchedule };
     html += `
       <div class="flex items-center p-3 border-b hover:bg-gray-50">
         <input type="checkbox" id="emp_${emp.id_number}" ${isSelected?'checked':''} onchange="toggleEmployee('${emp.id_number}', ${hasSchedule?'true':'false'}, '${fullName}', '${emp.current_section||''}')" class="mr-3" />
@@ -534,7 +667,7 @@ function displayEmployees(list){
         </label>
       </div>`;
   });
-  c.innerHTML = html;
+  if(append) c.insertAdjacentHTML('beforeend', html); else c.innerHTML = html;
 }
 function toggleEmployee(id, hasSchedule, name, currentSection){
   const i = selectedEmployees.indexOf(id);
@@ -554,15 +687,63 @@ function updateSelectedCount(){ document.getElementById('selectedCount').textCon
 // Assign
 function assignScheduleToEmployees(){
   const scheduleId = document.getElementById('scheduleSelect').value;
-  if(!scheduleId){ alert('Please select a schedule'); return; }
-  if(selectedEmployees.length===0){ alert('Please select at least one employee'); return; }
+  const aie = document.getElementById('assignInlineError'); if(aie){ aie.classList.add('hidden'); aie.textContent=''; }
+  if(!scheduleId){ if(aie){ aie.textContent = 'Please select a schedule'; aie.classList.remove('hidden'); } return; }
+  if(selectedEmployees.length===0){ if(aie){ aie.textContent = 'Please select at least one employee'; aie.classList.remove('hidden'); } return; }
+  // Build confirmation from selectedEmployees using cached info
+  try{
+    const items = selectedEmployees.map(id=>{
+      const meta = employeesIndex[id] || { name: id, hasCurrent: false };
+      return { id, name: meta.name, hasCurrent: !!meta.hasCurrent };
+    });
+    pendingEmpAssignment = { scheduleId };
+    showEmpReassignConfirm(items);
+    return; // wait for confirm
+  }catch(e){ proceedEmpAssign(scheduleId); }
+}
+
+function showEmpReassignConfirm(items){
+  const body = document.getElementById('empReassignConfirmBody'); const modal = document.getElementById('empReassignConfirmModal'); if(!body||!modal) return;
+  const total = items.length; const moving = items.filter(i=>i.hasCurrent).length;
+  const allNames = items.map(i=>i.name);
+  const currentNames = items.filter(i=>i.hasCurrent).map(i=>i.name);
+  const makeList = (names, cap=10)=>{
+    const rows = names.slice(0,cap).map(n=>`<li>${n}</li>`).join('');
+    const extra = names.length>cap ? `<div class=\"text-xs text-gray-500 mt-1\">and ${names.length-cap} more…</div>` : '';
+    return `<ul class=\"list-disc ml-5 space-y-0.5\">${rows}</ul>${extra}`;
+  };
+  const title = `You are about to move <strong>${total}</strong> employee(s) to the selected schedule.`;
+  const note = moving>0 ? `<p class=\"mt-2 text-gray-600\">Moving will replace their existing schedule.</p>` : '';
+  body.innerHTML = `
+    <p>${title}</p>
+    <div class=\"mt-2 space-y-3\">
+      <div>
+        <div class=\"font-medium mb-1\">Selected employees (${allNames.length}):</div>
+        ${makeList(allNames)}
+      </div>
+      <div>
+        <div class=\"font-medium mb-1\">Have current schedule (${currentNames.length}):</div>
+        ${currentNames.length ? makeList(currentNames) : '<div class=\"text-gray-500 text-sm\">None</div>'}
+      </div>
+    </div>
+    ${note}
+  `;
+  modal.classList.remove('hidden');
+}
+
+function hideEmpReassignConfirm(){ const m=document.getElementById('empReassignConfirmModal'); if(m) m.classList.add('hidden'); pendingEmpAssignment=null; }
+
+function confirmProceedEmpReassign(){ const data=pendingEmpAssignment; hideEmpReassignConfirm(); if(!data) return; proceedEmpAssign(data.scheduleId); }
+
+function proceedEmpAssign(scheduleId){
   const fd = new FormData();
   fd.append('action','assign_schedule');
   fd.append('schedule_id', scheduleId);
   selectedEmployees.forEach(id=> fd.append('employee_ids[]', id));
   fetch('ManageEmployeeSchedule.php',{ method:'POST', body: fd })
-    .then(r=>r.json()).then(d=>{ if(d.success){ showSuccessMessage(d.message); hideAssignScheduleModal(); location.reload(); } else { alert('Error: '+d.message); } })
-    .catch(()=>alert('Failed to assign schedule. Please try again.'));
+    .then(r=>r.json())
+    .then(d=>{ if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); hideAssignScheduleModal(); location.reload(); } else { const aie = document.getElementById('assignInlineError'); if(aie){ aie.textContent = d.message || 'Assign failed.'; aie.classList.remove('hidden'); } } })
+    .catch(()=>{ const aie = document.getElementById('assignInlineError'); if(aie){ aie.textContent = 'Failed to assign schedule. Please try again.'; aie.classList.remove('hidden'); } });
 }
 
 // View Employees follows the student pattern: navigate to a dedicated page
@@ -570,20 +751,54 @@ function viewScheduleEmployees(id, scheduleName){
   window.location.href = `view_schedule_employees.php?schedule_id=${id}&schedule_name=${encodeURIComponent(scheduleName)}`;
 }
 
-// Employee search
+// Employee search (supports 1+ char and pagination)
  document.getElementById('employeeSearch').addEventListener('input', function(){
   const q = this.value.trim();
-  if(q.length === 0){ loadAllEmployees(); return; }
-  if(q.length < 2) return;
-  fetch(`SearchEmployee.php?query=${encodeURIComponent(q)}`)
-    .then(async r=>{ const text = await r.text(); try{ return JSON.parse(text); } catch(e){ return { error:'Invalid JSON', details:text }; } })
-    .then(d=>{ const c=document.getElementById('employeesList'); if(d.error){ c.innerHTML = `<pre class=\"text-red-500 text-xs whitespace-pre-wrap p-4\">${d.details||d.error}</pre>`; return; } displayEmployees(d.employees||[]); })
-    .catch(err=>{ document.getElementById('employeesList').innerHTML = `<p class=\"text-red-500 text-center py-4\">Failed to load employees</p>`; console.error('SearchEmployee fetch error', err); });
+  if(q.length === 0){ employeesQuery=''; employeesOffset=0; loadEmployeesPage(false); return; }
+  employeesQuery = q; employeesOffset = 0; loadEmployeesPage(false);
 });
 
-function showSuccessMessage(message){
-  const s=document.getElementById('successMessage'); const t=document.getElementById('successText'); t.textContent=message; s.classList.remove('hidden'); setTimeout(()=>s.classList.add('hidden'),3000);
+// Infinite scroll handler
+function onEmployeesScroll(){
+  const el = document.getElementById('employeesList');
+  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+  if (nearBottom && employeesHasMore && !employeesLoading){
+    employeesOffset += employeesLimit;
+    loadEmployeesPage(true);
+  }
 }
+
+function showSuccessMessage(message){
+  const s=document.getElementById('successMessage'); const t=document.getElementById('successText');
+  if (s && t){ t.textContent=message; s.classList.remove('hidden'); setTimeout(()=>s.classList.add('hidden'),3000); }
+  showToast('success', message);
+}
+
+function showToast(type, message){
+  let container = document.getElementById('toast-container');
+  if(!container){ container = document.createElement('div'); container.id='toast-container'; container.style.position='fixed'; container.style.top='16px'; container.style.right='16px'; container.style.zIndex='9999'; document.body.appendChild(container); }
+  const toast = document.createElement('div');
+  toast.className = 'mb-2 px-4 py-3 rounded shadow text-white text-sm';
+  toast.style.minWidth = '240px';
+  toast.style.backgroundColor = type==='success' ? '#16a34a' : '#dc2626';
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(()=>{ toast.style.opacity='0'; toast.style.transition='opacity 300ms'; }, 2700);
+  setTimeout(()=>{ if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3100);
+}
+
+function showErrorMessage(message){
+  const e=document.getElementById('errorMessage'); const t=document.getElementById('errorText'); if(!e||!t){ alert('Error: '+message); return; }
+  t.textContent=message; e.classList.remove('hidden'); setTimeout(()=>e.classList.add('hidden'),4000);
+}
+
+// show persisted notice after reload
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{
+    const raw = sessionStorage.getItem('schedule_notice');
+    if(raw){ const n = JSON.parse(raw); if(n && n.message){ showToast(n.type || 'success', n.message); } sessionStorage.removeItem('schedule_notice'); }
+  }catch(e){}
+});
 
 function editSchedule(id){
   fetch(`get_employee_schedule.php?id=${id}`)
@@ -624,7 +839,7 @@ function deleteSchedule(id){
   if(!confirm('Delete this schedule? This will remove all employee assignments.')) return;
   const fd=new FormData(); fd.append('action','delete_schedule'); fd.append('schedule_id', id);
   fetch('ManageEmployeeSchedule.php',{ method:'POST', body: fd })
-    .then(r=>r.json()).then(d=>{ if(d.success){ showSuccessMessage(d.message); location.reload(); } else { alert('Error: '+d.message); } });
+    .then(r=>r.json()).then(d=>{ if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); location.reload(); } else { showErrorMessage(d.message || 'Delete failed.'); } });
 }
 
 // View Schedule Details

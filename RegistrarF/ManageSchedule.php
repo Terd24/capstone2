@@ -18,7 +18,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             // Same time for all days
             $start_time = $_POST['start_time'];
             $end_time = $_POST['end_time'];
-            $days = implode(', ', $_POST['days']);
+            $days = isset($_POST['days']) ? implode(', ', (array)$_POST['days']) : '';
+
+            // Validation: require at least one day
+            if (trim($days) === '') {
+                $response = ['success' => false, 'message' => 'Please select at least one day.'];
+                header('Content-Type: application/json');
+                echo json_encode($response);
+                exit;
+            }
             
             $stmt = $conn->prepare("INSERT INTO class_schedules (section_name, start_time, end_time, days, created_by) VALUES (?, ?, ?, ?, ?)");
             $stmt->bind_param("ssssi", $section_name, $start_time, $end_time, $days, $_SESSION['registrar_id']);
@@ -31,8 +39,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             }
         } else {
             // Different times for each day
-            $day_schedules = $_POST['day_schedules'];
+            $day_schedules = isset($_POST['day_schedules']) ? $_POST['day_schedules'] : [];
             $enabled_days = [];
+
+            // Validation: ensure at least one enabled day with valid times
+            $has_valid_day = false;
+            foreach ($day_schedules as $day => $schedule) {
+                if (!empty($schedule['enabled']) && !empty($schedule['start_time']) && !empty($schedule['end_time'])) {
+                    $has_valid_day = true; break;
+                }
+            }
+            if (!$has_valid_day) {
+                $response = ['success' => false, 'message' => 'Please enable at least one day and provide start and end times.'];
+                header('Content-Type: application/json');
+                echo json_encode($response);
+                exit;
+            }
             
             // First, create the main schedule record with placeholder times
             $stmt = $conn->prepare("INSERT INTO class_schedules (section_name, start_time, end_time, days, created_by) VALUES (?, '00:00:00', '23:59:59', 'Variable', ?)");
@@ -315,8 +337,11 @@ $schedules_result = $conn->query($schedules_query);
 <!-- Main Content -->
 <div class="container mx-auto px-6 py-8">
     <!-- Success Message -->
-    <div id="successMessage" class="hidden mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
+    <div id="successMessage" class="hidden mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
         <span id="successText"></span>
+    </div>
+    <div id="errorMessage" class="hidden mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+        <span id="errorText"></span>
     </div>
 
     <!-- Action Buttons -->
@@ -444,6 +469,26 @@ $schedules_result = $conn->query($schedules_query);
     </div>
 </div>
 
+<!-- Reassign Confirmation Modal -->
+<div id="reassignConfirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-lg font-bold text-gray-800">Confirm Reassignment</h3>
+      <button onclick="hideReassignConfirm()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div id="reassignConfirmBody" class="text-sm text-gray-700 space-y-2">
+      <!-- dynamic content -->
+    </div>
+    <div class="flex gap-3 pt-4">
+      <button onclick="hideReassignConfirm()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+      <button onclick="confirmProceedReassign()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirm</button>
+    </div>
+  </div>
+  
+</div>
+
 <!-- View Schedule Details Modal (Students) -->
 <div id="classScheduleDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
@@ -478,7 +523,7 @@ $schedules_result = $conn->query($schedules_query);
             <input type="hidden" id="scheduleId" name="schedule_id">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Section Name</label>
-                <input type="text" id="sectionName" name="section_name" placeholder="e.g., BSIT 7-02" required 
+                <input type="text" id="sectionName" name="section_name" placeholder="" required 
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -509,7 +554,7 @@ $schedules_result = $conn->query($schedules_query);
                 <!-- Same Time Schedule -->
                 <div id="sameTimeSchedule">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Days</label>
-                    <div class="grid grid-cols-2 gap-2 mb-4">
+                    <div id="sameDaysGroup" class="grid grid-cols-2 gap-2 mb-2">
                         <label class="flex items-center">
                             <input type="checkbox" name="days[]" value="Monday" class="mr-2">
                             Monday
@@ -539,6 +584,7 @@ $schedules_result = $conn->query($schedules_query);
                             Sunday
                         </label>
                     </div>
+                    <p id="sameDaysError" class="hidden text-sm text-red-600 mb-4">Please select at least one day.</p>
                 </div>
 
                 <!-- Different Time Schedule -->
@@ -601,6 +647,7 @@ $schedules_result = $conn->query($schedules_query);
                             <input type="time" name="day_schedules[Sunday][end_time]" class="border border-gray-300 rounded px-3 py-2">
                         </div>
                     </div>
+                    <p id="diffDaysError" class="hidden text-sm text-red-600">Please enable at least one day and provide start and end times.</p>
                 </div>
             </div>
             <div class="flex gap-3 pt-4">
@@ -647,20 +694,17 @@ $schedules_result = $conn->query($schedules_query);
         </div>
         
         <!-- Schedule Selection -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedule</label>
-            <select id="scheduleSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                <option value="">Choose a schedule...</option>
-                <?php 
-                $schedules_result->data_seek(0); // Reset result pointer
-                while ($schedule = $schedules_result->fetch_assoc()): 
-                ?>
-                    <option value="<?= $schedule['id'] ?>">
-                        <?= htmlspecialchars($schedule['section_name']) ?> 
-                        (<?= date('g:i A', strtotime($schedule['start_time'])) ?> - <?= date('g:i A', strtotime($schedule['end_time'])) ?>)
-                    </option>
-                <?php endwhile; ?>
-            </select>
+        <div class="mb-2">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedule</label>
+          <select id="scheduleSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+            <option value="">Choose a schedule...</option>
+            <?php 
+            $schedules_result->data_seek(0); // Reset result pointer
+            while ($s = $schedules_result->fetch_assoc()): ?>
+              <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['section_name']) ?> (<?= date('g:i A', strtotime($s['start_time'])) ?> - <?= date('g:i A', strtotime($s['end_time'])) ?>)</option>
+            <?php endwhile; ?>
+          </select>
+          <p id="assignInlineError" class="hidden text-sm text-red-600 mt-1"></p>
         </div>
 
         <!-- Search Students -->
@@ -671,9 +715,11 @@ $schedules_result = $conn->query($schedules_query);
         </div>
 
         <!-- Students List -->
-        <div id="studentsList" class="mb-4 max-h-60 overflow-y-auto border rounded-lg">
+        <div id="studentsList" class="border rounded-lg h-72 overflow-y-auto">
             <p class="text-gray-500 text-center py-4">Loading students...</p>
         </div>
+        <!-- View More (replaced by infinite scroll) -->
+        <div id="studentsMoreContainer" class="mb-4 hidden text-center"></div>
 
         <!-- Selected Students Count -->
         <div class="mb-4">
@@ -689,6 +735,14 @@ $schedules_result = $conn->query($schedules_query);
 
 <script>
 let selectedStudents = [];
+// Cache minimal info for students we've displayed so we can show them in confirmation even after search filters
+const studentsIndex = {}; // id -> { name, hasCurrent }
+// Pagination state for students
+let studentsLimit = 15;
+let studentsOffset = 0;
+let studentsQuery = '';
+let studentsHasMore = false;
+let studentsLoading = false;
 
 // Show/Hide Modals
 function showCreateScheduleModal() {
@@ -698,6 +752,10 @@ function showCreateScheduleModal() {
 function hideCreateScheduleModal() {
     document.getElementById('createScheduleModal').classList.add('hidden');
     document.getElementById('createScheduleForm').reset();
+    // Clear inline validation styles/messages
+    const sameErr = document.getElementById('sameDaysError'); if (sameErr) sameErr.classList.add('hidden');
+    const sameGrp = document.getElementById('sameDaysGroup'); if (sameGrp) sameGrp.classList.remove('ring-1','ring-red-400','rounded');
+    const diffErr = document.getElementById('diffDaysError'); if (diffErr) diffErr.classList.add('hidden');
     
     // Reset modal to create mode
     document.getElementById('modalTitle').textContent = 'Create New Schedule';
@@ -720,21 +778,69 @@ function showAssignScheduleModal() {
     document.getElementById('assignScheduleModal').classList.remove('hidden');
     selectedStudents = [];
     updateSelectedCount();
-    loadAllStudents();
+    studentsQuery = '';
+    studentsOffset = 0;
+    loadStudentsPage(false);
+    // Attach infinite scroll listener
+    const listEl = document.getElementById('studentsList');
+    listEl.addEventListener('scroll', onStudentsScroll);
 }
 
 function hideAssignScheduleModal() {
     document.getElementById('assignScheduleModal').classList.add('hidden');
     selectedStudents = [];
     document.getElementById('studentsList').innerHTML = '<p class="text-gray-500 text-center py-4">Loading students...</p>';
+    const moreC = document.getElementById('studentsMoreContainer'); if(moreC) moreC.classList.add('hidden');
+    // Detach scroll listener
+    const listEl = document.getElementById('studentsList');
+    listEl.removeEventListener('scroll', onStudentsScroll);
 }
 
 let currentScheduleId = null;
+// State for pending assignment confirmation
+let pendingAssignment = null; // { scheduleId, movingIds }
 
 // Create/Edit Schedule Form Submission
 document.getElementById('createScheduleForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+    // Client-side validation for day selection
+    const type = document.querySelector('input[name="schedule_type"]:checked')?.value || 'same';
+    let valid = true;
+    const formErrEl = document.getElementById('formError');
+    if (formErrEl) { formErrEl.classList.add('hidden'); formErrEl.textContent=''; }
+    if (type === 'same') {
+        const checks = Array.from(document.querySelectorAll('#sameDaysGroup input[type="checkbox"]:checked'));
+        const st = document.getElementById('startTime')?.value;
+        const et = document.getElementById('endTime')?.value;
+        const err = document.getElementById('sameDaysError');
+        if (checks.length === 0 || !st || !et) {
+            valid = false;
+            if (err) err.textContent = 'Please select at least one day and provide start and end times.';
+            if (err) err.classList.remove('hidden');
+        } else {
+            if (err) err.classList.add('hidden');
+        }
+    } else {
+        // different: at least one enabled day, and ALL enabled days must have both times
+        const enabled = Array.from(document.querySelectorAll('input[name^="day_schedules"][name$="[enabled]"]:checked'));
+        let hasAny = enabled.length > 0;
+        let allComplete = true;
+        enabled.forEach(cb => {
+            const day = cb.name.match(/day_schedules\[(.+?)\]/)?.[1];
+            if (!day) return;
+            const st = document.querySelector(`input[name="day_schedules[${day}][start_time]"]`)?.value;
+            const et = document.querySelector(`input[name="day_schedules[${day}][end_time]"]`)?.value;
+            if (!st || !et) { allComplete = false; }
+        });
+        const err = document.getElementById('diffDaysError');
+        if (!hasAny || !allComplete) {
+            valid = false;
+            if (err) err.textContent = 'Please enable at least one day and provide start and end times for all enabled days.';
+            if (err) err.classList.remove('hidden');
+        } else { if (err) err.classList.add('hidden'); }
+    }
+    if (!valid) { if (formErrEl){ formErrEl.textContent = 'Please fix the highlighted fields.'; formErrEl.classList.remove('hidden'); } return; }
+
     const formData = new FormData(this);
     const action = currentScheduleId ? 'edit_schedule' : 'create_schedule';
     formData.append('action', action);
@@ -750,44 +856,56 @@ document.getElementById('createScheduleForm').addEventListener('submit', functio
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showSuccessMessage(data.message);
+            // Persist notice across reload so user sees it
+            sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: data.message }));
             hideCreateScheduleModal();
-            location.reload(); // Refresh to show updated schedule
+            location.reload();
         } else {
-            alert('Error: ' + data.message);
+            if (formErrEl){ formErrEl.textContent = data.message || 'Action failed.'; formErrEl.classList.remove('hidden'); }
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to save schedule. Please try again.');
+        if (formErrEl){ formErrEl.textContent = 'Failed to save schedule. Please try again.'; formErrEl.classList.remove('hidden'); }
     });
 });
 
 
-// Load all students for individual selection
-function loadAllStudents() {
-    fetch('SearchStudent.php?all=1')
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                document.getElementById('studentsList').innerHTML = `<p class="text-red-500 text-center py-4">${data.error}</p>`;
-                return;
-            }
-            
-            displayStudents(data.students || []);
+// Load students page (supports search and pagination)
+function loadStudentsPage(append){
+    if (studentsLoading) return;
+    studentsLoading = true;
+    const params = new URLSearchParams();
+    if (studentsQuery === '') { params.set('all','1'); }
+    else { params.set('query', studentsQuery); }
+    params.set('limit', studentsLimit);
+    params.set('offset', studentsOffset);
+    fetch('SearchStudent.php?' + params.toString())
+        .then(r=>r.json())
+        .then(d=>{
+            const container = document.getElementById('studentsList');
+            if (d.error){ container.innerHTML = `<p class="text-red-500 text-center py-4">${d.error}</p>`; return; }
+            const list = d.students || [];
+            if (!append){ container.innerHTML = ''; }
+            displayStudents(list, append === true);
+            studentsHasMore = !!d.has_more;
+            const moreC = document.getElementById('studentsMoreContainer');
+            if (moreC){ moreC.classList.toggle('hidden', !studentsHasMore); }
         })
-        .catch(error => {
-            console.error('Error:', error);
+        .catch(err=>{
+            console.error('Error:', err);
             document.getElementById('studentsList').innerHTML = '<p class="text-red-500 text-center py-4">Failed to load students</p>';
-        });
+            const moreC = document.getElementById('studentsMoreContainer'); if(moreC) moreC.classList.add('hidden');
+        })
+        .finally(()=>{ studentsLoading = false; });
 }
 
 // Display students in the list
-function displayStudents(students) {
+function displayStudents(students, append=false) {
     const container = document.getElementById('studentsList');
     
     if (students.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-center py-4">No students found</p>';
+        if (!append) container.innerHTML = '<p class="text-gray-500 text-center py-4">No students found</p>';
         return;
     }
     
@@ -796,15 +914,18 @@ function displayStudents(students) {
         const isSelected = selectedStudents.includes(student.id_number);
         const hasSchedule = student.current_section || student.class_schedule;
         const scheduleInfo = hasSchedule ? `<span class="text-orange-600 font-medium">Current: ${student.current_section || 'Assigned'}</span>` : '<span class="text-green-600">Available</span>';
+        const fullName = student.full_name || (student.first_name + ' ' + student.last_name);
+        // cache
+        studentsIndex[student.id_number] = { name: fullName, hasCurrent: !!hasSchedule };
         
         html += `
             <div class="flex items-center p-3 border-b hover:bg-gray-50">
                 <input type="checkbox" id="student_${student.id_number}" 
                        ${isSelected ? 'checked' : ''} 
-                       onchange="toggleStudent('${student.id_number}', ${hasSchedule ? 'true' : 'false'}, '${student.full_name || student.first_name + ' ' + student.last_name}', '${student.current_section || ''}')" 
+                       onchange="toggleStudent('${student.id_number}', ${hasSchedule ? 'true' : 'false'}, '${fullName}', '${student.current_section || ''}')" 
                        class="mr-3">
                 <label for="student_${student.id_number}" class="flex-1 cursor-pointer">
-                    <div class="font-medium">${student.full_name || student.first_name + ' ' + student.last_name}</div>
+                    <div class="font-medium">${fullName}</div>
                     <div class="text-sm text-gray-600">ID: ${student.id_number} • ${student.grade_level || student.year_section || 'N/A'}</div>
                     <div class="text-sm">${scheduleInfo}</div>
                 </label>
@@ -812,7 +933,8 @@ function displayStudents(students) {
         `;
     });
     
-    container.innerHTML = html;
+    if (append) container.insertAdjacentHTML('beforeend', html);
+    else container.innerHTML = html;
 }
 
 // Toggle student selection with confirmation for reassignment
@@ -848,57 +970,103 @@ function updateSelectedCount() {
 function assignScheduleToStudents() {
     const scheduleId = document.getElementById('scheduleSelect').value;
     
-    if (!scheduleId) {
-        alert('Please select a schedule');
-        return;
-    }
+    const assignErr = document.getElementById('assignInlineError');
+    if (assignErr) { assignErr.classList.add('hidden'); assignErr.textContent=''; }
+    if (!scheduleId) { if(assignErr){ assignErr.textContent='Please select a schedule'; assignErr.classList.remove('hidden'); } return; }
+    if (selectedStudents.length === 0) { if(assignErr){ assignErr.textContent='Please select at least one student'; assignErr.classList.remove('hidden'); } return; }
     
-    if (selectedStudents.length === 0) {
-        alert('Please select at least one student');
-        return;
-    }
+    // Build confirmation from selectedStudents (not just visible rows), using cached info
+    try {
+        const items = selectedStudents.map(id => {
+            const meta = studentsIndex[id] || { name: id, hasCurrent: false };
+            return { id, name: meta.name, hasCurrent: !!meta.hasCurrent };
+        });
+        const movingCount = items.filter(i=>i.hasCurrent).length;
+        pendingAssignment = { scheduleId };
+        showReassignConfirmItems(items, items.length, movingCount);
+        return; // wait for user confirmation
+    } catch (e) { /* ignore */ }
     
+    proceedAssign(scheduleId);
+}
+
+function showReassignConfirmItems(items, totalCount, movingCount){
+    const body = document.getElementById('reassignConfirmBody');
+    const modal = document.getElementById('reassignConfirmModal');
+    if(!body || !modal){ return; }
+    const titleLine = `You are about to move <strong>${totalCount}</strong> student(s) to the selected schedule.`;
+    const allNames = items.map(i=>i.name);
+    const currentNames = items.filter(i=>i.hasCurrent).map(i=>i.name);
+    const makeList = (names, cap=10) => {
+        const rows = names.slice(0, cap).map(n=>`<li>${n}</li>`).join('');
+        const extra = names.length > cap ? `<div class=\"text-xs text-gray-500 mt-1\">and ${names.length-cap} more…</div>` : '';
+        return `<ul class=\"list-disc ml-5 space-y-0.5\">${rows}</ul>${extra}`;
+    };
+    const note = movingCount > 0 ? `<p class=\"mt-2 text-gray-600\">Moving will replace their existing schedule.</p>` : '';
+    body.innerHTML = `
+      <p>${titleLine}</p>
+      <div class=\"mt-2 space-y-3\">
+        <div>
+          <div class=\"font-medium mb-1\">Selected students (${allNames.length}):</div>
+          ${makeList(allNames)}
+        </div>
+        <div>
+          <div class=\"font-medium mb-1\">Have current schedule (${currentNames.length}):</div>
+          ${currentNames.length ? makeList(currentNames) : '<div class=\"text-gray-500 text-sm\">None</div>'}
+        </div>
+      </div>
+      ${note}
+    `;
+    modal.classList.remove('hidden');
+}
+
+function hideReassignConfirm(){ const m=document.getElementById('reassignConfirmModal'); if(m) m.classList.add('hidden'); pendingAssignment=null; }
+
+function confirmProceedReassign(){
+    const data = pendingAssignment; hideReassignConfirm();
+    if(!data) return;
+    proceedAssign(data.scheduleId);
+}
+
+function proceedAssign(scheduleId){
     const formData = new FormData();
     formData.append('action', 'assign_schedule');
     formData.append('schedule_id', scheduleId);
-    selectedStudents.forEach(studentId => {
-        formData.append('student_ids[]', studentId);
-    });
-    
-    fetch('ManageSchedule.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccessMessage(data.message);
-            hideAssignScheduleModal();
-            location.reload(); // Refresh to update student counts
-        } else {
-            alert('Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to assign schedule. Please try again.');
-    });
+    selectedStudents.forEach(studentId => formData.append('student_ids[]', studentId));
+    fetch('ManageSchedule.php', { method: 'POST', body: formData })
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); hideAssignScheduleModal(); location.reload(); }
+        else { showErrorMessage(d.message || 'Assign failed.'); }
+      })
+      .catch(()=>{ showErrorMessage('Failed to assign schedule. Please try again.'); });
 }
 
 // Student search functionality
 document.getElementById('studentSearch').addEventListener('input', function() {
     const query = this.value.trim();
-    if (query.length < 2) return;
-    
-    fetch(`SearchStudent.php?query=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (!data.error) {
-                displayStudents(data.students || []);
-            }
-        })
-        .catch(error => console.error('Search error:', error));
+    // When cleared, show all students again
+    if (query.length === 0) {
+        studentsQuery = '';
+        studentsOffset = 0;
+        loadStudentsPage(false);
+        return;
+    }
+    // Search even with a single character
+    studentsQuery = query;
+    studentsOffset = 0;
+    loadStudentsPage(false);
 });
+
+// Infinite scroll handler
+function onStudentsScroll(){
+    const el = document.getElementById('studentsList');
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+    if (nearBottom && studentsHasMore && !studentsLoading){
+        studentsOffset += studentsLimit;
+        loadStudentsPage(true);
+    }
+}
 
 // Toggle schedule type function
 function toggleScheduleType() {
@@ -924,18 +1092,51 @@ function toggleScheduleType() {
     }
 }
 
-// Show success message
+// Show success message (banner fallback) and toast utility
 function showSuccessMessage(message) {
     const successDiv = document.getElementById('successMessage');
     const successText = document.getElementById('successText');
-    
-    successText.textContent = message;
-    successDiv.classList.remove('hidden');
-    
-    setTimeout(() => {
-        successDiv.classList.add('hidden');
-    }, 3000);
+    if (successDiv && successText) {
+        successText.textContent = message;
+        successDiv.classList.remove('hidden');
+        setTimeout(() => successDiv.classList.add('hidden'), 3000);
+    }
+    showToast('success', message);
 }
+
+function showToast(type, message) {
+    // Create container once
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.position = 'fixed';
+        container.style.top = '16px';
+        container.style.right = '16px';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'mb-2 px-4 py-3 rounded shadow text-white text-sm';
+    toast.style.minWidth = '240px';
+    toast.style.backgroundColor = type === 'success' ? '#16a34a' : '#dc2626';
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 300ms'; }, 2700);
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3100);
+}
+
+// After reload, show persisted notice
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const raw = sessionStorage.getItem('schedule_notice');
+        if (raw) {
+            const n = JSON.parse(raw);
+            if (n && n.message) { showToast(n.type || 'success', n.message); }
+            sessionStorage.removeItem('schedule_notice');
+        }
+    } catch(e) { /* ignore */ }
+});
 
 // Back navigation
 function handleBackNavigation() {
@@ -1037,16 +1238,16 @@ function confirmDelete() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showSuccessMessage(data.message);
+                sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: data.message }));
                 hideDeleteModal();
-                location.reload(); // Refresh to remove deleted schedule
+                location.reload();
             } else {
-                alert('Error: ' + data.message);
+                showErrorMessage(data.message || 'Delete failed.');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Failed to delete schedule. Please try again.');
+            showErrorMessage('Failed to delete schedule. Please try again.');
         });
     }
 }

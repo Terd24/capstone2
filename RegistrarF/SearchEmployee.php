@@ -12,6 +12,10 @@ if (!isset($_SESSION['registrar_id'])) {
 $roleFilter = isset($_GET['role']) ? trim($_GET['role']) : '';
 $all = isset($_GET['all']);
 $query = trim($_GET['query'] ?? '');
+// Pagination params
+$limit  = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 15;
+$offset = isset($_GET['offset']) ? max(0, intval($_GET['offset'])) : 0;
+$fetchLimit = $limit + 1; // fetch extra to detect more
 
 // Build SQL to fetch employees with optional role filter
 $sql = "SELECT DISTINCT e.id_number, e.first_name, e.last_name,
@@ -36,15 +40,20 @@ if (!$all && $query !== '') {
 }
 
 if ($conditions) { $sql .= ' WHERE ' . implode(' AND ', $conditions); }
-$sql .= ' ORDER BY e.last_name, e.first_name LIMIT 200';
+$sql .= ' ORDER BY e.last_name, e.first_name LIMIT ? OFFSET ?';
 
 $stmt = $conn->prepare($sql);
 if (!$stmt) { echo json_encode(['error'=>'DB prepare error','details'=>$conn->error]); exit; }
-if (!empty($params)) { $stmt->bind_param($types, ...$params); }
+// Add limit/offset bindings
+$typesWithLO = $types . 'ii';
+$paramsWithLO = array_merge($params, [$fetchLimit, $offset]);
+$stmt->bind_param($typesWithLO, ...$paramsWithLO);
 if (!$stmt->execute()) { echo json_encode(['error'=>'DB execute error','details'=>$stmt->error]); exit; }
 $res = $stmt->get_result();
 if (!$res) { echo json_encode(['error'=>'DB result error','details'=>$stmt->error]); exit; }
 
 $employees = [];
 while ($row = $res->fetch_assoc()) { $employees[] = $row; }
-echo json_encode(['employees' => $employees]);
+$has_more = count($employees) > $limit;
+if ($has_more) { array_pop($employees); }
+echo json_encode(['employees' => $employees, 'has_more' => $has_more]);

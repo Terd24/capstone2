@@ -2,6 +2,11 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
+// Pagination parameters
+$limit  = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 15;
+$offset = isset($_GET['offset']) ? max(0, intval($_GET['offset'])) : 0;
+$fetchLimit = $limit + 1; // fetch one extra to know if there are more
+
 // Handle different types of requests
 if (isset($_GET['all']) && $_GET['all'] == '1') {
     // Return all students with their current schedule info
@@ -11,8 +16,9 @@ if (isset($_GET['all']) && $_GET['all'] == '1') {
          LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id
          LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id
          ORDER BY sa.first_name, sa.last_name 
-         LIMIT 100"
+         LIMIT ? OFFSET ?"
     );
+    $stmt->bind_param("ii", $fetchLimit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -20,8 +26,10 @@ if (isset($_GET['all']) && $_GET['all'] == '1') {
     while ($row = $result->fetch_assoc()) {
         $students[] = $row;
     }
+    $has_more = count($students) > $limit;
+    if ($has_more) { array_pop($students); }
     
-    echo json_encode(['students' => $students]);
+    echo json_encode(['students' => $students, 'has_more' => $has_more]);
     exit;
 }
 
@@ -33,10 +41,10 @@ if (isset($_GET['section'])) {
          FROM student_account 
          WHERE grade_level LIKE ? OR academic_track LIKE ?
          ORDER BY first_name, last_name 
-         LIMIT 50"
+         LIMIT ? OFFSET ?"
     );
     $searchTerm = "%$section%";
-    $stmt->bind_param("ss", $searchTerm, $searchTerm);
+    $stmt->bind_param("ssii", $searchTerm, $searchTerm, $fetchLimit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -44,8 +52,10 @@ if (isset($_GET['section'])) {
     while ($row = $result->fetch_assoc()) {
         $students[] = $row;
     }
+    $has_more = count($students) > $limit;
+    if ($has_more) { array_pop($students); }
     
-    echo json_encode(['students' => $students]);
+    echo json_encode(['students' => $students, 'has_more' => $has_more]);
     exit;
 }
 
@@ -63,10 +73,10 @@ $stmt = $conn->prepare(
      LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id
      WHERE (CONCAT(sa.first_name, ' ', sa.last_name) LIKE ? OR sa.id_number LIKE ?)
      ORDER BY sa.first_name, sa.last_name
-     LIMIT 10"
+     LIMIT ? OFFSET ?"
 );
 $searchTerm = "%$query%";
-$stmt->bind_param("ss", $searchTerm, $searchTerm);
+$stmt->bind_param("ssii", $searchTerm, $searchTerm, $fetchLimit, $offset);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -74,5 +84,7 @@ $students = [];
 while ($row = $result->fetch_assoc()) {
     $students[] = $row;
 }
+$has_more = count($students) > $limit;
+if ($has_more) { array_pop($students); }
 
-echo json_encode(['students' => $students]);
+echo json_encode(['students' => $students, 'has_more' => $has_more]);
