@@ -2,6 +2,9 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
+// Ensure server timezone aligns with local time for correct day-of-week calculations
+date_default_timezone_set('Asia/Manila');
+
 // Require registrar login
 if (!isset($_SESSION['registrar_id'])) {
     header("Location: ../StudentLogin/login.php");
@@ -209,27 +212,85 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
     </div>
 
     <div class="bg-white rounded-xl shadow p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-6">Schedules</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800">Schedules</h2>
+          <div class="w-full md:w-80">
+            <div class="relative">
+              <div id="scheduleSearchIcon" class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              <input id="scheduleSearch" type="text" placeholder="Search schedules by name or day..." class="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" />
+              <button id="scheduleSearchClear" type="button" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600" aria-label="Clear search">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="schedulesGrid">
             <?php if ($schedules_result && $schedules_result->num_rows > 0): ?>
                 <?php while ($schedule = $schedules_result->fetch_assoc()): ?>
-                    <div class="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition-shadow">
+                    <div class="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition-shadow schedule-card">
                         <div class="flex justify-between items-start mb-3">
-                            <h3 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($schedule['schedule_name']) ?></h3>
+                            <h3 class="text-lg font-bold text-gray-800 schedule-name"><?= htmlspecialchars($schedule['schedule_name']) ?></h3>
                             <div class="flex gap-2">
+                                <button onclick="openScheduleDetails(<?= (int)$schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">View</button>
                                 <button onclick="editSchedule(<?= (int)$schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">Edit</button>
                                 <button onclick="deleteSchedule(<?= (int)$schedule['id'] ?>)" class="text-red-500 hover:text-red-700 text-sm">Delete</button>
                             </div>
                         </div>
 
+                        <?php
+                          // Compute display time:
+                          // 1) If there is a day-specific schedule for TODAY, show it, e.g. "7:00 AM - 10:00 PM (Monday)"
+                          // 2) Otherwise, do NOT look ahead. If schedule is variable or full-day default,
+                          //    show placeholder "--:-- - --:--"; else show the general time range.
+
+                          $todayName = date('l');
+                          $display_time = date('g:i A', strtotime($schedule['start_time'])) . ' - ' . date('g:i A', strtotime($schedule['end_time']));
+                          $sid = (int)$schedule['id'];
+
+                          // Try to get today's schedule first
+                          $ds_today = $conn->prepare("SELECT start_time, end_time FROM employee_work_day_schedules WHERE schedule_id = ? AND LOWER(day_name) = LOWER(?)");
+                          if ($ds_today) {
+                              $ds_today->bind_param("is", $sid, $todayName);
+                              if ($ds_today->execute()) {
+                                  $res_today = $ds_today->get_result();
+                                  if ($res_today && $res_today->num_rows > 0) {
+                                      $row = $res_today->fetch_assoc();
+                                      $display_time = date('g:i A', strtotime($row['start_time'])) . ' - ' . date('g:i A', strtotime($row['end_time'])) . ' (' . $todayName . ')';
+                                  } else {
+                                      // No schedule for today.
+                                      $isFullDay = ($schedule['start_time'] === '00:00:00' && $schedule['end_time'] === '23:59:59');
+                                      $daysStr = isset($schedule['days']) ? trim((string)$schedule['days']) : '';
+                                      $isVariable = strcasecmp($daysStr, 'Variable') === 0;
+                                      if ($isVariable || $isFullDay) {
+                                          // Variable or default full-day: no specific time for today
+                                          $display_time = '--:-- - --:--';
+                                      } else {
+                                          // Same time for selected days. Only show time if today is one of those days; otherwise placeholder
+                                          $daysArr = array_filter(array_map('trim', explode(',', $daysStr)));
+                                          $match = false;
+                                          foreach ($daysArr as $dname) {
+                                              if (strcasecmp($dname, $todayName) === 0) { $match = true; break; }
+                                          }
+                                          if ($match) {
+                                              $display_time = date('g:i A', strtotime($schedule['start_time'])) . ' - ' . date('g:i A', strtotime($schedule['end_time'])) . ' (' . $todayName . ')';
+                                          } else {
+                                              $display_time = '--:-- - --:--';
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                        ?>
                         <div class="space-y-2 text-sm">
                             <div class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
-                                <span class="font-medium"><?= date('g:i A', strtotime($schedule['start_time'])) ?> - <?= date('g:i A', strtotime($schedule['end_time'])) ?></span>
+                                <span class="font-medium"><?= htmlspecialchars($display_time) ?></span>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 schedule-days">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
@@ -244,10 +305,10 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                         </div>
 
                         <div class="mt-4 pt-3 border-t">
-                            <button onclick="viewScheduleEmployees(<?= (int)$schedule['id'] ?>, '<?= htmlspecialchars($schedule['schedule_name']) ?>')"
-                                    class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg text-sm font-medium">
+                            <a href="view_schedule_employees.php?schedule_id=<?= (int)$schedule['id'] ?>&schedule_name=<?= urlencode($schedule['schedule_name']) ?>"
+                               class="block text-center bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg text-sm font-medium">
                                 View Employees
-                            </button>
+                            </a>
                         </div>
                     </div>
                 <?php endwhile; ?>
@@ -255,6 +316,7 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                 <div class="col-span-full text-center py-8 text-gray-500">No employee schedules created yet</div>
             <?php endif; ?>
         </div>
+        <div id="scheduleNoResults" class="hidden col-span-full text-center py-8 text-gray-500">No schedules found</div>
     </div>
 
     </div>
@@ -378,6 +440,24 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
       </div>
     </div>
 
+    <!-- View Schedule Details Modal -->
+    <div id="scheduleDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+          <h3 id="schedTitle" class="text-lg font-bold text-gray-800">Schedule Details</h3>
+          <button onclick="closeScheduleDetails()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div id="schedBody" class="space-y-3 text-sm text-gray-800">
+          <p>Loading schedule...</p>
+        </div>
+        <div class="pt-4">
+          <button onclick="closeScheduleDetails()" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">Close</button>
+        </div>
+      </div>
+    </div>
+
     <script>
 // State
 let selectedEmployees = [];
@@ -485,6 +565,11 @@ function assignScheduleToEmployees(){
     .catch(()=>alert('Failed to assign schedule. Please try again.'));
 }
 
+// View Employees follows the student pattern: navigate to a dedicated page
+function viewScheduleEmployees(id, scheduleName){
+  window.location.href = `view_schedule_employees.php?schedule_id=${id}&schedule_name=${encodeURIComponent(scheduleName)}`;
+}
+
 // Employee search
  document.getElementById('employeeSearch').addEventListener('input', function(){
   const q = this.value.trim();
@@ -540,6 +625,86 @@ function deleteSchedule(id){
   const fd=new FormData(); fd.append('action','delete_schedule'); fd.append('schedule_id', id);
   fetch('ManageEmployeeSchedule.php',{ method:'POST', body: fd })
     .then(r=>r.json()).then(d=>{ if(d.success){ showSuccessMessage(d.message); location.reload(); } else { alert('Error: '+d.message); } });
+}
+
+// View Schedule Details
+function openScheduleDetails(id){
+  const modal = document.getElementById('scheduleDetailsModal');
+  const body = document.getElementById('schedBody');
+  const title = document.getElementById('schedTitle');
+  body.innerHTML = '<p>Loading schedule...</p>';
+  title.textContent = 'Schedule Details';
+  modal.classList.remove('hidden');
+  fetch(`get_employee_schedule.php?id=${id}`)
+    .then(res=>res.json())
+    .then(d=>{
+      if(!d.success){ body.innerHTML = `<p class=\"text-red-600\">Failed to load schedule.</p>`; return; }
+      const s = d.schedule;
+      title.textContent = s.schedule_name + ' — Details';
+      const items = [];
+      if(s.has_day_schedules && s.day_schedules && Object.keys(s.day_schedules).length){
+        const order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        items.push(`<div><div class=\"font-semibold mb-1\">Per-day Times</div>`);
+        items.push('<ul class=\"list-disc ml-5 space-y-1\">');
+        order.forEach(day=>{
+          const dsd = s.day_schedules[day];
+          if(dsd){
+            items.push(`<li><span class=\"font-medium\">${day}:</span> ${formatTime(dsd.start_time)} - ${formatTime(dsd.end_time)}</li>`);
+          }
+        });
+        items.push('</ul></div>');
+      } else {
+        items.push(`<div><span class=\"font-semibold\">Time:</span> ${formatTime(s.start_time)} - ${formatTime(s.end_time)}</div>`);
+        items.push(`<div><span class=\"font-semibold\">Days:</span> ${s.days || '—'}</div>`);
+      }
+      body.innerHTML = items.join('');
+    })
+    .catch(()=>{ body.innerHTML = '<p class="text-red-600">Failed to load schedule.</p>'; });
+}
+function closeScheduleDetails(){ document.getElementById('scheduleDetailsModal').classList.add('hidden'); }
+function formatTime(t){ try{ const d = new Date(`1970-01-01T${t}`); return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); } catch(e){ return t; } }
+
+// Schedule search (client-side filter)
+const scheduleSearchEl = document.getElementById('scheduleSearch');
+if (scheduleSearchEl) {
+  const icon = document.getElementById('scheduleSearchIcon');
+  const clearBtn = document.getElementById('scheduleSearchClear');
+  const applyFilter = () => {
+    const q = scheduleSearchEl.value.trim().toLowerCase();
+    if (icon) icon.classList.toggle('hidden', q.length > 0);
+    if (clearBtn) clearBtn.classList.toggle('hidden', q.length === 0);
+    // Adjust left padding based on icon visibility
+    if (q.length > 0) {
+      scheduleSearchEl.classList.remove('pl-10');
+      scheduleSearchEl.classList.add('pl-3');
+    } else {
+      scheduleSearchEl.classList.add('pl-10');
+      scheduleSearchEl.classList.remove('pl-3');
+    }
+    const cards = document.querySelectorAll('.schedule-card');
+    let visibleCount = 0;
+    cards.forEach(card => {
+      const nameEl = card.querySelector('.schedule-name');
+      const daysEl = card.querySelector('.schedule-days');
+      const name = nameEl ? nameEl.textContent.toLowerCase() : '';
+      const days = daysEl ? daysEl.textContent.toLowerCase() : '';
+      const match = q.length === 0 || name.includes(q) || days.includes(q);
+      card.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+    const noRes = document.getElementById('scheduleNoResults');
+    if (noRes) noRes.classList.toggle('hidden', visibleCount > 0);
+  };
+  scheduleSearchEl.addEventListener('input', applyFilter);
+  scheduleSearchEl.addEventListener('focus', applyFilter);
+  scheduleSearchEl.addEventListener('blur', applyFilter);
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      scheduleSearchEl.value = '';
+      scheduleSearchEl.focus();
+      applyFilter();
+    });
+  }
 }
 </script>
 

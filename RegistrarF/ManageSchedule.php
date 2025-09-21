@@ -300,7 +300,6 @@ $schedules_result = $conn->query($schedules_query);
                     </svg>
                 </button>
                 <h1 class="text-xl font-bold">Schedule Management</h1>
-            </div>
             <div class="flex items-center space-x-4">
                 <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
                 <div class="text-right">
@@ -309,6 +308,7 @@ $schedules_result = $conn->query($schedules_query);
                 </div>
             </div>
         </div>
+        
     </div>
 </header>
 
@@ -337,32 +337,77 @@ $schedules_result = $conn->query($schedules_query);
 
     <!-- Schedules List -->
     <div class="bg-white rounded-xl card-shadow p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-6">Class Schedules</h2>
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Class Schedules</h2>
+            <div class="w-full md:w-80">
+                <div class="relative">
+                    <div id="classSearchIcon" class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input id="classScheduleSearch" type="text" placeholder="Search schedules by name or day..." class="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" />
+                    <button id="classSearchClear" type="button" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600" aria-label="Clear search">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="classSchedulesGrid">
             <?php if ($schedules_result && $schedules_result->num_rows > 0): ?>
                 <?php while ($schedule = $schedules_result->fetch_assoc()): ?>
-                    <div class="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition-shadow">
+                    <div class="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition-shadow class-schedule-card">
                         <div class="flex justify-between items-start mb-3">
-                            <h3 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($schedule['section_name']) ?></h3>
+                            <h3 class="text-lg font-bold text-gray-800 class-schedule-name"><?= htmlspecialchars($schedule['section_name']) ?></h3>
                             <div class="flex gap-2">
-                                <button onclick="editSchedule(<?= $schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">
-                                    Edit
-                                </button>
-                                <button onclick="deleteSchedule(<?= $schedule['id'] ?>)" class="text-red-500 hover:text-red-700 text-sm">
-                                    Delete
-                                </button>
+                                <button onclick="openClassScheduleDetails(<?= $schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">View</button>
+                                <button onclick="editSchedule(<?= $schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">Edit</button>
+                                <button onclick="deleteSchedule(<?= $schedule['id'] ?>)" class="text-red-500 hover:text-red-700 text-sm">Delete</button>
                             </div>
                         </div>
+
+                        <?php
+                          // Real-time display time for student schedules
+                          date_default_timezone_set('Asia/Manila');
+                          $todayName = date('l');
+                          $display_time = date('g:i A', strtotime($schedule['start_time'])) . ' - ' . date('g:i A', strtotime($schedule['end_time']));
+                          $sid = (int)$schedule['id'];
+                          $ds_today = $conn->prepare("SELECT start_time, end_time FROM day_schedules WHERE schedule_id = ? AND LOWER(day_name) = LOWER(?)");
+                          if ($ds_today) {
+                              $ds_today->bind_param("is", $sid, $todayName);
+                              if ($ds_today->execute()) {
+                                  $res_today = $ds_today->get_result();
+                                  if ($res_today && $res_today->num_rows > 0) {
+                                      $row = $res_today->fetch_assoc();
+                                      $display_time = date('g:i A', strtotime($row['start_time'])) . ' - ' . date('g:i A', strtotime($row['end_time'])) . ' (' . $todayName . ')';
+                                  } else {
+                                      $isFullDay = ($schedule['start_time'] === '00:00:00' && $schedule['end_time'] === '23:59:59');
+                                      $daysStr = isset($schedule['days']) ? trim((string)$schedule['days']) : '';
+                                      $isVariable = strcasecmp($daysStr, 'Variable') === 0;
+                                      if ($isVariable || $isFullDay) {
+                                          $display_time = '--:-- - --:--';
+                                      } else {
+                                          $daysArr = array_filter(array_map('trim', explode(',', $daysStr)));
+                                          $match = false;
+                                          foreach ($daysArr as $dname) { if (strcasecmp($dname, $todayName) === 0) { $match = true; break; } }
+                                          if ($match) {
+                                              $display_time = date('g:i A', strtotime($schedule['start_time'])) . ' - ' . date('g:i A', strtotime($schedule['end_time'])) . ' (' . $todayName . ')';
+                                          } else {
+                                              $display_time = '--:-- - --:--';
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                        ?>
                         
                         <div class="space-y-2 text-sm">
                             <div class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
-                                <span class="font-medium"><?= date('g:i A', strtotime($schedule['start_time'])) ?> - <?= date('g:i A', strtotime($schedule['end_time'])) ?></span>
+                                <span class="font-medium"><?= htmlspecialchars($display_time) ?></span>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 class-schedule-days">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
@@ -394,8 +439,29 @@ $schedules_result = $conn->query($schedules_query);
                 </div>
             <?php endif; ?>
         </div>
+        <!-- No results message for search -->
+        <div id="classNoResults" class="hidden col-span-full text-center py-8 text-gray-500">No schedules found</div>
     </div>
 </div>
+
+<!-- View Schedule Details Modal (Students) -->
+<div id="classScheduleDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="classSchedTitle" class="text-lg font-bold text-gray-800">Schedule Details</h3>
+            <button onclick="closeClassScheduleDetails()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div id="classSchedBody" class="space-y-3 text-sm text-gray-800">
+            <p>Loading schedule...</p>
+        </div>
+        <div class="pt-4">
+            <button onclick="closeClassScheduleDetails()" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">Close</button>
+        </div>
+    </div>
+    
+    </div>
 
 <!-- Create/Edit Schedule Modal -->
 <div id="createScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -988,6 +1054,67 @@ function confirmDelete() {
 function viewScheduleStudents(id, sectionName) {
     window.location.href = `view_schedule_students.php?schedule_id=${id}&section_name=${encodeURIComponent(sectionName)}`;
 }
+
+// View Schedule Details (Students)
+function openClassScheduleDetails(id){
+    const modal = document.getElementById('classScheduleDetailsModal');
+    const body = document.getElementById('classSchedBody');
+    const title = document.getElementById('classSchedTitle');
+    if(!modal || !body || !title){ console.error('Class schedule modal elements missing'); return; }
+    body.innerHTML = '<p>Loading schedule...</p>';
+    title.textContent = 'Schedule Details';
+    modal.classList.remove('hidden');
+    fetch(`get_schedule.php?id=${id}`)
+      .then(res=>res.json())
+      .then(d=>{
+        if(!d.success){ body.innerHTML = '<p class="text-red-600">Failed to load schedule.</p>'; return; }
+        const s = d.schedule; const items = [];
+        title.textContent = ((s.section_name||'') + ' — Details').trim();
+        if(s.has_day_schedules && s.day_schedules && Object.keys(s.day_schedules).length){
+          const order=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+          items.push('<div><div class="font-semibold mb-1">Per-day Times</div><ul class="list-disc ml-5 space-y-1">');
+          order.forEach(day=>{ const dsd=s.day_schedules[day]; if(dsd){ items.push(`<li><span class=\"font-medium\">${day}:</span> ${formatTime(dsd.start_time)} - ${formatTime(dsd.end_time)}</li>`); }});
+          items.push('</ul></div>');
+        } else {
+          items.push(`<div><span class=\"font-semibold\">Time:</span> ${formatTime(s.start_time)} - ${formatTime(s.end_time)}</div>`);
+          items.push(`<div><span class=\"font-semibold\">Days:</span> ${s.days||'—'}</div>`);
+        }
+        body.innerHTML = items.join('');
+      })
+      .catch(()=>{ body.innerHTML = '<p class="text-red-600">Failed to load schedule.</p>'; });
+}
+function closeClassScheduleDetails(){ const m=document.getElementById('classScheduleDetailsModal'); if(m) m.classList.add('hidden'); }
+function formatTime(t){ try{ const d = new Date(`1970-01-01T${t}`); return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); } catch(e){ return t; } }
+
+// Search filter for student schedules
+(function(){
+  const classSearchEl = document.getElementById('classScheduleSearch');
+  if(!classSearchEl) return;
+  const icon = document.getElementById('classSearchIcon');
+  const clearBtn = document.getElementById('classSearchClear');
+  const noRes = document.getElementById('classNoResults');
+  const applyFilter = () => {
+    const q = classSearchEl.value.trim().toLowerCase();
+    if(icon) icon.classList.toggle('hidden', q.length>0);
+    if(clearBtn) clearBtn.classList.toggle('hidden', q.length===0);
+    if(q.length>0){ classSearchEl.classList.remove('pl-10'); classSearchEl.classList.add('pl-3'); }
+    else { classSearchEl.classList.add('pl-10'); classSearchEl.classList.remove('pl-3'); }
+    const cards = document.querySelectorAll('.class-schedule-card');
+    let visible=0;
+    cards.forEach(card=>{
+      const name = (card.querySelector('.class-schedule-name')?.textContent || '').toLowerCase();
+      const days = (card.querySelector('.class-schedule-days')?.textContent || '').toLowerCase();
+      const match = q.length===0 || name.includes(q) || days.includes(q);
+      card.style.display = match ? '' : 'none';
+      if(match) visible++;
+    });
+    if(noRes) noRes.classList.toggle('hidden', visible>0);
+  };
+  classSearchEl.addEventListener('input', applyFilter);
+  classSearchEl.addEventListener('focus', applyFilter);
+  classSearchEl.addEventListener('blur', applyFilter);
+  if(clearBtn){ clearBtn.addEventListener('click', ()=>{ classSearchEl.value=''; classSearchEl.focus(); applyFilter(); }); }
+})();
 </script>
 
 </body>
