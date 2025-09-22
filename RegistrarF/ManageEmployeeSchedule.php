@@ -2,240 +2,283 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Ensure server timezone aligns with local time for correct day-of-week calculations
-date_default_timezone_set('Asia/Manila');
-
 // Require registrar login
 if (!isset($_SESSION['registrar_id'])) {
     header("Location: ../StudentLogin/login.php");
     exit;
 }
 
-// Handle create/edit/delete/assign for schedules (reuse class_schedules/day_schedules like students)
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    $response = ['success' => false, 'message' => 'Unknown action'];
+// Handle form submission for creating/editing schedules
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
+    if ($_POST['action'] == 'create_schedule') {
+        $section_name = $_POST['section_name'];
+        $schedule_type = $_POST['schedule_type'];
+        
+        if ($schedule_type == 'same') {
+            // Same time for all days
+            $start_time = $_POST['start_time'];
+            $end_time = $_POST['end_time'];
+            $days = isset($_POST['days']) ? implode(', ', (array)$_POST['days']) : '';
 
-    if ($_POST['action'] === 'create_schedule') {
-        $section_name = $_POST['section_name'] ?? '';
-        $schedule_type = $_POST['schedule_type'] ?? 'same';
-
-        if ($schedule_type === 'same') {
-            $start_time = $_POST['start_time'] ?? '';
-            $end_time   = $_POST['end_time'] ?? '';
-            $days       = isset($_POST['days']) ? implode(', ', (array)$_POST['days']) : '';
-
-            // Validation: at least one day and both times
-            if (trim($days) === '' || trim($start_time) === '' || trim($end_time) === '') {
-                echo json_encode(['success' => false, 'message' => 'Please select at least one day and provide start and end times.']);
+            // Validation: require at least one day
+            if (trim($days) === '') {
+                $response = ['success' => false, 'message' => 'Please select at least one day.'];
+                header('Content-Type: application/json');
+                echo json_encode($response);
                 exit;
             }
-
+            
+            // Employees: store in employee_work_schedules using schedule_name
             $stmt = $conn->prepare("INSERT INTO employee_work_schedules (schedule_name, start_time, end_time, days, created_by) VALUES (?, ?, ?, ?, ?)");
             $stmt->bind_param("ssssi", $section_name, $start_time, $end_time, $days, $_SESSION['registrar_id']);
+            
             if ($stmt->execute()) {
-                $response = ['success' => true, 'message' => 'Schedule created successfully!'];
+                $response['success'] = true;
+                $response['message'] = "Schedule created successfully!";
             } else {
-                $response['message'] = 'Error creating schedule: ' . $conn->error;
+                $response['message'] = "Error creating schedule.";
             }
         } else {
-            // Different times per day
-            $day_schedules = $_POST['day_schedules'] ?? [];
+            // Different times for each day
+            $day_schedules = isset($_POST['day_schedules']) ? $_POST['day_schedules'] : [];
+            $enabled_days = [];
 
-            // Validation: at least one enabled day AND all enabled days must have both times
-            $hasAnyEnabled = false; $allComplete = true;
-            foreach ($day_schedules as $day => $sched) {
-                if (!empty($sched['enabled'])) {
-                    $hasAnyEnabled = true;
-                    if (empty($sched['start_time']) || empty($sched['end_time'])) { $allComplete = false; }
+            // Validation: ensure at least one enabled day with valid times
+            $has_valid_day = false;
+            foreach ($day_schedules as $day => $schedule) {
+                if (!empty($schedule['enabled']) && !empty($schedule['start_time']) && !empty($schedule['end_time'])) {
+                    $has_valid_day = true; break;
                 }
             }
-            if (!$hasAnyEnabled || !$allComplete) {
-                echo json_encode(['success' => false, 'message' => 'Please enable at least one day and provide start and end times for all enabled days.']);
+            if (!$has_valid_day) {
+                $response = ['success' => false, 'message' => 'Please enable at least one day and provide start and end times.'];
+                header('Content-Type: application/json');
+                echo json_encode($response);
                 exit;
             }
-
+            
+            // First, create the main schedule record with placeholder times
             $stmt = $conn->prepare("INSERT INTO employee_work_schedules (schedule_name, start_time, end_time, days, created_by) VALUES (?, '00:00:00', '23:59:59', 'Variable', ?)");
             $stmt->bind_param("si", $section_name, $_SESSION['registrar_id']);
+            
             if ($stmt->execute()) {
                 $schedule_id = $conn->insert_id;
-                $enabled_days = [];
-                foreach ($day_schedules as $day => $sched) {
-                    if (!empty($sched['enabled']) && !empty($sched['start_time']) && !empty($sched['end_time'])) {
-                        $d = $conn->prepare("INSERT INTO employee_work_day_schedules (schedule_id, day_name, start_time, end_time) VALUES (?, ?, ?, ?)");
-                        $d->bind_param("isss", $schedule_id, $day, $sched['start_time'], $sched['end_time']);
-                        $d->execute();
+                
+                // Insert day-specific schedules (employee)
+                foreach ($day_schedules as $day => $schedule) {
+                    if (isset($schedule['enabled']) && $schedule['start_time'] && $schedule['end_time']) {
+                        $day_stmt = $conn->prepare("INSERT INTO employee_work_day_schedules (schedule_id, day_name, start_time, end_time) VALUES (?, ?, ?, ?)");
+                        $day_stmt->bind_param("isss", $schedule_id, $day, $schedule['start_time'], $schedule['end_time']);
+                        $day_stmt->execute();
                         $enabled_days[] = $day;
                     }
                 }
+                
+                // Update the main schedule with actual days
                 $days_string = implode(', ', $enabled_days);
-                $u = $conn->prepare("UPDATE employee_work_schedules SET days = ? WHERE id = ?");
-                $u->bind_param("si", $days_string, $schedule_id);
-                $u->execute();
-                $response = ['success' => true, 'message' => 'Day-specific schedule created successfully!'];
+                $update_stmt = $conn->prepare("UPDATE employee_work_schedules SET days = ? WHERE id = ?");
+                $update_stmt->bind_param("si", $days_string, $schedule_id);
+                $update_stmt->execute();
+                
+                $response['success'] = true;
+                $response['message'] = "Day-specific schedule created successfully!";
             } else {
-                $response['message'] = 'Error creating variable schedule: ' . $conn->error;
+                $response['message'] = "Error creating schedule.";
             }
         }
-        echo json_encode($response); exit;
+        
+        header('Content-Type: application/json');
+        echo json_encode($response);
+        exit;
     }
-
-    if ($_POST['action'] === 'edit_schedule') {
-        $schedule_id  = (int)($_POST['schedule_id'] ?? 0);
-        $section_name = $_POST['section_name'] ?? '';
-        $schedule_type = $_POST['schedule_type'] ?? 'same';
-
-        if ($schedule_type === 'same') {
-            $start_time = $_POST['start_time'] ?? '';
-            $end_time   = $_POST['end_time'] ?? '';
-            $days       = isset($_POST['days']) ? implode(', ', (array)$_POST['days']) : '';
-
-            // Validation
-            if (trim($days) === '' || trim($start_time) === '' || trim($end_time) === '') {
-                echo json_encode(['success' => false, 'message' => 'Please select at least one day and provide start and end times.']);
-                exit;
-            }
-
-            // Clear any day-specific rows
-            $clear = $conn->prepare("DELETE FROM employee_work_day_schedules WHERE schedule_id = ?");
-            $clear->bind_param("i", $schedule_id);
-            $clear->execute();
-
+    
+    if ($_POST['action'] == 'edit_schedule') {
+        $schedule_id = $_POST['schedule_id'];
+        $section_name = $_POST['section_name'];
+        $schedule_type = $_POST['schedule_type'];
+        
+        if ($schedule_type == 'same') {
+            // Same time for all days
+            $start_time = $_POST['start_time'];
+            $end_time = $_POST['end_time'];
+            $days = implode(',', $_POST['days']);
+            
+            // Clear any existing day-specific schedules
+            $clear_day_schedules = $conn->prepare("DELETE FROM employee_work_day_schedules WHERE schedule_id = ?");
+            $clear_day_schedules->bind_param("i", $schedule_id);
+            $clear_day_schedules->execute();
+            
+            // Update main schedule
             $stmt = $conn->prepare("UPDATE employee_work_schedules SET schedule_name = ?, start_time = ?, end_time = ?, days = ? WHERE id = ?");
             $stmt->bind_param("ssssi", $section_name, $start_time, $end_time, $days, $schedule_id);
             $stmt->execute();
+            
+            $schedule_text = $section_name . " (" . 
+                            date('g:i A', strtotime($start_time)) . " - " . 
+                            date('g:i A', strtotime($end_time)) . ")";
         } else {
-            $day_schedules = $_POST['day_schedules'] ?? [];
-
-            // Validation: at least one enabled day and all enabled days complete
-            $hasAnyEnabled = false; $allComplete = true;
-            foreach ($day_schedules as $day => $sched) {
-                if (!empty($sched['enabled'])) {
-                    $hasAnyEnabled = true;
-                    if (empty($sched['start_time']) || empty($sched['end_time'])) { $allComplete = false; }
-                }
-            }
-            if (!$hasAnyEnabled || !$allComplete) {
-                echo json_encode(['success' => false, 'message' => 'Please enable at least one day and provide start and end times for all enabled days.']);
-                exit;
-            }
-
-            $clear = $conn->prepare("DELETE FROM employee_work_day_schedules WHERE schedule_id = ?");
-            $clear->bind_param("i", $schedule_id);
-            $clear->execute();
-
+            // Different times for each day
+            $day_schedules = $_POST['day_schedules'];
+            $enabled_days = [];
+            
+            // Clear existing day-specific schedules
+            $clear_day_schedules = $conn->prepare("DELETE FROM employee_work_day_schedules WHERE schedule_id = ?");
+            $clear_day_schedules->bind_param("i", $schedule_id);
+            $clear_day_schedules->execute();
+            
+            // Update main schedule with placeholder times
             $stmt = $conn->prepare("UPDATE employee_work_schedules SET schedule_name = ?, start_time = '00:00:00', end_time = '23:59:59', days = 'Variable' WHERE id = ?");
             $stmt->bind_param("si", $section_name, $schedule_id);
             $stmt->execute();
-
-            $enabled_days = [];
-            foreach ($day_schedules as $day => $sched) {
-                if (!empty($sched['enabled']) && !empty($sched['start_time']) && !empty($sched['end_time'])) {
-                    $d = $conn->prepare("INSERT INTO employee_work_day_schedules (schedule_id, day_name, start_time, end_time) VALUES (?, ?, ?, ?)");
-                    $d->bind_param("isss", $schedule_id, $day, $sched['start_time'], $sched['end_time']);
-                    $d->execute();
+            
+            // Insert new day-specific schedules
+            foreach ($day_schedules as $day => $schedule) {
+                if (isset($schedule['enabled']) && $schedule['start_time'] && $schedule['end_time']) {
+                    $day_stmt = $conn->prepare("INSERT INTO employee_work_day_schedules (schedule_id, day_name, start_time, end_time) VALUES (?, ?, ?, ?)");
+                    $day_stmt->bind_param("isss", $schedule_id, $day, $schedule['start_time'], $schedule['end_time']);
+                    $day_stmt->execute();
                     $enabled_days[] = $day;
                 }
             }
+            
+            // Update the main schedule with actual days
             $days_string = implode(', ', $enabled_days);
-            $u = $conn->prepare("UPDATE employee_work_schedules SET days = ? WHERE id = ?");
-            $u->bind_param("si", $days_string, $schedule_id);
-            $u->execute();
+            $update_days = $conn->prepare("UPDATE employee_work_schedules SET days = ? WHERE id = ?");
+            $update_days->bind_param("si", $days_string, $schedule_id);
+            $update_days->execute();
+            
+            $schedule_text = $section_name . " (Variable Times)";
         }
-
-        echo json_encode(['success' => true, 'message' => 'Schedule updated successfully!']);
+        
+        // No employee-side mirrors required here
+        
+        $response = ['success' => true, 'message' => 'Schedule updated successfully!'];
+        
+        header('Content-Type: application/json');
+        echo json_encode($response);
         exit;
     }
-
-    if ($_POST['action'] === 'delete_schedule') {
-        $schedule_id = (int)($_POST['schedule_id'] ?? 0);
-
-        // Remove employee assignments for this schedule
-        $clear_emp = $conn->prepare("DELETE FROM employee_schedules WHERE schedule_id = ?");
-        $clear_emp->bind_param("i", $schedule_id);
-        $clear_emp->execute();
-
-        // Delete schedule
+    
+    if ($_POST['action'] == 'delete_schedule') {
+        $schedule_id = $_POST['schedule_id'];
+        
+        // Delete schedule (employee_schedules will be deleted by CASCADE)
         $stmt = $conn->prepare("DELETE FROM employee_work_schedules WHERE id = ?");
         $stmt->bind_param("i", $schedule_id);
+        
         if ($stmt->execute()) {
-            echo json_encode(['success' => true, 'message' => 'Schedule deleted successfully!']);
+            $response = ['success' => true, 'message' => 'Schedule deleted successfully!'];
         } else {
-            echo json_encode(['success' => false, 'message' => 'Error deleting schedule: ' . $conn->error]);
+            $response = ['success' => false, 'message' => 'Error deleting schedule: ' . $conn->error];
         }
+        
+        header('Content-Type: application/json');
+        echo json_encode($response);
         exit;
     }
-
-    if ($_POST['action'] === 'assign_schedule') {
-        $schedule_id = (int)($_POST['schedule_id'] ?? 0);
-        $employee_ids = $_POST['employee_ids'] ?? [];
-
-        if (!$schedule_id || empty($employee_ids)) {
-            echo json_encode(['success' => false, 'message' => 'Missing schedule or employees']);
-            exit;
+    
+    if ($_POST['action'] == 'assign_schedule') {
+        $schedule_id = $_POST['schedule_id'];
+        // Accept either employee_ids[] or student_ids[] from frontend
+        $employee_ids = $_POST['employee_ids'] ?? $_POST['student_ids'] ?? [];
+        
+        // Get schedule details (employee)
+        $schedule_stmt = $conn->prepare("SELECT schedule_name, start_time, end_time FROM employee_work_schedules WHERE id = ?");
+        $schedule_stmt->bind_param("i", $schedule_id);
+        $schedule_stmt->execute();
+        $schedule_result = $schedule_stmt->get_result();
+        $schedule_info = $schedule_result->fetch_assoc();
+        
+        // Check if this schedule has day-specific times
+        $day_schedules_query = $conn->prepare("SELECT day_name, start_time, end_time FROM employee_work_day_schedules WHERE schedule_id = ? ORDER BY FIELD(day_name, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')");
+        $day_schedules_query->bind_param("i", $schedule_id);
+        $day_schedules_query->execute();
+        $day_schedules_result = $day_schedules_query->get_result();
+        
+        if ($day_schedules_result->num_rows > 0) {
+            // Has day-specific schedules - create descriptive text
+            $schedule_text = $schedule_info['schedule_name'] . " (Variable Times)";
+        } else {
+            // Uses same time for all days
+            $schedule_text = $schedule_info['schedule_name'] . " (" . 
+                            date('g:i A', strtotime($schedule_info['start_time'])) . " - " . 
+                            date('g:i A', strtotime($schedule_info['end_time'])) . ")";
         }
-
-        $success = 0; $failed = 0;
+        
+        $success_count = 0; $error_count = 0;
         foreach ($employee_ids as $emp_id) {
-            // Remove existing assignment for employee
-            $rm = $conn->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
-            $rm->bind_param("s", $emp_id);
-            $rm->execute();
-
-            // Insert new
-            $ins = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
-            $ins->bind_param("sii", $emp_id, $schedule_id, $_SESSION['registrar_id']);
-            if ($ins->execute()) { $success++; } else { $failed++; }
+            // Remove any existing schedule assignments for this employee
+            $remove_existing = $conn->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
+            $remove_existing->bind_param("s", $emp_id);
+            $remove_existing->execute();
+            
+            // Insert new assignment
+            $insert_stmt = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
+            $insert_stmt->bind_param("sii", $emp_id, $schedule_id, $_SESSION['registrar_id']);
+            if ($insert_stmt->execute()) { $success_count++; } else { $error_count++; }
         }
-
-        $msg = "Assigned schedule to $success employee(s)" . ($failed ? " ($failed failed)" : "");
-        echo json_encode(['success' => true, 'message' => $msg]);
+        
+        $message = "Assigned $success_count Employee(s) Successfully";
+        if ($error_count > 0) {
+            $message .= " ($error_count failed)";
+        }
+        
+        $response = ['success' => true, 'message' => $message];
+        header('Content-Type: application/json');
+        echo json_encode($response);
         exit;
     }
-
-    echo json_encode($response); exit;
 }
 
-// Fetch schedules with employee counts
-$schedules_query = "SELECT cs.*, COUNT(es.id) as employee_count
-                    FROM employee_work_schedules cs
-                    LEFT JOIN employee_schedules es ON cs.id = es.schedule_id
-                    GROUP BY cs.id
-                    ORDER BY cs.schedule_name";
+// Fetch all schedules
+$schedules_query = "SELECT cs.*, COUNT(es.id) as employee_count 
+                   FROM employee_work_schedules cs 
+                   LEFT JOIN employee_schedules es ON cs.id = es.schedule_id 
+                   GROUP BY cs.id 
+                   ORDER BY cs.schedule_name";
 $schedules_result = $conn->query($schedules_query);
-// Separate result for the Assign modal select (fresh pointer)
-$schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_time FROM employee_work_schedules ORDER BY schedule_name");
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Manage Employee Schedule - Cornerstone College Inc.</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Schedule Management - Cornerstone College Inc.</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
+        .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
 
+<!-- Header -->
 <header class="bg-[#0B2C62] text-white shadow-lg">
-    <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-3">
-            <a href="RegistrarDashboard.php" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition" title="Back">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            </a>
-            <h1 class="text-xl font-bold">Employee Schedule Management</h1>
-        </div>
-        <div class="flex items-center gap-3">
-            <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1" />
-            <div class="text-right">
-                <div class="text-sm text-blue-200">Registrar Module</div>
-                <div class="font-semibold">Cornerstone College Inc.</div>
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <button onclick="handleBackNavigation()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                </button>
+                <h1 class="text-xl font-bold">Schedule Management</h1>
+            <div class="flex items-center space-x-4">
+                <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+                <div class="text-right">
+                    <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+                    <p class="text-blue-200 text-sm">Schedule Management System</p>
+                </div>
             </div>
         </div>
+        
     </div>
 </header>
 
+<!-- Main Content -->
 <div class="container mx-auto px-6 py-8">
+    <!-- Success Message -->
     <div id="successMessage" class="hidden mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
         <span id="successText"></span>
     </div>
@@ -243,56 +286,58 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
         <span id="errorText"></span>
     </div>
 
+    <!-- Action Buttons -->
     <div class="mb-6 flex gap-4">
         <button onclick="showCreateScheduleModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
             Create Schedule
         </button>
         <button onclick="showAssignScheduleModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+            </svg>
             Assign Schedule to Employees
         </button>
     </div>
 
-    <div class="bg-white rounded-xl shadow p-6">
+    <!-- Schedules List -->
+    <div class="bg-white rounded-xl card-shadow p-6">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
-          <h2 class="text-xl font-bold text-gray-800">Schedules</h2>
-          <div class="w-full md:w-80">
-            <div class="relative">
-              <div id="scheduleSearchIcon" class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              </div>
-              <input id="scheduleSearch" type="text" placeholder="Search schedules by name or day..." class="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" />
-              <button id="scheduleSearchClear" type="button" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600" aria-label="Clear search">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+            <h2 class="text-xl font-bold text-gray-800">Schedules</h2>
+            <div class="w-full md:w-80">
+                <div class="relative">
+                    <div id="classSearchIcon" class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input id="classScheduleSearch" type="text" placeholder="Search schedules by name or day..." class="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" />
+                    <button id="classSearchClear" type="button" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600" aria-label="Clear search">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
             </div>
-          </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="schedulesGrid">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="classSchedulesGrid">
             <?php if ($schedules_result && $schedules_result->num_rows > 0): ?>
                 <?php while ($schedule = $schedules_result->fetch_assoc()): ?>
-                    <div class="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition-shadow schedule-card">
+                    <div class="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition-shadow class-schedule-card">
                         <div class="flex justify-between items-start mb-3">
-                            <h3 class="text-lg font-bold text-gray-800 schedule-name"><?= htmlspecialchars($schedule['schedule_name']) ?></h3>
+                            <h3 class="text-lg font-bold text-gray-800 class-schedule-name"><?= htmlspecialchars($schedule['schedule_name']) ?></h3>
                             <div class="flex gap-2">
-                                <button onclick="openScheduleDetails(<?= (int)$schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">View</button>
+                                <button onclick="openClassScheduleDetails(<?= (int)$schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">View</button>
                                 <button onclick="editSchedule(<?= (int)$schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">Edit</button>
                                 <button onclick="deleteSchedule(<?= (int)$schedule['id'] ?>)" class="text-red-500 hover:text-red-700 text-sm">Delete</button>
                             </div>
                         </div>
 
                         <?php
-                          // Compute display time:
-                          // 1) If there is a day-specific schedule for TODAY, show it, e.g. "7:00 AM - 10:00 PM (Monday)"
-                          // 2) Otherwise, do NOT look ahead. If schedule is variable or full-day default,
-                          //    show placeholder "--:-- - --:--"; else show the general time range.
-
+                          // Real-time display time for employee schedules
+                          date_default_timezone_set('Asia/Manila');
                           $todayName = date('l');
                           $display_time = date('g:i A', strtotime($schedule['start_time'])) . ' - ' . date('g:i A', strtotime($schedule['end_time']));
                           $sid = (int)$schedule['id'];
-
-                          // Try to get today's schedule first
                           $ds_today = $conn->prepare("SELECT start_time, end_time FROM employee_work_day_schedules WHERE schedule_id = ? AND LOWER(day_name) = LOWER(?)");
                           if ($ds_today) {
                               $ds_today->bind_param("is", $sid, $todayName);
@@ -302,20 +347,15 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                                       $row = $res_today->fetch_assoc();
                                       $display_time = date('g:i A', strtotime($row['start_time'])) . ' - ' . date('g:i A', strtotime($row['end_time'])) . ' (' . $todayName . ')';
                                   } else {
-                                      // No schedule for today.
                                       $isFullDay = ($schedule['start_time'] === '00:00:00' && $schedule['end_time'] === '23:59:59');
                                       $daysStr = isset($schedule['days']) ? trim((string)$schedule['days']) : '';
                                       $isVariable = strcasecmp($daysStr, 'Variable') === 0;
                                       if ($isVariable || $isFullDay) {
-                                          // Variable or default full-day: no specific time for today
                                           $display_time = '--:-- - --:--';
                                       } else {
-                                          // Same time for selected days. Only show time if today is one of those days; otherwise placeholder
                                           $daysArr = array_filter(array_map('trim', explode(',', $daysStr)));
                                           $match = false;
-                                          foreach ($daysArr as $dname) {
-                                              if (strcasecmp($dname, $todayName) === 0) { $match = true; break; }
-                                          }
+                                          foreach ($daysArr as $dname) { if (strcasecmp($dname, $todayName) === 0) { $match = true; break; } }
                                           if ($match) {
                                               $display_time = date('g:i A', strtotime($schedule['start_time'])) . ' - ' . date('g:i A', strtotime($schedule['end_time'])) . ' (' . $todayName . ')';
                                           } else {
@@ -326,6 +366,7 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                               }
                           }
                         ?>
+                        
                         <div class="space-y-2 text-sm">
                             <div class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -333,7 +374,7 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                                 </svg>
                                 <span class="font-medium"><?= htmlspecialchars($display_time) ?></span>
                             </div>
-                            <div class="flex items-center gap-2 schedule-days">
+                            <div class="flex items-center gap-2 class-schedule-days">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
@@ -346,9 +387,9 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                                 <span><?= (int)$schedule['employee_count'] ?> employee(s) assigned</span>
                             </div>
                         </div>
-
+                        
                         <div class="mt-4 pt-3 border-t">
-                            <a href="view_schedule_employees.php?schedule_id=<?= (int)$schedule['id'] ?>&schedule_name=<?= urlencode($schedule['schedule_name']) ?>"
+                            <a href="view_schedule_employees.php?schedule_id=<?= (int)$schedule['id'] ?>&schedule_name=<?= urlencode($schedule['schedule_name']) ?>" 
                                class="block text-center bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg text-sm font-medium">
                                 View Employees
                             </a>
@@ -356,571 +397,911 @@ $schedules_for_select = $conn->query("SELECT id, schedule_name, start_time, end_
                     </div>
                 <?php endwhile; ?>
             <?php else: ?>
-                <div class="col-span-full text-center py-8 text-gray-500">No employee schedules created yet</div>
+                <div class="col-span-full text-center py-8">
+                    <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <p class="text-gray-500 text-lg">No schedules created yet</p>
+                    <p class="text-gray-400 text-sm">Click "Create Schedule" to get started</p>
+                </div>
             <?php endif; ?>
         </div>
-        <div id="scheduleNoResults" class="hidden col-span-full text-center py-8 text-gray-500">No schedules found</div>
+        <!-- No results message for search -->
+        <div id="classNoResults" class="hidden col-span-full text-center py-8 text-gray-500">No schedules found</div>
     </div>
+</div>
 
+<!-- Reassign Confirmation Modal -->
+<div id="reassignConfirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-lg font-bold text-gray-800">Confirm Reassignment</h3>
+      <button onclick="hideReassignConfirm()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
     </div>
+    <div id="reassignConfirmBody" class="text-sm text-gray-700 space-y-2">
+      <!-- dynamic content -->
+    </div>
+    <div class="flex gap-3 pt-4">
+      <button onclick="hideReassignConfirm()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+      <button onclick="confirmProceedReassign()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirm</button>
+    </div>
+  </div>
+  
+</div>
 
-    <!-- Create/Edit Schedule Modal (Student-style) -->
-    <div id="createScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+<!-- View Schedule Details Modal (Employees) -->
+<div id="classScheduleDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
         <div class="flex justify-between items-center mb-4">
-          <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Create New Schedule</h3>
-          <button onclick="hideCreateScheduleModal()" class="text-gray-500 hover:text-gray-700">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+            <h3 id="classSchedTitle" class="text-lg font-bold text-gray-800">Schedule Details</h3>
+            <button onclick="closeClassScheduleDetails()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div id="classSchedBody" class="space-y-3 text-sm text-gray-800">
+            <p>Loading schedule...</p>
+        </div>
+        <div class="pt-4">
+            <button onclick="closeClassScheduleDetails()" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">Close</button>
+        </div>
+    </div>
+    
+    </div>
+
+<!-- Create/Edit Schedule Modal -->
+<div id="createScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Create New Schedule</h3>
+            <button onclick="hideCreateScheduleModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
         </div>
         <form id="createScheduleForm" class="space-y-4">
-          <input type="hidden" id="scheduleId" name="schedule_id">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Schedule Name</label>
-            <input type="text" id="sectionName" name="section_name" placeholder="--:-- --" required 
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
-          </div>
-          <div class="grid grid-cols-2 gap-3">
+            <input type="hidden" id="scheduleId" name="schedule_id">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-              <input type="time" id="startTime" name="start_time" required 
-                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Schedule Name</label>
+                <input type="text" id="sectionName" name="section_name" placeholder="" required 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input type="time" id="startTime" name="start_time" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input type="time" id="endTime" name="end_time" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-              <input type="time" id="endTime" name="end_time" required 
-                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Type</label>
-            <div class="mb-4">
-              <label class="flex items-center mb-2">
-                <input type="radio" name="schedule_type" value="same" checked class="mr-2" onchange="toggleScheduleType()">
-                Same time for all days
-              </label>
-              <label class="flex items-center">
-                <input type="radio" name="schedule_type" value="different" class="mr-2" onchange="toggleScheduleType()">
-                Different times for each day
-              </label>
-            </div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Type</label>
+                <div class="mb-4">
+                    <label class="flex items-center mb-2">
+                        <input type="radio" name="schedule_type" value="same" checked class="mr-2" onchange="toggleScheduleType()">
+                        Same time for all days
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="schedule_type" value="different" class="mr-2" onchange="toggleScheduleType()">
+                        Different times for each day
+                    </label>
+                </div>
 
-            <!-- Same Time Schedule -->
-          <div id="sameTimeSchedule">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Days</label>
-            <div id="sameDaysGroup" class="grid grid-cols-2 gap-2 mb-2">
-              <label class="flex items-center"><input type="checkbox" name="days[]" value="Monday" class="mr-2">Monday</label>
-              <label class="flex items-center"><input type="checkbox" name="days[]" value="Tuesday" class="mr-2">Tuesday</label>
-              <label class="flex items-center"><input type="checkbox" name="days[]" value="Wednesday" class="mr-2">Wednesday</label>
-              <label class="flex items-center"><input type="checkbox" name="days[]" value="Thursday" class="mr-2">Thursday</label>
-              <label class="flex items-center"><input type="checkbox" name="days[]" value="Friday" class="mr-2">Friday</label>
-              <label class="flex items-center"><input type="checkbox" name="days[]" value="Saturday" class="mr-2">Saturday</label>
-              <label class="flex items-center"><input type="checkbox" name="days[]" value="Sunday" class="mr-2">Sunday</label>
-            </div>
-            <p id="sameDaysError" class="hidden text-sm text-red-600 mb-4">Please select at least one day.</p>
-          </div>
+                <!-- Same Time Schedule -->
+                <div id="sameTimeSchedule">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Days</label>
+                    <div id="sameDaysGroup" class="grid grid-cols-2 gap-2 mb-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="days[]" value="Monday" class="mr-2">
+                            Monday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="days[]" value="Tuesday" class="mr-2">
+                            Tuesday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="days[]" value="Wednesday" class="mr-2">
+                            Wednesday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="days[]" value="Thursday" class="mr-2">
+                            Thursday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="days[]" value="Friday" class="mr-2">
+                            Friday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="days[]" value="Saturday" class="mr-2">
+                            Saturday
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="days[]" value="Sunday" class="mr-2">
+                            Sunday
+                        </label>
+                    </div>
+                    <p id="sameDaysError" class="hidden text-sm text-red-600 mb-4">Please select at least one day.</p>
+                </div>
 
-            <!-- Different Time Schedule -->
-            <div id="differentTimeSchedule" class="hidden">
-              <div class="space-y-4">
-                <?php foreach(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] as $d): ?>
-                  <div class="grid grid-cols-3 gap-2 items-center">
-                    <label class="flex items-center"><input type="checkbox" name="day_schedules[<?= $d ?>][enabled]" value="1" class="mr-2"><?= $d ?></label>
-                    <input type="time" name="day_schedules[<?= $d ?>][start_time]" class="border border-gray-300 rounded px-3 py-2">
-                    <input type="time" name="day_schedules[<?= $d ?>][end_time]" class="border border-gray-300 rounded px-3 py-2">
-                  </div>
-                <?php endforeach; ?>
-          <p id="diffDaysError" class="hidden text-sm text-red-600">Please enable at least one day and provide start and end times.</p>
+                <!-- Different Time Schedule -->
+                <div id="differentTimeSchedule" class="hidden">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="day_schedules[Monday][enabled]" value="1" class="mr-2">
+                                Monday
+                            </label>
+                            <input type="time" name="day_schedules[Monday][start_time]" class="border border-gray-300 rounded px-3 py-2">
+                            <input type="time" name="day_schedules[Monday][end_time]" class="border border-gray-300 rounded px-3 py-2">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="day_schedules[Tuesday][enabled]" value="1" class="mr-2">
+                                Tuesday
+                            </label>
+                            <input type="time" name="day_schedules[Tuesday][start_time]" class="border border-gray-300 rounded px-3 py-2">
+                            <input type="time" name="day_schedules[Tuesday][end_time]" class="border border-gray-300 rounded px-3 py-2">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="day_schedules[Wednesday][enabled]" value="1" class="mr-2">
+                                Wednesday
+                            </label>
+                            <input type="time" name="day_schedules[Wednesday][start_time]" class="border border-gray-300 rounded px-3 py-2">
+                            <input type="time" name="day_schedules[Wednesday][end_time]" class="border border-gray-300 rounded px-3 py-2">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="day_schedules[Thursday][enabled]" value="1" class="mr-2">
+                                Thursday
+                            </label>
+                            <input type="time" name="day_schedules[Thursday][start_time]" class="border border-gray-300 rounded px-3 py-2">
+                            <input type="time" name="day_schedules[Thursday][end_time]" class="border border-gray-300 rounded px-3 py-2">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="day_schedules[Friday][enabled]" value="1" class="mr-2">
+                                Friday
+                            </label>
+                            <input type="time" name="day_schedules[Friday][start_time]" class="border border-gray-300 rounded px-3 py-2">
+                            <input type="time" name="day_schedules[Friday][end_time]" class="border border-gray-300 rounded px-3 py-2">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="day_schedules[Saturday][enabled]" value="1" class="mr-2">
+                                Saturday
+                            </label>
+                            <input type="time" name="day_schedules[Saturday][start_time]" class="border border-gray-300 rounded px-3 py-2">
+                            <input type="time" name="day_schedules[Saturday][end_time]" class="border border-gray-300 rounded px-3 py-2">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 items-center">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="day_schedules[Sunday][enabled]" value="1" class="mr-2">
+                                Sunday
+                            </label>
+                            <input type="time" name="day_schedules[Sunday][start_time]" class="border border-gray-300 rounded px-3 py-2">
+                            <input type="time" name="day_schedules[Sunday][end_time]" class="border border-gray-300 rounded px-3 py-2">
+                        </div>
+                    </div>
+                    <p id="diffDaysError" class="hidden text-sm text-red-600">Please enable at least one day and provide start and end times.</p>
+                </div>
             </div>
-          <!-- Inline form error (create/edit) -->
-          <p id="formError" class="hidden text-sm text-red-600"></p>
-        </div>
-          <div class="flex gap-3 pt-4">
-            <button type="button" onclick="hideCreateScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
-            <button type="submit" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Create Schedule</button>
-          </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="hideCreateScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+                <button type="submit" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Create Schedule</button>
+            </div>
         </form>
-      </div>
     </div>
+</div>
 
-    <!-- Reassign Confirmation Modal (Employees) -->
-    <div id="empReassignConfirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-        <div class="flex justify-between items-center mb-3">
-          <h3 class="text-lg font-bold text-gray-800">Confirm Assignment</h3>
-          <button onclick="hideEmpReassignConfirm()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4">
+        <div class="text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">Delete Schedule</h3>
+            <p class="text-sm text-gray-500 mb-6">Are you sure you want to delete this schedule? This will remove all employee assignments and cannot be undone.</p>
+            <div class="flex gap-3">
+                <button onclick="hideDeleteModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium">
+                    Cancel
+                </button>
+                <button onclick="confirmDelete()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium">
+                    Delete
+                </button>
+            </div>
         </div>
-        <div id="empReassignConfirmBody" class="text-sm text-gray-700 space-y-2">
-          <!-- dynamic content -->
-        </div>
-        <div class="flex gap-3 pt-4">
-          <button onclick="hideEmpReassignConfirm()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
-          <button onclick="confirmProceedEmpReassign()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirm</button>
-        </div>
-      </div>
     </div>
+</div>
 
-    <!-- Assign Schedule Modal (Student-style) -->
-    <div id="assignScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+<!-- Assign Schedule Modal -->
+<div id="assignScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-bold text-gray-800">Assign Schedule to Employees</h3>
-          <button onclick="hideAssignScheduleModal()" class="text-gray-500 hover:text-gray-700">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+            <h3 class="text-lg font-bold text-gray-800">Assign Schedule to Employees</h3>
+            <button onclick="hideAssignScheduleModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
         </div>
-
+        
         <!-- Schedule Selection -->
         <div class="mb-2">
           <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedule</label>
           <select id="scheduleSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
             <option value="">Choose a schedule...</option>
-            <?php if($schedules_for_select){ while($s = $schedules_for_select->fetch_assoc()): ?>
+            <?php 
+            $schedules_result->data_seek(0); // Reset result pointer
+            while ($s = $schedules_result->fetch_assoc()): ?>
               <option value="<?= (int)$s['id'] ?>"><?= htmlspecialchars($s['schedule_name']) ?> (<?= date('g:i A', strtotime($s['start_time'])) ?> - <?= date('g:i A', strtotime($s['end_time'])) ?>)</option>
-            <?php endwhile; } ?>
+            <?php endwhile; ?>
           </select>
           <p id="assignInlineError" class="hidden text-sm text-red-600 mt-1"></p>
         </div>
 
-        <!-- Search Employees -->
+        <!-- Search Students -->
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Search Employees</label>
-          <input type="text" id="employeeSearch" placeholder="Search by name or ID..." 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Search Employees</label>
+            <input type="text" id="studentSearch" placeholder="Search employee by name or ID..." 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
         </div>
 
         <!-- Employees List -->
-        <div id="employeesList" class="mb-4 max-h-60 overflow-y-auto border rounded-lg">
-          <p class="text-gray-500 text-center py-4">Loading employees...</p>
+        <div id="studentsList" class="border rounded-lg h-72 overflow-y-auto">
+            <p class="text-gray-500 text-center py-4">Loading employees...</p>
         </div>
         <!-- View More (replaced by infinite scroll) -->
-        <div id="employeesMoreContainer" class="mb-4 hidden text-center"></div>
+        <div id="studentsMoreContainer" class="mb-4 hidden text-center"></div>
 
-        <!-- Selected Count -->
-        <div class="mb-4 text-sm text-gray-700">Selected: <span id="selectedCount">0</span> employee(s)</div>
-
-        <div class="flex gap-3 pt-2">
-          <button type="button" onclick="hideAssignScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
-          <button type="button" onclick="assignScheduleToEmployees()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Assign Schedule</button>
+        <!-- Selected Students Count -->
+        <div class="mb-4">
+            <p class="text-sm text-gray-600">Selected: <span id="selectedCount">0</span> employee(s)</p>
         </div>
-      </div>
+
+        <div class="flex gap-3">
+            <button onclick="hideAssignScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+            <button onclick="assignScheduleToStudents()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Assign Schedule</button>
+        </div>
     </div>
+</div>
 
-    <!-- View Schedule Details Modal -->
-    <div id="scheduleDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-        <div class="flex justify-between items-center mb-4">
-          <h3 id="schedTitle" class="text-lg font-bold text-gray-800">Schedule Details</h3>
-          <button onclick="closeScheduleDetails()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-        <div id="schedBody" class="space-y-3 text-sm text-gray-800">
-          <p>Loading schedule...</p>
-        </div>
-        <div class="pt-4">
-          <button onclick="closeScheduleDetails()" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">Close</button>
-        </div>
-      </div>
-    </div>
+<script>
+let selectedStudents = [];
+// Cache minimal info for students we've displayed so we can show them in confirmation even after search filters
+const studentsIndex = {}; // id -> { name, hasCurrent }
+// Pagination state for students
+let studentsLimit = 15;
+let studentsOffset = 0;
+let studentsQuery = '';
+let studentsHasMore = false;
+let studentsLoading = false;
 
-    <script>
-// State
-let selectedEmployees = [];
+// Show/Hide Modals
+function showCreateScheduleModal() {
+    // Reset to defaults every time the modal opens
+    const modal = document.getElementById('createScheduleModal');
+    const form = document.getElementById('createScheduleForm');
+    if (form) form.reset();
+    // Title/button
+    const titleEl = document.getElementById('modalTitle'); if (titleEl) titleEl.textContent = 'Create New Schedule';
+    const submitEl = document.getElementById('submitBtn'); if (submitEl) submitEl.textContent = 'Create Schedule';
+    // Hidden id and basic fields
+    const idEl = document.getElementById('scheduleId'); if (idEl) idEl.value = '';
+    const nameEl = document.getElementById('sectionName'); if (nameEl) nameEl.value = '';
+    const stEl = document.getElementById('startTime'); if (stEl) stEl.value = '';
+    const etEl = document.getElementById('endTime'); if (etEl) etEl.value = '';
+    // Force schedule type to 'same'
+    const sameRadio = document.querySelector('input[name="schedule_type"][value="same"]');
+    const diffRadio = document.querySelector('input[name="schedule_type"][value="different"]');
+    if (sameRadio) sameRadio.checked = true; if (diffRadio) diffRadio.checked = false;
+    // Show same days group, hide different-day grid
+    const sameDiv = document.getElementById('sameTimeSchedule'); if (sameDiv) sameDiv.classList.remove('hidden');
+    const diffDiv = document.getElementById('differentTimeSchedule'); if (diffDiv) diffDiv.classList.add('hidden');
+    // Uncheck all same-days checkboxes
+    document.querySelectorAll('input[name="days[]"]').forEach(cb => { cb.checked = false; });
+    // Clear all per-day checkboxes and time inputs
+    document.querySelectorAll('#differentTimeSchedule input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('#differentTimeSchedule input[type="time"]').forEach(inp => { inp.value = ''; });
+    // Hide any inline errors
+    const sameErr = document.getElementById('sameDaysError'); if (sameErr) sameErr.classList.add('hidden');
+    const diffErr = document.getElementById('diffDaysError'); if (diffErr) diffErr.classList.add('hidden');
+    // Finally open
+    modal.classList.remove('hidden');
+}
+
+function hideCreateScheduleModal() {
+    document.getElementById('createScheduleModal').classList.add('hidden');
+    document.getElementById('createScheduleForm').reset();
+    // Clear inline validation styles/messages
+    const sameErr = document.getElementById('sameDaysError'); if (sameErr) sameErr.classList.add('hidden');
+    const sameGrp = document.getElementById('sameDaysGroup'); if (sameGrp) sameGrp.classList.remove('ring-1','ring-red-400','rounded');
+    const diffErr = document.getElementById('diffDaysError'); if (diffErr) diffErr.classList.add('hidden');
+    
+    // Reset modal to create mode
+    document.getElementById('modalTitle').textContent = 'Create New Schedule';
+    document.getElementById('submitBtn').textContent = 'Create Schedule';
+    currentScheduleId = null;
+    
+    // Clear all form fields
+    document.getElementById('scheduleId').value = '';
+    document.getElementById('sectionName').value = '';
+    document.getElementById('startTime').value = '';
+    document.getElementById('endTime').value = '';
+    
+    // Uncheck all day checkboxes
+    document.querySelectorAll('input[name="days[]"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+function showAssignScheduleModal() {
+    document.getElementById('assignScheduleModal').classList.remove('hidden');
+    selectedStudents = [];
+    updateSelectedCount();
+    // Reset search box and state
+    const searchEl = document.getElementById('studentSearch'); if (searchEl) searchEl.value = '';
+    // Reset schedule select to default (empty)
+    const sel = document.getElementById('scheduleSelect');
+    if (sel) { sel.value = ''; }
+    studentsQuery = '';
+    studentsOffset = 0;
+    const listC = document.getElementById('studentsList'); if (listC) listC.innerHTML = '<p class="text-gray-500 text-center py-4">Loading employees...</p>';
+    loadStudentsPage(false);
+    // Attach infinite scroll listener
+    const listEl = document.getElementById('studentsList');
+    listEl.addEventListener('scroll', onStudentsScroll);
+    if (sel) sel.addEventListener('change', onEmployeeScheduleChangeReload);
+}
+
+function hideAssignScheduleModal() {
+    document.getElementById('assignScheduleModal').classList.add('hidden');
+    selectedStudents = [];
+    document.getElementById('studentsList').innerHTML = '<p class="text-gray-500 text-center py-4">Loading employees...</p>';
+    const moreC = document.getElementById('studentsMoreContainer'); if(moreC) moreC.classList.add('hidden');
+    // Detach scroll listener
+    const listEl = document.getElementById('studentsList');
+    listEl.removeEventListener('scroll', onStudentsScroll);
+}
+
 let currentScheduleId = null;
-let pendingEmpAssignment = null; // { scheduleId }
-// Cache minimal info so selections survive search rerenders
-const employeesIndex = {}; // id -> { name, hasCurrent }
-// Pagination for employees
-let employeesLimit = 15;
-let employeesOffset = 0;
-let employeesQuery = '';
-let employeesHasMore = false;
-let employeesLoading = false;
+// State for pending assignment confirmation
+let pendingAssignment = null; // { scheduleId, movingIds }
 
-// Create/Edit Schedule modal controls
-function showCreateScheduleModal(){
-  currentScheduleId = null;
-  document.getElementById('modalTitle').textContent='Create New Schedule';
-  document.getElementById('submitBtn').textContent='Create Schedule';
-  document.getElementById('createScheduleForm').reset();
-  document.getElementById('differentTimeSchedule').classList.add('hidden');
-  document.getElementById('sameTimeSchedule').classList.remove('hidden');
-  const fe = document.getElementById('formError'); if (fe){ fe.classList.add('hidden'); fe.textContent=''; }
-  document.getElementById('createScheduleModal').classList.remove('hidden');
-}
-function hideCreateScheduleModal(){
-  document.getElementById('createScheduleModal').classList.add('hidden');
-  // Reset inline errors
-  const se=document.getElementById('sameDaysError'); if(se) se.classList.add('hidden');
-  const de=document.getElementById('diffDaysError'); if(de) de.classList.add('hidden');
-  const fe=document.getElementById('formError'); if (fe){ fe.classList.add('hidden'); fe.textContent=''; }
-}
-function toggleScheduleType(){
-  const type = document.querySelector('input[name="schedule_type"]:checked').value;
-  document.getElementById('sameTimeSchedule').classList.toggle('hidden', type!=='same');
-  document.getElementById('differentTimeSchedule').classList.toggle('hidden', type!=='different');
-  document.getElementById('startTime').required = (type==='same');
-  document.getElementById('endTime').required = (type==='same');
-}
+// Create/Edit Schedule Form Submission
+document.getElementById('createScheduleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Client-side validation for day selection
+    const type = document.querySelector('input[name="schedule_type"]:checked')?.value || 'same';
+    let valid = true;
+    const formErrEl = document.getElementById('formError');
+    if (formErrEl) { formErrEl.classList.add('hidden'); formErrEl.textContent=''; }
+    if (type === 'same') {
+        const checks = Array.from(document.querySelectorAll('#sameDaysGroup input[type="checkbox"]:checked'));
+        const st = document.getElementById('startTime')?.value;
+        const et = document.getElementById('endTime')?.value;
+        const err = document.getElementById('sameDaysError');
+        if (checks.length === 0 || !st || !et) {
+            valid = false;
+            if (err) err.textContent = 'Please select at least one day and provide start and end times.';
+            if (err) err.classList.remove('hidden');
+        } else {
+            if (err) err.classList.add('hidden');
+        }
+    } else {
+        // different: at least one enabled day, and ALL enabled days must have both times
+        const enabled = Array.from(document.querySelectorAll('input[name^="day_schedules"][name$="[enabled]"]:checked'));
+        let hasAny = enabled.length > 0;
+        let allComplete = true;
+        enabled.forEach(cb => {
+            const day = cb.name.match(/day_schedules\[(.+?)\]/)?.[1];
+            if (!day) return;
+            const st = document.querySelector(`input[name="day_schedules[${day}][start_time]"]`)?.value;
+            const et = document.querySelector(`input[name="day_schedules[${day}][end_time]"]`)?.value;
+            if (!st || !et) { allComplete = false; }
+        });
+        const err = document.getElementById('diffDaysError');
+        if (!hasAny || !allComplete) {
+            valid = false;
+            if (err) err.textContent = 'Please enable at least one day and provide start and end times for all enabled days.';
+            if (err) err.classList.remove('hidden');
+        } else { if (err) err.classList.add('hidden'); }
+    }
+    if (!valid) { if (formErrEl){ formErrEl.textContent = 'Please fix the highlighted fields.'; formErrEl.classList.remove('hidden'); } return; }
 
-// Submit create/edit schedule
-document.getElementById('createScheduleForm').addEventListener('submit', function(e){
-  e.preventDefault();
-  // Client-side validation for day selection
-  const type = document.querySelector('input[name="schedule_type"]:checked')?.value || 'same';
-  let valid = true;
-  const formErrEl = document.getElementById('formError'); if(formErrEl){ formErrEl.classList.add('hidden'); formErrEl.textContent=''; }
-  if (type === 'same') {
-    const checks = Array.from(document.querySelectorAll('#sameDaysGroup input[type="checkbox"]:checked'));
-    const st = document.getElementById('startTime')?.value;
-    const et = document.getElementById('endTime')?.value;
-    const err = document.getElementById('sameDaysError');
-    if (checks.length === 0 || !st || !et) { valid = false; if(err){ err.textContent='Please select at least one day and provide start and end times.'; err.classList.remove('hidden'); } }
-    else { if(err) err.classList.add('hidden'); }
-  } else {
-    const enabled = Array.from(document.querySelectorAll('input[name^="day_schedules"][name$="[enabled]"]:checked'));
-    let hasAny = enabled.length>0; let allComplete = true;
-    enabled.forEach(cb=>{ const day=cb.name.match(/day_schedules\[(.+?)\]/)?.[1]; if(!day) return; const st=document.querySelector(`input[name="day_schedules[${day}][start_time]"]`)?.value; const et=document.querySelector(`input[name="day_schedules[${day}][end_time]"]`)?.value; if(!st||!et){ allComplete=false; } });
-    const err = document.getElementById('diffDaysError'); if(!hasAny || !allComplete){ valid=false; if(err){ err.textContent='Please enable at least one day and provide start and end times for all enabled days.'; err.classList.remove('hidden'); } } else { if(err) err.classList.add('hidden'); }
-  }
-  if(!valid){ if(formErrEl){ formErrEl.textContent='Please fix the highlighted fields.'; formErrEl.classList.remove('hidden'); } return; }
-
-  const fd = new FormData(this);
-  if(currentScheduleId){ fd.append('action','edit_schedule'); }
-  else { fd.append('action','create_schedule'); }
-  fetch('ManageEmployeeSchedule.php', { method:'POST', body: fd })
-    .then(r=>r.json())
-    .then(d=>{ if(d.success){
-        // persist success across reload
-        sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message }));
-        hideCreateScheduleModal();
-        location.reload();
-      } else { if(formErrEl){ formErrEl.textContent = d.message || 'Action failed.'; formErrEl.classList.remove('hidden'); } } })
-    .catch(()=>{ if(formErrEl){ formErrEl.textContent = 'Failed to save schedule.'; formErrEl.classList.remove('hidden'); } });
+    const formData = new FormData(this);
+    const action = currentScheduleId ? 'edit_schedule' : 'create_schedule';
+    formData.append('action', action);
+    
+    if (currentScheduleId) {
+        formData.append('schedule_id', currentScheduleId);
+    }
+    
+    fetch('ManageEmployeeSchedule.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Persist notice across reload so user sees it
+            sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: data.message }));
+            hideCreateScheduleModal();
+            location.reload();
+        } else {
+            if (formErrEl){ formErrEl.textContent = data.message || 'Action failed.'; formErrEl.classList.remove('hidden'); }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        if (formErrEl){ formErrEl.textContent = 'Failed to save schedule. Please try again.'; formErrEl.classList.remove('hidden'); }
+    });
 });
 
-// Assign modal controls
-function showAssignScheduleModal() {
-  document.getElementById('assignScheduleModal').classList.remove('hidden');
-  selectedEmployees = [];
-  updateSelectedCount();
-  employeesQuery = '';
-  employeesOffset = 0;
-  loadEmployeesPage(false);
-  // Attach infinite scroll listener
-  const listEl = document.getElementById('employeesList');
-  listEl.addEventListener('scroll', onEmployeesScroll);
-}
-function hideAssignScheduleModal() {
-  document.getElementById('assignScheduleModal').classList.add('hidden');
-  selectedEmployees = [];
-  document.getElementById('employeesList').innerHTML = '<p class="text-gray-500 text-center py-4">Loading employees...</p>';
-  const moreC = document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden');
-  // Detach scroll listener
-  const listEl = document.getElementById('employeesList');
-  listEl.removeEventListener('scroll', onEmployeesScroll);
+
+// Load students page (supports search and pagination)
+function loadStudentsPage(append){
+    if (studentsLoading) return;
+    studentsLoading = true;
+    const params = new URLSearchParams();
+    if (studentsQuery === '') { params.set('all','1'); }
+    else { params.set('query', studentsQuery); }
+    params.set('limit', studentsLimit);
+    params.set('offset', studentsOffset);
+    fetch('SearchEmployee.php?' + params.toString())
+        .then(r=>r.json())
+        .then(d=>{
+            const container = document.getElementById('studentsList');
+            if (d.error){ container.innerHTML = `<p class="text-red-500 text-center py-4">${d.error}</p>`; return; }
+            const list = d.employees || d.students || [];
+            if (!append){ container.innerHTML = ''; }
+            displayStudents(list, append === true);
+            studentsHasMore = !!d.has_more;
+            const moreC = document.getElementById('studentsMoreContainer');
+            if (moreC){ moreC.classList.toggle('hidden', !studentsHasMore); }
+        })
+        .catch(err=>{
+            console.error('Error:', err);
+            document.getElementById('studentsList').innerHTML = '<p class="text-red-500 text-center py-4">Failed to load employees</p>';
+            const moreC = document.getElementById('studentsMoreContainer'); if(moreC) moreC.classList.add('hidden');
+        })
+        .finally(()=>{ studentsLoading = false; });
 }
 
-// Load/Display Employees
-function loadEmployeesPage(append){
-  if (employeesLoading) return;
-  employeesLoading = true;
-  const params = new URLSearchParams();
-  if (employeesQuery === '') params.set('all','1'); else params.set('query', employeesQuery);
-  params.set('limit', employeesLimit);
-  params.set('offset', employeesOffset);
-  fetch('SearchEmployee.php?' + params.toString())
-    .then(async r=>{ const text = await r.text(); try{ return { ok:true, data: JSON.parse(text) }; } catch(e){ return { ok:false, text }; } })
-    .then(res=>{
-      const c = document.getElementById('employeesList');
-      if(!res.ok){ c.innerHTML = `<pre class=\"text-red-500 text-xs whitespace-pre-wrap p-4\">${res.text || 'Failed to load employees'}</pre>`; const moreC=document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden'); return; }
-      const d = res.data; if(d.error){ c.innerHTML = `<p class=\"text-red-500 text-center py-4\">${d.error}${d.details?': '+d.details:''}</p>`; const moreC=document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden'); return; }
-      if(!append) c.innerHTML='';
-      displayEmployees(d.employees||[], append===true);
-      employeesHasMore = !!d.has_more;
-      const moreC = document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.toggle('hidden', !employeesHasMore);
-    })
-    .catch(err=>{ document.getElementById('employeesList').innerHTML = `<p class=\"text-red-500 text-center py-4\">Failed to load employees</p>`; console.error('SearchEmployee fetch error', err); const moreC=document.getElementById('employeesMoreContainer'); if(moreC) moreC.classList.add('hidden'); })
-    .finally(()=>{ employeesLoading = false; });
-}
-function displayEmployees(list, append=false){
-  const c = document.getElementById('employeesList');
-  if(list.length===0){ if(!append){ c.innerHTML='<p class="text-gray-500 text-center py-4">No employees found</p>'; } return; }
-  let html='';
-  list.forEach(emp=>{
-    const isSelected = selectedEmployees.includes(emp.id_number);
-    const hasSchedule = !!emp.current_section;
-    const scheduleInfo = hasSchedule ? `<span class=\"text-orange-600 font-medium\">Current: ${emp.current_section}</span>` : '<span class=\"text-green-600\">Available</span>';
-    const fullName = emp.full_name || (emp.first_name + ' ' + emp.last_name);
-    // cache
-    employeesIndex[emp.id_number] = { name: fullName, hasCurrent: !!hasSchedule };
-    html += `
-      <div class="flex items-center p-3 border-b hover:bg-gray-50">
-        <input type="checkbox" id="emp_${emp.id_number}" ${isSelected?'checked':''} onchange="toggleEmployee('${emp.id_number}', ${hasSchedule?'true':'false'}, '${fullName}', '${emp.current_section||''}')" class="mr-3" />
-        <label for="emp_${emp.id_number}" class="flex-1 cursor-pointer">
-          <div class="font-medium">${fullName}</div>
-          <div class="text-sm text-gray-600">ID: ${emp.id_number}</div>
-          <div class="text-sm">${scheduleInfo}</div>
-        </label>
-      </div>`;
-  });
-  if(append) c.insertAdjacentHTML('beforeend', html); else c.innerHTML = html;
-}
-function toggleEmployee(id, hasSchedule, name, currentSection){
-  const i = selectedEmployees.indexOf(id);
-  if(i>-1){ selectedEmployees.splice(i,1); }
-  else {
-    if(hasSchedule==='true'){
-      const msg = `${name} is already assigned to \"${currentSection}\". Type the employee's name to confirm reassignment: \"${name}\"`;
-      const input = prompt(msg);
-      if(input!==name){ document.getElementById('emp_'+id).checked=false; return; }
+// Display students in the list
+function displayStudents(students, append=false) {
+    const container = document.getElementById('studentsList');
+    
+    if (students.length === 0) {
+        if (!append) container.innerHTML = '<p class="text-gray-500 text-center py-4">No employees found</p>';
+        return;
     }
-    selectedEmployees.push(id);
-  }
-  updateSelectedCount();
-}
-function updateSelectedCount(){ document.getElementById('selectedCount').textContent = selectedEmployees.length; }
-
-// Assign
-function assignScheduleToEmployees(){
-  const scheduleId = document.getElementById('scheduleSelect').value;
-  const aie = document.getElementById('assignInlineError'); if(aie){ aie.classList.add('hidden'); aie.textContent=''; }
-  if(!scheduleId){ if(aie){ aie.textContent = 'Please select a schedule'; aie.classList.remove('hidden'); } return; }
-  if(selectedEmployees.length===0){ if(aie){ aie.textContent = 'Please select at least one employee'; aie.classList.remove('hidden'); } return; }
-  // Build confirmation from selectedEmployees using cached info
-  try{
-    const items = selectedEmployees.map(id=>{
-      const meta = employeesIndex[id] || { name: id, hasCurrent: false };
-      return { id, name: meta.name, hasCurrent: !!meta.hasCurrent };
+    
+    let html = '';
+    students.forEach(emp => {
+        const id = emp.id_number;
+        const fullName = emp.full_name || (emp.first_name + ' ' + emp.last_name);
+        const currentName = emp.current_schedule || emp.schedule_text || emp.current_section || emp.class_schedule;
+        const hasSchedule = !!currentName;
+        const isSelected = selectedStudents.includes(id);
+        const scheduleInfo = hasSchedule ? `<span class="text-orange-600 font-medium">Current: ${currentName}</span>` : '<span class="text-green-600">Available</span>';
+        // cache
+        studentsIndex[id] = { name: fullName, hasCurrent: !!hasSchedule };
+        
+        html += `
+            <div class="flex items-center p-3 border-b hover:bg-gray-50 cursor-pointer select-none" onclick="toggleStudent('${id}', ${hasSchedule ? 'true' : 'false'}, '${fullName}', '${currentName || ''}')">
+                <input type="checkbox" id="student_${id}" ${isSelected ? 'checked' : ''} class="mr-3 pointer-events-none">
+                <div class="flex-1">
+                    <div class="font-medium">${fullName}</div>
+                    <div class="text-sm text-gray-600">ID: ${id} • ${emp.position || emp.department || 'N/A'}</div>
+                    <div class="text-sm">${scheduleInfo}</div>
+                </div>
+            </div>
+        `;
     });
-    pendingEmpAssignment = { scheduleId };
-    showEmpReassignConfirm(items);
-    return; // wait for confirm
-  }catch(e){ proceedEmpAssign(scheduleId); }
+    
+    if (append) container.insertAdjacentHTML('beforeend', html);
+    else container.innerHTML = html;
 }
 
-function showEmpReassignConfirm(items){
-  const body = document.getElementById('empReassignConfirmBody'); const modal = document.getElementById('empReassignConfirmModal'); if(!body||!modal) return;
-  const total = items.length; const moving = items.filter(i=>i.hasCurrent).length;
-  const allNames = items.map(i=>i.name);
-  const currentNames = items.filter(i=>i.hasCurrent).map(i=>i.name);
-  const makeList = (names, cap=10)=>{
-    const rows = names.slice(0,cap).map(n=>`<li>${n}</li>`).join('');
-    const extra = names.length>cap ? `<div class=\"text-xs text-gray-500 mt-1\">and ${names.length-cap} more…</div>` : '';
-    return `<ul class=\"list-disc ml-5 space-y-0.5\">${rows}</ul>${extra}`;
-  };
-  const title = `You are about to move <strong>${total}</strong> employee(s) to the selected schedule.`;
-  const note = moving>0 ? `<p class=\"mt-2 text-gray-600\">Moving will replace their existing schedule.</p>` : '';
-  body.innerHTML = `
-    <p>${title}</p>
-    <div class=\"mt-2 space-y-3\">
-      <div>
-        <div class=\"font-medium mb-1\">Selected employees (${allNames.length}):</div>
-        ${makeList(allNames)}
+// Toggle student selection with confirmation for reassignment
+function toggleStudent(studentId, hasSchedule, studentName, currentSection) {
+    const index = selectedStudents.indexOf(studentId);
+    
+    if (index > -1) {
+        // Deselecting student
+        selectedStudents.splice(index, 1);
+    } else {
+        selectedStudents.push(studentId);
+    }
+    updateSelectedCount();
+    const cb = document.getElementById(`student_${studentId}`); if (cb) cb.checked = selectedStudents.includes(studentId);
+}
+
+// Update selected count
+function updateSelectedCount() {
+    document.getElementById('selectedCount').textContent = selectedStudents.length;
+}
+
+// Assign schedule to selected students
+function assignScheduleToStudents() {
+    const scheduleId = document.getElementById('scheduleSelect').value;
+    
+    const assignErr = document.getElementById('assignInlineError');
+    if (assignErr) { assignErr.classList.add('hidden'); assignErr.textContent=''; }
+    if (!scheduleId) { if(assignErr){ assignErr.textContent='Please select a schedule'; assignErr.classList.remove('hidden'); } return; }
+    if (selectedStudents.length === 0) { if(assignErr){ assignErr.textContent='Please select at least one employee'; assignErr.classList.remove('hidden'); } return; }
+    
+    // Build confirmation from selectedStudents (not just visible rows), using cached info
+    try {
+        const items = selectedStudents.map(id => {
+            const meta = studentsIndex[id] || { name: id, hasCurrent: false };
+            return { id, name: meta.name, hasCurrent: !!meta.hasCurrent };
+        });
+        const movingCount = items.filter(i=>i.hasCurrent).length;
+        pendingAssignment = { scheduleId };
+        showReassignConfirmItems(items, items.length, movingCount);
+        return; // wait for user confirmation
+    } catch (e) { /* ignore */ }
+    
+    proceedAssign(scheduleId);
+}
+
+function showReassignConfirmItems(items, totalCount, movingCount){
+    const body = document.getElementById('reassignConfirmBody');
+    const modal = document.getElementById('reassignConfirmModal');
+    if(!body || !modal){ return; }
+    const titleLine = `You are about to move <strong>${totalCount}</strong> employee(s) to the selected schedule.`;
+    const allNames = items.map(i=>i.name);
+    const currentNames = items.filter(i=>i.hasCurrent).map(i=>i.name);
+    const makeList = (names, cap=10) => {
+        const rows = names.slice(0, cap).map(n=>`<li>${n}</li>`).join('');
+        const extra = names.length > cap ? `<div class=\"text-xs text-gray-500 mt-1\">and ${names.length-cap} more…</div>` : '';
+        return `<ul class=\"list-disc ml-5 space-y-0.5\">${rows}</ul>${extra}`;
+    };
+    const note = movingCount > 0 ? `<p class=\"mt-2 text-gray-600\">Moving will replace their existing schedule.</p>` : '';
+    body.innerHTML = `
+      <p>${titleLine}</p>
+      <div class=\"mt-2 space-y-3\">
+        <div>
+          <div class=\"font-medium mb-1\">Selected employees (${allNames.length}):</div>
+          ${makeList(allNames)}
+        </div>
+        <div>
+          <div class=\"font-medium mb-1\">Have current schedule (${currentNames.length}):</div>
+          ${currentNames.length ? makeList(currentNames) : '<div class=\"text-gray-500 text-sm\">None</div>'}
+        </div>
       </div>
-      <div>
-        <div class=\"font-medium mb-1\">Have current schedule (${currentNames.length}):</div>
-        ${currentNames.length ? makeList(currentNames) : '<div class=\"text-gray-500 text-sm\">None</div>'}
-      </div>
-    </div>
-    ${note}
-  `;
-  modal.classList.remove('hidden');
+      ${note}
+    `;
+    modal.classList.remove('hidden');
 }
 
-function hideEmpReassignConfirm(){ const m=document.getElementById('empReassignConfirmModal'); if(m) m.classList.add('hidden'); pendingEmpAssignment=null; }
+function hideReassignConfirm(){ const m=document.getElementById('reassignConfirmModal'); if(m) m.classList.add('hidden'); pendingAssignment=null; }
 
-function confirmProceedEmpReassign(){ const data=pendingEmpAssignment; hideEmpReassignConfirm(); if(!data) return; proceedEmpAssign(data.scheduleId); }
-
-function proceedEmpAssign(scheduleId){
-  const fd = new FormData();
-  fd.append('action','assign_schedule');
-  fd.append('schedule_id', scheduleId);
-  selectedEmployees.forEach(id=> fd.append('employee_ids[]', id));
-  fetch('ManageEmployeeSchedule.php',{ method:'POST', body: fd })
-    .then(r=>r.json())
-    .then(d=>{ if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); hideAssignScheduleModal(); location.reload(); } else { const aie = document.getElementById('assignInlineError'); if(aie){ aie.textContent = d.message || 'Assign failed.'; aie.classList.remove('hidden'); } } })
-    .catch(()=>{ const aie = document.getElementById('assignInlineError'); if(aie){ aie.textContent = 'Failed to assign schedule. Please try again.'; aie.classList.remove('hidden'); } });
+function confirmProceedReassign(){
+    const data = pendingAssignment; hideReassignConfirm();
+    if(!data) return;
+    proceedAssign(data.scheduleId);
 }
 
-// View Employees follows the student pattern: navigate to a dedicated page
-function viewScheduleEmployees(id, scheduleName){
-  window.location.href = `view_schedule_employees.php?schedule_id=${id}&schedule_name=${encodeURIComponent(scheduleName)}`;
+function proceedAssign(scheduleId){
+    const formData = new FormData();
+    formData.append('action', 'assign_schedule');
+    formData.append('schedule_id', scheduleId);
+    selectedStudents.forEach(studentId => formData.append('employee_ids[]', studentId));
+    fetch('ManageEmployeeSchedule.php', { method: 'POST', body: formData })
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); hideAssignScheduleModal(); location.reload(); }
+        else { showErrorBanner(d.message || 'Assign failed.'); }
+      })
+      .catch(()=>{ showErrorBanner('Failed to assign schedule. Please try again.'); });
 }
 
-// Employee search (supports 1+ char and pagination)
- document.getElementById('employeeSearch').addEventListener('input', function(){
-  const q = this.value.trim();
-  if(q.length === 0){ employeesQuery=''; employeesOffset=0; loadEmployeesPage(false); return; }
-  employeesQuery = q; employeesOffset = 0; loadEmployeesPage(false);
+// Student search functionality
+document.getElementById('studentSearch').addEventListener('input', function() {
+    const query = this.value.trim();
+    // When cleared, show all employees again
+    if (query.length === 0) {
+        studentsQuery = '';
+        studentsOffset = 0;
+        loadStudentsPage(false);
+        return;
+    }
+    // Search even with a single character
+    studentsQuery = query;
+    studentsOffset = 0;
+    loadStudentsPage(false);
 });
 
 // Infinite scroll handler
-function onEmployeesScroll(){
-  const el = document.getElementById('employeesList');
-  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
-  if (nearBottom && employeesHasMore && !employeesLoading){
-    employeesOffset += employeesLimit;
-    loadEmployeesPage(true);
-  }
+function onStudentsScroll(){
+    const el = document.getElementById('studentsList');
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+    if (nearBottom && studentsHasMore && !studentsLoading){
+        studentsOffset += studentsLimit;
+        loadStudentsPage(true);
+    }
 }
 
-function showSuccessMessage(message){
-  const s=document.getElementById('successMessage'); const t=document.getElementById('successText');
-  if (s && t){ t.textContent=message; s.classList.remove('hidden'); setTimeout(()=>s.classList.add('hidden'),3000); }
-  showToast('success', message);
+// ---------- Toast/Banner Notifications ----------
+function showBanner(message, type='success', timeout=3000){
+  try{
+    const box = document.createElement('div');
+    box.className = 'fixed top-4 right-4 z-[70] px-4 py-2 rounded-lg shadow text-white ' + (type==='success' ? 'bg-green-600' : 'bg-red-600');
+    box.textContent = message;
+    document.body.appendChild(box);
+    setTimeout(()=>{ box.style.transition='opacity .3s'; box.style.opacity='0'; setTimeout(()=>box.remove(), 300); }, timeout);
+  }catch(e){}
 }
+function showSuccessBanner(msg){ showBanner(msg, 'success'); }
+function showErrorBanner(msg){ showBanner(msg, 'error'); }
 
-function showToast(type, message){
-  let container = document.getElementById('toast-container');
-  if(!container){ container = document.createElement('div'); container.id='toast-container'; container.style.position='fixed'; container.style.top='16px'; container.style.right='16px'; container.style.zIndex='9999'; document.body.appendChild(container); }
-  const toast = document.createElement('div');
-  toast.className = 'mb-2 px-4 py-3 rounded shadow text-white text-sm';
-  toast.style.minWidth = '240px';
-  toast.style.backgroundColor = type==='success' ? '#16a34a' : '#dc2626';
-  toast.textContent = message;
-  container.appendChild(toast);
-  setTimeout(()=>{ toast.style.opacity='0'; toast.style.transition='opacity 300ms'; }, 2700);
-  setTimeout(()=>{ if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3100);
-}
-
-function showErrorMessage(message){
-  const e=document.getElementById('errorMessage'); const t=document.getElementById('errorText'); if(!e||!t){ alert('Error: '+message); return; }
-  t.textContent=message; e.classList.remove('hidden'); setTimeout(()=>e.classList.add('hidden'),4000);
-}
-
-// show persisted notice after reload
 document.addEventListener('DOMContentLoaded', ()=>{
   try{
     const raw = sessionStorage.getItem('schedule_notice');
-    if(raw){ const n = JSON.parse(raw); if(n && n.message){ showToast(n.type || 'success', n.message); } sessionStorage.removeItem('schedule_notice'); }
+    if(raw){ const data = JSON.parse(raw); showBanner(data.message || 'Action completed', data.type || 'success'); sessionStorage.removeItem('schedule_notice'); }
   }catch(e){}
 });
 
-function editSchedule(id){
-  fetch(`get_employee_schedule.php?id=${id}`)
-    .then(r=>r.json()).then(data=>{
-      if(data.success){
-        const schedule=data.schedule; 
-        document.getElementById('scheduleId').value=schedule.id;
-        document.getElementById('sectionName').value=schedule.schedule_name;
-        if(schedule.has_day_schedules){
-          document.querySelector('input[name="schedule_type"][value="different"]').checked = true; toggleScheduleType();
-          const ds = schedule.day_schedules; Object.keys(ds).forEach(day=>{
-            const d=ds[day];
-            const cb=document.querySelector(`input[name=\"day_schedules[${day}][enabled]\"]`);
-            const st=document.querySelector(`input[name=\"day_schedules[${day}][start_time]\"]`);
-            const et=document.querySelector(`input[name=\"day_schedules[${day}][end_time]\"]`);
-            if(cb) cb.checked = true; if(st) st.value = d.start_time; if(et) et.value = d.end_time;
-          });
-        } else {
-          document.querySelector('input[name="schedule_type"][value="same"]').checked = true; toggleScheduleType();
-          document.getElementById('startTime').value = schedule.start_time;
-          document.getElementById('endTime').value = schedule.end_time;
-          document.querySelectorAll('input[name="days[]"]').forEach(cb=>cb.checked=false);
-          if(schedule.days && schedule.days !== 'Variable'){
-            schedule.days.split(',').forEach(day=>{
-              const cb=document.querySelector(`input[name=\"days[]\"][value=\"${day.trim()}\"]`); if(cb) cb.checked=true;
-            });
-          }
+// Toggle schedule type function
+function toggleScheduleType() {
+    const scheduleType = document.querySelector('input[name="schedule_type"]:checked').value;
+    const sameTimeDiv = document.getElementById('sameTimeSchedule');
+    const differentTimeDiv = document.getElementById('differentTimeSchedule');
+    const startTimeInput = document.getElementById('startTime');
+    const endTimeInput = document.getElementById('endTime');
+    const timeFieldsDiv = startTimeInput.closest('.grid'); // Get the parent div containing both time fields
+    
+    if (scheduleType === 'same') {
+        sameTimeDiv.classList.remove('hidden');
+        differentTimeDiv.classList.add('hidden');
+        timeFieldsDiv.classList.remove('hidden'); // Show time fields
+        startTimeInput.required = true;
+        endTimeInput.required = true;
+    } else {
+        sameTimeDiv.classList.add('hidden');
+        differentTimeDiv.classList.remove('hidden');
+        timeFieldsDiv.classList.add('hidden'); // Hide time fields
+        startTimeInput.required = false;
+        endTimeInput.required = false;
+    }
+}
+
+// Show success message (banner fallback) and toast utility
+function showSuccessMessage(message) {
+    const successDiv = document.getElementById('successMessage');
+    const successText = document.getElementById('successText');
+    if (successDiv && successText) {
+        successText.textContent = message;
+        successDiv.classList.remove('hidden');
+        setTimeout(() => successDiv.classList.add('hidden'), 3000);
+    }
+    showToast('success', message);
+}
+
+function showToast(type, message) {
+    // Create container once
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.position = 'fixed';
+        container.style.top = '16px';
+        container.style.right = '16px';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'mb-2 px-4 py-3 rounded shadow text-white text-sm';
+    toast.style.minWidth = '240px';
+    toast.style.backgroundColor = type === 'success' ? '#16a34a' : '#dc2626';
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 300ms'; }, 2700);
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3100);
+}
+
+// After reload, show persisted notice
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const raw = sessionStorage.getItem('schedule_notice');
+        if (raw) {
+            const n = JSON.parse(raw);
+            if (n && n.message) { showToast(n.type || 'success', n.message); }
+            sessionStorage.removeItem('schedule_notice');
         }
-        document.getElementById('modalTitle').textContent='Edit Schedule';
-        document.getElementById('submitBtn').textContent='Update Schedule';
-        currentScheduleId = id;
-        document.getElementById('createScheduleModal').classList.remove('hidden');
-      } else { alert('Error loading schedule data'); }
-    }).catch(()=>alert('Failed to load schedule data'));
+    } catch(e) { /* ignore */ }
+});
+
+// Back navigation
+function handleBackNavigation() {
+    window.location.href = 'RegistrarDashboard.php';
 }
 
-function deleteSchedule(id){
-  if(!confirm('Delete this schedule? This will remove all employee assignments.')) return;
-  const fd=new FormData(); fd.append('action','delete_schedule'); fd.append('schedule_id', id);
-  fetch('ManageEmployeeSchedule.php',{ method:'POST', body: fd })
-    .then(r=>r.json()).then(d=>{ if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); location.reload(); } else { showErrorMessage(d.message || 'Delete failed.'); } });
-}
-
-// View Schedule Details
-function openScheduleDetails(id){
-  const modal = document.getElementById('scheduleDetailsModal');
-  const body = document.getElementById('schedBody');
-  const title = document.getElementById('schedTitle');
-  body.innerHTML = '<p>Loading schedule...</p>';
-  title.textContent = 'Schedule Details';
-  modal.classList.remove('hidden');
-  fetch(`get_employee_schedule.php?id=${id}`)
-    .then(res=>res.json())
-    .then(d=>{
-      if(!d.success){ body.innerHTML = `<p class=\"text-red-600\">Failed to load schedule.</p>`; return; }
-      const s = d.schedule;
-      title.textContent = s.schedule_name + ' — Details';
-      const items = [];
-      if(s.has_day_schedules && s.day_schedules && Object.keys(s.day_schedules).length){
-        const order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-        items.push(`<div><div class=\"font-semibold mb-1\">Per-day Times</div>`);
-        items.push('<ul class=\"list-disc ml-5 space-y-1\">');
-        order.forEach(day=>{
-          const dsd = s.day_schedules[day];
-          if(dsd){
-            items.push(`<li><span class=\"font-medium\">${day}:</span> ${formatTime(dsd.start_time)} - ${formatTime(dsd.end_time)}</li>`);
-          }
+// Edit schedule function
+function editSchedule(id) {
+    // Fetch schedule data
+    fetch(`get_employee_schedule.php?id=${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const schedule = data.schedule;
+                
+                // Populate form with existing data
+                document.getElementById('scheduleId').value = schedule.id;
+                document.getElementById('sectionName').value = schedule.schedule_name;
+                
+                // Set schedule type based on whether it has day-specific schedules
+                if (schedule.has_day_schedules) {
+                    document.querySelector('input[name="schedule_type"][value="different"]').checked = true;
+                    toggleScheduleType();
+                    
+                    // Populate day-specific schedules
+                    const daySchedules = schedule.day_schedules;
+                    Object.keys(daySchedules).forEach(day => {
+                        const dayData = daySchedules[day];
+                        const dayCheckbox = document.querySelector(`input[name="day_schedules[${day}][enabled]"]`);
+                        const startTimeInput = document.querySelector(`input[name="day_schedules[${day}][start_time]"]`);
+                        const endTimeInput = document.querySelector(`input[name="day_schedules[${day}][end_time]"]`);
+                        
+                        if (dayCheckbox) dayCheckbox.checked = true;
+                        if (startTimeInput) startTimeInput.value = dayData.start_time;
+                        if (endTimeInput) endTimeInput.value = dayData.end_time;
+                    });
+                } else {
+                    document.querySelector('input[name="schedule_type"][value="same"]').checked = true;
+                    toggleScheduleType();
+                    
+                    // Populate uniform schedule data
+                    document.getElementById('startTime').value = schedule.start_time;
+                    document.getElementById('endTime').value = schedule.end_time;
+                    
+                    // Clear all checkboxes first
+                    document.querySelectorAll('input[name="days[]"]').forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                    
+                    // Check the appropriate days
+                    if (schedule.days && schedule.days !== 'Variable') {
+                        const days = schedule.days.split(',');
+                        days.forEach(day => {
+                            const checkbox = document.querySelector(`input[name="days[]"][value="${day.trim()}"]`);
+                            if (checkbox) checkbox.checked = true;
+                        });
+                    }
+                }
+                
+                // Update modal title and button
+                document.getElementById('modalTitle').textContent = 'Edit Schedule';
+                document.getElementById('submitBtn').textContent = 'Update Schedule';
+                
+                currentScheduleId = id;
+                document.getElementById('createScheduleModal').classList.remove('hidden');
+            } else {
+                alert('Error loading schedule data');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to load schedule data');
         });
-        items.push('</ul></div>');
-      } else {
-        items.push(`<div><span class=\"font-semibold\">Time:</span> ${formatTime(s.start_time)} - ${formatTime(s.end_time)}</div>`);
-        items.push(`<div><span class=\"font-semibold\">Days:</span> ${s.days || '—'}</div>`);
-      }
-      body.innerHTML = items.join('');
-    })
-    .catch(()=>{ body.innerHTML = '<p class="text-red-600">Failed to load schedule.</p>'; });
 }
-function closeScheduleDetails(){ document.getElementById('scheduleDetailsModal').classList.add('hidden'); }
+
+let scheduleToDelete = null;
+
+// Delete schedule function
+function deleteSchedule(id) {
+    scheduleToDelete = id;
+    document.getElementById('deleteModal').classList.remove('hidden');
+}
+
+function hideDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+    scheduleToDelete = null;
+}
+
+function confirmDelete() {
+    if (scheduleToDelete) {
+        const formData = new FormData();
+        formData.append('action', 'delete_schedule');
+        formData.append('schedule_id', scheduleToDelete);
+        
+        fetch('ManageEmployeeSchedule.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: data.message }));
+                hideDeleteModal();
+                location.reload();
+            } else {
+                showErrorMessage(data.message || 'Delete failed.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showErrorMessage('Failed to delete schedule. Please try again.');
+        });
+    }
+}
+
+function viewScheduleStudents(id, sectionName) {
+    window.location.href = `view_schedule_students.php?schedule_id=${id}&section_name=${encodeURIComponent(sectionName)}`;
+}
+
+// View Schedule Details (Students)
+function openClassScheduleDetails(id){
+    const modal = document.getElementById('classScheduleDetailsModal');
+    const body = document.getElementById('classSchedBody');
+    const title = document.getElementById('classSchedTitle');
+    if(!modal || !body || !title){ console.error('Class schedule modal elements missing'); return; }
+    body.innerHTML = '<p>Loading schedule...</p>';
+    title.textContent = 'Schedule Details';
+    modal.classList.remove('hidden');
+    fetch(`get_employee_schedule.php?id=${id}`)
+      .then(res=>res.json())
+      .then(d=>{
+        if(!d.success){ body.innerHTML = '<p class="text-red-600">Failed to load schedule.</p>'; return; }
+        const s = d.schedule; const items = [];
+        title.textContent = ((s.schedule_name||'') + ' — Details').trim();
+        if(s.has_day_schedules && s.day_schedules && Object.keys(s.day_schedules).length){
+          const order=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+          items.push('<div><div class="font-semibold mb-1">Per-day Times</div><ul class="list-disc ml-5 space-y-1">');
+          order.forEach(day=>{ const dsd=s.day_schedules[day]; if(dsd){ items.push(`<li><span class=\"font-medium\">${day}:</span> ${formatTime(dsd.start_time)} - ${formatTime(dsd.end_time)}</li>`); }});
+          items.push('</ul></div>');
+        } else {
+          items.push(`<div><span class=\"font-semibold\">Time:</span> ${formatTime(s.start_time)} - ${formatTime(s.end_time)}</div>`);
+          items.push(`<div><span class=\"font-semibold\">Days:</span> ${s.days||'—'}</div>`);
+        }
+        body.innerHTML = items.join('');
+      })
+      .catch(()=>{ body.innerHTML = '<p class="text-red-600">Failed to load schedule.</p>'; });
+}
+function closeClassScheduleDetails(){ const m=document.getElementById('classScheduleDetailsModal'); if(m) m.classList.add('hidden'); }
 function formatTime(t){ try{ const d = new Date(`1970-01-01T${t}`); return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); } catch(e){ return t; } }
 
-// Schedule search (client-side filter)
-const scheduleSearchEl = document.getElementById('scheduleSearch');
-if (scheduleSearchEl) {
-  const icon = document.getElementById('scheduleSearchIcon');
-  const clearBtn = document.getElementById('scheduleSearchClear');
+// Search filter for student schedules
+(function(){
+  const classSearchEl = document.getElementById('classScheduleSearch');
+  if(!classSearchEl) return;
+  const icon = document.getElementById('classSearchIcon');
+  const clearBtn = document.getElementById('classSearchClear');
+  const noRes = document.getElementById('classNoResults');
   const applyFilter = () => {
-    const q = scheduleSearchEl.value.trim().toLowerCase();
-    if (icon) icon.classList.toggle('hidden', q.length > 0);
-    if (clearBtn) clearBtn.classList.toggle('hidden', q.length === 0);
-    // Adjust left padding based on icon visibility
-    if (q.length > 0) {
-      scheduleSearchEl.classList.remove('pl-10');
-      scheduleSearchEl.classList.add('pl-3');
-    } else {
-      scheduleSearchEl.classList.add('pl-10');
-      scheduleSearchEl.classList.remove('pl-3');
-    }
-    const cards = document.querySelectorAll('.schedule-card');
-    let visibleCount = 0;
-    cards.forEach(card => {
-      const nameEl = card.querySelector('.schedule-name');
-      const daysEl = card.querySelector('.schedule-days');
-      const name = nameEl ? nameEl.textContent.toLowerCase() : '';
-      const days = daysEl ? daysEl.textContent.toLowerCase() : '';
-      const match = q.length === 0 || name.includes(q) || days.includes(q);
+    const q = classSearchEl.value.trim().toLowerCase();
+    if(icon) icon.classList.toggle('hidden', q.length>0);
+    if(clearBtn) clearBtn.classList.toggle('hidden', q.length===0);
+    if(q.length>0){ classSearchEl.classList.remove('pl-10'); classSearchEl.classList.add('pl-3'); }
+    else { classSearchEl.classList.add('pl-10'); classSearchEl.classList.remove('pl-3'); }
+    const cards = document.querySelectorAll('.class-schedule-card');
+    let visible=0;
+    cards.forEach(card=>{
+      const name = (card.querySelector('.class-schedule-name')?.textContent || '').toLowerCase();
+      const days = (card.querySelector('.class-schedule-days')?.textContent || '').toLowerCase();
+      const match = q.length===0 || name.includes(q) || days.includes(q);
       card.style.display = match ? '' : 'none';
-      if (match) visibleCount++;
+      if(match) visible++;
     });
-    const noRes = document.getElementById('scheduleNoResults');
-    if (noRes) noRes.classList.toggle('hidden', visibleCount > 0);
+    if(noRes) noRes.classList.toggle('hidden', visible>0);
   };
-  scheduleSearchEl.addEventListener('input', applyFilter);
-  scheduleSearchEl.addEventListener('focus', applyFilter);
-  scheduleSearchEl.addEventListener('blur', applyFilter);
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      scheduleSearchEl.value = '';
-      scheduleSearchEl.focus();
-      applyFilter();
-    });
-  }
-}
+  classSearchEl.addEventListener('input', applyFilter);
+  classSearchEl.addEventListener('focus', applyFilter);
+  classSearchEl.addEventListener('blur', applyFilter);
+  if(clearBtn){ clearBtn.addEventListener('click', ()=>{ classSearchEl.value=''; classSearchEl.focus(); applyFilter(); }); }
+})();
 </script>
 
 </body>

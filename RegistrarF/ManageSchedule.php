@@ -276,7 +276,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             }
         }
         
-        $message = "Assigned schedule to $success_count student(s)";
+        $message = "Assigned $success_count Student(s) Successfully";
         if ($error_count > 0) {
             $message .= " ($error_count failed)";
         }
@@ -746,7 +746,35 @@ let studentsLoading = false;
 
 // Show/Hide Modals
 function showCreateScheduleModal() {
-    document.getElementById('createScheduleModal').classList.remove('hidden');
+    // Reset to defaults every time the modal opens
+    const modal = document.getElementById('createScheduleModal');
+    const form = document.getElementById('createScheduleForm');
+    if (form) form.reset();
+    // Title/button
+    const titleEl = document.getElementById('modalTitle'); if (titleEl) titleEl.textContent = 'Create New Schedule';
+    const submitEl = document.getElementById('submitBtn'); if (submitEl) submitEl.textContent = 'Create Schedule';
+    // Hidden id and fields
+    const idEl = document.getElementById('scheduleId'); if (idEl) idEl.value = '';
+    const nameEl = document.getElementById('sectionName'); if (nameEl) nameEl.value = '';
+    const stEl = document.getElementById('startTime'); if (stEl) stEl.value = '';
+    const etEl = document.getElementById('endTime'); if (etEl) etEl.value = '';
+    // Force schedule type to 'same'
+    const sameRadio = document.querySelector('input[name="schedule_type"][value="same"]');
+    const diffRadio = document.querySelector('input[name="schedule_type"][value="different"]');
+    if (sameRadio) sameRadio.checked = true; if (diffRadio) diffRadio.checked = false;
+    // Show same group, hide different group
+    const sameDiv = document.getElementById('sameTimeSchedule'); if (sameDiv) sameDiv.classList.remove('hidden');
+    const diffDiv = document.getElementById('differentTimeSchedule'); if (diffDiv) diffDiv.classList.add('hidden');
+    // Uncheck all same-days
+    document.querySelectorAll('input[name="days[]"]').forEach(cb => { cb.checked = false; });
+    // Clear per-day inputs
+    document.querySelectorAll('#differentTimeSchedule input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('#differentTimeSchedule input[type="time"]').forEach(inp => { inp.value = ''; });
+    // Hide inline errors
+    const sameErr = document.getElementById('sameDaysError'); if (sameErr) sameErr.classList.add('hidden');
+    const diffErr = document.getElementById('diffDaysError'); if (diffErr) diffErr.classList.add('hidden');
+    // Show modal
+    modal.classList.remove('hidden');
 }
 
 function hideCreateScheduleModal() {
@@ -778,12 +806,17 @@ function showAssignScheduleModal() {
     document.getElementById('assignScheduleModal').classList.remove('hidden');
     selectedStudents = [];
     updateSelectedCount();
+    // Reset search box and schedule selector
+    const searchEl = document.getElementById('studentSearch'); if (searchEl) searchEl.value = '';
+    const sel = document.getElementById('scheduleSelect'); if (sel) sel.value = '';
     studentsQuery = '';
     studentsOffset = 0;
+    const listC = document.getElementById('studentsList'); if (listC) listC.innerHTML = '<p class="text-gray-500 text-center py-4">Loading students...</p>';
     loadStudentsPage(false);
     // Attach infinite scroll listener
     const listEl = document.getElementById('studentsList');
     listEl.addEventListener('scroll', onStudentsScroll);
+    if (sel) sel.addEventListener('change', onScheduleChangeReload);
 }
 
 function hideAssignScheduleModal() {
@@ -794,6 +827,7 @@ function hideAssignScheduleModal() {
     // Detach scroll listener
     const listEl = document.getElementById('studentsList');
     listEl.removeEventListener('scroll', onStudentsScroll);
+    const sel = document.getElementById('scheduleSelect'); if (sel) sel.removeEventListener('change', onScheduleChangeReload);
 }
 
 let currentScheduleId = null;
@@ -880,6 +914,8 @@ function loadStudentsPage(append){
     else { params.set('query', studentsQuery); }
     params.set('limit', studentsLimit);
     params.set('offset', studentsOffset);
+    const scheduleId = document.getElementById('scheduleSelect')?.value || '';
+    if (scheduleId) { params.set('exclude_schedule_id', scheduleId); }
     fetch('SearchStudent.php?' + params.toString())
         .then(r=>r.json())
         .then(d=>{
@@ -910,25 +946,24 @@ function displayStudents(students, append=false) {
     }
     
     let html = '';
-    students.forEach(student => {
-        const isSelected = selectedStudents.includes(student.id_number);
-        const hasSchedule = student.current_section || student.class_schedule;
-        const scheduleInfo = hasSchedule ? `<span class="text-orange-600 font-medium">Current: ${student.current_section || 'Assigned'}</span>` : '<span class="text-green-600">Available</span>';
-        const fullName = student.full_name || (student.first_name + ' ' + student.last_name);
+    students.forEach(s => {
+        const id = s.id_number;
+        const fullName = s.full_name || (s.first_name + ' ' + s.last_name);
+        const currentName = s.current_section || s.class_schedule;
+        const hasSchedule = !!currentName;
+        const isSelected = selectedStudents.includes(id);
+        const scheduleInfo = hasSchedule ? `<span class="text-orange-600 font-medium">Current: ${currentName}</span>` : '<span class="text-green-600">Available</span>';
         // cache
-        studentsIndex[student.id_number] = { name: fullName, hasCurrent: !!hasSchedule };
+        studentsIndex[id] = { name: fullName, hasCurrent: !!hasSchedule };
         
         html += `
-            <div class="flex items-center p-3 border-b hover:bg-gray-50">
-                <input type="checkbox" id="student_${student.id_number}" 
-                       ${isSelected ? 'checked' : ''} 
-                       onchange="toggleStudent('${student.id_number}', ${hasSchedule ? 'true' : 'false'}, '${fullName}', '${student.current_section || ''}')" 
-                       class="mr-3">
-                <label for="student_${student.id_number}" class="flex-1 cursor-pointer">
+            <div class="flex items-center p-3 border-b hover:bg-gray-50 cursor-pointer select-none" onclick="toggleStudent('${id}', ${hasSchedule ? 'true' : 'false'}, '${fullName}', '${currentName || ''}')">
+                <input type="checkbox" id="student_${id}" ${isSelected ? 'checked' : ''} class="mr-3 pointer-events-none">
+                <div class="flex-1">
                     <div class="font-medium">${fullName}</div>
-                    <div class="text-sm text-gray-600">ID: ${student.id_number} • ${student.grade_level || student.year_section || 'N/A'}</div>
+                    <div class="text-sm text-gray-600">ID: ${id} • ${s.grade_level || s.year_section || 'N/A'}</div>
                     <div class="text-sm">${scheduleInfo}</div>
-                </label>
+                </div>
             </div>
         `;
     });
@@ -945,20 +980,10 @@ function toggleStudent(studentId, hasSchedule, studentName, currentSection) {
         // Deselecting student
         selectedStudents.splice(index, 1);
     } else {
-        // Selecting student - check if they have existing schedule
-        if (hasSchedule === 'true') {
-            const confirmMessage = `${studentName} is already assigned to "${currentSection}". Do you want to move them to the new schedule?\n\nPlease type the student's name to confirm: "${studentName}"`;
-            const userInput = prompt(confirmMessage);
-            
-            if (userInput !== studentName) {
-                // User didn't type the correct name or cancelled
-                document.getElementById(`student_${studentId}`).checked = false;
-                return;
-            }
-        }
         selectedStudents.push(studentId);
     }
     updateSelectedCount();
+    const cb = document.getElementById(`student_${studentId}`); if (cb) cb.checked = selectedStudents.includes(studentId);
 }
 
 // Update selected count
@@ -1066,6 +1091,11 @@ function onStudentsScroll(){
         studentsOffset += studentsLimit;
         loadStudentsPage(true);
     }
+}
+
+function onScheduleChangeReload(){
+    studentsOffset = 0; studentsQuery = '';
+    loadStudentsPage(false);
 }
 
 // Toggle schedule type function

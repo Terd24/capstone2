@@ -30,12 +30,14 @@ if ($_SERVER["REQUEST_METHOD"] === 'POST' && isset($_POST['action']) && $_POST['
         $rm = $conn->prepare("DELETE FROM employee_schedules WHERE employee_id = ? AND schedule_id = ?");
         $rm->bind_param("si", $employee_id, $schedule_id);
         if ($rm->execute()) {
-            $success_msg = "Employee removed from schedule successfully!";
+            $notice = 'success';
+            $msg = 'Removed employee from schedule successfully!';
         } else {
-            $error_msg = "Failed to remove employee from schedule.";
+            $notice = 'error';
+            $msg = 'Failed to remove employee from schedule.';
         }
     }
-    header("Location: view_schedule_employees.php?schedule_id=".$schedule_id."&schedule_name=".urlencode($schedule_name));
+    header("Location: view_schedule_employees.php?schedule_id=".$schedule_id."&schedule_name=".urlencode($schedule_name)."&notice=".$notice."&msg=".urlencode($msg));
     exit;
 }
 
@@ -108,7 +110,10 @@ $employees_result = $employees_stmt->get_result();
   <div class="bg-white rounded-xl card-shadow p-6">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-xl font-bold text-gray-800">Assigned Employees</h2>
-      <div class="text-sm text-gray-600">Total: <span id="totalCount"><?= $employees_result->num_rows ?></span> employee(s)</div>
+      <div class="flex items-center gap-3">
+        <div class="text-sm text-gray-600 mr-2">Total: <span id="totalCount"><?= $employees_result->num_rows ?></span> employee(s)</div>
+        <button type="button" onclick="showAssignModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add Employees</button>
+      </div>
     </div>
 
     <div class="mb-6">
@@ -172,6 +177,49 @@ $employees_result = $employees_stmt->get_result();
   </div>
 </div>
 
+<!-- Assign Employees Modal (centered) -->
+<div id="assignModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-gray-800">Assign Schedule to Employees</h3>
+      <button onclick="hideAssignModal()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="mb-2 text-sm text-gray-600">Schedule: <span class="font-medium"><?= htmlspecialchars($schedule_name) ?></span></div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Search Employees</label>
+      <input type="text" id="assignSearch" placeholder="Search employee by name or ID..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" />
+    </div>
+    <div id="assignList" class="border rounded-lg h-72 overflow-y-auto">
+      <p class="text-gray-500 text-center py-4">Loading employees...</p>
+    </div>
+    <div class="mb-4 text-sm text-gray-600">Selected: <span id="assignSelected">0</span> employee(s)</div>
+    <div class="flex gap-3">
+      <button type="button" onclick="hideAssignModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+      <button type="button" onclick="assignFromModal()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Assign Schedule</button>
+    </div>
+    <p id="assignInlineError" class="hidden mt-2 text-sm text-red-600"></p>
+  </div>
+</div>
+
+<!-- Confirm Reassignment Modal -->
+<div id="confirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-lg font-bold text-gray-800">Confirm Reassignment</h3>
+      <button onclick="hideConfirm()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div id="confirmBody" class="text-sm text-gray-700 space-y-2"></div>
+    <div class="flex gap-3 pt-4">
+      <button onclick="hideConfirm()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+      <button onclick="confirmAssignProceed()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <!-- Remove Employee Modal -->
 <div id="removeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
   <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4">
@@ -194,6 +242,139 @@ $employees_result = $employees_stmt->get_result();
 </div>
 
 <script>
+// --- Center Assign Modal Logic ---
+const SCHEDULE_ID = <?= (int)$schedule_id ?>;
+let aSelected = [];
+let aQuery = '';
+let aLimit = 15;
+let aOffset = 0;
+let aHasMore = false;
+let aLoading = false;
+const aIndex = {}; // id -> {name, hasCurrent}
+
+function showAssignModal(){
+  document.getElementById('assignModal').classList.remove('hidden');
+  aSelected = []; aQuery=''; aOffset=0; updateAssignSelected();
+  loadAssignPage(false);
+  const listEl = document.getElementById('assignList');
+  listEl.addEventListener('scroll', onAssignScroll);
+}
+function hideAssignModal(){
+  document.getElementById('assignModal').classList.add('hidden');
+  const listEl = document.getElementById('assignList');
+  listEl.removeEventListener('scroll', onAssignScroll);
+}
+
+document.getElementById('assignSearch').addEventListener('input', ()=>{ aQuery=document.getElementById('assignSearch').value.trim(); aOffset=0; loadAssignPage(false); });
+
+function loadAssignPage(append){
+  if(aLoading) return; aLoading = true;
+  const params = new URLSearchParams();
+  if(aQuery==='') params.set('all','1'); else params.set('query', aQuery);
+  params.set('limit', aLimit); params.set('offset', aOffset);
+  // Exclude those already in this schedule
+  params.set('exclude_schedule_id', SCHEDULE_ID);
+  fetch('SearchEmployee.php?' + params.toString())
+    .then(r=>r.json())
+    .then(d=>{
+      const list = d.employees || [];
+      renderAssignList(list, !!append);
+      aHasMore = !!d.has_more;
+    })
+    .catch(()=>{ document.getElementById('assignList').innerHTML = '<p class="text-red-600 text-center py-4">Failed to load employees</p>'; })
+    .finally(()=>{ aLoading=false; });
+}
+
+function renderAssignList(items, append){
+  const c = document.getElementById('assignList');
+  if(!append){ c.innerHTML = ''; }
+  if(items.length===0 && !append){ c.innerHTML = '<p class="text-gray-500 text-center py-4">No employees found</p>'; return; }
+  let html='';
+  items.forEach(emp=>{
+    const id = emp.id_number; const name = emp.full_name || (emp.first_name + ' ' + emp.last_name);
+    const currentName = emp.current_schedule || emp.schedule_text || emp.current_section;
+    const hasCurrent = !!currentName;
+    aIndex[id] = { name, hasCurrent };
+    const checked = aSelected.includes(id) ? 'checked' : '';
+    const info = hasCurrent ? `<span class=\"text-orange-600 font-medium\">Current: ${currentName}</span>` : '<span class=\"text-green-600\">Available</span>';
+    html += `
+      <div class=\"flex items-center p-3 border-b hover:bg-gray-50 cursor-pointer select-none\" onclick=\"toggleAssign('${id}', ${hasCurrent})\">
+        <input id=\"emp_${id}\" type=\"checkbox\" ${checked} onchange=\"toggleAssign('${id}', ${hasCurrent})\" class=\"mr-3 pointer-events-none\">
+        <div class=\"flex-1\">
+          <div class=\"font-medium\">${name}</div>
+          <div class=\"text-sm text-gray-600\">ID: ${id} • ${emp.position || emp.department || 'N/A'}</div>
+          <div class=\"text-sm\">${info}</div>
+        </div>
+      </div>`;
+  });
+  c.insertAdjacentHTML('beforeend', html);
+}
+
+function onAssignScroll(){
+  const el = document.getElementById('assignList');
+  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+  if(nearBottom && aHasMore && !aLoading){ aOffset += aLimit; loadAssignPage(true); }
+}
+
+function toggleAssign(id, hasCurrent){
+  const idx = aSelected.indexOf(id);
+  if(idx>-1){ aSelected.splice(idx,1); }
+  else {
+    aSelected.push(id);
+  }
+  updateAssignSelected();
+  const cb = document.getElementById('emp_'+id); if(cb){ cb.checked = aSelected.includes(id); }
+}
+
+function updateAssignSelected(){ document.getElementById('assignSelected').textContent = aSelected.length; }
+
+let pending = null;
+function assignFromModal(){
+  const err = document.getElementById('assignInlineError'); err.classList.add('hidden'); err.textContent='';
+  if(aSelected.length===0){ err.textContent='Please select at least one employee'; err.classList.remove('hidden'); return; }
+  // Build confirmation body
+  try{
+    const items = aSelected.map(id=>{ const m = aIndex[id]||{name:id,hasCurrent:false}; return {id, name:m.name, hasCurrent:!!m.hasCurrent}; });
+    const movingCount = items.filter(i=>i.hasCurrent).length;
+    pending = { ids: aSelected.slice() };
+    showConfirm(items, items.length, movingCount);
+    return;
+  }catch(e){}
+  doAssign(aSelected);
+}
+
+function showConfirm(items, total, moving){
+  const body = document.getElementById('confirmBody');
+  const listNames = items.map(i=>`<li>${i.name}</li>`).join('');
+  const currentNames = items.filter(i=>i.hasCurrent).map(i=>i.name);
+  const curList = currentNames.length ? `<ul class=\"list-disc ml-5 space-y-0.5\">${currentNames.map(n=>`<li>${n}</li>`).join('')}</ul>` : 'None';
+  body.innerHTML = `
+    <p>You are about to move <strong>${total}</strong> employee(s) to the selected schedule.</p>
+    <div class=\"mt-2 space-y-3\">
+      <div>
+        <div class=\"font-medium mb-1\">Selected employees (${items.length}):</div>
+        <ul class=\"list-disc ml-5 space-y-0.5\">${listNames}</ul>
+      </div>
+      <div>
+        <div class=\"font-medium mb-1\">Have current schedule (${currentNames.length}):</div>
+        ${curList}
+      </div>
+    </div>`;
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+function hideConfirm(){ document.getElementById('confirmModal').classList.add('hidden'); }
+function confirmAssignProceed(){ const p=pending; hideConfirm(); if(!p) return; doAssign(p.ids); }
+
+function doAssign(ids){
+  const fd = new FormData();
+  fd.append('action','assign_schedule');
+  fd.append('schedule_id', SCHEDULE_ID);
+  ids.forEach(id=>fd.append('employee_ids[]', id));
+  fetch('ManageEmployeeSchedule.php', { method: 'POST', body: fd })
+    .then(r=>r.json())
+    .then(d=>{ if(d.success){ try{ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); }catch(e){} hideAssignModal(); window.location.reload(); } else { showErrorBanner(d.message||'Assign failed.'); const err=document.getElementById('assignInlineError'); err.textContent=d.message||'Assign failed.'; err.classList.remove('hidden'); } })
+    .catch(()=>{ showErrorBanner('Failed to assign employees. Please try again.'); const err=document.getElementById('assignInlineError'); err.textContent='Failed to assign employees. Please try again.'; err.classList.remove('hidden'); });
+}
 function removeEmployee(empId, empName){
   document.getElementById('removeEmployeeId').value = empId;
   document.getElementById('employeeName').textContent = empName;
@@ -219,6 +400,31 @@ if(searchInput){
     const total = document.getElementById('totalCount'); if(total) total.textContent = visible;
   });
 }
+
+// Toast/Banner Notifications (top-right)
+function showBanner(message, type='success', timeout=3000){
+  const box = document.createElement('div');
+  box.className = 'fixed top-4 right-4 z-[70] px-4 py-2 rounded-lg shadow text-white ' + (type==='success' ? 'bg-green-600' : 'bg-red-600');
+  box.textContent = message;
+  document.body.appendChild(box);
+  setTimeout(()=>{ box.style.transition='opacity .3s'; box.style.opacity='0'; setTimeout(()=>box.remove(), 300); }, timeout);
+}
+function showSuccessBanner(msg){ showBanner(msg, 'success'); }
+function showErrorBanner(msg){ showBanner(msg, 'error'); }
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{
+    const raw = sessionStorage.getItem('schedule_notice');
+    if(raw){ const data = JSON.parse(raw); showBanner(data.message || 'Action completed', data.type || 'success'); sessionStorage.removeItem('schedule_notice'); }
+  }catch(e){}
+  // Read URL notice (from remove redirects)
+  try{
+    const url = new URL(window.location.href);
+    const notice = url.searchParams.get('notice');
+    const msg = url.searchParams.get('msg');
+    if(notice && msg){ showBanner(decodeURIComponent(msg), notice==='success' ? 'success' : 'error'); url.searchParams.delete('notice'); url.searchParams.delete('msg'); history.replaceState(null,'',url.toString()); }
+  }catch(e){}
+});
 </script>
 
 </body>

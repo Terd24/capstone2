@@ -16,11 +16,13 @@ $query = trim($_GET['query'] ?? '');
 $limit  = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 15;
 $offset = isset($_GET['offset']) ? max(0, intval($_GET['offset'])) : 0;
 $fetchLimit = $limit + 1; // fetch extra to detect more
+$excludeScheduleId = isset($_GET['exclude_schedule_id']) ? intval($_GET['exclude_schedule_id']) : 0;
 
 // Build SQL to fetch employees with optional role filter
 $sql = "SELECT DISTINCT e.id_number, e.first_name, e.last_name,
                CONCAT(e.first_name, ' ', e.last_name) AS full_name,
-               ws.schedule_name AS current_section
+               ws.schedule_name AS current_section,
+               ws.id AS ws_id
         FROM employees e
         LEFT JOIN employee_accounts ea ON ea.employee_id = e.id_number
         LEFT JOIN employee_schedules es ON es.employee_id = e.id_number
@@ -40,7 +42,13 @@ if (!$all && $query !== '') {
 }
 
 if ($conditions) { $sql .= ' WHERE ' . implode(' AND ', $conditions); }
-$sql .= ' ORDER BY e.last_name, e.first_name LIMIT ? OFFSET ?';
+// Exclude those already in the target schedule if requested
+if ($excludeScheduleId > 0) {
+    $sql .= ($conditions ? ' AND' : ' WHERE') . ' (es.schedule_id IS NULL OR es.schedule_id <> ?)';
+    $params[] = $excludeScheduleId; $types .= 'i';
+}
+// Order: available first (no schedule), then alphabetically
+$sql .= ' ORDER BY (ws.id IS NOT NULL) ASC, e.last_name, e.first_name LIMIT ? OFFSET ?';
 
 $stmt = $conn->prepare($sql);
 if (!$stmt) { echo json_encode(['error'=>'DB prepare error','details'=>$conn->error]); exit; }

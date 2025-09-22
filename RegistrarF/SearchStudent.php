@@ -6,19 +6,30 @@ include("../StudentLogin/db_conn.php");
 $limit  = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 15;
 $offset = isset($_GET['offset']) ? max(0, intval($_GET['offset'])) : 0;
 $fetchLimit = $limit + 1; // fetch one extra to know if there are more
+// Optionally exclude students already in a specific schedule
+$excludeScheduleId = isset($_GET['exclude_schedule_id']) ? intval($_GET['exclude_schedule_id']) : 0;
 
 // Handle different types of requests
 if (isset($_GET['all']) && $_GET['all'] == '1') {
     // Return all students with their current schedule info
-    $stmt = $conn->prepare(
-        "SELECT sa.id_number, CONCAT(sa.first_name, ' ', sa.last_name) as full_name, sa.first_name, sa.last_name, sa.academic_track as program, sa.grade_level as year_section, sa.rfid_uid, sa.class_schedule, cs.section_name as current_section
-         FROM student_account sa
-         LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id
-         LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id
-         ORDER BY sa.first_name, sa.last_name 
-         LIMIT ? OFFSET ?"
-    );
-    $stmt->bind_param("ii", $fetchLimit, $offset);
+    $sql = "SELECT sa.id_number, CONCAT(sa.first_name, ' ', sa.last_name) as full_name, sa.first_name, sa.last_name, sa.academic_track as program, sa.grade_level as year_section, sa.rfid_uid, sa.class_schedule, cs.section_name as current_section, ss.schedule_id
+            FROM student_account sa
+            LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id
+            LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id";
+    $types = '';
+    $params = [];
+    if ($excludeScheduleId > 0) {
+        $sql .= " WHERE (ss.schedule_id IS NULL OR ss.schedule_id <> ?)";
+        $types .= 'i';
+        $params[] = $excludeScheduleId;
+    }
+    // Order: available first (no schedule), then alphabetically
+    $sql .= " ORDER BY (ss.schedule_id IS NOT NULL) ASC, sa.last_name, sa.first_name LIMIT ? OFFSET ?";
+    $types .= 'ii';
+    $params[] = $fetchLimit; $params[] = $offset;
+    $stmt = $conn->prepare($sql);
+    if(!$stmt){ echo json_encode(['error'=>'DB prepare error','details'=>$conn->error]); exit; }
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -66,17 +77,18 @@ if (!$query) {
     exit;
 }
 
-$stmt = $conn->prepare(
-    "SELECT sa.id_number, CONCAT(sa.first_name, ' ', sa.last_name) as full_name, sa.first_name, sa.last_name, sa.academic_track as program, sa.grade_level as year_section, sa.rfid_uid, sa.class_schedule, cs.section_name as current_section
-     FROM student_account sa
-     LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id
-     LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id
-     WHERE (CONCAT(sa.first_name, ' ', sa.last_name) LIKE ? OR sa.id_number LIKE ?)
-     ORDER BY sa.first_name, sa.last_name
-     LIMIT ? OFFSET ?"
-);
+$sql = "SELECT sa.id_number, CONCAT(sa.first_name, ' ', sa.last_name) as full_name, sa.first_name, sa.last_name, sa.academic_track as program, sa.grade_level as year_section, sa.rfid_uid, sa.class_schedule, cs.section_name as current_section, ss.schedule_id
+        FROM student_account sa
+        LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id
+        LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id
+        WHERE (CONCAT(sa.first_name, ' ', sa.last_name) LIKE ? OR sa.id_number LIKE ?)";
+if ($excludeScheduleId > 0) { $sql .= " AND (ss.schedule_id IS NULL OR ss.schedule_id <> ?)"; }
+$sql .= " ORDER BY (ss.schedule_id IS NOT NULL) ASC, sa.last_name, sa.first_name LIMIT ? OFFSET ?";
+$stmt = $conn->prepare($sql);
+if(!$stmt){ echo json_encode(['error'=>'DB prepare error','details'=>$conn->error]); exit; }
 $searchTerm = "%$query%";
-$stmt->bind_param("ssii", $searchTerm, $searchTerm, $fetchLimit, $offset);
+if ($excludeScheduleId > 0) { $stmt->bind_param("ssiii", $searchTerm, $searchTerm, $excludeScheduleId, $fetchLimit, $offset); }
+else { $stmt->bind_param("ssii", $searchTerm, $searchTerm, $fetchLimit, $offset); }
 $stmt->execute();
 $result = $stmt->get_result();
 

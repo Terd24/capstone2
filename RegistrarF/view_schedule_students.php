@@ -50,19 +50,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
         $clear_student = $conn->prepare("UPDATE student_account SET class_schedule = NULL WHERE id_number = ?");
         $clear_student->bind_param("s", $student_id);
         $clear_student->execute();
-        
-        // Clear schedule from attendance_record
         $clear_attendance = $conn->prepare("UPDATE attendance_record SET schedule = NULL WHERE id_number = ?");
         $clear_attendance->bind_param("s", $student_id);
         $clear_attendance->execute();
-        
-        $success_msg = "Student removed from schedule successfully!";
+        $notice = 'success';
+        $msg = 'Removed student from schedule successfully!';
     } else {
-        $error_msg = "Failed to remove student from schedule.";
+        $notice = 'error';
+        $msg = 'Failed to remove student from schedule.';
     }
-    
-    // Refresh the page to show updated list
-    header("Location: view_schedule_students.php?schedule_id=$schedule_id&section_name=" . urlencode($section_name));
+    // Refresh the page with notice
+    header("Location: view_schedule_students.php?schedule_id=$schedule_id&section_name=" . urlencode($section_name) . "&notice=".$notice."&msg=".urlencode($msg));
     exit;
 }
 ?>
@@ -129,8 +127,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
     <div class="bg-white rounded-xl card-shadow p-6">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-800">Assigned Students</h2>
-            <div class="text-sm text-gray-600">
-                Total: <span id="totalCount"><?= $students_result->num_rows ?></span> student(s)
+            <div class="flex items-center gap-3">
+                <div class="text-sm text-gray-600 mr-2">Total: <span id="totalCount"><?= $students_result->num_rows ?></span> student(s)</div>
+                <button type="button" onclick="showAssignStudentsModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Add Students</button>
             </div>
         </div>
         
@@ -210,6 +209,50 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
     </div>
 </div>
 
+<!-- Assign Students Modal (centered) -->
+<div id="assignStudentsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-gray-800">Assign Schedule to Students</h3>
+      <button onclick="hideAssignStudentsModal()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="mb-2 text-sm text-gray-600">Schedule: <span class="font-medium"><?= htmlspecialchars($section_name) ?></span></div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Search Students</label>
+      <input type="text" id="assignStudentSearch" placeholder="Search students by name, ID, or program..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" />
+    </div>
+    <div id="assignStudentsList" class="border rounded-lg h-72 overflow-y-auto">
+      <p class="text-gray-500 text-center py-4">Loading students...</p>
+    </div>
+    <div class="mb-4 text-sm text-gray-600">Selected: <span id="assignStudentsSelected">0</span> student(s)</div>
+    <div class="flex gap-3">
+      <button type="button" onclick="hideAssignStudentsModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+      <button type="button" onclick="assignStudentsProceed()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Assign Schedule</button>
+    </div>
+    <p id="assignStudentsError" class="hidden mt-2 text-sm text-red-600"></p>
+  </div>
+  
+</div>
+
+<!-- Confirm Reassignment Modal (students) -->
+<div id="confirmStudentsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-lg font-bold text-gray-800">Confirm Reassignment</h3>
+      <button onclick="hideConfirmStudents()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div id="confirmStudentsBody" class="text-sm text-gray-700 space-y-2"></div>
+    <div class="flex gap-3 pt-4">
+      <button onclick="hideConfirmStudents()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
+      <button onclick="confirmStudentsProceed()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <!-- Remove Student Modal -->
 <div id="removeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4">
@@ -238,6 +281,141 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
 </div>
 
 <script>
+// --- Assign Students Modal Logic ---
+const STUD_SCHEDULE_ID = <?= (int)$schedule_id ?>;
+let sSelected = [];
+let sQuery = '';
+let sLimit = 15;
+let sOffset = 0;
+let sHasMore = false;
+let sLoading = false;
+const sIndex = {}; // id -> { name, hasCurrent }
+
+function showAssignStudentsModal(){
+  const modal = document.getElementById('assignStudentsModal');
+  sSelected = []; sQuery=''; sOffset=0; updateAssignStudentsCount();
+  const list = document.getElementById('assignStudentsList'); if(list) list.innerHTML = '<p class="text-gray-500 text-center py-4">Loading students...</p>';
+  modal.classList.remove('hidden');
+  loadStudentsPickPage(false);
+  document.getElementById('assignStudentSearch').addEventListener('input', onStudentSearchChange);
+  list.addEventListener('scroll', onStudentsPickScroll);
+}
+function hideAssignStudentsModal(){
+  const modal = document.getElementById('assignStudentsModal');
+  modal.classList.add('hidden');
+  const list = document.getElementById('assignStudentsList');
+  document.getElementById('assignStudentSearch').removeEventListener('input', onStudentSearchChange);
+  if(list) list.removeEventListener('scroll', onStudentsPickScroll);
+}
+
+function onStudentSearchChange(){ sQuery = this.value.trim(); sOffset=0; loadStudentsPickPage(false); }
+
+function loadStudentsPickPage(append){
+  if(sLoading) return; sLoading=true;
+  const params = new URLSearchParams();
+  if(sQuery==='') params.set('all','1'); else params.set('query', sQuery);
+  params.set('limit', sLimit); params.set('offset', sOffset);
+  // Exclude those already in this schedule
+  params.set('exclude_schedule_id', STUD_SCHEDULE_ID);
+  fetch('SearchStudent.php?' + params.toString())
+    .then(r=>r.json())
+    .then(d=>{
+      const list = d.students || [];
+      renderStudentsPick(list, !!append);
+      sHasMore = !!d.has_more;
+    })
+    .catch(()=>{ document.getElementById('assignStudentsList').innerHTML = '<p class="text-red-600 text-center py-4">Failed to load students</p>'; })
+    .finally(()=>{ sLoading=false; });
+}
+
+function renderStudentsPick(items, append){
+  const c = document.getElementById('assignStudentsList');
+  if(!append){ c.innerHTML = ''; }
+  if(items.length===0 && !append){ c.innerHTML = '<p class="text-gray-500 text-center py-4">No students found</p>'; return; }
+  let html='';
+  items.forEach(st=>{
+    const id = st.id_number; const name = st.full_name || (st.first_name + ' ' + st.last_name);
+    const currentName = st.current_section || st.class_schedule;
+    const hasCurrent = !!currentName; sIndex[id] = { name, hasCurrent };
+    const checked = sSelected.includes(id) ? 'checked' : '';
+    const info = hasCurrent ? `<span class=\"text-orange-600 font-medium\">Current: ${currentName}</span>` : '<span class=\"text-green-600\">Available</span>';
+    html += `
+      <div class=\"flex items-center p-3 border-b hover:bg-gray-50 cursor-pointer select-none\" onclick=\"toggleStudentPick('${id}', ${hasCurrent})\">
+        <input id=\"stud_${id}\" type=\"checkbox\" ${checked} onchange=\"toggleStudentPick('${id}', ${hasCurrent})\" class=\"mr-3 pointer-events-none\">
+        <div class=\"flex-1\">
+          <div class=\"font-medium\">${name}</div>
+          <div class=\"text-sm text-gray-600\">ID: ${id} • ${st.grade_level || st.year_section || 'N/A'}</div>
+          <div class=\"text-sm\">${info}</div>
+        </div>
+      </div>`;
+  });
+  c.insertAdjacentHTML('beforeend', html);
+}
+
+function onStudentsPickScroll(){
+  const el = document.getElementById('assignStudentsList');
+  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+  if(nearBottom && sHasMore && !sLoading){ sOffset += sLimit; loadStudentsPickPage(true); }
+}
+
+function toggleStudentPick(id, hasCurrent){
+  const idx = sSelected.indexOf(id);
+  if(idx>-1){ sSelected.splice(idx,1); }
+  else { sSelected.push(id); }
+  updateAssignStudentsCount();
+  const cb = document.getElementById('stud_'+id); if (cb) cb.checked = sSelected.includes(id);
+}
+
+function updateAssignStudentsCount(){ document.getElementById('assignStudentsSelected').textContent = sSelected.length; }
+
+let pendingStud = null;
+function assignStudentsProceed(){
+  const err = document.getElementById('assignStudentsError'); err.classList.add('hidden'); err.textContent='';
+  if(sSelected.length===0){ err.textContent='Please select at least one student'; err.classList.remove('hidden'); return; }
+  // Build confirmation view
+  try{
+    const items = sSelected.map(id=>{ const m = sIndex[id]||{name:id,hasCurrent:false}; return {id, name:m.name, hasCurrent:!!m.hasCurrent}; });
+    const movingCount = items.filter(i=>i.hasCurrent).length;
+    pendingStud = { ids: sSelected.slice() };
+    showConfirmStudents(items, items.length, movingCount);
+    return;
+  }catch(e){}
+  doAssignStudents(sSelected);
+}
+
+function showConfirmStudents(items, total, moving){
+  const body = document.getElementById('confirmStudentsBody');
+  const listNames = items.map(i=>`<li>${i.name}</li>`).join('');
+  const currentNames = items.filter(i=>i.hasCurrent).map(i=>i.name);
+  const curList = currentNames.length ? `<ul class=\"list-disc ml-5 space-y-0.5\">${currentNames.map(n=>`<li>${n}</li>`).join('')}</ul>` : 'None';
+  body.innerHTML = `
+    <p>You are about to move <strong>${total}</strong> student(s) to the selected schedule.</p>
+    <div class=\"mt-2 space-y-3\">
+      <div>
+        <div class=\"font-medium mb-1\">Selected students (${items.length}):</div>
+        <ul class=\"list-disc ml-5 space-y-0.5\">${listNames}</ul>
+      </div>
+      <div>
+        <div class=\"font-medium mb-1\">Have current schedule (${currentNames.length}):</div>
+        ${curList}
+      </div>
+    </div>`;
+  document.getElementById('confirmStudentsModal').classList.remove('hidden');
+}
+function hideConfirmStudents(){ document.getElementById('confirmStudentsModal').classList.add('hidden'); }
+function confirmStudentsProceed(){ const p=pendingStud; hideConfirmStudents(); if(!p) return; doAssignStudents(p.ids); }
+
+function doAssignStudents(ids){
+  const fd = new FormData();
+  fd.append('action','assign_schedule');
+  fd.append('schedule_id', STUD_SCHEDULE_ID);
+  ids.forEach(id=>fd.append('student_ids[]', id));
+  fetch('ManageSchedule.php', { method: 'POST', body: fd })
+    .then(r=>r.json())
+    .then(d=>{ if(d.success){ try{ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); }catch(e){} hideAssignStudentsModal(); window.location.reload(); } else { showErrorBanner(d.message||'Assign failed.'); const err=document.getElementById('assignStudentsError'); err.textContent=d.message||'Assign failed.'; err.classList.remove('hidden'); } })
+    .catch(()=>{ showErrorBanner('Failed to assign students. Please try again.'); const err=document.getElementById('assignStudentsError'); err.textContent='Failed to assign students. Please try again.'; err.classList.remove('hidden'); });
+}
+
 function removeStudent(studentId, studentName) {
     document.getElementById('removeStudentId').value = studentId;
     document.getElementById('studentName').textContent = studentName;
@@ -247,6 +425,31 @@ function removeStudent(studentId, studentName) {
 function hideRemoveModal() {
     document.getElementById('removeModal').classList.add('hidden');
 }
+
+// Toast/Banner Notifications
+function showBanner(message, type='success', timeout=3000){
+  let box = document.createElement('div');
+  box.className = `fixed top-4 right-4 z-[70] px-4 py-2 rounded-lg shadow text-white ${type==='success' ? 'bg-green-600' : 'bg-red-600'}`;
+  box.textContent = message;
+  document.body.appendChild(box);
+  setTimeout(()=>{ box.classList.add('opacity-0'); box.style.transition='opacity .3s'; setTimeout(()=>box.remove(),300); }, timeout);
+}
+function showSuccessBanner(msg){ showBanner(msg, 'success'); }
+function showErrorBanner(msg){ showBanner(msg, 'error'); }
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{
+    const raw = sessionStorage.getItem('schedule_notice');
+    if(raw){ const {type, message} = JSON.parse(raw); showBanner(message || 'Action completed', type || 'success'); sessionStorage.removeItem('schedule_notice'); }
+  }catch(e){}
+  // Read URL notice from remove redirect
+  try{
+    const url = new URL(window.location.href);
+    const notice = url.searchParams.get('notice');
+    const msg = url.searchParams.get('msg');
+    if(notice && msg){ showBanner(decodeURIComponent(msg), notice==='success' ? 'success' : 'error'); url.searchParams.delete('notice'); url.searchParams.delete('msg'); history.replaceState(null,'',url.toString()); }
+  }catch(e){}
+});
 
 // Search functionality
 document.getElementById('searchInput').addEventListener('input', function() {
