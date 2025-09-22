@@ -249,6 +249,14 @@ $schedules_result = $conn->query($schedules_query);
     <style>
         .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
         .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        /* Match student dropdown UI */
+        #scheduleSelect { font-size: 0.875rem; }
+        #scheduleSelect option { padding-top: 2px; padding-bottom: 2px; }
+        .sched-item { padding: 8px 12px; cursor: pointer; }
+        .sched-item:hover { background-color: #f3f4f6; }
+        #scheduleTrigger { border-color: #0B2C62 !important; box-shadow: 0 0 0 2px rgba(11, 44, 98, 0.12); background-color: #ffffff; }
+        #scheduleTrigger:focus { box-shadow: 0 0 0 3px rgba(11, 44, 98, 0.25); outline: none; }
+        #scheduleMenu { border-color: #0B2C62 !important; box-shadow: 0 10px 20px rgba(0,0,0,0.15); background-color: #ffffff; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -257,22 +265,24 @@ $schedules_result = $conn->query($schedules_query);
 <header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
         <div class="flex justify-between items-center">
-            <div class="flex items-center space-x-4">
+            <!-- Left: back button + page title -->
+            <div class="flex items-center space-x-3">
                 <button onclick="handleBackNavigation()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                 </button>
-                <h1 class="text-xl font-bold">Schedule Management</h1>
-            <div class="flex items-center space-x-4">
-                <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-                <div class="text-right">
-                    <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-                    <p class="text-blue-200 text-sm">Schedule Management System</p>
+                <span class="text-lg md:text-xl font-bold">Schedule Management</span>
+            </div>
+            <!-- Right: school logo + name -->
+            <div class="flex items-center space-x-3">
+                <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-10 w-10 md:h-12 md:w-12 rounded-full bg-white p-1">
+                <div class="text-right leading-tight">
+                    <div class="text-sm md:text-base font-bold">Cornerstone College Inc.</div>
+                    <div class="text-[11px] md:text-sm text-blue-200">Schedule Management System</div>
                 </div>
             </div>
         </div>
-        
     </div>
 </header>
 
@@ -638,7 +648,21 @@ $schedules_result = $conn->query($schedules_query);
         <!-- Schedule Selection -->
         <div class="mb-2">
           <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedule</label>
-          <select id="scheduleSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+          <input type="text" id="scheduleSearch" placeholder="Search by Schedule Name" 
+                 class="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" />
+          <div class="relative">
+            <!-- Trigger that looks like a select -->
+            <button type="button" id="scheduleTrigger" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-left bg-white focus:ring-2 focus:ring-green-500">
+              <span id="scheduleTriggerText">Choose a schedule...</span>
+              <span class="float-right">▾</span>
+            </button>
+            <!-- Scrollable menu (about 10 items tall) -->
+            <div id="scheduleMenu" class="hidden absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow max-h-64 overflow-y-auto">
+              <div id="scheduleMenuList"></div>
+            </div>
+          </div>
+          <!-- Hidden native select for value/state -->
+          <select id="scheduleSelect" class="hidden">
             <option value="">Choose a schedule...</option>
             <?php 
             $schedules_result->data_seek(0); // Reset result pointer
@@ -685,6 +709,9 @@ let studentsOffset = 0;
 let studentsQuery = '';
 let studentsHasMore = false;
 let studentsLoading = false;
+// Preserve previous page overflow so we can restore after Assign modal closes
+let __prevBodyOverflow = '';
+let __prevHtmlOverflow = '';
 
 // Show/Hide Modals
 function showCreateScheduleModal() {
@@ -746,6 +773,13 @@ function hideCreateScheduleModal() {
 
 function showAssignScheduleModal() {
     document.getElementById('assignScheduleModal').classList.remove('hidden');
+    // Lock background scroll
+    try {
+        __prevBodyOverflow = document.body.style.overflow;
+        __prevHtmlOverflow = document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+    } catch(e){}
     selectedStudents = [];
     updateSelectedCount();
     // Reset search box and state
@@ -753,29 +787,146 @@ function showAssignScheduleModal() {
     // Reset schedule select to default (empty)
     const sel = document.getElementById('scheduleSelect');
     if (sel) { sel.value = ''; }
+    // Build the custom schedule dropdown and bind search
+    const schSearchEl = document.getElementById('scheduleSearch');
+    if (schSearchEl){
+        schSearchEl.value = '';
+        schSearchEl.removeEventListener('input', onScheduleSearchInput);
+        schSearchEl.addEventListener('input', onScheduleSearchInput);
+    }
+    renderScheduleMenuFromSelect();
     studentsQuery = '';
     studentsOffset = 0;
     const listC = document.getElementById('studentsList'); if (listC) listC.innerHTML = '<p class="text-gray-500 text-center py-4">Loading employees...</p>';
     loadStudentsPage(false);
     // Attach infinite scroll listener
     const listEl = document.getElementById('studentsList');
-    listEl.addEventListener('scroll', onStudentsScroll);
+    listEl.addEventListener('scroll', (e)=>{ onStudentsScroll(e); hideScheduleMenu(); });
+    // Close menu on clicks inside list area
+    listEl.addEventListener('click', hideScheduleMenu);
     if (sel) sel.addEventListener('change', onEmployeeScheduleChangeReload);
+    // Open/close menu + outside click + Esc
+    const trig = document.getElementById('scheduleTrigger');
+    if (trig){
+        trig.removeEventListener('click', toggleScheduleMenu);
+        trig.addEventListener('click', toggleScheduleMenu);
+    }
+    document.addEventListener('click', closeScheduleMenuOnOutside);
+    document.addEventListener('keydown', onScheduleMenuKeyDown);
+    // Also close when focusing the schedule search box
+    const schSearch = document.getElementById('scheduleSearch');
+    if (schSearch){ schSearch.addEventListener('focus', hideScheduleMenu); }
 }
 
 function hideAssignScheduleModal() {
     document.getElementById('assignScheduleModal').classList.add('hidden');
+    // Restore background scroll
+    try {
+        document.body.style.overflow = __prevBodyOverflow || '';
+        document.documentElement.style.overflow = __prevHtmlOverflow || '';
+    } catch(e){}
     selectedStudents = [];
     document.getElementById('studentsList').innerHTML = '<p class="text-gray-500 text-center py-4">Loading employees...</p>';
     const moreC = document.getElementById('studentsMoreContainer'); if(moreC) moreC.classList.add('hidden');
     // Detach scroll listener
     const listEl = document.getElementById('studentsList');
     listEl.removeEventListener('scroll', onStudentsScroll);
+    listEl.removeEventListener('scroll', hideScheduleMenu);
+    listEl.removeEventListener('click', hideScheduleMenu);
+    const schSearchEl = document.getElementById('scheduleSearch');
+    if (schSearchEl){ schSearchEl.removeEventListener('input', onScheduleSearchInput); schSearchEl.removeEventListener('focus', hideScheduleMenu); }
+    document.removeEventListener('click', closeScheduleMenuOnOutside);
+    document.removeEventListener('keydown', onScheduleMenuKeyDown);
 }
 
 let currentScheduleId = null;
 // State for pending assignment confirmation
 let pendingAssignment = null; // { scheduleId, movingIds }
+
+// ---- Custom dropdown helpers (copied from ManageSchedule) ----
+function renderScheduleMenuFromSelect(){
+    const sel = document.getElementById('scheduleSelect');
+    const list = document.getElementById('scheduleMenuList');
+    const label = document.getElementById('scheduleTriggerText');
+    if (!sel || !list || !label) return;
+    // build items from options, skipping first placeholder
+    let html = '';
+    for (let i = 1; i < sel.options.length; i++) {
+        const opt = sel.options[i];
+        const active = sel.value === opt.value ? ' active' : '';
+        html += `<div class="sched-item${active}" data-value="${opt.value.replace(/\"/g,'&quot;')}">${opt.textContent}</div>`;
+    }
+    list.innerHTML = html || '<div class="p-3 text-sm text-gray-500">No schedules found</div>';
+    // update trigger text
+    const cur = sel.value ? (sel.options[sel.selectedIndex]?.textContent || 'Choose a schedule...') : 'Choose a schedule...';
+    label.textContent = cur;
+    // bind click handlers
+    list.querySelectorAll('.sched-item').forEach(el => {
+        el.addEventListener('click', () => {
+            const val = el.getAttribute('data-value');
+            setScheduleSelection(val);
+            hideScheduleMenu();
+        });
+    });
+}
+
+function setScheduleSelection(value){
+    const sel = document.getElementById('scheduleSelect');
+    const label = document.getElementById('scheduleTriggerText');
+    if (!sel) return;
+    sel.value = value || '';
+    const text = sel.value ? (sel.options[sel.selectedIndex]?.textContent || 'Choose a schedule...') : 'Choose a schedule...';
+    if (label) label.textContent = text;
+    sel.dispatchEvent(new Event('change'));
+}
+
+function toggleScheduleMenu(){
+    const menu = document.getElementById('scheduleMenu'); if (!menu) return;
+    menu.classList.toggle('hidden');
+}
+function hideScheduleMenu(){ const menu = document.getElementById('scheduleMenu'); if (menu) menu.classList.add('hidden'); }
+function closeScheduleMenuOnOutside(e){
+    const menu = document.getElementById('scheduleMenu');
+    const trig = document.getElementById('scheduleTrigger');
+    if (!menu || !trig) return;
+    if (menu.classList.contains('hidden')) return;
+    const within = menu.contains(e.target) || trig.contains(e.target);
+    if (!within) hideScheduleMenu();
+}
+function onScheduleMenuKeyDown(e){ if (e.key === 'Escape') hideScheduleMenu(); }
+function onScheduleSearchInput(e){ filterScheduleOptions(e.target.value); }
+// Cache and filter options in the hidden select, then re-render the custom menu
+let originalScheduleOptionsEmp = null; // Array<{value,text}>
+function cacheOriginalScheduleOptionsEmp(){
+    if (originalScheduleOptionsEmp) return;
+    const select = document.getElementById('scheduleSelect'); if (!select) return;
+    originalScheduleOptionsEmp = Array.from(select.options).map(o=>({ value: o.value, text: o.textContent }));
+}
+function filterScheduleOptions(q){
+    cacheOriginalScheduleOptionsEmp();
+    const select = document.getElementById('scheduleSelect'); if (!select) return;
+    const query = (q||'').toLowerCase();
+    // Keep the first option (placeholder)
+    const placeholder = originalScheduleOptionsEmp[0];
+    const rest = originalScheduleOptionsEmp.slice(1);
+    const filtered = rest.filter(opt => opt.text.toLowerCase().includes(query));
+    // Rebuild options
+    select.innerHTML = '';
+    const def = document.createElement('option'); def.value = placeholder.value; def.textContent = placeholder.text; select.appendChild(def);
+    filtered.forEach(opt => {
+        const o = document.createElement('option'); o.value = opt.value; o.textContent = opt.text; select.appendChild(o);
+    });
+    // Re-render custom menu so it reflects the filtered list
+    renderScheduleMenuFromSelect();
+}
+
+// Reload employees when selected schedule changes (like students)
+function onEmployeeScheduleChangeReload(){
+    studentsOffset = 0; studentsQuery = '';
+    loadEmployeesAfterSchedule();
+}
+// Wrapper to call existing loader name
+function loadEmployeesAfterSchedule(){ loadStudentsPage(false); }
 
 // Create/Edit Schedule Form Submission
 document.getElementById('createScheduleForm').addEventListener('submit', function(e) {
@@ -896,9 +1047,11 @@ function displayStudents(students, append=false) {
         const scheduleInfo = hasSchedule ? `<span class="text-orange-600 font-medium">Current: ${currentName}</span>` : '<span class="text-green-600">Available</span>';
         // cache
         studentsIndex[id] = { name: fullName, hasCurrent: !!hasSchedule };
-        
+        // Escape quotes for safe inline attribute usage
+        const safeName = String(fullName||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const safeCurrent = String(currentName||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         html += `
-            <div class="flex items-center p-3 border-b hover:bg-gray-50 cursor-pointer select-none" onclick="toggleStudent('${id}', ${hasSchedule ? 'true' : 'false'}, '${fullName}', '${currentName || ''}')">
+            <div class="flex items-center p-3 border-b hover:bg-gray-50 cursor-pointer select-none" onclick="toggleStudent('${id}', ${hasSchedule ? 'true' : 'false'}, '${safeName}', '${safeCurrent}')">
                 <input type="checkbox" id="student_${id}" ${isSelected ? 'checked' : ''} class="mr-3 pointer-events-none">
                 <div class="flex-1">
                     <div class="font-medium">${fullName}</div>
