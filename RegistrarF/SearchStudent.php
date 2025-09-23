@@ -81,14 +81,24 @@ $sql = "SELECT sa.id_number, CONCAT(sa.first_name, ' ', sa.last_name) as full_na
         FROM student_account sa
         LEFT JOIN student_schedules ss ON sa.id_number = ss.student_id
         LEFT JOIN class_schedules cs ON ss.schedule_id = cs.id
-        WHERE (CONCAT(sa.first_name, ' ', sa.last_name) LIKE ? OR sa.id_number LIKE ?)";
+        WHERE (
+            CONCAT(sa.first_name, ' ', sa.last_name) LIKE ?
+            OR sa.id_number LIKE ?
+            OR sa.rfid_uid = ?
+            OR sa.rfid_uid LIKE ?
+        )";
 if ($excludeScheduleId > 0) { $sql .= " AND (ss.schedule_id IS NULL OR ss.schedule_id <> ?)"; }
 $sql .= " ORDER BY (ss.schedule_id IS NOT NULL) ASC, sa.last_name, sa.first_name LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($sql);
 if(!$stmt){ echo json_encode(['error'=>'DB prepare error','details'=>$conn->error]); exit; }
 $searchTerm = "%$query%";
-if ($excludeScheduleId > 0) { $stmt->bind_param("ssiii", $searchTerm, $searchTerm, $excludeScheduleId, $fetchLimit, $offset); }
-else { $stmt->bind_param("ssii", $searchTerm, $searchTerm, $fetchLimit, $offset); }
+$rfidExact = $query;
+$rfidLike = "%$query%";
+if ($excludeScheduleId > 0) {
+    $stmt->bind_param("ssssiii", $searchTerm, $searchTerm, $rfidExact, $rfidLike, $excludeScheduleId, $fetchLimit, $offset);
+} else {
+    $stmt->bind_param("ssssii", $searchTerm, $searchTerm, $rfidExact, $rfidLike, $fetchLimit, $offset);
+}
 $stmt->execute();
 $result = $stmt->get_result();
 

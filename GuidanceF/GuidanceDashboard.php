@@ -20,12 +20,16 @@ header("Expires: 0");
   <title>Guidance Dashboard - Cornerstone College Inc.</title>
   <link rel="icon" href="../images/LogoCCI.png" type="image/png">
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QR Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
   <style>
     .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
     .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
     .record-item:hover { transform: translateY(-2px); transition: all 0.3s ease; box-shadow: 0 8px 25px rgba(11, 44, 98, 0.15); }
     .record-item { cursor: pointer; transition: all 0.3s ease; border-left: 4px solid transparent; }
     .record-item:hover { border-left-color: #0B2C62; }
+    /* Mirror video only when class is applied */
+    .mirror-video video { transform: scaleX(-1); -webkit-transform: scaleX(-1); }
   </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
@@ -93,10 +97,43 @@ header("Expires: 0");
               class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors">
         Manage Violations
       </button>
+      <button id="scanQrBtn"
+              onclick="showQRScanner()"
+              class="inline-flex items-center gap-2 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+              aria-label="Scan QR">
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 4h-1a3 3 0 0 0-3 3v1" />
+          <path d="M18 4h1a3 3 0 0 1 3 3v1" />
+          <path d="M2 16v1a3 3 0 0 0 3 3h1" />
+          <path d="M22 16v1a3 3 0 0 1-3 3h-1" />
+          <rect x="3" y="11" width="18" height="2" rx="1" fill="currentColor" stroke="none" />
+        </svg>
+        <span>Scan</span>
+      </button>
       <p id="searchError" class="text-red-600 text-sm"></p>
     </div>
   </div>
 </div>
+
+<!-- QR Scanner Modal -->
+<div id="qrScannerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800">Scan Student QR</h3>
+      <button onclick="closeQRScanner()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div id="qrReader" class="w-full"></div>
+    <!-- Inline error message shown for invalid scans -->
+    <p id="qrInlineError" class="mt-2 text-red-600 text-sm hidden"></p>
+    <p id="qrStatus" class="mt-3 text-sm text-gray-600">Point your camera at the student's RFID QR code.</p>
+    <div class="flex gap-3 pt-4">
+      <button onclick="switchQRScannerCamera()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg">Switch Camera</button>
+      <button onclick="closeQRScanner()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Close</button>
+    </div>
+  </div>
+ </div>
 
 
 <!-- Success Notification -->
@@ -705,6 +742,124 @@ header("Expires: 0");
     loadViolationTypes();
   }
   
+  // ===== QR SCANNER (html5-qrcode) FOR GUIDANCE =====
+  let qrScanner = null;
+  let qrCameraIds = [];
+  let qrCameraIndex = 0;
+  let qrStarting = false;
+
+  function ensureHtml5QrcodeReady() {
+    return new Promise((resolve) => {
+      if (window.Html5Qrcode) return resolve();
+      const check = setInterval(() => { if (window.Html5Qrcode) { clearInterval(check); resolve(); } }, 100);
+    });
+  }
+
+  // Show/hide inline error just below the camera preview
+  function setQRInlineError(message) {
+    const el = document.getElementById('qrInlineError');
+    if (!el) return;
+    if (message) { el.textContent = message; el.classList.remove('hidden'); }
+    else { el.textContent = ''; el.classList.add('hidden'); }
+  }
+
+  // Mirror preview only for front/user cameras
+  function setMirrorFromCurrentStream() {
+    try {
+      const readerEl = document.getElementById('qrReader');
+      const video = readerEl ? readerEl.querySelector('video') : null;
+      const stream = video && video.srcObject ? video.srcObject : null;
+      const tracks = stream ? stream.getVideoTracks() : [];
+      const settings = tracks.length ? (tracks[0].getSettings ? tracks[0].getSettings() : {}) : {};
+      const fm = (settings.facingMode || '').toString().toLowerCase();
+      if (fm.includes('user') || fm.includes('front') || fm.includes('selfie')) readerEl && readerEl.classList.add('mirror-video');
+      else readerEl && readerEl.classList.remove('mirror-video');
+    } catch (_) {}
+  }
+
+  async function showQRScanner() {
+    try {
+      const modal = document.getElementById('qrScannerModal');
+      if (modal) modal.classList.remove('hidden');
+      const status = document.getElementById('qrStatus');
+      if (status) status.textContent = "Initializing camera...";
+      setQRInlineError('');
+      await ensureHtml5QrcodeReady();
+
+      if (!qrCameraIds.length) {
+        const devices = await Html5Qrcode.getCameras();
+        qrCameraIds = (devices || []).map(d => d.id);
+        if (!qrCameraIds.length) { if (status) status.textContent = 'No camera found.'; return; }
+      }
+
+      await startQRScannerWithCamera(qrCameraIds[qrCameraIndex]);
+    } catch (e) {
+      console.error('QR init error:', e);
+      const status = document.getElementById('qrStatus');
+      if (status) status.textContent = 'Failed to start camera: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  async function startQRScannerWithCamera(cameraId) {
+    if (qrStarting) return;
+    qrStarting = true;
+    try {
+      if (qrScanner) {
+        try { await qrScanner.stop(); } catch(_){}
+        try { await qrScanner.clear(); } catch(_){}
+      }
+      qrScanner = new Html5Qrcode('qrReader');
+      const fps = 10;
+      const qrbox = { width: 250, height: 250 };
+      await qrScanner.start(
+        { deviceId: { exact: cameraId } },
+        { fps, qrbox },
+        async (decodedText) => {
+          const text = (decodedText || '').trim();
+          if (!text) return;
+          // RFID-only: validate via Guidance GetRecord first
+          try {
+            const res = await fetch(`GetRecord.php?rfid_uid=${encodeURIComponent(text)}`);
+            const data = await res.json();
+            if (data && !data.error && data.student && data.student.id_number) {
+              setQRInlineError('');
+              closeQRScanner();
+              // Load student data into the dashboard (mirrors keyboard RFID flow)
+              loadStudentData(text);
+            } else {
+              setQRInlineError('Invalid RFID. Please scan a registered student RFID.');
+            }
+          } catch (e) {
+            setQRInlineError('Scan check failed. Please try again.');
+          }
+        },
+        () => {
+          const el = document.getElementById('qrStatus');
+          if (el) el.textContent = 'Scanning...';
+        }
+      );
+      setTimeout(setMirrorFromCurrentStream, 150);
+      const status = document.getElementById('qrStatus'); if (status) status.textContent = 'Scanning...';
+    } finally {
+      qrStarting = false;
+    }
+  }
+
+  async function switchQRScannerCamera() {
+    if (!qrCameraIds.length) return;
+    qrCameraIndex = (qrCameraIndex + 1) % qrCameraIds.length;
+    await startQRScannerWithCamera(qrCameraIds[qrCameraIndex]);
+  }
+
+  async function closeQRScanner() {
+    const modal = document.getElementById('qrScannerModal');
+    if (modal) modal.classList.add('hidden');
+    if (qrScanner) {
+      try { await qrScanner.stop(); } catch(_){}
+      try { await qrScanner.clear(); } catch(_){}
+    }
+  }
+
   function closeViolationTypeModal() {
     document.getElementById('violationTypeModal').classList.add('hidden');
     resetViolationForm();

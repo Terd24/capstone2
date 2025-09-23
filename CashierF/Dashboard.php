@@ -20,6 +20,8 @@ header("Expires: 0");
   <title>Cashier Dashboard - Cornerstone College Inc.</title>
   <link rel="icon" href="../images/LogoCCI.png" type="image/png">
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QR Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
   <style>
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
@@ -37,6 +39,11 @@ header("Expires: 0");
     }
     input[type="number"] {
       -moz-appearance: textfield;
+    }
+    /* Mirror the QR camera preview */
+    #qrReader video {
+      transform: scaleX(-1);
+      -webkit-transform: scaleX(-1);
     }
   </style>
 </head>
@@ -111,9 +118,43 @@ header("Expires: 0");
                 class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors">
           Manage Fee Types
         </button>
+        <button id="scanQrBtn"
+                onclick="showQRScanner()"
+                class="inline-flex items-center gap-2 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                aria-label="Scan QR">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+
+            <path d="M6 4h-1a3 3 0 0 0-3 3v1" />
+            <path d="M18 4h1a3 3 0 0 1 3 3v1" />
+            <path d="M2 16v1a3 3 0 0 0 3 3h1" />
+            <path d="M22 16v1a3 3 0 0 1-3 3h-1" />
+            <rect x="3" y="11" width="18" height="2" rx="1" fill="currentColor" stroke="none" />
+          </svg>
+          <span>Scan</span>
+        </button>
       </div>
       <div id="searchError" class="mt-2 text-red-600 text-sm"></div>
       <div id="searchResults" class="mt-4 space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- QR Scanner Modal -->
+  <div id="qrScannerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70]">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-gray-800">Scan Student QR</h3>
+        <button onclick="closeQRScanner()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div id="qrReader" class="w-full"></div>
+      <!-- Inline error message for invalid scans -->
+      <p id="qrInlineError" class="mt-2 text-red-600 text-sm hidden"></p>
+      <p id="qrStatus" class="mt-3 text-sm text-gray-600">Point your camera at the QR code. The code should contain the RFID number.</p>
+      <div class="flex gap-3 pt-4">
+        <button onclick="switchQRScannerCamera()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg">Switch Camera</button>
+        <button onclick="closeQRScanner()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Close</button>
+      </div>
     </div>
   </div>
 
@@ -474,6 +515,148 @@ header("Expires: 0");
       handleRFID(rfid);
     });
 
+    // ===== QR SCANNER (html5-qrcode) =====
+    let qrScanner = null;
+    let qrCameraIds = [];
+    let qrCameraIndex = 0;
+    let qrStarting = false;
+
+    // Inline error helper for the scanner modal
+    function setQRInlineError(message) {
+      const el = document.getElementById('qrInlineError');
+      if (!el) return;
+      if (message) {
+        el.textContent = message;
+        el.classList.remove('hidden');
+      } else {
+        el.textContent = '';
+        el.classList.add('hidden');
+      }
+    }
+
+    // Toggle mirror based on the active track's facingMode (front/user vs environment)
+    function setMirrorFromCurrentStream() {
+      try {
+        const readerEl = document.getElementById('qrReader');
+        const video = readerEl ? readerEl.querySelector('video') : null;
+        const stream = video && video.srcObject ? video.srcObject : null;
+        const tracks = stream ? stream.getVideoTracks() : [];
+        const settings = tracks.length ? (tracks[0].getSettings ? tracks[0].getSettings() : {}) : {};
+        const fm = (settings.facingMode || '').toString().toLowerCase();
+        // Front cameras usually report 'user' or contain 'front'
+        if (fm.includes('user') || fm.includes('front') || fm.includes('selfie')) {
+          readerEl && readerEl.classList.add('mirror-video');
+        } else {
+          readerEl && readerEl.classList.remove('mirror-video');
+        }
+      } catch (_) {}
+    }
+
+    function ensureHtml5QrcodeReady() {
+      return new Promise((resolve) => {
+        if (window.Html5Qrcode) return resolve();
+        const check = setInterval(() => {
+          if (window.Html5Qrcode) { clearInterval(check); resolve(); }
+        }, 100);
+      });
+    }
+
+    async function showQRScanner() {
+      try {
+        const modal = document.getElementById('qrScannerModal');
+        if (modal) modal.classList.remove('hidden');
+        document.getElementById('qrStatus').textContent = 'Initializing camera...';
+        setQRInlineError('');
+
+        await ensureHtml5QrcodeReady();
+
+        // Get cameras once
+        if (!qrCameraIds.length) {
+          const devices = await Html5Qrcode.getCameras();
+          qrCameraIds = (devices || []).map(d => d.id);
+          if (!qrCameraIds.length) {
+            document.getElementById('qrStatus').textContent = 'No camera found.';
+            return;
+          }
+        }
+
+        await startQRScannerWithCamera(qrCameraIds[qrCameraIndex]);
+      } catch (e) {
+        console.error('QR init error:', e);
+        const status = document.getElementById('qrStatus');
+        if (status) status.textContent = 'Failed to start camera: ' + (e && e.message ? e.message : e);
+      }
+    }
+
+    async function startQRScannerWithCamera(cameraId) {
+      if (qrStarting) return; // prevent double start
+      qrStarting = true;
+      try {
+        // Stop any existing instance
+        if (qrScanner) {
+          try { await qrScanner.stop(); } catch(_){}
+          try { await qrScanner.clear(); } catch(_){}
+        }
+        qrScanner = new Html5Qrcode('qrReader');
+        const fps = 10;
+        const qrbox = { width: 250, height: 250 };
+        await qrScanner.start(
+          { deviceId: { exact: cameraId } },
+          { fps, qrbox },
+          async (decodedText, decodedResult) => {
+            // Expect QR to contain the RFID UID directly
+            const text = (decodedText || '').trim();
+            if (!text) return;
+            // Validate first so we can show error INSIDE the modal instead of closing it
+            try {
+              const res = await fetch(`SearchStudent.php?query=${encodeURIComponent(text)}`);
+              const data = await res.json();
+              const students = (data && data.students) ? data.students : [];
+              // Accept if we can find at least one student whose rfid_uid matches exactly
+              const match = students.find(s => (s.rfid_uid || '').toString() === text);
+              if (match) {
+                setQRInlineError('');
+                closeQRScanner();
+                handleRFID(text);
+              } else {
+                setQRInlineError('Invalid QR/RFID. Please scan a registered student QR.');
+              }
+            } catch (e) {
+              setQRInlineError('Scan check failed. Please try again.');
+            }
+          },
+          (errorMessage) => {
+            // per-frame decode errors are noisy; show minimal status
+            const el = document.getElementById('qrStatus');
+            if (el) el.textContent = 'Scanning...';
+          }
+        );
+        // Apply mirror a moment after video attaches
+        setTimeout(setMirrorFromCurrentStream, 150);
+        const status = document.getElementById('qrStatus');
+        if (status) status.textContent = 'Scanning...';
+      } finally {
+        qrStarting = false;
+      }
+    }
+
+    async function switchQRScannerCamera() {
+      if (!qrCameraIds.length) return;
+      qrCameraIndex = (qrCameraIndex + 1) % qrCameraIds.length;
+      await startQRScannerWithCamera(qrCameraIds[qrCameraIndex]);
+    }
+
+    async function closeQRScanner() {
+      const modal = document.getElementById('qrScannerModal');
+      if (modal) modal.classList.add('hidden');
+      if (qrScanner) {
+        try { await qrScanner.stop(); } catch(_){}
+        try { await qrScanner.clear(); } catch(_){}
+      }
+      // Return focus to RFID field for normal flow
+      focusRFID();
+    }
+
     function showTab(tab) {
       document.getElementById('tab-balance').classList.add('hidden');
       document.getElementById('tab-history').classList.add('hidden');
@@ -522,6 +705,22 @@ header("Expires: 0");
         searchBtn.classList.remove('shake');
         searchBtn.classList.add('bg-[#0B2C62]');
       }, 600);
+    }
+
+    // Show a top-level error for invalid RFID/QR scans
+    function showRFIDError(message) {
+      if (!message) return;
+      const el = document.getElementById('searchError');
+      if (el) {
+        el.textContent = message;
+      }
+      // brief visual feedback on the Search button
+      searchBtn.classList.remove('bg-[#0B2C62]');
+      searchBtn.classList.add('bg-red-600');
+      setTimeout(() => {
+        searchBtn.classList.remove('bg-red-600');
+        searchBtn.classList.add('bg-[#0B2C62]');
+      }, 1200);
     }
 
     let allSearchResults = [];   // store all results globally
@@ -958,6 +1157,12 @@ const items = slice.map(s => {
     })
     .then(data => {
       console.log('GetBalance response data:', data);
+      // Guard: show error and stop if RFID is not registered/invalid
+      if (!data || data.error || !data.id_number || !data.full_name) {
+        showRFIDError('RFID not found or not registered. Please scan a valid student QR/RFID.');
+        clearRFIDAndFocus();
+        return;
+      }
       // ✅ Always render student info with simple gray avatar
       document.getElementById('student-info').innerHTML = `
         <div class="flex items-center space-x-4">
