@@ -48,6 +48,9 @@ try {
     // Start transaction
     $conn->begin_transaction();
     
+    // Track created OR number if payment record is inserted
+    $created_or = null;
+    
     // Get current fee item details
     $stmt = $conn->prepare("SELECT fee_type, amount FROM student_fee_items WHERE id = ?");
     $stmt->bind_param("i", $fee_id);
@@ -93,6 +96,9 @@ try {
             throw new Exception('Failed to create payment record');
         }
         
+        // Expose OR number to frontend
+        $created_or = $or_number;
+        
         // Keep the fee item in student_fee_items for temporary display
         // It will be filtered out in the frontend display logic
     }
@@ -102,7 +108,8 @@ try {
     
     echo json_encode([
         'success' => true, 
-        'message' => 'Payment updated successfully for ' . $fee_item['fee_type']
+        'message' => 'Payment updated successfully for ' . $fee_item['fee_type'],
+        'or_number' => $created_or
     ]);
     
 } catch (Exception $e) {

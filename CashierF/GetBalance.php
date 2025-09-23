@@ -10,6 +10,12 @@ if (!isset($_GET['rfid_uid'])) {
 $rfid_uid = strtoupper(trim($_GET['rfid_uid']));
 $selected_term = isset($_GET['term']) ? trim($_GET['term']) : null;
 
+// Optional history filters and pagination
+$limit = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 20;
+$offset = isset($_GET['offset']) ? max(0, intval($_GET['offset'])) : 0;
+$start_date = isset($_GET['start_date']) && $_GET['start_date'] !== '' ? $_GET['start_date'] : null; // format: YYYY-MM-DD
+$end_date = isset($_GET['end_date']) && $_GET['end_date'] !== '' ? $_GET['end_date'] : null;       // format: YYYY-MM-DD
+
 // Get student basic info
 $stmt = $conn->prepare("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track as program, grade_level as year_section FROM student_account WHERE UPPER(rfid_uid) = ?");
 $stmt->bind_param("s", $rfid_uid);
@@ -46,17 +52,23 @@ if ($selected_term) {
 // Check if we have a valid term
 if (!$school_year_term) {
     // No fee items, but still check for payment history
-    $hist_stmt = $conn->prepare("SELECT date, or_number, fee_type, amount, payment_method 
-                                 FROM student_payments 
-                                 WHERE id_number = ? 
-                                 ORDER BY date DESC, id DESC");
-    $hist_stmt->bind_param("s", $id_number);
+    // Build dynamic history query with optional date range and pagination
+    $sql = "SELECT date, or_number, fee_type, amount, payment_method FROM student_payments WHERE id_number = ?";
+    $types = "s";
+    $params = [$id_number];
+
+    if ($start_date) { $sql .= " AND DATE(date) >= ?"; $types .= "s"; $params[] = $start_date; }
+    if ($end_date)   { $sql .= " AND DATE(date) <= ?"; $types .= "s"; $params[] = $end_date; }
+
+    $sql .= " ORDER BY date DESC, id DESC LIMIT ? OFFSET ?";
+    $types .= "ii"; $params[] = $limit; $params[] = $offset;
+
+    $hist_stmt = $conn->prepare($sql);
+    $hist_stmt->bind_param($types, ...$params);
     $hist_stmt->execute();
     $hist_res = $hist_stmt->get_result();
     $history = [];
-    while ($row = $hist_res->fetch_assoc()) {
-        $history[] = $row;
-    }
+    while ($row = $hist_res->fetch_assoc()) { $history[] = $row; }
     $hist_stmt->close();
     
     echo json_encode([
@@ -69,7 +81,10 @@ if (!$school_year_term) {
         "gross_total" => 0,
         "total_paid" => 0,
         "remaining_balance" => 0,
-        "history" => $history
+        "history" => $history,
+        "has_more" => count($history) === $limit,
+        "offset" => $offset + count($history),
+        "limit" => $limit
     ]);
     exit;
 }
@@ -103,17 +118,23 @@ $item_stmt->close();
 $remaining_balance = $gross_total - $total_paid;
 
 // Get payment history (if any)
-$hist_stmt = $conn->prepare("SELECT date, or_number, fee_type, amount, payment_method 
-                             FROM student_payments 
-                             WHERE id_number = ? AND school_year_term = ? 
-                             ORDER BY date DESC, id DESC");
-$hist_stmt->bind_param("ss", $id_number, $school_year_term);
+// Build dynamic history query with optional date range and pagination
+$sql = "SELECT date, or_number, fee_type, amount, payment_method 
+        FROM student_payments 
+        WHERE id_number = ? AND school_year_term = ?";
+$types = "ss";
+$params = [$id_number, $school_year_term];
+if ($start_date) { $sql .= " AND DATE(date) >= ?"; $types .= "s"; $params[] = $start_date; }
+if ($end_date)   { $sql .= " AND DATE(date) <= ?"; $types .= "s"; $params[] = $end_date; }
+$sql .= " ORDER BY date DESC, id DESC LIMIT ? OFFSET ?";
+$types .= "ii"; $params[] = $limit; $params[] = $offset;
+
+$hist_stmt = $conn->prepare($sql);
+$hist_stmt->bind_param($types, ...$params);
 $hist_stmt->execute();
 $hist_res = $hist_stmt->get_result();
 $history = [];
-while ($row = $hist_res->fetch_assoc()) {
-    $history[] = $row;
-}
+while ($row = $hist_res->fetch_assoc()) { $history[] = $row; }
 $hist_stmt->close();
 
 // Final JSON response
@@ -127,6 +148,9 @@ echo json_encode([
     "gross_total" => $gross_total,
     "total_paid" => $total_paid,
     "remaining_balance" => $remaining_balance,
-    "history" => $history
+    "history" => $history,
+    "has_more" => count($history) === $limit,
+    "offset" => $offset + count($history),
+    "limit" => $limit
 ]);
 ?>

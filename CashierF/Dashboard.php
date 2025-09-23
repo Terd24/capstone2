@@ -233,7 +233,7 @@ header("Expires: 0");
                      class="w-full border border-gray-300 rounded-lg px-4 py-3 pr-20 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                      onchange="checkPaymentAmount()" oninput="checkPaymentAmount()" required>
               <button type="button" onclick="matchEditAmountDue()" 
-                      class="absolute right-2 top-2 bottom-2 bg-blue-500 hover:bg-blue-600 text-white px-3 rounded text-sm">
+                      class="absolute right-2 top-2 bottom-2 bg-[#0B2C62] hover:bg-blue-900 text-white px-3 rounded text-sm">
                 Match
               </button>
             </div>
@@ -286,6 +286,9 @@ header("Expires: 0");
           </svg>
         </button>
       </div>
+      <!-- MESSAGES MOVED TO TOP FOR VISIBILITY -->
+      <div id="feeTypeError" class="hidden mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm"></div>
+      <div id="feeTypeSuccess" class="hidden mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg text-sm"></div>
       
       <!-- Add New Fee Type Form -->
       <div class="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -304,7 +307,7 @@ header("Expires: 0");
             </div>
           </div>
           <div class="flex gap-3 mt-4">
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+            <button type="submit" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium transition-colors">
               Add Fee Type
             </button>
           </div>
@@ -318,9 +321,25 @@ header("Expires: 0");
           <div class="text-center py-4 text-gray-500">Loading fee types...</div>
         </div>
       </div>
-      
-      <div id="feeTypeError" class="hidden mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm"></div>
-      <div id="feeTypeSuccess" class="hidden mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal (matches Registrar style) -->
+  <div id="feeTypeDeleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+          <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Delete Fee Type</h3>
+        <p class="text-sm text-gray-500 mb-6">Are you sure you want to delete <span id="feeTypeDeleteName" class="font-medium text-gray-900"></span>? This action cannot be undone.</p>
+        <div class="flex gap-3">
+          <button onclick="hideFeeTypeDeleteModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium">Cancel</button>
+          <button onclick="confirmFeeTypeDelete()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium">Delete</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -470,6 +489,17 @@ header("Expires: 0");
         document.getElementById('tab-history').classList.remove('hidden');
         document.querySelectorAll('.tab-btn')[1].classList.add('border-blue-600', 'font-semibold', 'text-blue-600');
         document.querySelectorAll('.tab-btn')[1].classList.remove('text-gray-600', 'border-transparent');
+
+        // If history is empty (e.g., after adding a payment), proactively fetch
+        const body = document.getElementById('historyBody');
+        const rows = body ? body.querySelectorAll('tr').length : 0;
+        if (rows === 0 && window.currentStudentRFID) {
+          // Reset pagination and load fresh history
+          window.historyOffset = 0;
+          window.historyHasMore = true;
+          window.historyLoading = false;
+          handleRFID(window.currentStudentRFID);
+        }
       }
       focusRFID(); 
     }
@@ -619,13 +649,309 @@ const items = slice.map(s => {
         });
     }
 
+    // ===== Helper functions to support Add Balance modal =====
+    // Cache for fee types loaded from server
+    window.cachedFeeTypes = window.cachedFeeTypes || null;
+
+    async function loadFeeTypes() {
+      try {
+        if (window.cachedFeeTypes) return window.cachedFeeTypes;
+        const res = await fetch('ManageFeeTypes.php');
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.data)) {
+          window.cachedFeeTypes = data.data;
+          return window.cachedFeeTypes;
+        }
+        window.cachedFeeTypes = [];
+        return [];
+      } catch (e) {
+        console.error('Failed to load fee types:', e);
+        window.cachedFeeTypes = [];
+        return [];
+      }
+    }
+
+    function updateFeeTypeDropdowns() {
+      const select = document.getElementById('mainFeeTypeSelect');
+      if (!select) return;
+      // Clear existing (keep first placeholder)
+      while (select.options.length > 1) select.remove(1);
+      const types = Array.isArray(window.cachedFeeTypes) ? window.cachedFeeTypes : [];
+      types.forEach(ft => {
+        const opt = document.createElement('option');
+        opt.value = ft.id || ft.fee_name;
+        opt.textContent = `${ft.fee_name}${ft.default_amount ? ` (₱${Number(ft.default_amount).toLocaleString('en-PH', {minimumFractionDigits:2})})` : ''}`;
+        opt.setAttribute('data-name', ft.fee_name);
+        opt.setAttribute('data-amount', ft.default_amount || 0);
+        select.appendChild(opt);
+      });
+      // Optionally add a custom item entry in the future
+      // const custom = document.createElement('option');
+      // custom.value = 'custom'; custom.textContent = 'Custom Fee Type...';
+      // select.appendChild(custom);
+    }
+
+    // ===== FEE TYPE MODAL HANDLERS =====
+    function renderFeeTypesList(types) {
+      const list = document.getElementById('feeTypesList');
+      if (!list) return;
+      if (!Array.isArray(types) || types.length === 0) {
+        list.innerHTML = '<div class="text-center py-4 text-gray-500">No fee types yet.</div>';
+        return;
+      }
+      list.innerHTML = types.map(t => {
+        const id = t.id;
+        const name = t.fee_name;
+        const amt = Number(t.default_amount || 0);
+        const safeAttrName = String(name).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `
+          <div id="fee-row-${id}" class="flex items-center justify-between border rounded-lg px-4 py-3 bg-white">
+            <div class="flex-1">
+              <div class="font-medium text-gray-800">${name}</div>
+              <div class="text-sm text-gray-600">Default: ₱${amt.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1 text-xs rounded bg-[#0B2C62] hover:bg-blue-900 text-white" onclick="startEditFeeType(${id})">Edit</button>
+              <button class="px-3 py-1 text-xs rounded bg-red-500 hover:bg-red-600 text-white" onclick="openFeeTypeDeleteFromBtn(this)" data-id="${id}" data-name="${safeAttrName}">Delete</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    async function showFeeTypeModal() {
+      // Reset messages
+      const err = document.getElementById('feeTypeError');
+      const ok = document.getElementById('feeTypeSuccess');
+      if (err) { err.classList.add('hidden'); err.textContent = ''; }
+      if (ok) { ok.classList.add('hidden'); ok.textContent = ''; }
+
+      // Load and render list
+      const types = await loadFeeTypes();
+      renderFeeTypesList(types);
+
+      // Show modal
+      const modal = document.getElementById('feeTypeModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeFeeTypeModal() {
+      const modal = document.getElementById('feeTypeModal');
+      if (modal) modal.classList.add('hidden');
+      focusRFID();
+    }
+
+    // Smoothly scroll the fee type modal content to the top (for messages visibility)
+    function scrollFeeTypeModalTop() {
+      const container = document.querySelector('#feeTypeModal > div');
+      if (container && typeof container.scrollTo === 'function') {
+        container.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (container) {
+        container.scrollTop = 0;
+      }
+    }
+
+    // ===== Delete Confirmation (Registrar-style) =====
+    let feeTypeToDelete = null;
+
+    function openFeeTypeDeleteModal(id, name) {
+      feeTypeToDelete = id;
+      const nameSpan = document.getElementById('feeTypeDeleteName');
+      if (nameSpan) nameSpan.textContent = name || 'this fee type';
+      const modal = document.getElementById('feeTypeDeleteModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function hideFeeTypeDeleteModal() {
+      const modal = document.getElementById('feeTypeDeleteModal');
+      if (modal) modal.classList.add('hidden');
+      feeTypeToDelete = null;
+    }
+
+    function confirmFeeTypeDelete() {
+      if (feeTypeToDelete == null) return;
+      deleteFeeType(feeTypeToDelete);
+      hideFeeTypeDeleteModal();
+    }
+
+    // Convenience: open modal from button with data attributes
+    function openFeeTypeDeleteFromBtn(btn) {
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      const name = btn.getAttribute('data-name') || '';
+      openFeeTypeDeleteModal(id, name);
+    }
+
+    // Add new fee type
+    function submitFeeType(ev) {
+      if (ev) ev.preventDefault();
+      const nameEl = document.getElementById('feeTypeName');
+      const amtEl = document.getElementById('feeTypeAmount');
+      const err = document.getElementById('feeTypeError');
+      const ok = document.getElementById('feeTypeSuccess');
+      if (err) { err.classList.add('hidden'); err.textContent = ''; }
+      if (ok) { ok.classList.add('hidden'); ok.textContent = ''; }
+
+      const name = (nameEl?.value || '').trim();
+      const amt = parseFloat(amtEl?.value || '0');
+      if (!name) { if (err){err.textContent='Fee name is required'; err.classList.remove('hidden');} return; }
+      if (amt < 0) { if (err){err.textContent='Default amount must be non-negative'; err.classList.remove('hidden');} return; }
+
+      const fd = new FormData();
+      fd.append('action', 'add');
+      fd.append('fee_name', name);
+      fd.append('default_amount', String(amt));
+
+      fetch('ManageFeeTypes.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(async data => {
+          if (!data.success) { if (err){err.textContent = data.message || 'Failed to add fee type'; err.classList.remove('hidden'); scrollFeeTypeModalTop();} return; }
+          if (ok) { ok.textContent = data.message || 'Fee type added'; ok.classList.remove('hidden'); }
+          // Invalidate cache and refresh UI/dropdowns
+          window.cachedFeeTypes = null;
+          const types = await loadFeeTypes();
+          renderFeeTypesList(types);
+          updateFeeTypeDropdowns();
+          // Clear inputs
+          if (nameEl) nameEl.value = '';
+          if (amtEl) amtEl.value = '';
+          scrollFeeTypeModalTop();
+        })
+        .catch(() => { if (err){err.textContent='Network error while adding fee type'; err.classList.remove('hidden'); scrollFeeTypeModalTop();} });
+    }
+
+    // Inline edit helpers
+    function startEditFeeType(id) {
+      const row = document.getElementById(`fee-row-${id}`);
+      if (!row) return;
+      const current = window.cachedFeeTypes?.find(t => String(t.id) === String(id));
+      const name = current ? current.fee_name : '';
+      const amt = current ? Number(current.default_amount || 0) : 0;
+      row.innerHTML = `
+        <div class="flex-1 flex items-center gap-3">
+          <input id="edit-name-${id}" type="text" class="border rounded px-3 py-2 w-1/2" value="${name}">
+          <input id="edit-amt-${id}" type="number" step="0.01" min="0" class="border rounded px-3 py-2 w-40" value="${amt.toFixed(2)}">
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-1 text-xs rounded bg-[#0B2C62] hover:bg-blue-900 text-white" onclick="saveEditFeeType(${id})">Save</button>
+          <button class="px-3 py-1 text-xs rounded bg-gray-300 hover:bg-gray-400 text-gray-800" onclick="cancelEditFeeType(${id})">Cancel</button>
+        </div>`;
+    }
+
+    function cancelEditFeeType(id) {
+      // Re-render from cache
+      renderFeeTypesList(window.cachedFeeTypes || []);
+    }
+
+    function saveEditFeeType(id) {
+      const nameEl = document.getElementById(`edit-name-${id}`);
+      const amtEl = document.getElementById(`edit-amt-${id}`);
+      const err = document.getElementById('feeTypeError');
+      const ok = document.getElementById('feeTypeSuccess');
+      if (err) { err.classList.add('hidden'); err.textContent = ''; }
+      if (ok) { ok.classList.add('hidden'); ok.textContent = ''; }
+      const name = (nameEl?.value || '').trim();
+      const amt = parseFloat(amtEl?.value || '0');
+      if (!name) { if (err){err.textContent='Fee name is required'; err.classList.remove('hidden');} return; }
+      if (amt < 0) { if (err){err.textContent='Default amount must be non-negative'; err.classList.remove('hidden');} return; }
+
+      const fd = new FormData();
+      fd.append('action', 'edit');
+      fd.append('id', String(id));
+      fd.append('fee_name', name);
+      fd.append('default_amount', String(amt));
+
+      fetch('ManageFeeTypes.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(async data => {
+          if (!data.success) { if (err){err.textContent = data.message || 'Failed to update fee type'; err.classList.remove('hidden'); scrollFeeTypeModalTop();} return; }
+          if (ok) { ok.textContent = data.message || 'Fee type updated'; ok.classList.remove('hidden'); }
+          window.cachedFeeTypes = null;
+          const types = await loadFeeTypes();
+          renderFeeTypesList(types);
+          updateFeeTypeDropdowns();
+          scrollFeeTypeModalTop();
+        })
+        .catch(() => { if (err){err.textContent='Network error while updating fee type'; err.classList.remove('hidden'); scrollFeeTypeModalTop();} });
+    }
+
+    function deleteFeeType(id) {
+      const err = document.getElementById('feeTypeError');
+      const ok = document.getElementById('feeTypeSuccess');
+      const fd = new FormData();
+      fd.append('action', 'delete');
+      fd.append('id', String(id));
+      fetch('ManageFeeTypes.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(async data => {
+          if (!data.success) { if (err){err.textContent = data.message || 'Failed to delete fee type'; err.classList.remove('hidden'); scrollFeeTypeModalTop();} return; }
+          if (ok) { ok.textContent = data.message || 'Fee type deleted'; ok.classList.remove('hidden'); }
+          window.cachedFeeTypes = null;
+          const types = await loadFeeTypes();
+          renderFeeTypesList(types);
+          updateFeeTypeDropdowns();
+          scrollFeeTypeModalTop();
+        })
+        .catch(() => { if (err){err.textContent='Network error while deleting fee type'; err.classList.remove('hidden'); scrollFeeTypeModalTop();} });
+    }
+
+    function handleFeeTypeChange(el) {
+      // When fee type changes, if there is a default amount, prefill Amount Due
+      try {
+        const row = el.closest('.space-y-2');
+        const amount = el.selectedOptions && el.selectedOptions[0] ? Number(el.selectedOptions[0].getAttribute('data-amount') || 0) : 0;
+        if (row) {
+          const nums = row.querySelectorAll('input[type="number"]');
+          if (nums && nums[0]) {
+            if (!nums[0].value || Number(nums[0].value) === 0) {
+              nums[0].value = amount ? amount.toFixed(2) : '';
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('handleFeeTypeChange error:', e);
+      }
+    }
+
+    function matchAllAmountsDue() {
+      // Sets Paid equal to Amount Due for all items in the Add Balance form
+      const container = document.getElementById('feeItemsContainer');
+      if (!container) return;
+      container.querySelectorAll('.space-y-2').forEach(row => {
+        const nums = row.querySelectorAll('input[type="number"]');
+        if (nums.length >= 2) {
+          const due = parseFloat(nums[0].value) || 0;
+          nums[1].value = due > 0 ? due.toFixed(2) : '';
+          // Update payment method visibility for both main and dynamic rows
+          if (row.parentElement && row.parentElement.id === 'feeItemsContainer') {
+            // main first row check
+            checkMainFormPayment(nums[1]);
+          } else {
+            checkAddBalancePayment(nums[1]);
+          }
+        }
+      });
+    }
+
     // ===== FETCH BALANCE & HISTORY =====
     function handleRFID(rfid) {
       console.log('handleRFID called with:', rfid);
       // Store RFID globally for refresh purposes
       window.currentStudentRFID = rfid;
       
-  fetch(`GetBalance.php?rfid_uid=${encodeURIComponent(rfid)}`)
+  // Reset history pagination state
+  window.historyLimit = 10;
+  window.historyOffset = 0;
+  window.historyHasMore = false;
+  window.historyLoading = false;
+  // Read filters if present (use globals as fallback before UI renders)
+  const startInput = document.getElementById('historyStartDate');
+  const endInput = document.getElementById('historyEndDate');
+  const startVal = (startInput && startInput.value) ? startInput.value : (window.historyStartDate || '');
+  const endVal = (endInput && endInput.value) ? endInput.value : (window.historyEndDate || '');
+  const startParam = startVal ? `&start_date=${encodeURIComponent(startVal)}` : '';
+  const endParam = endVal ? `&end_date=${encodeURIComponent(endVal)}` : '';
+
+  fetch(`GetBalance.php?rfid_uid=${encodeURIComponent(rfid)}&limit=${window.historyLimit}&offset=0${startParam}${endParam}`)
     .then(res => {
       console.log('GetBalance response status:', res.status);
       return res.json();
@@ -748,8 +1074,8 @@ const items = slice.map(s => {
               </div>
             </div>
             <div class="flex gap-2">
-              <button onclick="showAddBalanceForm('${data.id_number}', '${data.full_name}')" 
-                      class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+              <button onclick="showAddBalanceFormAndRefresh('${data.id_number}', '${data.full_name}')" 
+                      class="bg-[#0B2C62] hover:bg-blue-900 text-white px-3 py-1 rounded text-sm">
                 Add More Fees
               </button>
             </div>
@@ -788,7 +1114,7 @@ const items = slice.map(s => {
                     <td class="px-4 py-3 text-right ${paid > 0 ? 'text-green-600 font-semibold' : 'text-gray-500'}">₱${paid.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-right font-bold ${isPaid ? 'text-green-600' : 'text-red-600'}">₱${Math.abs(balance).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-center">
-                      ${isPaid ? '<span class="text-green-600 text-xs font-semibold">✓ PAID</span>' : `<button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors">Edit</button>`}
+                      ${isPaid ? '<span class="text-green-600 text-xs font-semibold">✓ PAID</span>' : `<button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-2 py-1 rounded text-xs font-medium transition-colors">Edit</button>`}
                     </td>
                   </tr>
                   `;
@@ -887,6 +1213,11 @@ const items = slice.map(s => {
       document.getElementById('studentDisplay').value = studentName;
       document.getElementById('studentId').value = studentId;
       
+      // Ensure academic years dropdown is populated before setting defaults
+      if (typeof populateAcademicYears === 'function') {
+        populateAcademicYears();
+      }
+
       // Get latest term from database and set as default
       fetch('GetLatestTerm.php')
         .then(res => res.json())
@@ -899,6 +1230,10 @@ const items = slice.map(s => {
             const nextYear = currentYear + 1;
             setSchoolYearAndSemester(`${currentYear}-${nextYear} 1st Semester`);
           }
+          // Update hidden composed field after setting values
+          if (typeof updateSchoolTermHidden === 'function') {
+            updateSchoolTermHidden();
+          }
         })
         .catch(err => {
           console.error('Error getting latest term:', err);
@@ -906,6 +1241,9 @@ const items = slice.map(s => {
           const currentYear = new Date().getFullYear();
           const nextYear = currentYear + 1;
           setSchoolYearAndSemester(`${currentYear}-${nextYear} 1st Semester`);
+          if (typeof updateSchoolTermHidden === 'function') {
+            updateSchoolTermHidden();
+          }
         });
       
       // Load fee types and update dropdowns
@@ -1020,6 +1358,96 @@ const items = slice.map(s => {
       }
     }
 
+    // ===== Minimal handlers to enable Edit modal =====
+    function editFeePayment(feeId, feeType, amountDue, paid) {
+      // Populate fields
+      const idEl = document.getElementById('editFeeId');
+      const typeEl = document.getElementById('editFeeType');
+      const dueEl = document.getElementById('editAmountDue');
+      const paidEl = document.getElementById('editPaidAmount');
+      if (!idEl || !typeEl || !dueEl || !paidEl) return;
+      idEl.value = feeId;
+      typeEl.value = feeType;
+      dueEl.value = Number(amountDue || 0).toFixed(2);
+      paidEl.value = Number(paid || 0).toFixed(2);
+
+      // Reset method controls and messages
+      const methodSel = document.getElementById('editPaymentMethod');
+      if (methodSel) methodSel.value = 'Cash';
+      const manual = document.getElementById('editManualPaymentInput');
+      if (manual) { manual.classList.add('hidden'); manual.required = false; manual.value = ''; }
+      const err = document.getElementById('editPaymentError');
+      if (err) { err.classList.add('hidden'); err.textContent = ''; }
+      const ok = document.getElementById('editPaymentSuccess');
+      if (ok) { ok.classList.add('hidden'); ok.textContent = ''; }
+
+      // Show or hide payment method based on amounts
+      checkPaymentAmount();
+
+      // Open modal
+      const modal = document.getElementById('editPaymentModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function checkPaymentAmount() {
+      const due = parseFloat((document.getElementById('editAmountDue')?.value) || '0');
+      const paid = parseFloat((document.getElementById('editPaidAmount')?.value) || '0');
+      const div = document.getElementById('paymentMethodDiv');
+      if (!div) return;
+      if (paid > 0 && paid >= due && due > 0) {
+        div.classList.remove('hidden');
+      } else {
+        div.classList.add('hidden');
+      }
+    }
+
+    function matchEditAmountDue() {
+      const dueEl = document.getElementById('editAmountDue');
+      const paidEl = document.getElementById('editPaidAmount');
+      if (!dueEl || !paidEl) return;
+      const due = parseFloat(dueEl.value || '0');
+      paidEl.value = due > 0 ? due.toFixed(2) : '0.00';
+      checkPaymentAmount();
+    }
+
+    function closeEditPaymentModal() {
+      const modal = document.getElementById('editPaymentModal');
+      if (modal) modal.classList.add('hidden');
+      focusRFID();
+    }
+
+    function submitPaymentEdit(ev) {
+      if (ev) ev.preventDefault();
+      const feeId = parseInt((document.getElementById('editFeeId')?.value) || '0', 10);
+      const paid = parseFloat((document.getElementById('editPaidAmount')?.value) || '0');
+      const due = parseFloat((document.getElementById('editAmountDue')?.value) || '0');
+      let method = (document.getElementById('editPaymentMethod')?.value) || 'Cash';
+      const manual = document.getElementById('editManualPaymentInput');
+      if (method === 'Other' && manual && manual.value.trim()) method = manual.value.trim();
+
+      const err = document.getElementById('editPaymentError');
+      if (err) { err.classList.add('hidden'); err.textContent = ''; }
+
+      if (!feeId || feeId <= 0) { if (err){err.textContent='Invalid fee item'; err.classList.remove('hidden');} return; }
+      if (paid < 0) { if (err){err.textContent='Paid amount cannot be negative'; err.classList.remove('hidden');} return; }
+      if (paid > due) { if (err){err.textContent=`Paid cannot exceed Amount Due (₱${due.toFixed(2)})`; err.classList.remove('hidden');} return; }
+
+      const fd = new FormData();
+      fd.append('fee_id', String(feeId));
+      fd.append('paid_amount', String(paid));
+      fd.append('payment_method', method);
+
+      fetch('UpdatePayment.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) { if (err){err.textContent = data.message || 'Failed to update payment'; err.classList.remove('hidden');} return; }
+          closeEditPaymentModal();
+          if (window.currentStudentRFID) handleRFID(window.currentStudentRFID);
+          if (data.or_number) { try { window.open(`Receipt.php?or=${encodeURIComponent(data.or_number)}`, '_blank'); } catch(_){} }
+        })
+        .catch(() => { if (err){err.textContent='Network error. Please try again.'; err.classList.remove('hidden');} });
+    }
+
     function submitBalance(event) {
       if (event) event.preventDefault();
       
@@ -1131,6 +1559,15 @@ const items = slice.map(s => {
           successDiv.textContent = data.message;
           successDiv.classList.remove('hidden');
           
+          // If any ORs were created for fully paid items, open their receipts
+          if (Array.isArray(data.or_numbers) && data.or_numbers.length > 0) {
+            data.or_numbers.forEach((or, idx) => {
+              setTimeout(() => {
+                window.open(`Receipt.php?or=${encodeURIComponent(or)}`, '_blank');
+              }, idx * 300);
+            });
+          }
+          
           // Mark newly added fees as temporarily visible if they are fully paid
           if (data.added_fees) {
             window.temporarilyVisibleFees = window.temporarilyVisibleFees || new Set();
@@ -1193,168 +1630,7 @@ const items = slice.map(s => {
       });
     }
 
-    // ===== FEE ITEMS MANAGEMENT =====
-    function addFeeItem() {
-      const container = document.getElementById('feeItemsContainer');
-      const newItem = document.createElement('div');
-      newItem.className = 'space-y-2 p-3 bg-gray-50 rounded-lg relative';
-      newItem.innerHTML = `
-        <div class="space-y-2">
-          <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="handleFeeTypeSelection(this)">
-            <option value="">Select Fee Type...</option>
-          </select>
-          <div class="flex gap-2">
-            <input type="number" placeholder="Amount Due" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="checkAddBalancePayment(this)" oninput="checkAddBalancePayment(this)">
-            <input type="number" placeholder="Paid" step="0.01" min="0" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="checkAddBalancePayment(this)" oninput="checkAddBalancePayment(this)">
-          </div>
-          <div class="payment-method-section hidden">
-            <label class="block text-sm font-medium text-gray-700 mb-2 mt-2">Payment Method</label>
-            <div class="flex gap-2">
-              <select class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="handleDynamicPaymentMethodChange(this)">
-                <option value="Cash">Cash</option>
-                <option value="GCash">GCash</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Check">Check</option>
-                <option value="Credit Card">Credit Card</option>
-                <option value="Other">Other (Manual Input)</option>
-              </select>
-              <input type="text" placeholder="Enter payment method" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm hidden manual-payment-input">
-            </div>
-          </div>
-        </div>
-        <button type="button" onclick="this.parentElement.remove()" class="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center">×</button>
-      `;
-      container.appendChild(newItem);
-      updateFeeTypeDropdowns();
-    }
-
-    function updateFeeTypeDropdowns() {
-      const dropdowns = document.querySelectorAll('#feeItemsContainer select:not(#addBalancePaymentMethod)');
-      dropdowns.forEach(dropdown => {
-        const currentValue = dropdown.value;
-        dropdown.innerHTML = '<option value="">Select Fee Type...</option>';
-        
-        if (allFeeTypes && allFeeTypes.length > 0) {
-          allFeeTypes.forEach(feeType => {
-            const option = document.createElement('option');
-            option.value = feeType.id;
-            option.textContent = `${feeType.fee_name} (₱${parseFloat(feeType.default_amount).toLocaleString('en-PH', {minimumFractionDigits: 2})})`;
-            option.dataset.amount = feeType.default_amount;
-            option.dataset.name = feeType.fee_name;
-            dropdown.appendChild(option);
-          });
-        }
-        
-        dropdown.value = currentValue;
-      });
-    }
-
-    function handleFeeTypeChange(selectElement) {
-      console.log('handleFeeTypeChange called');
-      const container = selectElement.closest('.space-y-2');
-      const amountInput = container.querySelector('input[placeholder="Amount Due"]');
-      
-      console.log('Selected value:', selectElement.value);
-      console.log('Amount input found:', amountInput);
-      
-      if (selectElement.value === '') {
-        if (amountInput) amountInput.value = '';
-      } else {
-        const selectedOption = selectElement.options[selectElement.selectedIndex];
-        console.log('Selected option:', selectedOption);
-        console.log('Option dataset:', selectedOption ? selectedOption.dataset : 'none');
-        
-        if (selectedOption && selectedOption.dataset && selectedOption.dataset.amount) {
-          const amount = parseFloat(selectedOption.dataset.amount).toFixed(2);
-          console.log('Setting amount to:', amount);
-          if (amountInput) amountInput.value = amount;
-        } else {
-          if (amountInput) amountInput.value = '';
-        }
-      }
-    }
-
-    function matchAmountDue(button) {
-      const container = button.closest('.space-y-2');
-      const amountDueInput = container.querySelector('input[placeholder="Amount Due"]');
-      const paidInput = container.querySelector('input[placeholder="Paid"]');
-      
-      if (amountDueInput && paidInput && amountDueInput.value) {
-        paidInput.value = amountDueInput.value;
-      }
-    }
-
-    function matchEditAmountDue() {
-      const amountDue = document.getElementById('editAmountDue').value;
-      const paidInput = document.getElementById('editPaidAmount');
-      
-      if (amountDue && paidInput) {
-        paidInput.value = amountDue;
-        checkPaymentAmount(); // Trigger payment method check
-      }
-    }
-
-    function matchAllAmountsDue() {
-      const container = document.getElementById('feeItemsContainer');
-      const feeItems = container.querySelectorAll('.space-y-2');
-      
-      feeItems.forEach((item, index) => {
-        const amountDueInput = item.querySelector('input[placeholder="Amount Due"]');
-        const paidInput = item.querySelector('input[placeholder="Paid"]');
-        
-        if (amountDueInput && paidInput && amountDueInput.value) {
-          paidInput.value = amountDueInput.value;
-          // Trigger payment method check after setting the value
-          if (index === 0) {
-            // First item is main form
-            checkMainFormPayment(paidInput);
-          } else {
-            // Other items are dynamic
-            checkAddBalancePayment(paidInput);
-          }
-        }
-      });
-    }
-
-    function editFeePayment(feeId, feeType, amountDue, currentPaid) {
-      // Populate the edit form
-      document.getElementById('editFeeId').value = feeId;
-      document.getElementById('editFeeType').value = feeType;
-      document.getElementById('editAmountDue').value = amountDue.toFixed(2);
-      document.getElementById('editAmountDueHidden').value = amountDue.toFixed(2);
-      document.getElementById('editPaidAmount').value = currentPaid.toFixed(2);
-      
-      // Reset messages
-      document.getElementById('editPaymentError').classList.add('hidden');
-      document.getElementById('editPaymentSuccess').classList.add('hidden');
-      
-      // Check if payment method should be shown
-      checkPaymentAmount();
-      
-      // Show modal
-      document.getElementById('editPaymentModal').classList.remove('hidden');
-    }
-    
-    function checkPaymentAmount() {
-      const paidAmount = parseFloat(document.getElementById('editPaidAmount').value) || 0;
-      const amountDue = parseFloat(document.getElementById('editAmountDue').value) || 0;
-      const paymentMethodDiv = document.getElementById('paymentMethodDiv');
-      const paymentMethodSelect = document.getElementById('editPaymentMethod');
-      
-      // Show payment method field if paid amount equals amount due
-      if (Math.abs(paidAmount - amountDue) < 0.01 && paidAmount > 0) {
-        paymentMethodDiv.classList.remove('hidden');
-        paymentMethodSelect.setAttribute('required', 'required');
-      } else {
-        paymentMethodDiv.classList.add('hidden');
-        paymentMethodSelect.removeAttribute('required');
-      }
-    }
-
-    function closeEditPaymentModal() {
-      document.getElementById('editPaymentModal').classList.add('hidden');
-      focusRFID();
-    }
+    // ... rest of your code ...
 
     function submitPaymentEdit(event) {
       if (event) event.preventDefault();
@@ -1391,6 +1667,11 @@ const items = slice.map(s => {
           // Close modal immediately and refresh data
           closeEditPaymentModal();
           
+          // If an OR was generated, open the receipt in a new tab
+          if (data.or_number) {
+            window.open(`Receipt.php?or=${encodeURIComponent(data.or_number)}`, '_blank');
+          }
+          
           // Use stored RFID to refresh immediately
           if (window.currentStudentRFID) {
             console.log('Refreshing after payment edit with RFID:', window.currentStudentRFID);
@@ -1413,259 +1694,7 @@ const items = slice.map(s => {
       });
     }
 
-    // ===== FEE TYPE MANAGEMENT =====
-    let allFeeTypes = [];
-    
-    function showFeeTypeModal() {
-      document.getElementById('feeTypeModal').classList.remove('hidden');
-      loadFeeTypes();
-      
-      // Reset form
-      document.getElementById('addFeeTypeForm').reset();
-      document.getElementById('feeTypeError').classList.add('hidden');
-      document.getElementById('feeTypeSuccess').classList.add('hidden');
-    }
-    
-    function closeFeeTypeModal() {
-      document.getElementById('feeTypeModal').classList.add('hidden');
-      focusRFID();
-    }
-    
-    function loadFeeTypes() {
-      return fetch('ManageFeeTypes.php')
-        .then(response => response.json())
-        .then(data => {
-          console.log('LoadFeeTypes response:', data);
-          if (data.success && data.data) {
-            allFeeTypes = data.data;
-            renderFeeTypesList(data.data);
-            if (typeof updateFeeTypeDropdowns === 'function') {
-              updateFeeTypeDropdowns();
-            }
-          } else {
-            document.getElementById('feeTypesList').innerHTML = '<div class="text-center py-4 text-red-500">Failed to load fee types</div>';
-          }
-          return data;
-        })
-        .catch(error => {
-          console.error('Error loading fee types:', error);
-          document.getElementById('feeTypesList').innerHTML = '<div class="text-center py-4 text-red-500">Error loading fee types</div>';
-          throw error;
-        });
-    }
-    
-    function renderFeeTypesList(feeTypes) {
-      const container = document.getElementById('feeTypesList');
-      
-      if (!feeTypes || feeTypes.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-center py-4">No fee types found</p>';
-        return;
-      }
-      
-      let html = '<div class="space-y-2">';
-      feeTypes.forEach(feeType => {
-        html += `
-          <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-            <div>
-              <div class="font-medium">${feeType.fee_name}</div>
-              <div class="text-sm text-gray-600">₱${parseFloat(feeType.default_amount).toFixed(2)}</div>
-            </div>
-            <div class="flex gap-2">
-              <button onclick="editFeeType(${feeType.id}, '${feeType.fee_name}', ${feeType.default_amount})" 
-                      class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
-                Edit
-              </button>
-              <button onclick="deleteFeeType(${feeType.id}, '${feeType.fee_name}')" 
-                      class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
-                Delete
-              </button>
-            </div>
-          </div>
-        `;
-      });
-      html += '</div>';
-      
-      container.innerHTML = html;
-    }
-    
-    function submitFeeType(event) {
-      if (event) event.preventDefault();
-      
-      const form = document.getElementById('addFeeTypeForm');
-      const formData = new FormData(form);
-      
-      // Check if this is an edit operation
-      const editId = document.getElementById('editFeeTypeId');
-      if (editId && editId.value) {
-        formData.append('action', 'edit');
-        formData.append('id', editId.value);
-      } else {
-        formData.append('action', 'add');
-      }
-      
-      console.log('Submitting fee type:', {
-        action: formData.get('action'),
-        fee_name: formData.get('fee_name'),
-        default_amount: formData.get('default_amount'),
-        id: formData.get('id')
-      });
-      
-      fetch('ManageFeeTypes.php', {
-        method: 'POST',
-        body: formData
-      })
-      .then(response => {
-        console.log('Response status:', response.status);
-        return response.text();
-      })
-      .then(text => {
-        console.log('Raw response:', text);
-        try {
-          const data = JSON.parse(text);
-          if (data.success) {
-            // Reset form
-            form.reset();
-            if (editId) editId.value = '';
-            
-            // Reset button text
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.textContent = 'Add Fee Type';
-            
-            // Show success message
-            alert('Fee type saved successfully!');
-            
-            // Reload fee types list
-            loadFeeTypes();
-            
-            // Update dropdowns in add balance modal
-            if (typeof updateFeeTypeDropdowns === 'function') {
-              updateFeeTypeDropdowns();
-            }
-          } else {
-            alert('Error: ' + (data.message || 'Failed to save fee type'));
-          }
-        } catch (e) {
-          console.error('JSON parse error:', e);
-          alert('Server error: ' + text);
-        }
-      })
-      .catch(error => {
-        console.error('Fetch error:', error);
-        alert('Network error saving fee type');
-      });
-    }
-    
-    function editFeeType(id, name, amount) {
-      // Populate form with existing data
-      document.getElementById('feeTypeName').value = name;
-      document.getElementById('feeTypeAmount').value = amount;
-      
-      // Add hidden field for edit ID if it doesn't exist
-      let editIdField = document.getElementById('editFeeTypeId');
-      if (!editIdField) {
-        editIdField = document.createElement('input');
-        editIdField.type = 'hidden';
-        editIdField.id = 'editFeeTypeId';
-        editIdField.name = 'edit_id';
-        document.getElementById('addFeeTypeForm').appendChild(editIdField);
-      }
-      editIdField.value = id;
-      
-      // Change button text
-      const submitBtn = document.querySelector('#addFeeTypeForm button[type="submit"]');
-      submitBtn.textContent = 'Update Fee Type';
-    }
-    
-    function deleteFeeType(id, name) {
-      if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-        return;
-      }
-      
-      const formData = new FormData();
-      formData.append('action', 'delete');
-      formData.append('id', id);
-      
-      fetch('ManageFeeTypes.php', {
-        method: 'POST',
-        body: formData
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          alert('Fee type deleted successfully!');
-          
-          // Reload fee types list
-          loadFeeTypes();
-          
-          // Update dropdowns in add balance modal
-          updateFeeTypeDropdowns();
-        } else {
-          alert('Error: ' + (data.message || 'Failed to delete fee type'));
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Error deleting fee type');
-      });
-    }
-    
-    // Function to update a balance row to show as paid immediately
-    function updateBalanceRowToPaid(feeId, paidAmount) {
-      console.log('updateBalanceRowToPaid called with feeId:', feeId, 'paidAmount:', paidAmount);
-      
-      // Find the row with the specific fee ID
-      const balanceTable = document.querySelector('#balance-display table tbody');
-      console.log('Balance table found:', balanceTable);
-      if (!balanceTable) {
-        console.log('No balance table found');
-        return;
-      }
-      
-      const rows = balanceTable.querySelectorAll('tr');
-      console.log('Found rows:', rows.length);
-      
-      rows.forEach((row, index) => {
-        console.log('Checking row', index);
-        const editButton = row.querySelector('button[onclick*="editFeePayment"]');
-        if (editButton) {
-          const onclickAttr = editButton.getAttribute('onclick');
-          console.log('Found edit button with onclick:', onclickAttr);
-          const feeIdMatch = onclickAttr.match(/editFeePayment\((\d+),/);
-          if (feeIdMatch && parseInt(feeIdMatch[1]) === feeId) {
-            console.log('Found matching row for fee ID:', feeId);
-            
-            // Update the row to show as paid
-            row.className = 'bg-green-50 border-green-200';
-            
-            // Update fee type cell to show (PAID)
-            const feeTypeCell = row.cells[1];
-            if (feeTypeCell && !feeTypeCell.textContent.includes('(PAID)')) {
-              feeTypeCell.innerHTML = feeTypeCell.textContent + ' <span class="text-green-600 font-semibold">(PAID)</span>';
-            }
-            
-            // Update paid amount cell
-            const paidCell = row.cells[3];
-            if (paidCell) {
-              paidCell.innerHTML = `<span class="text-green-600 font-semibold">₱${paidAmount.toFixed(2)}</span>`;
-            }
-            
-            // Update balance cell to show 0.00
-            const balanceCell = row.cells[4];
-            if (balanceCell) {
-              balanceCell.innerHTML = `<span class="text-green-600 font-semibold">₱0.00</span>`;
-            }
-            
-            // Update action cell to show PAID status
-            const actionCell = row.cells[5];
-            if (actionCell) {
-              actionCell.innerHTML = '<span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">✓ PAID</span>';
-            }
-            
-            console.log('Row updated successfully');
-          }
-        }
-      });
-    }
+    // ... rest of your code ...
 
     function submitPaymentEdit(event) {
       if (event) event.preventDefault();
@@ -1694,6 +1723,11 @@ const items = slice.map(s => {
         console.log('Response data:', data);
         if (data.success) {
           closeEditPaymentModal();
+          
+          // If an OR was generated, open the receipt in a new tab
+          if (data.or_number) {
+            window.open(`Receipt.php?or=${encodeURIComponent(data.or_number)}`, '_blank');
+          }
           
           // Update the UI immediately for paid fees
           const feeId = parseInt(formData.get('fee_id'));
@@ -1754,7 +1788,7 @@ const items = slice.map(s => {
     
     function loadAvailableTerms(studentId) {
       const dropdown = document.getElementById('termDropdown');
-      dropdown.innerHTML = '<div class="p-2 text-sm text-gray-500">Loading available terms...</div>';
+      dropdown.innerHTML = '<div class="p-2 text-sm text-gray-500 border-b">Loading available terms...</div>';
       
       fetch(`GetAvailableTerms.php?id_number=${encodeURIComponent(studentId)}`)
         .then(response => response.json())
@@ -1784,8 +1818,15 @@ const items = slice.map(s => {
       // Hide dropdown
       document.getElementById('termDropdown').classList.add('hidden');
       
-      // Fetch balance data for the selected term
-      fetch(`GetBalance.php?rfid_uid=${window.currentStudentRFID}&term=${encodeURIComponent(term)}`)
+      // Reset pagination and include filters
+      window.historyOffset = 0; window.historyHasMore = false; window.historyLoading = false;
+      const startInput = document.getElementById('historyStartDate');
+      const endInput = document.getElementById('historyEndDate');
+      const startVal = (startInput && startInput.value) ? startInput.value : (window.historyStartDate || '');
+      const endVal = (endInput && endInput.value) ? endInput.value : (window.historyEndDate || '');
+      const startParam = startVal ? `&start_date=${encodeURIComponent(startVal)}` : '';
+      const endParam = endVal ? `&end_date=${encodeURIComponent(endVal)}` : '';
+      fetch(`GetBalance.php?rfid_uid=${window.currentStudentRFID}&term=${encodeURIComponent(term)}&limit=${window.historyLimit}&offset=0${startParam}${endParam}`)
         .then(response => response.json())
         .then(data => {
           console.log('Term switch data:', data);
@@ -1848,64 +1889,7 @@ const items = slice.map(s => {
             </div>
             <div class="flex gap-2">
               <button onclick="showAddBalanceFormAndRefresh('${data.id_number}', '${data.full_name}')" 
-                      class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
-                Add More Fees
-              </button>
-            </div>
-          </div>
-          
-          <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-            <table class="min-w-full">
-              <thead class="bg-gradient-to-r from-gray-800 to-gray-900 text-white">
-                <tr>
-                  <th class="px-4 py-3 text-center text-sm font-semibold">#</th>
-                  <th class="px-4 py-3 text-left text-sm font-semibold">Fee Type</th>
-                  <th class="px-4 py-3 text-right text-sm font-semibold">Amount Due</th>
-                  <th class="px-4 py-3 text-right text-sm font-semibold">Paid</th>
-                  <th class="px-4 py-3 text-right text-sm font-semibold">Balance</th>
-                  <th class="px-4 py-3 text-center text-sm font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody class="text-gray-800 text-sm">
-                <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No fee items found</td></tr>
-              </tbody>
-            </table>
-            
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-t-2 border-blue-200">
-              <div class="flex justify-between items-center">
-                <div class="text-sm text-gray-600">
-                  <span class="font-medium">Total Due:</span> ₱0.00 | 
-                  <span class="font-medium">Total Paid:</span> ₱0.00
-                </div>
-                <div class="text-right">
-                  <span class="text-sm text-gray-600 font-medium">Remaining Balance:</span>
-                  <div class="text-xl font-bold text-green-600">
-                    ₱0.00
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      } else {
-        // Display balance data for selected term
-        document.getElementById('tab-balance').innerHTML = `
-          <div class="flex items-center justify-between mb-4">
-            <div class="relative">
-              <button id="termSelector" onclick="toggleTermDropdown('${data.id_number}')" 
-                      class="text-lg font-semibold text-gray-800 hover:text-blue-600 flex items-center gap-2 transition-colors">
-                ${data.school_year_term}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
-              <div id="termDropdown" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-64">
-                <div class="p-2 text-sm text-gray-500 border-b">Loading available terms...</div>
-              </div>
-            </div>
-            <div class="flex gap-2">
-              <button onclick="showAddBalanceForm('${data.id_number}', '${data.full_name}')" 
-                      class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                      class="bg-[#0B2C62] hover:bg-blue-900 text-white px-3 py-1 rounded text-sm">
                 Add More Fees
               </button>
             </div>
@@ -1944,7 +1928,88 @@ const items = slice.map(s => {
                     <td class="px-4 py-3 text-right ${paid > 0 ? 'text-green-600 font-semibold' : 'text-gray-500'}">₱${paid.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-right font-bold ${isPaid ? 'text-green-600' : 'text-red-600'}">₱${Math.abs(balance).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
                     <td class="px-4 py-3 text-center">
-                      ${isPaid ? '<span class="text-green-600 text-xs font-semibold">✓ PAID</span>' : `<button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors">Edit</button>`}
+                      ${isPaid ? '<span class="text-green-600 text-xs font-semibold">✓ PAID</span>' : `<button onclick=\"editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})\" class=\"bg-[#0B2C62] hover:bg-blue-900 text-white px-2 py-1 rounded text-xs font-medium transition-colors\">Edit</button>`}
+                    </td>
+                  </tr>
+                  `;
+                }).join('') : '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No unpaid fees</td></tr>'}
+              </tbody>
+            </table>
+            
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-t-2 border-blue-200">
+              <div class="flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                  <span class="font-medium">Total Due:</span> ₱0.00 | 
+                  <span class="font-medium">Total Paid:</span> ₱0.00
+                </div>
+                <div class="text-right">
+                  <span class="text-sm text-gray-600 font-medium">Remaining Balance:</span>
+                  <div class="text-xl font-bold text-green-600">
+                    ₱0.00
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        // Display balance data for selected term
+        document.getElementById('tab-balance').innerHTML = `
+          <div class="flex items-center justify-between mb-4">
+            <div class="relative">
+              <button id="termSelector" onclick="toggleTermDropdown('${data.id_number}')" 
+                      class="text-lg font-semibold text-gray-800 hover:text-blue-600 flex items-center gap-2 transition-colors">
+                ${data.school_year_term}
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              <div id="termDropdown" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-64">
+                <div class="p-2 text-sm text-gray-500 border-b">Loading available terms...</div>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="showAddBalanceFormAndRefresh('${data.id_number}', '${data.full_name}')" 
+                      class="bg-[#0B2C62] hover:bg-blue-900 text-white px-3 py-1 rounded text-sm">
+                Add More Fees
+              </button>
+            </div>
+          </div>
+          
+          <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+            <table class="min-w-full">
+              <thead class="bg-gradient-to-r from-gray-800 to-gray-900 text-white">
+                <tr>
+                  <th class="px-4 py-3 text-center text-sm font-semibold">#</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold">Fee Type</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">Amount Due</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">Paid</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">Balance</th>
+                  <th class="px-4 py-3 text-center text-sm font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-800 text-sm">
+                ${data.fee_items && data.fee_items.length > 0 ? data.fee_items.filter(fee => {
+                  const amountDue = parseFloat(fee.amount || 0);
+                  const paid = parseFloat(fee.paid || 0);
+                  const isPaid = amountDue <= paid;
+                  // Show unpaid items OR recently paid items (marked with temporary flag)
+                  return amountDue > paid || (isPaid && window.temporarilyVisibleFees && window.temporarilyVisibleFees.has(fee.id));
+                }).map((fee, index) => {
+                  const amountDue = parseFloat(fee.amount || 0);
+                  const paid = parseFloat(fee.paid || 0);
+                  const balance = amountDue - paid;
+                  const isPaid = balance <= 0;
+                  
+                  return `
+                  <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors ${isPaid ? 'bg-green-50' : ''}">
+                    <td class="px-4 py-3 text-center font-medium">${index + 1}</td>
+                    <td class="px-4 py-3 font-medium">${fee.fee_type} ${isPaid ? '<span class="text-xs text-green-600 font-semibold">(PAID)</span>' : ''}</td>
+                    <td class="px-4 py-3 text-right font-semibold">₱${amountDue.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right ${paid > 0 ? 'text-green-600 font-semibold' : 'text-gray-500'}">₱${paid.toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right font-bold ${isPaid ? 'text-green-600' : 'text-red-600'}">₱${Math.abs(balance).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-center">
+                      ${isPaid ? '<span class="text-green-600 text-xs font-semibold">✓ PAID</span>' : `<button onclick="editFeePayment(${fee.id}, '${fee.fee_type}', ${amountDue}, ${paid})" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-2 py-1 rounded text-xs font-medium transition-colors">Edit</button>`}
                     </td>
                   </tr>
                   `;
@@ -1972,70 +2037,214 @@ const items = slice.map(s => {
     }
     
     function updateHistoryDisplay(data) {
-      if (data.history && data.history.length > 0) {
-        let historyHTML = '';
-        data.history.forEach((row, index) => {
-          const formattedDate = new Date(row.date).toLocaleDateString('en-US', {
-            month: '2-digit',
-            day: '2-digit',
-            year: '2-digit'
-          });
-          
-          historyHTML += `
-            <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
-              <td class="px-4 py-3 text-sm text-gray-900">${index + 1}</td>
-              <td class="px-4 py-3 text-sm text-gray-900">${formattedDate}</td>
-              <td class="px-4 py-3 text-sm text-gray-900">${row.fee_type || 'Payment'}</td>
-              <td class="px-4 py-3 text-sm font-semibold text-gray-900">₱${parseFloat(row.amount).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">${row.payment_method || 'Cash'}</td>
-            </tr>
-          `;
-        });
-        
-        document.getElementById('tab-history').innerHTML = `
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center">
-              <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                </svg>
-              </div>
-              <div>
-                <h2 class="text-xl font-bold text-gray-800">Transaction History</h2>
-                <p class="text-sm text-gray-600">${data.school_year_term || 'All Terms'}</p>
-              </div>
-            </div>
+      // Track current term for subsequent paginated requests
+      window.currentHistoryTerm = (data.school_year_term && data.school_year_term !== 'No balance record') ? data.school_year_term : null;
+
+      // Build filter toolbar
+      const filterBar = `
+        <div class="flex flex-wrap items-end gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-700 mb-1">Start Date</label>
+            <input type="date" id="historyStartDate" value="${window.historyStartDate || ''}" class="border rounded px-3 py-2 text-base" />
           </div>
-          <div class="overflow-hidden rounded-lg border border-gray-200">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-900">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">#</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Date</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Description</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Amount</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Method</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${historyHTML}
-              </tbody>
-            </table>
+          <div>
+            <label class="block text-sm text-gray-700 mb-1">End Date</label>
+            <input type="date" id="historyEndDate" value="${window.historyEndDate || ''}" class="border rounded px-3 py-2 text-base" />
           </div>
-        `;
-      } else {
-        document.getElementById('tab-history').innerHTML = `
-          <div class="text-center py-12">
-            <div class="w-16 h-16 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex items-end gap-2 pb-1">
+            <button id="applyHistoryFiltersBtn" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-4 py-2 rounded text-base">Apply</button>
+            <button id="clearHistoryFiltersBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded text-base">Clear</button>
+          </div>
+        </div>`;
+
+      // Container and table shell
+      document.getElementById('tab-history').innerHTML = `
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center">
+            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
               </svg>
             </div>
-            <h3 class="text-lg font-semibold text-gray-800 mb-2">No Transaction History</h3>
-            <p class="text-sm text-gray-500">This student has no payment records on file</p>
+            <div>
+              <h2 class="text-xl font-bold text-gray-800">Transaction History</h2>
+              <p class="text-sm text-gray-600">${data.school_year_term || 'All Terms'}</p>
+            </div>
           </div>
-        `;
+        </div>
+        ${filterBar}
+        <div id="historyContainer" class="rounded-lg border border-gray-200 overflow-y-auto" style="max-height: 420px;">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-900">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">#</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Description</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-white uppercase tracking-wider">Amount</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Method</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody" class="bg-white divide-y divide-gray-200"></tbody>
+          </table>
+          <div id="historyLoadingRow" class="hidden px-4 py-3 text-sm text-gray-500">Loading more...</div>
+          <div id="historySentinel" class="w-full h-6"></div>
+        </div>
+      `;
+
+      // Render first page rows
+      renderHistoryRows(data.history || [], false);
+
+      // Set pagination state
+      window.historyOffset = data.offset || 0;
+      window.historyHasMore = !!data.has_more;
+
+      // Wire up filters
+      const applyBtn = document.getElementById('applyHistoryFiltersBtn');
+      if (applyBtn) applyBtn.onclick = applyHistoryFilters;
+      const clearBtn = document.getElementById('clearHistoryFiltersBtn');
+      if (clearBtn) clearBtn.onclick = clearHistoryFilters;
+
+      // Ensure inputs show the current global values even after re-render
+      const sInp = document.getElementById('historyStartDate');
+      const eInp = document.getElementById('historyEndDate');
+      if (sInp && (window.historyStartDate || '')) sInp.value = window.historyStartDate || '';
+      if (eInp && (window.historyEndDate || '')) eInp.value = window.historyEndDate || '';
+
+      // Setup infinite scrolling
+      setupHistoryInfiniteScroll();
+
+      // If no rows came back (some datasets start at later offsets), proactively load once
+      const initialRows = Array.isArray(data.history) ? data.history.length : 0;
+      if (initialRows === 0) {
+        // ensure we attempt another page
+        if (typeof data.has_more === 'undefined') window.historyHasMore = true;
+        // kick one manual load to populate
+        loadMoreHistory();
+
+        // Fallback: if still empty shortly after, fetch without term filter (all terms)
+        setTimeout(async () => {
+          const body = document.getElementById('historyBody');
+          if (!body) return;
+          const rowsNow = body.querySelectorAll('tr').length;
+          if (rowsNow === 0 && window.currentStudentRFID) {
+            try {
+              const startInput = document.getElementById('historyStartDate');
+              const endInput = document.getElementById('historyEndDate');
+              const startParam = startInput && startInput.value ? `&start_date=${encodeURIComponent(startInput.value)}` : '';
+              const endParam = endInput && endInput.value ? `&end_date=${encodeURIComponent(endInput.value)}` : '';
+              const url = `GetBalance.php?rfid_uid=${encodeURIComponent(window.currentStudentRFID)}&limit=${window.historyLimit || 20}&offset=0${startParam}${endParam}`;
+              const res = await fetch(url);
+              const allData = await res.json();
+              if (Array.isArray(allData.history) && allData.history.length) {
+                window.historyOffset = allData.offset || allData.history.length;
+                window.historyHasMore = !!allData.has_more;
+                renderHistoryRows(allData.history, true);
+              }
+            } catch (_) {}
+          }
+        }, 700);
       }
+    }
+
+    function renderHistoryRows(rows, append = true) {
+      const tbody = document.getElementById('historyBody');
+      if (!tbody) return;
+      const existingCount = append ? tbody.querySelectorAll('tr').length : 0;
+      const chunk = rows.map((row, idx) => {
+        const formattedDate = new Date(row.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+        const orSafe = row.or_number ? encodeURIComponent(row.or_number) : '';
+        const seq = existingCount + idx + 1;
+        return `
+          <tr class="${seq % 2 === 1 ? 'bg-white' : 'bg-gray-50'}">
+            <td class="px-4 py-3 text-sm text-gray-900">${seq}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${formattedDate}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${row.fee_type || 'Payment'}</td>
+            <td class="px-4 py-3 text-sm font-semibold text-gray-900 text-right">₱${parseFloat(row.amount).toLocaleString('en-PH', {minimumFractionDigits: 2})}</td>
+            <td class="px-4 py-3 text-sm text-gray-600 text-center">${row.payment_method || 'Cash'}</td>
+            <td class="px-4 py-3 text-sm text-center">${row.or_number ? `<a href="Receipt.php?or=${orSafe}" target="_blank" class="inline-block bg-[#0B2C62] hover:bg-blue-900 text-white px-3 py-1 rounded text-xs">Print Receipt</a>` : '<span class="text-gray-400 text-xs">No OR</span>'}</td>
+          </tr>`;
+      }).join('');
+
+      if (append) {
+        tbody.insertAdjacentHTML('beforeend', chunk);
+      } else {
+        tbody.innerHTML = chunk;
+      }
+    }
+
+    function setupHistoryInfiniteScroll() {
+      const sentinel = document.getElementById('historySentinel');
+      const container = document.getElementById('historyContainer');
+      if (!sentinel || !container) return;
+
+      if (window.historyObserver) {
+        window.historyObserver.disconnect();
+      }
+
+      window.historyObserver = new IntersectionObserver(async (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            await loadMoreHistory();
+          }
+        }
+      }, { root: container, rootMargin: '0px 0px 200px 0px' });
+      window.historyObserver.observe(sentinel);
+    }
+
+    async function loadMoreHistory() {
+      if (!window.historyHasMore || window.historyLoading) return;
+      if (!window.currentStudentRFID) return;
+      window.historyLoading = true;
+      const loadingRow = document.getElementById('historyLoadingRow');
+      if (loadingRow) loadingRow.classList.remove('hidden');
+
+      try {
+        const startInput = document.getElementById('historyStartDate');
+        const endInput = document.getElementById('historyEndDate');
+        const startParam = startInput && startInput.value ? `&start_date=${encodeURIComponent(startInput.value)}` : '';
+        const endParam = endInput && endInput.value ? `&end_date=${encodeURIComponent(endInput.value)}` : '';
+        const termParam = window.currentHistoryTerm ? `&term=${encodeURIComponent(window.currentHistoryTerm)}` : '';
+        const url = `GetBalance.php?rfid_uid=${encodeURIComponent(window.currentStudentRFID)}${termParam}&limit=${window.historyLimit}&offset=${window.historyOffset}${startParam}${endParam}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        if (Array.isArray(data.history)) {
+          renderHistoryRows(data.history, true);
+          window.historyOffset = data.offset || (window.historyOffset + data.history.length);
+          window.historyHasMore = !!data.has_more;
+        } else {
+          window.historyHasMore = false;
+        }
+      } catch (e) {
+        console.error('Load more history failed:', e);
+        window.historyHasMore = false;
+      } finally {
+        window.historyLoading = false;
+        if (loadingRow) loadingRow.classList.add('hidden');
+      }
+    }
+
+    function applyHistoryFilters() {
+      if (!window.currentStudentRFID) return;
+      // Save to globals so values persist after re-render
+      const s = document.getElementById('historyStartDate');
+      const e = document.getElementById('historyEndDate');
+      window.historyStartDate = s && s.value ? s.value : '';
+      window.historyEndDate = e && e.value ? e.value : '';
+      // Reset and reload via handleRFID which respects filters
+      handleRFID(window.currentStudentRFID);
+    }
+
+    function clearHistoryFilters() {
+      // Reset globals and UI then reload
+      window.historyStartDate = '';
+      window.historyEndDate = '';
+      const s = document.getElementById('historyStartDate');
+      const e = document.getElementById('historyEndDate');
+      if (s) s.value = '';
+      if (e) e.value = '';
+      if (window.currentStudentRFID) handleRFID(window.currentStudentRFID);
     }
     
     // Close dropdown when clicking outside

@@ -31,6 +31,8 @@ if (!isset($_POST['fee_items']) || empty($_POST['fee_items'])) {
 }
 
 try {
+    // Track OR numbers created for fully paid items
+    $created_ors = [];
     // Check if student exists
     $student_check = $conn->prepare("SELECT id_number FROM student_account WHERE id_number = ?");
     $student_check->bind_param("s", $id_number);
@@ -88,6 +90,9 @@ try {
                     if (!$payment_stmt->execute()) {
                         throw new Exception('Failed to create payment record for ' . $item['fee_type']);
                     }
+
+                    // Collect OR for frontend receipt
+                    $created_ors[] = $or_number;
                 }
             }
         }
@@ -121,7 +126,8 @@ try {
     echo json_encode([
         'success' => true, 
         'message' => 'Balance updated successfully',
-        'added_fees' => $added_fees
+        'added_fees' => $added_fees,
+        'or_numbers' => $created_ors
     ]);
 
 } catch (Exception $e) {
