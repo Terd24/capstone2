@@ -1,6 +1,9 @@
 <?php
 session_start();
 include '../StudentLogin/db_conn.php';
+// Ensure we have today's date early for queries that run before the later timezone block
+date_default_timezone_set('Asia/Manila');
+$today = date('Y-m-d');
 
 // Handle AJAX requests
 if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
@@ -69,17 +72,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
         if ($t_res && $t_res->num_rows === 1) {
             $row = $t_res->fetch_assoc();
             if (empty($row['time_in'])) {
+                // No time in yet -> record time in
                 $upd = $conn->prepare("UPDATE teacher_attendance SET time_in = ? WHERE id = ?");
                 $upd->bind_param("si", $time, $row['id']);
                 $upd->execute();
                 $_SESSION['success'] = "Time In recorded for $teacher_name at " . date('g:i A', strtotime($time));
-            } elseif (empty($row['time_out'])) {
+            } else {
+                // Has time in -> always update time out to latest tap (mirror student behavior)
                 $upd = $conn->prepare("UPDATE teacher_attendance SET time_out = ? WHERE id = ?");
                 $upd->bind_param("si", $time, $row['id']);
                 $upd->execute();
                 $_SESSION['success'] = "Time Out recorded for $teacher_name at " . date('g:i A', strtotime($time));
-            } else {
-                $_SESSION['success'] = "$teacher_name already timed in and out today.";
             }
         } else {
             $ins = $conn->prepare("INSERT INTO teacher_attendance (employee_id, date, day, time_in) VALUES (?,?,?,?)");
@@ -378,6 +381,22 @@ $attendance_records = $attendance_query->get_result();
                         <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
                         <p class="text-blue-200 text-sm">Attendance Portal</p>
                     </div>
+
+    <script>
+      // Preserve scroll position across reloads so the page doesn't jump to top after tap
+      try {
+        window.history.scrollRestoration = 'manual';
+        const key = 'attendance_scroll_y';
+        const savedY = sessionStorage.getItem(key);
+        if (savedY !== null) {
+          window.scrollTo(0, parseInt(savedY, 10) || 0);
+          sessionStorage.removeItem(key);
+        }
+        window.addEventListener('beforeunload', function(){
+          try { sessionStorage.setItem(key, String(window.scrollY || window.pageYOffset || 0)); } catch(e) {}
+        });
+      } catch(e) {}
+    </script>
                 </div>
                 
                 <div class="flex items-center space-x-4">
@@ -408,7 +427,7 @@ $attendance_records = $attendance_query->get_result();
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <!-- Current Time Display -->
-        <div class="bg-gradient-to-r from-orange-400 to-yellow-500 rounded-2xl shadow-xl p-8 mb-8 text-center text-white">
+        <div class="bg-gradient-to-r from-orange-400 to-yellow-500 rounded-2xl shadow-xl p-8 mb-6 text-center text-white">
             <div class="text-5xl font-bold mb-2" id="currentTime">
                 <?= date('h:i:s A') ?>
             </div>
@@ -423,7 +442,7 @@ $attendance_records = $attendance_query->get_result();
         $has_error = isset($_SESSION['error']);
         ?>
         <?php if ($has_success): ?>
-            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-800 px-6 py-4 rounded-xl mb-6 shadow-sm">
+            <div id="successBanner" class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-800 px-6 py-4 rounded-xl mb-6 shadow-sm">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -445,26 +464,108 @@ $attendance_records = $attendance_query->get_result();
         <?php endif; ?>
 
         <!-- Today's Schedule -->
-        <div class="bg-white rounded-2xl shadow-lg mb-8">
-            <div class="p-6 border-b border-gray-100">
-                <div class="flex items-center mb-4">
+        <div id="todayScheduleBlock" class="bg-white rounded-2xl shadow-lg mb-3">
+            <div class="p-2 border-b border-gray-100">
+                <div class="flex items-center mb-1">
                     <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>
                     <h2 class="text-xl font-bold text-gray-800">Today's Schedule</h2>
                 </div>
             </div>
             
-            <?php if ($latest_student): ?>
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+            <?php if (($view_role ?? 'student') === 'teacher' && isset($latest_teacher) && $latest_teacher): ?>
+            <?php
+              // Build employee display similar to HR logic
+              $empId = $latest_teacher['employee_id'];
+              $dayName = date('l', strtotime($today));
+              $shiftIn = null; $shiftOut = null; $hasDay = false;
+              $ws = $conn->prepare("SELECT ws.start_time, ws.end_time, ws.days, ws.id AS schedule_id
+                                     FROM employees e
+                                     LEFT JOIN employee_schedules es ON e.id_number = es.employee_id
+                                     LEFT JOIN employee_work_schedules ws ON es.schedule_id = ws.id
+                                     WHERE e.id_number = ? LIMIT 1");
+              if ($ws) {
+                $ws->bind_param('s', $empId);
+                $ws->execute();
+                $resWS = $ws->get_result();
+                if ($resWS && $resWS->num_rows > 0) {
+                  $sd = $resWS->fetch_assoc();
+                  $shiftIn = $sd['start_time'];
+                  $shiftOut = $sd['end_time'];
+                  if (!empty($sd['days'])) {
+                    $daysArr = array_map('trim', explode(',', $sd['days']));
+                    $hasDay = in_array($dayName, $daysArr, true) || strcasecmp(trim((string)$sd['days']), 'Variable') === 0;
+                  }
+                  if (!empty($sd['schedule_id'])) {
+                    $ds = $conn->prepare("SELECT start_time, end_time FROM employee_work_day_schedules WHERE schedule_id = ? AND day_name = ? LIMIT 1");
+                    if ($ds) { $ds->bind_param('is', $sd['schedule_id'], $dayName); $ds->execute(); $ovr=$ds->get_result(); if ($ovr && $ovr->num_rows>0){ $o=$ovr->fetch_assoc(); $shiftIn=$o['start_time']; $shiftOut=$o['end_time']; $hasDay=true; } }
+                  }
+                }
+              }
+              $empTimeIn = $latest_teacher['time_in'];
+              $empTimeOut = $latest_teacher['time_out'];
+              $empStatus = (!empty($empTimeIn) && !empty($empTimeOut)) ? 'Present' : ((!empty($empTimeIn)) ? 'Time In Only' : '—');
+              $empStatusColor = ($empStatus==='Present') ? 'text-green-600' : (($empStatus==='Time In Only')?'text-blue-600':'text-gray-600');
+            ?>
+            <div class="p-2">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Date</p>
                         <p class="font-semibold text-gray-900"><?= date('F j, Y') ?></p>
                     </div>
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Day</p>
                         <p class="font-semibold text-gray-900"><?= date('l') ?></p>
                     </div>
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+                        <p class="text-sm text-gray-600 mb-1">Work Schedule</p>
+                        <p class="font-semibold text-gray-900">
+                          <?php if ($hasDay && $shiftIn && $shiftOut): ?>
+                            <?= date('g:i A', strtotime($shiftIn)) . ' - ' . date('g:i A', strtotime($shiftOut)) ?>
+                          <?php elseif ($hasDay && $shiftIn): ?>
+                            <?= date('g:i A', strtotime($shiftIn)) ?>
+                          <?php else: ?>
+                            No Work Schedule
+                          <?php endif; ?>
+                        </p>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100 md:col-span-2">
+                        <p class="text-sm text-gray-600 mb-1">Employee</p>
+                        <p class="font-semibold text-gray-900">
+                          <?= htmlspecialchars(trim(($latest_teacher['first_name'] ?? '') . ' ' . ($latest_teacher['last_name'] ?? ''))) ?>
+                        </p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+                        <p class="text-sm text-gray-600 mb-1">Time In</p>
+                        <p class="text-xl font-bold text-gray-800">
+                            <?= $empTimeIn ? date('g:i A', strtotime($empTimeIn)) : '--' ?>
+                        </p>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+                        <p class="text-sm text-gray-600 mb-1">Time Out</p>
+                        <p class="text-xl font-bold text-gray-800">
+                            <?= $empTimeOut ? date('g:i A', strtotime($empTimeOut)) : '--' ?>
+                        </p>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+                        <p class="text-sm text-gray-600 mb-1">Status</p>
+                        <p class="text-xl font-bold <?= $empStatusColor ?>"><?= htmlspecialchars($empStatus) ?></p>
+                    </div>
+                </div>
+            </div>
+            <?php elseif ($latest_student): ?>
+            <div class="p-2">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+                        <p class="text-sm text-gray-600 mb-1">Date</p>
+                        <p class="font-semibold text-gray-900"><?= date('F j, Y') ?></p>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+                        <p class="text-sm text-gray-600 mb-1">Day</p>
+                        <p class="font-semibold text-gray-900"><?= date('l') ?></p>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Section</p>
                         <p class="font-semibold text-gray-900">
                             <?php 
@@ -478,7 +579,7 @@ $attendance_records = $attendance_query->get_result();
                             ?>
                         </p>
                     </div>
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Class Schedule</p>
                         <p class="font-semibold text-gray-900">
                             <?php 
@@ -535,7 +636,7 @@ $attendance_records = $attendance_query->get_result();
                             ?>
                         </p>
                     </div>
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Student</p>
                         <p class="font-semibold text-gray-900">
                             <?= htmlspecialchars(trim($latest_student['first_name'] . ' ' . $latest_student['middle_name'] . ' ' . $latest_student['last_name'])) ?>
@@ -543,20 +644,20 @@ $attendance_records = $attendance_query->get_result();
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Time In</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?= $latest_student['time_in'] ? date('g:i A', strtotime($latest_student['time_in'])) : '--' ?>
                         </p>
                     </div>
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Time Out</p>
                         <p class="text-xl font-bold text-gray-800">
                             <?= $latest_student['time_out'] ? date('g:i A', strtotime($latest_student['time_out'])) : '--' ?>
                         </p>
                     </div>
-                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                    <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
                         <p class="text-sm text-gray-600 mb-1">Status</p>
                         <p class="text-xl font-bold <?php 
                         // Always use the database status, don't calculate it
@@ -594,8 +695,23 @@ $attendance_records = $attendance_query->get_result();
             <input type="text" name="rfid" id="rfidInput">
         </form>
 
-    <!-- Attendance Records -->
-    <div class="bg-white rounded-2xl shadow-lg">
+        <script>
+          // Auto-clear latest student and reload so the schedule shows the empty state
+          (function(){
+            const banner = document.getElementById('successBanner');
+            const sched = document.getElementById('todayScheduleBlock');
+            if (banner && sched) {
+              setTimeout(async function(){
+                try { await fetch('?clear_student=1', { credentials: 'same-origin' }); } catch(e) {}
+                // Reload; scroll position is preserved by the scrollRestoration/sessionStorage logic
+                location.reload();
+              }, 3000); // 3 seconds; adjust if you want
+            }
+          })();
+        </script>
+
+    <!-- Attendance Records (hidden; feature moved to Registrar portal) -->
+    <div class="bg-white rounded-2xl shadow-lg hidden">
         <div class="p-6 border-b border-gray-100">
             <div class="flex items-center mb-6">
                 <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>

@@ -212,6 +212,10 @@ function timeAgo($time) {
                       class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm">
                 Manage Student Schedule
               </button>
+              <button onclick="window.location.href='AttendanceRecords.php'" 
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mt-2">
+                Attendance Record
+              </button>
               <!-- Manage Employee Schedule moved to HR portal -->
 
             </div>

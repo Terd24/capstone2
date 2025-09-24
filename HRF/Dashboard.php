@@ -148,6 +148,9 @@ input[type=number] { -moz-appearance: textfield; }
             <button onclick="window.location.href='../HRF/ManageEmployeeSchedule.php'" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium whitespace-nowrap">
                 Manage Employee Schedule
             </button>
+            <button onclick="window.location.href='../HRF/EmployeeAttendance.php'" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium whitespace-nowrap">
+                Employee Attendance
+            </button>
         </div>
     </div>
 
