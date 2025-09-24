@@ -67,6 +67,26 @@ input[type=number] { -moz-appearance: textfield; }
           <p class="text-sm text-blue-200">Welcome,</p>
           <p class="font-semibold"><?= htmlspecialchars($_SESSION['hr_name'] ?? 'HR User') ?></p>
         </div>
+
+<!-- Delete Employee (entire record) Confirmation Modal -->
+<div id="deleteEmployeeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index:11000;">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+        <div class="flex flex-col items-center text-center">
+            <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
+                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86A2 2 0 0021 17.13L13.93 4.87a2 2 0 00-3.86 0L3 17.13A2 2 0 005.07 19z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Delete Employee</h3>
+            <p class="text-gray-600 mb-6">Are you sure you want to delete this employee record? This will also remove their system accounts and cannot be undone.</p>
+            <div class="flex w-full gap-3">
+                <button onclick="closeDeleteEmployeeConfirmation()" class="flex-1 py-2.5 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 font-medium">Cancel</button>
+                <button id="confirmDeleteEmployeeBtn" class="flex-1 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium">Delete</button>
+            </div>
+        </div>
+    </div>
+    
+</div>
       </div>
       
       <div class="flex items-center space-x-4">
@@ -119,11 +139,14 @@ input[type=number] { -moz-appearance: textfield; }
         
         <div class="flex items-center gap-3">
             <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-full sm:w-64 border border-[#0B2C62]/30 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] placeholder-gray-400"/>
-            <button onclick="openModal()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg shadow hover:bg-[#256f37] transition flex items-center gap-2 font-medium whitespace-nowrap">
+            <button onclick="openModal()" class="px-4 py-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition flex items-center gap-2 font-medium whitespace-nowrap">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 Add Employee
+            </button>
+            <button onclick="window.location.href='../HRF/ManageEmployeeSchedule.php'" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium whitespace-nowrap">
+                Manage Employee Schedule
             </button>
         </div>
     </div>
@@ -146,7 +169,7 @@ input[type=number] { -moz-appearance: textfield; }
                             <td class="px-4 py-3"><?= htmlspecialchars($row['full_name']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($row['position']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($row['department']) ?></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= $row['username'] ? '<span class="px-2 py-1 bg-green-500 text-white rounded text-xs">Active</span>' : '<span class="px-2 py-1 bg-gray-500 text-white rounded text-xs">No Account</span>' ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= $row['username'] ? '<span class="px-2 py-1 bg-green-500 text-white rounded text-xs">Has Account</span>' : '<span class="px-2 py-1 bg-gray-500 text-white rounded text-xs">No Account</span>' ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" onclick="event.stopPropagation()">
                                 <button onclick="viewEmployee('<?= $row['id_number'] ?>')" class="text-blue-600 hover:text-blue-900 mr-2 p-2 rounded" title="View Employee">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,10 +202,12 @@ input[type=number] { -moz-appearance: textfield; }
     <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border-2 border-[#0B2C62] transform transition-all scale-100">
         <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#0B2C62] rounded-t-2xl">
             <h2 class="text-lg font-semibold text-white">Employee Information</h2>
-            <div class="flex gap-3">
-                <button id="editEmployeeBtn" onclick="toggleEditMode()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
-                <button id="deleteEmployeeBtn" onclick="showDeleteConfirmation(getCurrentEmployeeId())" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition hidden">Delete</button>
-                <button onclick="closeViewModal()" class="text-2xl font-bold text-white hover:text-gray-300">&times;</button>
+            <div class="flex flex-col items-end gap-1">
+                <div class="flex gap-3">
+                    <button id="editEmployeeBtn" onclick="toggleEditMode()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
+                    <button id="deleteEmployeeBtn" onclick="showDeleteEmployeeConfirmation(getCurrentEmployeeId())" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete Employee</button>
+                    <button onclick="closeViewModal()" class="text-2xl font-bold text-white hover:text-gray-300">&times;</button>
+                </div>
             </div>
         </div>
         <div class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar" id="employeeDetailsContent">
@@ -216,47 +241,7 @@ input[type=number] { -moz-appearance: textfield; }
     </div>
 </div>
 
-<!-- Create Account Modal -->
-<div id="createAccountModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4">
-        <div class="bg-[#0B2C62] text-white p-6 rounded-t-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-xl font-bold">Create System Account</h3>
-                <button onclick="closeCreateAccountModal()" class="text-white hover:text-gray-300">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-        </div>
-        <form id="createAccountForm" class="p-6">
-            <input type="hidden" id="accountEmployeeId" name="employee_id">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                <input type="text" name="username" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                <input type="password" name="password" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                <select name="role" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
-                    <option value="">Select Role</option>
-                    <option value="registrar">Registrar</option>
-                    <option value="cashier">Cashier</option>
-                    <option value="guidance">Guidance</option>
-                    <option value="attendance">Attendance</option>
-                    <option value="hr">HR</option>
-                </select>
-            </div>
-            <div class="flex justify-end gap-3">
-                <button type="button" onclick="closeCreateAccountModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg hover:bg-[#0B2C62]/90 transition">Create Account</button>
-            </div>
-        </form>
-    </div>
-</div>
+<!-- Removed duplicate static Create Account Modal to avoid ID conflicts. The dynamic modal below is the single source of truth. -->
 
 <!-- Add Employee Modal -->
 <div id="addEmployeeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
@@ -453,7 +438,7 @@ input[type=number] { -moz-appearance: textfield; }
                 </svg>
             </button>
         </div>
-        <form id="createAccountForm" onsubmit="createNewAccount(event)">
+        <form id="createAccountForm" onsubmit="createNewAccount(event)" autocomplete="off">
             <div id="createAccountContent">
                 <!-- Content will be populated by JavaScript -->
             </div>
@@ -470,26 +455,20 @@ input[type=number] { -moz-appearance: textfield; }
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div id="deleteConfirmationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-full max-w-md">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold text-gray-800">Confirm Account Deletion</h3>
-            <button onclick="closeDeleteConfirmation()" class="text-gray-500 hover:text-gray-700">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+<div id="deleteConfirmationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index:10090;">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+        <div class="flex flex-col items-center text-center">
+            <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
+                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86A2 2 0 0021 17.13L13.93 4.87a2 2 0 00-3.86 0L3 17.13A2 2 0 005.07 19z" />
                 </svg>
-            </button>
-        </div>
-        <div class="mb-6">
-            <p class="text-gray-600">Are you sure you want to remove this employee's system account? The employee record will remain, but they will lose access to the system.</p>
-        </div>
-        <div class="flex justify-end gap-2">
-            <button onclick="closeDeleteConfirmation()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
-                Cancel
-            </button>
-            <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                Delete
-            </button>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Remove Login Access</h3>
+            <p class="text-gray-600 mb-6">Are you sure you want to remove this employee's system account? The employee record will remain, but they will lose access to the system.</p>
+            <div class="flex w-full gap-3">
+                <button onclick="closeDeleteConfirmation()" class="flex-1 py-2.5 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 font-medium">Cancel</button>
+                <button id="confirmDeleteBtn" class="flex-1 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium">Delete</button>
+            </div>
         </div>
     </div>
 </div>
@@ -585,15 +564,9 @@ function showEmployeeDetailsModal(employee) {
     currentEmployeeId = employee.id_number;
     const content = document.getElementById('employeeDetailsContent');
     
-    // Show/hide delete button based on account status
+    // Ensure top Delete (entire employee) button is visible
     const deleteBtn = document.getElementById('deleteEmployeeBtn');
-    if (deleteBtn) {
-        if (employee.username) {
-            deleteBtn.classList.remove('hidden');
-        } else {
-            deleteBtn.classList.add('hidden');
-        }
-    }
+    if (deleteBtn) deleteBtn.classList.remove('hidden');
     
     // Update edit button text based on mode
     const editBtn = document.getElementById('editEmployeeBtn');
@@ -658,12 +631,16 @@ function showEmployeeDetailsModal(employee) {
             <!-- Personal Account Section -->
             <div class="col-span-3 mb-6">
                 <div class="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-1 flex items-center justify-between">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                         </svg>
-                        PERSONAL ACCOUNT
+                        <span>PERSONAL ACCOUNT</span>
+                        <button type="button" onclick="showDeleteConfirmation('${employee.id_number}')" class="ml-auto px-3 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700">
+                            Remove Login Access
+                        </button>
                     </h3>
+                    <p class="text-xs text-gray-500 mb-4 text-right">Removes login access only. The employee record will remain.</p>
                     <div class="grid grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username</label>
@@ -828,15 +805,52 @@ function getCurrentEmployeeId() {
 
 // Show delete confirmation modal
 function showDeleteConfirmation(employeeId) {
-    document.getElementById('deleteConfirmationModal').classList.remove('hidden');
-    document.getElementById('confirmDeleteBtn').onclick = function() {
+    const modal = document.getElementById('deleteConfirmationModal');
+    modal.classList.remove('hidden');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    confirmBtn.onclick = function() {
         removeAccount(employeeId);
-        document.getElementById('deleteConfirmationModal').classList.add('hidden');
     };
 }
 
 function closeDeleteConfirmation() {
     document.getElementById('deleteConfirmationModal').classList.add('hidden');
+}
+
+// Delete Employee (entire record) handlers
+function showDeleteEmployeeConfirmation(employeeId) {
+    const modal = document.getElementById('deleteEmployeeModal');
+    modal.classList.remove('hidden');
+    const btn = document.getElementById('confirmDeleteEmployeeBtn');
+    btn.onclick = function(){ removeEmployee(employeeId); };
+}
+
+function closeDeleteEmployeeConfirmation() {
+    document.getElementById('deleteEmployeeModal').classList.add('hidden');
+}
+
+function removeEmployee(employeeId) {
+    fetch('delete_employee.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `employee_id=${encodeURIComponent(employeeId)}`
+    })
+    .then(r=>r.json())
+    .then(data=>{
+        if(data.success){
+            closeDeleteEmployeeConfirmation();
+            closeViewModal();
+            showToast('Employee deleted successfully', 'success');
+            setTimeout(()=> location.reload(), 800);
+        } else {
+            closeDeleteEmployeeConfirmation();
+            showToast(data.message || 'Error deleting employee', 'error');
+        }
+    })
+    .catch(()=>{
+        closeDeleteEmployeeConfirmation();
+        showToast('Network error while deleting employee', 'error');
+    });
 }
 
 // Account management functions
@@ -877,23 +891,28 @@ function resetPassword(employeeId) {
 }
 
 function removeAccount(employeeId) {
-    if (confirm('Are you sure you want to remove this employee\'s system account? The employee record will remain.')) {
-        fetch('manage_account.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `action=remove_account&employee_id=${employeeId}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Account removed successfully');
-                closeViewModal();
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        });
-    }
+    // Perform deletion and use custom toast, no browser confirm() or alert()
+    fetch('manage_account.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `action=remove_account&employee_id=${employeeId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeDeleteConfirmation();
+            closeViewModal();
+            showToast('Account removed successfully', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            closeDeleteConfirmation();
+            showToast(data.message || 'Error removing account', 'error');
+        }
+    })
+    .catch(() => {
+        closeDeleteConfirmation();
+        showToast('Network error while removing account', 'error');
+    });
 }
 
 function createAccountForEmployee(employeeId) {
@@ -936,17 +955,18 @@ function showCreateAccountModal(employee) {
         <input type="hidden" name="employee_id" value="${employee.id_number}">
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
-            <input type="text" name="username" required 
+            <input type="text" id="ca_username" name="username" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" tabindex="0"
                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            <span id="ca_username_error" class="hidden text-red-500 text-sm mt-1"></span>
         </div>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
-            <input type="password" name="password" required minlength="6"
+            <input type="password" name="password" required minlength="6" autocomplete="new-password" tabindex="0"
                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500">
         </div>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
-            <select name="role" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            <select name="role" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500" tabindex="0">
                 <option value="">Select Role</option>
                 <option value="registrar">Registrar</option>
                 <option value="cashier">Cashier</option>
@@ -957,6 +977,26 @@ function showCreateAccountModal(employee) {
         </div>
     `;
     document.getElementById('createAccountModal').classList.remove('hidden');
+    // Autofocus the username field to ensure typing works immediately
+    setTimeout(() => {
+        const usernameInput = document.querySelector('#createAccountModal input[name="username"]');
+        if (usernameInput) {
+            usernameInput.readOnly = false;
+            usernameInput.disabled = false;
+            usernameInput.focus();
+        }
+        const passwordInput = document.querySelector('#createAccountModal input[name="password"]');
+        if (passwordInput) {
+            passwordInput.readOnly = false;
+            passwordInput.disabled = false;
+        }
+    }, 0);
+    // Prevent global key handlers from hijacking keystrokes while modal is open
+    const modalEl = document.getElementById('createAccountModal');
+    if (modalEl && !modalEl._keydownBound) {
+        modalEl.addEventListener('keydown', (e) => { e.stopPropagation(); }, true);
+        modalEl._keydownBound = true;
+    }
 }
 
 function closeEditAccountModal() {
@@ -993,6 +1033,16 @@ function createNewAccount(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
     formData.append('create_account', '1');
+    // Clear previous username error styles/messages
+    const u = document.getElementById('ca_username');
+    const uErr = document.getElementById('ca_username_error');
+    if (u) {
+        u.classList.remove('border-red-500','ring-2','ring-red-500');
+    }
+    if (uErr) {
+        uErr.textContent = '';
+        uErr.classList.add('hidden');
+    }
     
     fetch('create_account.php', {
         method: 'POST',
@@ -1006,6 +1056,18 @@ function createNewAccount(event) {
             closeViewModal();
             location.reload();
         } else {
+            // Inline handle for duplicate username
+            if (data.message && data.message.toLowerCase().includes('username already taken')) {
+                if (u) {
+                    u.classList.add('border-red-500','ring-2','ring-red-500');
+                    u.focus();
+                }
+                if (uErr) {
+                    uErr.textContent = 'Username already in use';
+                    uErr.classList.remove('hidden');
+                }
+                return; // keep modal open, no alert
+            }
             alert('Error: ' + data.message);
         }
     });
@@ -1080,17 +1142,6 @@ function closeEditModal() {
     document.getElementById('editEmployeeModal').classList.add('hidden');
 }
 
-// Create account function
-function createAccount(employeeId) {
-    document.getElementById('accountEmployeeId').value = employeeId;
-    document.getElementById('createAccountModal').classList.remove('hidden');
-}
-
-// Close create account modal
-function closeCreateAccountModal() {
-    document.getElementById('createAccountModal').classList.add('hidden');
-}
-
 // Handle edit employee form submission
 document.getElementById('editEmployeeForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -1117,31 +1168,7 @@ document.getElementById('editEmployeeForm').addEventListener('submit', function(
     });
 });
 
-// Handle create account form submission
-document.getElementById('createAccountForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    
-    fetch('create_account.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Account created successfully!');
-            closeCreateAccountModal();
-            location.reload(); // Refresh to show updated data
-        } else {
-            alert('Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error creating account');
-    });
-});
+// Removed duplicate create account form submission handler to avoid duplicate alerts.
 
 // Show success notification with animation
 const notificationElement = document.getElementById("notif");
@@ -1195,5 +1222,24 @@ document.addEventListener('click', function(event) {
 });
 
 </script>
+<!-- Toast Notification -->
+<div id="toast" class="fixed top-5 right-5 z-50 hidden">
+  <div id="toastInner" class="px-4 py-3 rounded shadow-lg text-white"></div>
+  <style>
+    .toast-success { background: #16a34a; }
+    .toast-error { background: #dc2626; }
+  </style>
+  <script>
+    function showToast(message, type='success'){
+      const t = document.getElementById('toast');
+      const ti = document.getElementById('toastInner');
+      ti.className = 'px-4 py-3 rounded shadow-lg text-white ' + (type==='success'?'toast-success':'toast-error');
+      ti.textContent = message;
+      t.classList.remove('hidden');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(()=>{ t.classList.add('hidden'); }, 2000);
+    }
+  </script>
+</div>
 </body>
 </html>

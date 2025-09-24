@@ -2,8 +2,8 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Require registrar login
-if (!isset($_SESSION['registrar_id'])) {
+// Require HR login
+if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSION['hr_name']))) {
     header("Location: ../StudentLogin/login.php");
     exit;
 }

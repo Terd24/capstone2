@@ -34,16 +34,7 @@ if ($result->num_rows === 0) {
     exit;
 }
 
-// Check if account already exists
-$stmt = $conn->prepare("SELECT username FROM employee_accounts WHERE employee_id = ?");
-$stmt->bind_param("s", $employee_id);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($result->num_rows > 0) {
-    echo json_encode(['success' => false, 'message' => 'Account already exists for this employee']);
-    exit;
-}
+// Allow multiple accounts per employee. We intentionally do not block when one already exists.
 
 // Check if username is taken
 $stmt = $conn->prepare("SELECT username FROM employee_accounts WHERE username = ?");

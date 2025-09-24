@@ -2,11 +2,13 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Require registrar login
-if (!isset($_SESSION['registrar_id'])) {
+// Require HR login
+if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSION['hr_name']))) {
     header("Location: ../StudentLogin/login.php");
     exit;
 }
+// Actor id for audit fields
+$actorId = $_SESSION['id_number'] ?? 0;
 
 // Handle form submission for creating/editing schedules
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -30,7 +32,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             
             // Employees: store in employee_work_schedules using schedule_name
             $stmt = $conn->prepare("INSERT INTO employee_work_schedules (schedule_name, start_time, end_time, days, created_by) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssssi", $section_name, $start_time, $end_time, $days, $_SESSION['registrar_id']);
+            $stmt->bind_param("ssssi", $section_name, $start_time, $end_time, $days, $actorId);
             
             if ($stmt->execute()) {
                 $response['success'] = true;
@@ -59,7 +61,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             
             // First, create the main schedule record with placeholder times
             $stmt = $conn->prepare("INSERT INTO employee_work_schedules (schedule_name, start_time, end_time, days, created_by) VALUES (?, '00:00:00', '23:59:59', 'Variable', ?)");
-            $stmt->bind_param("si", $section_name, $_SESSION['registrar_id']);
+            $stmt->bind_param("si", $section_name, $actorId);
             
             if ($stmt->execute()) {
                 $schedule_id = $conn->insert_id;
@@ -214,7 +216,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             
             // Insert new assignment
             $insert_stmt = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
-            $insert_stmt->bind_param("sii", $emp_id, $schedule_id, $_SESSION['registrar_id']);
+            $insert_stmt->bind_param("sii", $emp_id, $schedule_id, $actorId);
             if ($insert_stmt->execute()) { $success_count++; } else { $error_count++; }
         }
         
@@ -1279,7 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Back navigation
 function handleBackNavigation() {
-    window.location.href = 'RegistrarDashboard.php';
+    window.location.href = 'Dashboard.php';
 }
 
 // Edit schedule function
