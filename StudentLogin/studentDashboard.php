@@ -85,7 +85,7 @@ $all_stmt->close();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
               </svg>
               <?php if ($unread_count > 0): ?>
-                <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <span id="notifBellCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   <?= $unread_count > 9 ? '9+' : $unread_count ?>
                 </span>
               <?php endif; ?>
@@ -103,7 +103,7 @@ $all_stmt->close();
                     Notifications
                   </h3>
                   <?php if ($unread_count > 0): ?>
-                    <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    <span id="notifHeaderCount" class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                       <?= $unread_count ?>
                     </span>
                   <?php endif; ?>
@@ -119,7 +119,7 @@ $all_stmt->close();
                   while ($notification = $recent_notifications->fetch_assoc()): 
                     $count++;
                   ?>
-                    <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer <?= $notification['is_read'] ? 'opacity-75' : 'bg-blue-25' ?>" data-initial="<?= $count <= 5 ? 'true' : 'false' ?>">
+                    <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer <?= $notification['is_read'] ? 'opacity-75' : 'bg-blue-25' ?>" data-initial="<?= $count <= 5 ? 'true' : 'false' ?>" data-message="<?= htmlspecialchars($notification['message'], ENT_QUOTES) ?>" data-id="<?= (int)$notification['id'] ?>" data-read="<?= $notification['is_read'] ? '1' : '0' ?>">
                       <div class="flex items-start space-x-3">
                         <div class="flex-shrink-0">
                           <?php if (!$notification['is_read']): ?>
@@ -431,7 +431,7 @@ $all_stmt->close();
     
     nextBatch.forEach(notification => {
       const notificationHTML = `
-        <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${notification.is_read == '0' ? 'bg-blue-25' : 'opacity-75'}">
+        <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${notification.is_read == '0' ? 'bg-blue-25' : 'opacity-75'}" data-message="${notification.message.replace(/\"/g, '&quot;')}" data-id="${Number(notification.id)}" data-read="${notification.is_read}">
           <div class="flex items-start space-x-3">
             <div class="flex-shrink-0">
               ${notification.is_read == '0' ? 
@@ -476,6 +476,7 @@ $all_stmt->close();
   document.addEventListener('DOMContentLoaded', function() {
     const notificationBtn = document.getElementById('notificationBtn');
     const dropdown = document.getElementById('notificationsDropdown');
+    const notificationsList = document.getElementById('notificationsList');
     
     console.log('DOM loaded, notification button:', notificationBtn);
     console.log('Dropdown element:', dropdown);
@@ -492,6 +493,78 @@ $all_stmt->close();
       document.addEventListener('click', function(event) {
         if (!notificationBtn.contains(event.target) && !dropdown.contains(event.target)) {
           dropdown.classList.add('hidden');
+        }
+      });
+
+      // Helpers to decrement badges safely
+      function decrementBadge(el) {
+        if (!el) return;
+        const txt = (el.textContent || '').trim();
+        let num = 0;
+        if (txt === '' ) return;
+        if (txt.includes('+')) {
+          // treat 9+ as at least 9
+          num = parseInt(txt) || 9;
+        } else {
+          num = parseInt(txt) || 0;
+        }
+        if (num <= 1) {
+          el.remove();
+        } else {
+          el.textContent = String(num - 1);
+        }
+      }
+
+      // Delegated click handler for notifications
+      function routeFromMessage(message) {
+        if (!message) { window.location.href = 'requested_document.php'; return; }
+        const msg = message.toLowerCase();
+        // Specific document-related routing first
+        if (msg.includes('successfully submitted')) return window.location.href = 'documents.php';
+        if (msg.includes('document request') || msg.includes("status has been updated") || msg.includes('ready to claim') || msg.includes('pending')) return window.location.href = 'requested_document.php';
+        // Other modules
+        if (msg.includes('grade')) return window.location.href = 'Grades.php';
+        if (msg.includes('balance') || msg.includes('payment')) return window.location.href = 'Balances.php';
+        if (msg.includes('attendance')) return window.location.href = 'attendance/Attendance.php';
+        if (msg.includes('guidance')) return window.location.href = 'GuidanceRecord.php';
+        if (msg.includes('document')) return window.location.href = 'requested_document.php';
+        // default
+        window.location.href = 'requested_document.php';
+      }
+
+      notificationsList.addEventListener('click', function(e) {
+        const item = e.target.closest('.notification-item');
+        if (item) {
+          const message = item.getAttribute('data-message') || '';
+          const wasRead = item.getAttribute('data-read') === '1';
+          const id = parseInt(item.getAttribute('data-id') || '0');
+
+          // Optimistic UI update if it was unread
+          if (!wasRead) {
+            // Remove blue highlight and dot, dim text
+            item.classList.remove('bg-blue-25');
+            item.classList.add('opacity-75');
+            const dot = item.querySelector('.w-2.h-2');
+            if (dot) { dot.classList.remove('bg-blue-500'); dot.classList.add('bg-gray-300'); }
+            const title = item.querySelector('p.text-sm');
+            if (title) { title.classList.remove('font-semibold'); }
+            item.setAttribute('data-read', '1');
+            // Decrement badges
+            decrementBadge(document.getElementById('notifHeaderCount'));
+            decrementBadge(document.getElementById('notifBellCount'));
+          }
+
+          // Mark as read in backend (fire and forget)
+          if (id > 0 && !wasRead) {
+            fetch('mark_notification_read.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id })
+            }).catch(()=>{});
+          }
+
+          // Navigate
+          routeFromMessage(message);
         }
       });
     } else {

@@ -159,6 +159,51 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     }
 
     if ($update_stmt->execute()) {
+        // Sync credentials <-> submitted_documents
+        $credentialOptions = ['F-138','Good Moral','PSA Birth','ESC Certification'];
+        $selectedCreds = array_values(array_filter(array_map('trim', explode(',', $credentials))));
+
+        // Fetch existing submitted credential document names for this student
+        $existing = [];
+        if ($q = $conn->prepare("SELECT document_name FROM submitted_documents WHERE id_number = ?")) {
+            $q->bind_param("s", $student_id);
+            if ($q->execute()) {
+                $res = $q->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $name = $row['document_name'];
+                    if (in_array($name, $credentialOptions, true)) {
+                        $existing[$name] = true;
+                    }
+                }
+            }
+            $q->close();
+        }
+
+        // Insert newly checked credentials not yet in submitted_documents
+        if ($ins = $conn->prepare("INSERT INTO submitted_documents (id_number, document_name, date_submitted, remarks) VALUES (?, ?, NOW(), ?)")) {
+            $remarks = 'Submitted';
+            foreach ($selectedCreds as $docName) {
+                if (in_array($docName, $credentialOptions, true) && !isset($existing[$docName]) && $docName !== '') {
+                    $doc = substr($docName, 0, 255);
+                    $ins->bind_param("sss", $student_id, $doc, $remarks);
+                    $ins->execute();
+                }
+            }
+            $ins->close();
+        }
+
+        // Delete unchecked credential items from submitted_documents
+        $selectedSet = array_flip($selectedCreds);
+        if ($del = $conn->prepare("DELETE FROM submitted_documents WHERE id_number = ? AND document_name = ?")) {
+            foreach ($credentialOptions as $opt) {
+                if (!isset($selectedSet[$opt]) && isset($existing[$opt])) {
+                    $doc = substr($opt, 0, 255);
+                    $del->bind_param("ss", $student_id, $doc);
+                    $del->execute();
+                }
+            }
+            $del->close();
+        }
         // Update parent password if provided
         if (!empty($parent_password)) {
             $parent_hashed = password_hash($parent_password, PASSWORD_DEFAULT);

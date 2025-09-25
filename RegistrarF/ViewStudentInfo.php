@@ -26,7 +26,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_submitted'])) {
     $stmtNotif->bind_param("ss", $id_number, $message);
     $stmtNotif->execute();
     $stmtNotif->close();
+    header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=submitted");
+    exit;
+}
 
+// ✅ Handle Delete Requested Document
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_requested'])) {
+    $id_number = $_POST['id_number'] ?? '';
+    $doc_id    = isset($_POST['doc_id']) ? intval($_POST['doc_id']) : 0;
+    if ($doc_id > 0 && $id_number !== '') {
+        $del = $conn->prepare("DELETE FROM document_requests WHERE id = ? AND student_id = ?");
+        $del->bind_param("is", $doc_id, $id_number);
+        $del->execute();
+        $del->close();
+    }
+    header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=requested");
+    exit;
+}
+// ✅ Handle Delete Submitted Document
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_submitted'])) {
+    $id_number = $_POST['id_number'] ?? '';
+    $doc_id    = isset($_POST['doc_id']) ? intval($_POST['doc_id']) : 0;
+    if ($doc_id > 0 && $id_number !== '') {
+        // Find the document_name before deletion
+        $docName = null;
+        if ($stmtGet = $conn->prepare("SELECT document_name FROM submitted_documents WHERE id = ? AND id_number = ? LIMIT 1")) {
+            $stmtGet->bind_param("is", $doc_id, $id_number);
+            if ($stmtGet->execute()) {
+                $res = $stmtGet->get_result();
+                if ($row = $res->fetch_assoc()) {
+                    $docName = $row['document_name'];
+                }
+            }
+            $stmtGet->close();
+        }
+
+        // Delete the submitted document row
+        $del = $conn->prepare("DELETE FROM submitted_documents WHERE id = ? AND id_number = ?");
+        $del->bind_param("is", $doc_id, $id_number);
+        $del->execute();
+        $del->close();
+
+        // Also remove from student_account.credentials if present
+        if (!empty($docName)) {
+            if ($stmtCred = $conn->prepare("SELECT credentials FROM student_account WHERE id_number = ? LIMIT 1")) {
+                $stmtCred->bind_param("s", $id_number);
+                if ($stmtCred->execute()) {
+                    $credRes = $stmtCred->get_result();
+                    if ($credRow = $credRes->fetch_assoc()) {
+                        $credStr = $credRow['credentials'] ?? '';
+                        $list = array_filter(array_map('trim', explode(',', $credStr)));
+                        // Remove the deleted document name from the credentials list
+                        $newList = [];
+                        foreach ($list as $item) {
+                            if (strcasecmp($item, $docName) !== 0) { // case-insensitive compare
+                                $newList[] = $item;
+                            }
+                        }
+                        $updated = implode(',', $newList);
+                        if ($upd = $conn->prepare("UPDATE student_account SET credentials = ? WHERE id_number = ?")) {
+                            $upd->bind_param("ss", $updated, $id_number);
+                            $upd->execute();
+                            $upd->close();
+                        }
+                    }
+                }
+                $stmtCred->close();
+            }
+        }
+    }
     header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=submitted");
     exit;
 }
@@ -111,6 +179,77 @@ if ($docType === 'submitted') {
     <meta charset="UTF-8">
     <title>Student Information - Cornerstone College Inc.</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Delete Requested Document Modal -->
+<div id="deleteRequestedModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[2147483647] flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl w/full max-w-md mx-4 p-6">
+    <div class="flex flex-col items-center text-center">
+      <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.29 3.86l-8.02 13.86A2 2 0 003.99 20h16.02a2 2 0 001.72-3.28L13.71 3.86a2 2 0 00-3.42 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-800 mb-1">Delete Requested Document</h3>
+      <p class="text-sm text-gray-600 mb-4">Are you sure you want to delete "<span id="delReqDocName" class="font-semibold"></span>"? This action cannot be undone.</p>
+      <form id="deleteRequestedForm" method="POST" class="w-full">
+        <input type="hidden" name="delete_requested" value="1">
+        <input type="hidden" name="id_number" value="<?= htmlspecialchars($student['id_number']) ?>">
+        <input type="hidden" name="doc_id" id="delReqDocId" value="">
+        <div class="flex gap-3 w-full mt-2">
+          <button type="button" onclick="closeDeleteRequestedModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancel</button>
+          <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  </div>
+
+<script>
+  function showDeleteRequestedModal(id, name){
+    document.getElementById('delReqDocId').value = id;
+    document.getElementById('delReqDocName').textContent = name;
+    document.getElementById('deleteRequestedModal').classList.remove('hidden');
+  }
+  function closeDeleteRequestedModal(){
+    document.getElementById('deleteRequestedModal').classList.add('hidden');
+  }
+</script>
+<!-- Delete Submitted Document Modal -->
+<div id="deleteSubmittedModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[2147483647] flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+    <div class="flex flex-col items-center text-center">
+      <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.29 3.86l-8.02 13.86A2 2 0 003.99 20h16.02a2 2 0 001.72-3.28L13.71 3.86a2 2 0 00-3.42 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-800 mb-1">Delete Submitted Document</h3>
+      <p class="text-sm text-gray-600 mb-4">Are you sure you want to delete "<span id="delDocName" class="font-semibold"></span>"? This action cannot be undone.</p>
+      <form id="deleteSubmittedForm" method="POST" class="w-full">
+        <input type="hidden" name="delete_submitted" value="1">
+        <input type="hidden" name="id_number" value="<?= htmlspecialchars($student['id_number']) ?>">
+        <input type="hidden" name="doc_id" id="delDocId" value="">
+        <div class="flex gap-3 w-full mt-2">
+          <button type="button" onclick="closeDeleteSubmittedModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancel</button>
+          <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  </div>
+
+<script>
+  function showDeleteSubmittedModal(id, name){
+    document.getElementById('delDocId').value = id;
+    document.getElementById('delDocName').textContent = name;
+    document.getElementById('deleteSubmittedModal').classList.remove('hidden');
+  }
+  function closeDeleteSubmittedModal(){
+    document.getElementById('deleteSubmittedModal').classList.add('hidden');
+  }
+</script>
     <link rel="icon" type="image/png" href="../images/Logo.png">
     <style>
         .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
@@ -249,6 +388,20 @@ if ($docType === 'submitted') {
                                         if (!in_array($name, $submittedDocs)) {
                                             echo "<option value='".htmlspecialchars($name)."'>".htmlspecialchars($name)."</option>";
                                         }
+
+// ✅ Handle Delete Requested Document
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_requested'])) {
+    $id_number = $_POST['id_number'] ?? '';
+    $doc_id    = isset($_POST['doc_id']) ? intval($_POST['doc_id']) : 0;
+    if ($doc_id > 0 && $id_number !== '') {
+        $del = $conn->prepare("DELETE FROM document_requests WHERE id = ? AND student_id = ?");
+        $del->bind_param("is", $doc_id, $id_number);
+        $del->execute();
+        $del->close();
+    }
+    header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=requested");
+    exit;
+}
                                     endforeach;
                                   else:
                                     // Fallback to legacy list if no types configured yet
@@ -303,8 +456,10 @@ if ($docType === 'submitted') {
                             <select class="border border-gray-300 px-3 py-2 rounded-lg bg-white text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent"
                                     onchange="updateStatus(<?= $doc['id'] ?>, this)">
                                 <option value="Pending"        <?= $doc['status']==='Pending' ? 'selected' : '' ?>>Pending</option>
+                                <option value="Approved"       <?= $doc['status']==='Approved' ? 'selected' : '' ?>>Approved</option>
                                 <option value="Ready to Claim" <?= $doc['status']==='Ready to Claim' ? 'selected' : '' ?>>Ready to Claim</option>
                                 <option value="Claimed"        <?= $doc['status']==='Claimed' ? 'selected' : '' ?>>Claimed</option>
+                                <option value="Declined"       <?= $doc['status']==='Declined' ? 'selected' : '' ?>>Declined</option>
                             </select>
                         </td>
                         <td class="py-4 px-6 text-center">
@@ -323,18 +478,24 @@ if ($docType === 'submitted') {
                 <tr class="hidden detail-row bg-blue-50">
                     <td colspan="<?= $docType==='requested'?6:4 ?>" class="p-6 text-gray-700 border-t border-blue-100">
                         <?php if($docType==='requested'): ?>
-                            <div>
-                                <p><strong>Document Type:</strong> <?= htmlspecialchars($doc['document_type']) ?></p>
-                                <p><strong>Purpose:</strong> <?= htmlspecialchars($doc['purpose']) ?></p>
-                                <p><strong>Date Requested:</strong> <?= date('M j, Y g:i:s A', strtotime($doc['date_requested'])) ?></p>
-                                <p><strong>Status:</strong> <?= htmlspecialchars($doc['status']) ?></p>
-                                <p><strong>Claimed At:</strong> <?= $doc['date_claimed'] ? date('M j, Y g:i:s A', strtotime($doc['date_claimed'])) : '---' ?></p>
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div>
+                                    <p><strong>Document Type:</strong> <?= htmlspecialchars($doc['document_type']) ?></p>
+                                    <p><strong>Purpose:</strong> <?= htmlspecialchars($doc['purpose']) ?></p>
+                                    <p><strong>Date Requested:</strong> <?= date('M j, Y g:i:s A', strtotime($doc['date_requested'])) ?></p>
+                                    <p><strong>Status:</strong> <?= htmlspecialchars($doc['status']) ?></p>
+                                    <p><strong>Claimed At:</strong> <?= $doc['date_claimed'] ? date('M j, Y g:i:s A', strtotime($doc['date_claimed'])) : '---' ?></p>
+                                </div>
+                                <button type="button" onclick="showDeleteRequestedModal(<?= (int)$doc['id'] ?>, '<?= htmlspecialchars(addslashes($doc['document_type'])) ?>')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">Delete</button>
                             </div>
                         <?php else: ?>
-                            <div>
-                                <p><strong>Document Name:</strong> <?= htmlspecialchars($doc['document_name']) ?></p>
-                                <p><strong>Date Submitted:</strong> <?= date('M j, Y g:i:s A', strtotime($doc['date_submitted'])) ?></p>
-                                <p><strong>Remarks:</strong> <?= htmlspecialchars($doc['remarks']) ?></p>
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div>
+                                    <p><strong>Document Name:</strong> <?= htmlspecialchars($doc['document_name']) ?></p>
+                                    <p><strong>Date Submitted:</strong> <?= date('M j, Y g:i:s A', strtotime($doc['date_submitted'])) ?></p>
+                                    <p><strong>Remarks:</strong> <?= htmlspecialchars($doc['remarks']) ?></p>
+                                </div>
+                                <button type="button" onclick="showDeleteSubmittedModal(<?= (int)$doc['id'] ?>, '<?= htmlspecialchars(addslashes($doc['document_name'])) ?>')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">Delete</button>
                             </div>
                         <?php endif; ?>
                     </td>
@@ -375,14 +536,8 @@ let lastKeyTime = Date.now();
 const rfidInput = document.getElementById("rfid_input");
 const rfidForm = document.getElementById("rfidForm");
 
-document.addEventListener('keydown', (e) => {
-    const currentTime = Date.now();
-    
-    // Reset buffer if too much time passed between keys
-    if (currentTime - lastKeyTime > 100) rfidBuffer = "";
-    lastKeyTime = currentTime;
-
-    // Ignore typing in inputs or textareas
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') closeStudentModal();
     if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
 
     if (e.key === 'Enter') {

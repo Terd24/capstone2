@@ -349,6 +349,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     }
                 }
 
+                // Insert submitted credentials into student's submitted_documents list
+                // So that Documents page shows them immediately
+                if (!empty($credentials)) {
+                    $credItems = array_filter(array_map('trim', explode(',', $credentials)));
+                    if (!empty($credItems)) {
+                        $remarks = 'Submitted via Registrar onboarding';
+                        $ins = $conn->prepare("INSERT INTO submitted_documents (id_number, document_name, date_submitted, remarks) VALUES (?, ?, NOW(), ?)");
+                        if ($ins) {
+                            foreach ($credItems as $docName) {
+                                // Guard against excessively long names
+                                $docName = substr($docName, 0, 255);
+                                $ins->bind_param("sss", $student_id, $docName, $remarks);
+                                $ins->execute();
+                            }
+                            $ins->close();
+                        }
+                    }
+                }
+
                 // All good: commit
                 $conn->commit();
                 $_SESSION['success_msg'] = !empty($parent_username) ? "Student and parent accounts created successfully!" : "Student account created successfully!";

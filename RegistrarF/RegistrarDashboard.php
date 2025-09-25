@@ -143,7 +143,7 @@ function timeAgo($time) {
         </svg>
         <span>Scan</span>
       </button>
-      <button type="button" onclick="openManageDocTypes()" class="bg-gray-200 hover:bg-gray-300 text-gray-900 px-6 py-3 rounded-xl font-medium transition-colors">Document Types</button>
+      <button type="button" onclick="openManageDocTypes()" class="inline-flex items-center bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors">Document Types</button>
       <p id="searchError" class="text-red-600 text-sm"></p>
     </div>
     <div id="searchResults" class="mt-4 space-y-2"></div>
