@@ -31,7 +31,6 @@ $result = $conn->query("SELECT * FROM document_requests ORDER BY
 
 // Fetch recent requests - prioritize unread first, then oldest, exclude claimed
 $recent = $conn->query("SELECT * FROM document_requests WHERE status != 'Claimed' ORDER BY is_read ASC, date_requested ASC LIMIT 10");
-
 // Helper function for PHP fallback time ago (optional)
 function timeAgo($time) {
     // Use MySQL timestamp directly to avoid timezone conversion issues
@@ -144,6 +143,7 @@ function timeAgo($time) {
         </svg>
         <span>Scan</span>
       </button>
+      <button type="button" onclick="openManageDocTypes()" class="bg-gray-200 hover:bg-gray-300 text-gray-900 px-6 py-3 rounded-xl font-medium transition-colors">Document Types</button>
       <p id="searchError" class="text-red-600 text-sm"></p>
     </div>
     <div id="searchResults" class="mt-4 space-y-2"></div>
@@ -249,30 +249,36 @@ function timeAgo($time) {
             <div id="recentContent" class="hidden space-y-3">
             <?php if ($recent && $recent->num_rows > 0): ?>
                 <?php while ($row = $recent->fetch_assoc()): ?>
-                    <div class="bg-gray-50 p-4 rounded border mb-3 flex justify-between items-start" 
+                    <div class="group border border-gray-200 rounded-xl p-4 bg-white hover:shadow-md transition flex items-start justify-between" 
                          id="req-<?= $row['id'] ?>"
                          data-timestamp="<?= strtotime($row['date_requested']) ?>"
                          data-date="<?= $row['date_requested'] ?>">
                         <div class="flex flex-col gap-1">
-                            <p class="text-xs text-gray-400 font-medium time-ago" data-time="<?= strtotime($row['date_requested']) ?>" data-debug="<?= $row['date_requested'] ?>"><?= timeAgo($row['date_requested']) ?></p>
-                            <p class="font-medium text-gray-700"><?= htmlspecialchars($row['document_type']) ?></p>
-                            <p class="text-xs text-gray-500">
-                                By: <?= htmlspecialchars($row['student_name']) ?> (<?= htmlspecialchars($row['student_id']) ?>)
+                            <p class="text-[11px] text-gray-400 uppercase tracking-wide time-ago" data-time="<?= strtotime($row['date_requested']) ?>" data-debug="<?= $row['date_requested'] ?>"><?= timeAgo($row['date_requested']) ?></p>
+                            <p class="text-base font-semibold text-[#0B2C62] leading-5"><?= htmlspecialchars($row['document_type']) ?></p>
+                            <p class="text-xs text-gray-500">By: <?= htmlspecialchars($row['student_name']) ?> (<?= htmlspecialchars($row['student_id']) ?>)</p>
+                            <p class="text-xs text-gray-400 line-clamp-1">
+                                <?= htmlspecialchars($row['purpose'] ?: 'Document request.') ?>
                             </p>
-                            <span class="text-xs text-gray-400"><?= htmlspecialchars($row['purpose'] ?: 'Document request.') ?></span>
                         </div>
-                        <div class="flex flex-col items-end gap-1">
+                        <div class="flex flex-col items-end gap-2">
                             <?php if (!$row['is_read']): ?>
-                                <span id="badge-<?= $row['id'] ?>" class="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">1</span>
+                                <span id="badge-<?= $row['id'] ?>" class="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">NEW</span>
                             <?php endif; ?>
                             <a href="ViewStudentInfo.php?student_id=<?= urlencode($row['student_id']) ?>&type=requested"
                                data-id="<?= $row['id'] ?>"
-                               class="view-link text-sm text-blue-600 hover:underline">View</a>
+                               class="view-link inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
+                                View
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </a>
                         </div>
                     </div>
                 <?php endwhile; ?>
             <?php else: ?>
-                <div class="bg-gray-50 p-4 rounded text-gray-500">No recent requests.</div>
+                <div class="rounded-xl border border-dashed border-gray-300 p-6 text-center text-gray-500 bg-white">
+                  <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  No recent requests.
+                </div>
             <?php endif; ?>
             </div>
         </div>
@@ -342,6 +348,70 @@ function timeAgo($time) {
         </div>
     </div>
 </div>
+
+<!-- Manage Document Types Modal -->
+<div id="manageDocTypesModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-xl mx-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800">Manage Document Types</h3>
+      <button onclick="closeManageDocTypes()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <!-- Segmented switch: Submit Types | Request Types -->
+    <div class="inline-flex mb-3 bg-gray-100 rounded-lg p-1 text-sm" role="tablist">
+      <button id="modeSubmitBtn" type="button" class="px-3 py-1 rounded-md transition-colors" onclick="switchDocMode('submit')">Submit Types</button>
+      <button id="modeRequestBtn" type="button" class="px-3 py-1 rounded-md transition-colors" onclick="switchDocMode('request')">Request Types</button>
+    </div>
+    
+
+    <div class="bg-gray-50 rounded-xl p-4 mb-4">
+      <div class="grid grid-cols-1 gap-3 items-end">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Document Name</label>
+          <input type="text" id="docTypeName" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="e.g., Transcript of Records" />
+        </div>
+      </div>
+      <!-- Inline error box -->
+      <div id="docTypeError" class="hidden mt-2 bg-red-50 text-red-700 border border-red-200 rounded-lg px-3 py-2 text-sm"></div>
+      <div class="flex gap-3 mt-3">
+        <button id="addDocTypeBtn" onclick="createDocType()" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-4 py-2 rounded-lg">Add Document Type</button>
+        <!-- Cancel button appears only in edit mode -->
+      </div>
+    </div>
+
+    <div>
+      <h4 class="font-semibold text-gray-800 mb-2">Existing Document Types</h4>
+      <div id="docTypesList" class="space-y-2 max-h-80 overflow-y-auto">
+        <!-- items -->
+      </div>
+    </div>
+  </div>
+  
+</div>
+
+<!-- Confirm Delete Modal -->
+<div id="confirmDeleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[90]">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+    <div class="flex flex-col items-center text-center">
+      <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.29 3.86l-8.02 13.86A2 2 0 003.99 20h16.02a2 2 0 001.72-3.28L13.71 3.86a2 2 0 00-3.42 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-800 mb-1">Delete Document Type</h3>
+      <p id="confirmDeleteText" class="text-sm text-gray-600 mb-4">Are you sure you want to delete this type?</p>
+      <div class="flex gap-3 w-full mt-2">
+        <button onclick="closeConfirmDelete()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancel</button>
+        <button id="confirmDeleteBtn" onclick="confirmDelete()" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">Delete</button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+<!-- Toast Notification -->
+<div id="toastContainer" class="fixed top-4 right-4 z-[100]"></div>
 
 <script>
 // ===== RFID Scanner Logic =====
@@ -459,19 +529,22 @@ function renderRecent() {
 
     if (shownRecent < recentRequests.length) {
         if (!document.getElementById('viewMoreRecent')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mt-2 flex justify-center';
             const btn = document.createElement('button');
-            btn.textContent = 'View More';
             btn.id = 'viewMoreRecent';
-            btn.className = 'mt-2 text-sm px-3 py-1 bg-gray-200 rounded';
+            btn.className = 'inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full border border-[#0B2C62] text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white transition';
+            btn.innerHTML = 'View More <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>';
             btn.addEventListener('click', () => {
                 shownRecent += 3;
                 renderRecent();
             });
-            document.getElementById('recentContent').appendChild(btn);
+            wrapper.appendChild(btn);
+            document.getElementById('recentContent').appendChild(wrapper);
         }
     } else {
         const btn = document.getElementById('viewMoreRecent');
-        if (btn) btn.remove();
+        if (btn) btn.parentElement.remove();
     }
 }
 renderRecent();
@@ -703,6 +776,150 @@ async function closeQRScanner() {
     try { await qrScanner.stop(); } catch(_){ }
     try { await qrScanner.clear(); } catch(_){ }
   }
+}
+
+// ===== Manage Document Types Logic =====
+function openManageDocTypes(){
+  const m = document.getElementById('manageDocTypesModal');
+  if(m){ 
+    m.classList.remove('hidden'); 
+    // default to submit tab when opening
+    currentDocMode = currentDocMode || 'submit';
+    updateModeButtons();
+    loadDocTypes(); 
+  }
+}
+function closeManageDocTypes(){
+  const m = document.getElementById('manageDocTypesModal');
+  if(m){ m.classList.add('hidden'); }
+}
+// Filtering tabs state
+let currentDocMode = 'submit';
+function switchDocMode(mode){ currentDocMode = mode; updateModeButtons(); loadDocTypes(); }
+function updateModeButtons(){
+  const a = document.getElementById('modeSubmitBtn');
+  const b = document.getElementById('modeRequestBtn');
+  if(!a||!b) return;
+  if(currentDocMode==='submit'){
+    a.className = 'px-3 py-1 rounded-md bg-[#0B2C62] text-white shadow transition-colors';
+    b.className = 'px-3 py-1 rounded-md text-[#0B2C62] bg-white border border-[#0B2C62]/30 hover:bg-gray-100 transition-colors';
+  } else {
+    b.className = 'px-3 py-1 rounded-md bg-[#0B2C62] text-white shadow transition-colors';
+    a.className = 'px-3 py-1 rounded-md text-[#0B2C62] bg-white border border-[#0B2C62]/30 hover:bg-gray-100 transition-colors';
+  }
+}
+function resetDocTypeForm(){
+  document.getElementById('docTypeName').value='';
+  const saveBtn = document.getElementById('saveDocTypeBtn');
+  if (saveBtn) saveBtn.remove();
+  const cancelBtn = document.getElementById('cancelDocTypeBtn');
+  if (cancelBtn) cancelBtn.remove();
+  const addBtn = document.getElementById('addDocTypeBtn');
+  if (addBtn){ addBtn.disabled = false; addBtn.classList.remove('opacity-50','pointer-events-none'); }
+  hideDocTypeError();
+}
+async function loadDocTypes(){
+  try{
+    const res = await fetch('manage_document_types.php?action=list');
+    const data = await res.json();
+    const list = document.getElementById('docTypesList');
+    list.innerHTML = '';
+    if(data.success && Array.isArray(data.items)){
+      const filtered = data.items.filter(it => currentDocMode==='submit' ? (it.is_submittable==1) : (it.is_requestable==1));
+      if(filtered.length===0){ list.innerHTML = '<div class="text-gray-500 text-sm">No document types in this tab yet.</div>'; return; }
+      filtered.forEach(item=>{
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between bg-white border rounded-lg p-3';
+        row.innerHTML = `
+          <div>
+            <div class=\"font-medium text-gray-800\">${escapeHtml(item.name)}</div>
+          </div>
+          <div class=\"flex gap-2\">
+            <button class=\"text-blue-600\" onclick=\"editDocType(${item.id}, '${escapeAttr(item.name)}')\">Edit</button>
+            <button class=\"text-red-600\" onclick=\"openConfirmDelete(${item.id}, '${escapeAttr(item.name)}')\">Delete</button>
+          </div>`;
+        list.appendChild(row);
+      });
+    } else {
+      list.innerHTML = '<div class="text-gray-500 text-sm">No document types yet.</div>';
+    }
+  }catch(e){ console.error(e); }
+}
+function showDocTypeError(msg){
+  const el = document.getElementById('docTypeError');
+  if(!el) return; el.textContent = msg||'Something went wrong.'; el.classList.remove('hidden');
+}
+function hideDocTypeError(){
+  const el = document.getElementById('docTypeError');
+  if(!el) return; el.textContent=''; el.classList.add('hidden');
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+function escapeAttr(s){ return (s||'').replace(/['"\\]/g, m=>({"'":"&#39;","\"":"&quot;","\\":"\\\\"}[m])); }
+async function createDocType(){
+  const name = document.getElementById('docTypeName').value.trim();
+  if(!name){ showDocTypeError('Please enter a document name.'); return; }
+  const fd = new FormData(); fd.append('action','create'); fd.append('name', name); fd.append('mode', currentDocMode);
+  const res = await fetch('manage_document_types.php', { method:'POST', body: fd});
+  const data = await res.json();
+  if(data.success){ resetDocTypeForm(); loadDocTypes(); showToast('Document type added successfully'); }
+  else showDocTypeError(data.message||'Failed to add document type.');
+}
+function editDocType(id, name){
+  document.getElementById('docTypeName').value = name;
+  let saveBtn = document.getElementById('saveDocTypeBtn');
+  const addBtn = document.querySelector('#manageDocTypesModal button[onclick="createDocType()"]');
+  if(!saveBtn){
+    saveBtn = document.createElement('button');
+    saveBtn.id = 'saveDocTypeBtn';
+    saveBtn.className = 'bg-[#0B2C62] hover:bg-blue-900 text-white px-4 py-2 rounded-lg ml-3';
+    saveBtn.textContent = 'Save Changes';
+    addBtn.after(saveBtn);
+    // Create cancel button only in edit mode
+    let cancelBtn = document.createElement('button');
+    cancelBtn.id = 'cancelDocTypeBtn';
+    cancelBtn.className = 'bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg ml-3';
+    cancelBtn.textContent = 'Cancel';
+    saveBtn.after(cancelBtn);
+    cancelBtn.onclick = ()=>{ resetDocTypeForm(); };
+  }
+  // Disable Add while editing
+  const addMain = document.getElementById('addDocTypeBtn');
+  if(addMain){ addMain.disabled = true; addMain.classList.add('opacity-50','pointer-events-none'); }
+  saveBtn.onclick = async ()=>{
+    const newName = document.getElementById('docTypeName').value.trim();
+    if(!newName){ showDocTypeError('Please enter a document name.'); return; }
+    const fd = new FormData(); fd.append('action','update'); fd.append('id', id); fd.append('name', newName);
+    const res = await fetch('manage_document_types.php', { method:'POST', body: fd});
+    const data = await res.json();
+    if(data.success){ resetDocTypeForm(); loadDocTypes(); showToast('Document type updated successfully'); }
+    else showDocTypeError(data.message||'Failed to update document type.');
+  };
+}
+let pendingDeleteId = null;
+function openConfirmDelete(id, name){
+  pendingDeleteId = id;
+  const txt = document.getElementById('confirmDeleteText');
+  if (txt) txt.textContent = `Are you sure you want to delete "${name}"? This action cannot be undone.`;
+  const m = document.getElementById('confirmDeleteModal'); if(m) m.classList.remove('hidden');
+}
+function closeConfirmDelete(){ const m = document.getElementById('confirmDeleteModal'); if(m) m.classList.add('hidden'); pendingDeleteId = null; }
+async function confirmDelete(){
+  if(!pendingDeleteId) { closeConfirmDelete(); return; }
+  const fd = new FormData(); fd.append('action','delete'); fd.append('id', pendingDeleteId);
+  const res = await fetch('manage_document_types.php', { method:'POST', body: fd});
+  const data = await res.json();
+  if(data.success){ closeConfirmDelete(); loadDocTypes(); showToast('Document type deleted successfully'); }
+  else { closeConfirmDelete(); showDocTypeError(data.message||'Failed to delete document type.'); }
+}
+function showToast(message){
+  const cont = document.getElementById('toastContainer');
+  if(!cont) return;
+  const toast = document.createElement('div');
+  toast.className = 'mb-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow transition-opacity';
+  toast.textContent = message || 'Action completed successfully';
+  cont.appendChild(toast);
+  setTimeout(()=>{ toast.style.opacity='0'; }, 2000);
+  setTimeout(()=>{ toast.remove(); }, 2600);
 }
 </script>
 </body>

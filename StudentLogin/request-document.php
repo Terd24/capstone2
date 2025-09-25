@@ -10,13 +10,8 @@ if (!isset($_SESSION['id_number'])) {
 $student_id = $_SESSION['id_number'];
 $student_name = $_SESSION['full_name'] ?? 'Unknown';
 
-// ✅ Fetch only currently active submitted docs
-$stmt = $conn->prepare("
-    SELECT document_name 
-    FROM submitted_documents 
-    WHERE id_number = ? 
-    AND remarks = 'Submitted'
-");
+// ✅ Fetch only currently active submitted docs for this student
+$stmt = $conn->prepare("\n    SELECT document_name \n    FROM submitted_documents \n    WHERE id_number = ? \n    AND remarks = 'Submitted'\n");
 $stmt->bind_param("s", $student_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -26,21 +21,25 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// ✅ Handle form submission
+// ✅ Fetch requestable document types from registrar configuration (independent of submitted docs)
+$available_request_options = [];
+$resTypes = @$conn->query("SELECT name FROM document_types WHERE is_requestable = 1 ORDER BY name ASC");
+if ($resTypes) {
+  while ($r = $resTypes->fetch_assoc()) { $available_request_options[] = $r['name']; }
+}
+
+// ✅ Handle form submission with server-side validation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $document_type = trim($_POST['document_type'] ?? '');
     $purpose = trim($_POST['purpose'] ?? '');
 
     if ($document_type === '' || $purpose === '') {
         $error = "Please fill out all fields.";
+    } elseif (!in_array($document_type, $available_request_options, true)) {
+        $error = "This document type is not requestable.";
     } else {
-        // 🔹 Only block duplicate requests if still active (Pending or Ready to Claim)
-        $check = $conn->prepare("
-            SELECT id 
-            FROM document_requests 
-            WHERE student_id = ? AND document_type = ? 
-            AND status IN ('Pending','Ready to Claim')
-        ");
+        // Only block duplicate requests if still active (Pending or Ready to Claim)
+        $check = $conn->prepare("SELECT id FROM document_requests WHERE student_id = ? AND document_type = ? AND status IN ('Pending','Ready to Claim')");
         $check->bind_param("ss", $student_id, $document_type);
         $check->execute();
         $check->store_result();
@@ -49,20 +48,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "You already have an active request for this document.";
         } else {
             // Insert new request
-            $stmt2 = $conn->prepare("
-                INSERT INTO document_requests (student_id, student_name, document_type, purpose, status, date_requested) 
-                VALUES (?, ?, ?, ?, 'Pending', NOW())
-            ");
+            $stmt2 = $conn->prepare("INSERT INTO document_requests (student_id, student_name, document_type, purpose, status, date_requested) VALUES (?, ?, ?, ?, 'Pending', NOW())");
             $stmt2->bind_param("ssss", $student_id, $student_name, $document_type, $purpose);
             $stmt2->execute();
             $stmt2->close();
 
             // Notification
             $msg = "📤 You have submitted a document request for $document_type. We’ll notify you once it’s processed.";
-            $stmt3 = $conn->prepare("
-                INSERT INTO notifications (student_id, message, date_sent, is_read) 
-                VALUES (?, ?, NOW(), 0)
-            ");
+            $stmt3 = $conn->prepare("INSERT INTO notifications (student_id, message, date_sent, is_read) VALUES (?, ?, NOW(), 0)");
             $stmt3->bind_param("ss", $student_id, $msg);
             $stmt3->execute();
             $stmt3->close();
@@ -82,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <style>
     .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
   </style>
-</head>
+  </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
   <!-- Header -->
@@ -141,11 +134,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </label>
             <select name="document_type" class="w-full border border-gray-300 px-4 py-3 rounded-xl shadow-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] transition-all" required>
               <option value="">Select a document type</option>
-              <?php foreach ($submitted_docs as $doc): ?>
+              <?php foreach ($available_request_options as $doc): ?>
                   <option value="<?= htmlspecialchars($doc) ?>"><?= htmlspecialchars($doc) ?></option>
               <?php endforeach; ?>
             </select>
-            <p class="text-xs text-gray-500 mt-1">Only documents you have submitted are available for request</p>
           </div>
 
           <!-- Purpose Field -->

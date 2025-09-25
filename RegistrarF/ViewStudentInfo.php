@@ -54,6 +54,15 @@ if (!$student) {
 
 $docType = $_GET['type'] ?? 'requested';
 
+// Load available document types for dropdown (dashboard-managed)
+$docTypes = [];
+$resTypes = @$conn->query("SELECT name, is_submittable FROM document_types WHERE is_submittable = 1 ORDER BY name ASC");
+if ($resTypes) {
+    while ($row = $resTypes->fetch_assoc()) {
+        $docTypes[] = $row; // ['name'=>..., 'is_requestable'=>0/1]
+    }
+}
+
 // ✅ Fetch Submitted or Requested Docs
 if ($docType === 'submitted') {
     $stmt2 = $conn->prepare("
@@ -234,14 +243,22 @@ if ($docType === 'submitted') {
                             <label class="block text-sm font-medium mb-1">Document Name</label>
                             <select name="document_name" class="w-full border border-gray-300 p-2 rounded" required>
                                 <option value="">Select Document</option>
-                                <?php
-                                $allDocs = ["Form 137", "Transcript of Records", "Certificate of Enrollment", "Good Moral Certificate"];
-                                foreach ($allDocs as $docOption) {
-                                    if (!in_array($docOption, $submittedDocs)) { 
-                                        echo "<option value='" . htmlspecialchars($docOption) . "'>$docOption</option>";
+                                <?php if (!empty($docTypes)):
+                                    foreach ($docTypes as $t):
+                                        $name = $t['name'];
+                                        if (!in_array($name, $submittedDocs)) {
+                                            echo "<option value='".htmlspecialchars($name)."'>".htmlspecialchars($name)."</option>";
+                                        }
+                                    endforeach;
+                                  else:
+                                    // Fallback to legacy list if no types configured yet
+                                    $legacy = ["Form 137","Transcript of Records","Certificate of Enrollment","Good Moral Certificate"];
+                                    foreach ($legacy as $docOption) {
+                                        if (!in_array($docOption, $submittedDocs)) {
+                                            echo "<option value='".htmlspecialchars($docOption)."'>".htmlspecialchars($docOption)."</option>";
+                                        }
                                     }
-                                }
-                                ?>
+                                  endif; ?>
                             </select>
                         </div>
                         <button type="submit" class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-3 rounded-lg font-medium transition-colors duration-200">
