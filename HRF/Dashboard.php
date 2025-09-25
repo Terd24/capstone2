@@ -257,7 +257,7 @@ input[type=number] { -moz-appearance: textfield; }
         </div>
 
         <!-- Form -->
-        <form method="POST" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+        <form method="POST" autocomplete="off" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
             
             <!-- Personal Information Section -->
             <div class="col-span-3 mb-6">
@@ -272,21 +272,21 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Row: ID Number, First Name, Last Name -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Employee ID *</label>
-                            <input type="text" name="id_number" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="id_number" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">First Name *</label>
-                            <input type="text" name="first_name" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="first_name" autocomplete="off" pattern="[A-Za-z\s]+" title="Letters only" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last Name *</label>
-                            <input type="text" name="last_name" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\s]+" title="Letters only" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
 
                         <!-- Row: Position, Department, Hire Date -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Position *</label>
-                            <input type="text" name="position" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="position" autocomplete="off" pattern="[A-Za-z\s]+" title="Letters only" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Department *</label>
@@ -309,18 +309,18 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Row: Email, Phone -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Email </label>
-                            <input type="email" name="email" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="email" name="email" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Phone </label>
-                            <input type="text" name="phone" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" placeholder="11 digits" data-maxlen="11" title="Please enter exactly 11 digits (e.g., 09123456789)">
+                            <input type="text" name="phone" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" data-maxlen="11" title="Please enter exactly 11 digits (e.g., 09123456789)">
                         </div>
                         <div></div>
 
                         <!-- Complete Address -->
                         <div class="col-span-3">
                             <label class="block text-sm font-semibold mb-1">Complete Address </label>
-                            <textarea name="address" rows="3" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"></textarea>
+                            <textarea name="address" rows="3" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"></textarea>
                         </div>
                     </div>
                 </div>
@@ -346,11 +346,11 @@ input[type=number] { -moz-appearance: textfield; }
                     <div id="accountFields" class="hidden grid grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username</label>
-                            <input type="text" name="username" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="username" autocomplete="off" pattern="^[A-Za-z0-9_]+$" title="Letters, numbers, underscores only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password</label>
-                            <input type="password" name="password" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="password" name="password" autocomplete="new-password" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Role</label>
@@ -367,7 +367,7 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- RFID (required when role = Teacher) -->
                         <div id="rfidField" class="col-span-1 hidden">
                             <label class="block text-sm font-semibold mb-1">RFID</label>
-                            <input type="text" id="rfid_uid" name="rfid_uid" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" placeholder="10 digits" data-maxlen="10" title="Please enter exactly 10 digits">
+                            <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" placeholder="10 digits" data-maxlen="10" title="Please enter exactly 10 digits">
                         </div>
                     </div>
                 </div>

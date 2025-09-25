@@ -113,6 +113,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
             $check_username->store_result();
             if ($check_username->num_rows > 0) {
                 $error_msg = "Student username already in use!";
+                // Keep modal open and preserve form inputs
+                $form_data = $_POST;
+                $show_modal = true;
+                $_SESSION['error_msg'] = $error_msg;
+                $_SESSION['form_data'] = $form_data;
+                $_SESSION['show_modal'] = true;
             }
             $check_username->close();
         }
@@ -125,6 +131,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
             $check_parent_username->store_result();
             if ($check_parent_username->num_rows > 0) {
                 $error_msg = "Parent username already in use!";
+                // Keep modal open and preserve inputs
+                $form_data = $_POST;
+                $show_modal = true;
+                $_SESSION['error_msg'] = $error_msg;
+                $_SESSION['form_data'] = $form_data;
+                $_SESSION['show_modal'] = true;
             }
             $check_parent_username->close();
         }
@@ -284,7 +296,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         }
 
         // Only insert if no validation errors and no duplicate errors
-        if (empty($error_id) && empty($error_rfid) && empty($validation_errors)) {
+        // Include $error_msg to block insert when any prior checks set an error (e.g., duplicate username)
+        if (empty($error_id) && empty($error_rfid) && empty($validation_errors) && empty($error_msg)) {
             // Begin transaction to avoid partial inserts
             $conn->begin_transaction();
 
@@ -405,7 +418,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         $address = trim($_POST['address'] ?? '');
         $id_number = trim($_POST['id_number'] ?? '');
         $password = $_POST['password'] ?? '';
-        $rfid_uid = trim($_POST['rfid_uid'] ?? '');
         $username = trim($_POST['username'] ?? '');
         
         // Validation
@@ -415,6 +427,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
             $form_data = $_POST;
             $show_modal = true;
             // Don't redirect - stay on current page to show error
+        }
+
+        // ID must be digits only and exactly 11
+        if (!empty($id_number)) {
+            if (!preg_match('/^[0-9]+$/', $id_number)) {
+                $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Registrar ID must contain digits only.";
+                $show_modal = true; $form_data = $_POST;
+            } elseif (strlen($id_number) !== 11) {
+                $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Registrar ID must be exactly 11 digits.";
+                $show_modal = true; $form_data = $_POST;
+            }
+        }
+
+        // Username pattern check
+        if (!empty($username) && !preg_match('/^[A-Za-z0-9_]+$/', $username)) {
+            $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Username can only contain letters, numbers, and underscores.";
+            $form_data = $_POST;
+            $show_modal = true;
         }
         
         // Check if ID already exists
@@ -442,26 +472,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         }
         $check_username_stmt->close();
         
-        // Hash password
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        
-        // Insert into registrar_account table
-        $stmt = $conn->prepare("INSERT INTO registrar_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
-        
-        if ($stmt->execute()) {
-            $_SESSION['success_msg'] = "Registrar account created successfully!";
-            header("Location: AccountList.php?type=registrar");
-            exit;
-        } else {
-            $error_msg = "Error creating registrar account. Please try again.";
-            $form_data = $_POST;
-            $show_modal = true;
-            // Don't redirect - stay on current page to show error
+        if (empty($error_msg)) {
+            // Hash password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
+            // Insert into registrar_account table
+            $stmt = $conn->prepare("INSERT INTO registrar_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
+            
+            if ($stmt->execute()) {
+                $_SESSION['success_msg'] = "Registrar account created successfully!";
+                header("Location: AccountList.php?type=registrar");
+                exit;
+            } else {
+                $error_msg = "Error creating registrar account. Please try again.";
+                $form_data = $_POST;
+                $show_modal = true;
+                // Don't redirect - stay on current page to show error
+            }
+            
+            $stmt->close();
+            $check_stmt->close();
         }
-        
-        $stmt->close();
-        $check_stmt->close();
     } elseif ($account_type === 'cashier') {
         // Handle cashier account creation
         $first_name = trim($_POST['first_name'] ?? '');
@@ -479,6 +511,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         if (empty($first_name) || empty($last_name) || empty($dob) || empty($birthplace) || empty($gender) || 
             empty($address) || empty($id_number) || empty($password) || empty($username)) {
             $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+
+        // ID must be digits only and exactly 11
+        if (!empty($id_number)) {
+            if (!preg_match('/^[0-9]+$/', $id_number)) {
+                $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Cashier ID must contain digits only.";
+                $show_modal = true; $form_data = $_POST;
+            } elseif (strlen($id_number) !== 11) {
+                $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Cashier ID must be exactly 11 digits.";
+                $show_modal = true; $form_data = $_POST;
+            }
+        }
+
+        // Username pattern check
+        if (!empty($username) && !preg_match('/^[A-Za-z0-9_]+$/', $username)) {
+            $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Username can only contain letters, numbers, and underscores.";
             $form_data = $_POST;
             $show_modal = true;
         }
@@ -508,25 +558,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         }
         $check_username_stmt->close();
         
-        // Hash password
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        
-        // Insert cashier account
-        $stmt = $conn->prepare("INSERT INTO cashier_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
-        
-        if ($stmt->execute()) {
-            $_SESSION['success_msg'] = "Cashier account created successfully!";
-            header("Location: AccountList.php?type=cashier");
-            exit;
-        } else {
-            $error_msg = "Error creating cashier account. Please try again.";
-            $form_data = $_POST;
-            $show_modal = true;
+        if (empty($error_msg)) {
+            // Hash password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
+            // Insert cashier account
+            $stmt = $conn->prepare("INSERT INTO cashier_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
+            
+            if ($stmt->execute()) {
+                $_SESSION['success_msg'] = "Cashier account created successfully!";
+                header("Location: AccountList.php?type=cashier");
+                exit;
+            } else {
+                $error_msg = "Error creating cashier account. Please try again.";
+                $form_data = $_POST;
+                $show_modal = true;
+            }
+            
+            $stmt->close();
+            $check_stmt->close();
         }
-        
-        $stmt->close();
-        $check_stmt->close();
     } elseif ($account_type === 'guidance') {
         // Handle guidance account creation
         $first_name = trim($_POST['first_name'] ?? '');
@@ -544,6 +596,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         if (empty($first_name) || empty($last_name) || empty($dob) || empty($birthplace) || empty($gender) || 
             empty($address) || empty($id_number) || empty($password) || empty($username)) {
             $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+
+        // ID must be digits only and exactly 11
+        if (!empty($id_number)) {
+            if (!preg_match('/^[0-9]+$/', $id_number)) {
+                $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Guidance ID must contain digits only.";
+                $show_modal = true; $form_data = $_POST;
+            } elseif (strlen($id_number) !== 11) {
+                $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Guidance ID must be exactly 11 digits.";
+                $show_modal = true; $form_data = $_POST;
+            }
+        }
+
+        // Username pattern check
+        if (!empty($username) && !preg_match('/^[A-Za-z0-9_]+$/', $username)) {
+            $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Username can only contain letters, numbers, and underscores.";
             $form_data = $_POST;
             $show_modal = true;
         }
@@ -573,27 +643,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         }
         $check_username_stmt->close();
         
-        // Hash password
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        
-        // Insert guidance account
-        $insert_sql = "INSERT INTO guidance_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $insert_stmt = $conn->prepare($insert_sql);
-        $insert_stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
-        
-        if ($insert_stmt->execute()) {
-            $_SESSION['success_msg'] = "Guidance account created successfully!";
-            header("Location: AccountList.php?type=guidance");
-            exit;
-        } else {
-            $error_msg = "Error creating guidance account. Please try again.";
-            $form_data = $_POST;
-            $show_modal = true;
+        if (empty($error_msg)) {
+            // Hash password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
+            // Insert guidance account
+            $insert_sql = "INSERT INTO guidance_account (first_name, last_name, middle_name, dob, birthplace, gender, address, id_number, password, username) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $insert_stmt = $conn->prepare($insert_sql);
+            $insert_stmt->bind_param("ssssssssss", $first_name, $last_name, $middle_name, $dob, $birthplace, $gender, $address, $id_number, $hashed_password, $username);
+            
+            if ($insert_stmt->execute()) {
+                $_SESSION['success_msg'] = "Guidance account created successfully!";
+                header("Location: AccountList.php?type=guidance");
+                exit;
+            } else {
+                $error_msg = "Error creating guidance account. Please try again.";
+                $form_data = $_POST;
+                $show_modal = true;
+            }
+            
+            $stmt->close();
+            $check_stmt->close();
         }
-        
-        $stmt->close();
-        $check_stmt->close();
     } elseif ($account_type === 'parent') {
         // Handle parent account creation
         $first_name = trim($_POST['first_name'] ?? '');
@@ -608,6 +680,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         if (empty($first_name) || empty($last_name) || empty($child_id) || 
             empty($password) || empty($username)) {
             $error_msg = "Please fill in all required fields.";
+            $form_data = $_POST;
+            $show_modal = true;
+        }
+
+        // Child ID must be digits only and exactly 11
+        if (!empty($child_id)) {
+            if (!preg_match('/^[0-9]+$/', $child_id)) {
+                $error_msg = ($error_msg ? $error_msg+'<br>' : '') . "Student ID must contain digits only.";
+                $show_modal = true; $form_data = $_POST;
+            } elseif (strlen($child_id) !== 11) {
+                $error_msg = ($error_msg ? $error_msg+'<br>' : '') . "Student ID must be exactly 11 digits.";
+                $show_modal = true; $form_data = $_POST;
+            }
+        }
+
+        // Username pattern check
+        if (!empty($username) && !preg_match('/^[A-Za-z0-9_]+$/', $username)) {
+            $error_msg = ($error_msg ? $error_msg.'<br>' : '') . "Username can only contain letters, numbers, and underscores.";
             $form_data = $_POST;
             $show_modal = true;
         }
@@ -655,24 +745,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         }
         $check_username_stmt->close();
         
-        // Hash password
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        
-        // Insert into parent_account table (minimal fields)
-        $stmt = $conn->prepare("INSERT INTO parent_account (username, password, child_id) VALUES (?, ?, ?)");
-        $stmt->bind_param("sss", $username, $hashed_password, $child_id);
-        
-        if ($stmt->execute()) {
-            $_SESSION['success_msg'] = "Parent account created successfully!";
-            header("Location: AccountList.php");
-            exit;
-        } else {
-            $error_msg = "Error creating parent account. Please try again.";
-            $form_data = $_POST;
-            $show_modal = true;
+        if (empty($error_msg)) {
+            // Hash password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
+            // Insert into parent_account table (minimal fields)
+            $stmt = $conn->prepare("INSERT INTO parent_account (username, password, child_id) VALUES (?, ?, ?)");
+            $stmt->bind_param("sss", $username, $hashed_password, $child_id);
+            
+            if ($stmt->execute()) {
+                $_SESSION['success_msg'] = "Parent account created successfully!";
+                header("Location: AccountList.php");
+                exit;
+            } else {
+                $error_msg = "Error creating parent account. Please try again.";
+                $form_data = $_POST;
+                $show_modal = true;
+            }
+            
+            $stmt->close();
         }
-        
-        $stmt->close();
     } elseif ($account_type === 'attendance') {
         // Handle attendance account creation
         $username = trim($_POST['username'] ?? '');
@@ -757,7 +849,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
 
         <!-- Unified Student and Parent Form -->
         <div id="unifiedForm" class="account-form">
-            <form method="POST" action="AccountList.php" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+            <form method="POST" action="AccountList.php" autocomplete="off" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
                 <input type="hidden" name="account_type" value="unified_student_parent">
                 
                 <!-- Personal Information Section -->
@@ -773,7 +865,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-3 gap-6 mb-4">
                         <div>
                             <label class="block text-sm font-semibold mb-1">LRN *</label>
-                            <input type="number" name="lrn" required value="<?= htmlspecialchars($form_data['lrn'] ?? '') ?>" pattern="[0-9]+" title="Please enter numbers only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="lrn" required value="<?= htmlspecialchars($form_data['lrn'] ?? '') ?>" pattern="^[0-9]{12}$" maxlength="12" data-maxlen="12" inputmode="numeric" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" title="Please enter exactly 12 digits">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Academic Track / Course *</label>
@@ -828,15 +920,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-3 gap-6 mb-4">
                         <div>
                             <label class="block text-sm font-semibold mb-1">First Name *</label>
-                            <input type="text" name="first_name" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="first_name" autocomplete="off" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last Name *</label>
-                            <input type="text" name="last_name" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="last_name" autocomplete="off" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
-                            <input type="text" name="middle_name" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="middle_name" autocomplete="off" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
                         </div>
                     </div>
                     
@@ -844,7 +936,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-3 gap-6 mb-4">
                         <div>
                             <label class="block text-sm font-semibold mb-1">School Year *</label>
-                            <input type="text" name="school_year" required value="<?= htmlspecialchars($form_data['school_year'] ?? '') ?>" pattern="[0-9\-]+" title="Please enter numbers and dash only (e.g. 2024-2025)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <select id="schoolYearSelect" name="school_year" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                <option value="">Select Year</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Grade Level *</label>
@@ -873,7 +967,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Birthplace *</label>
-                            <input type="text" name="birthplace" required value="<?= htmlspecialchars($form_data['birthplace'] ?? '') ?>" pattern="[A-Za-z\s,.-]+" title="Please enter a valid location" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="birthplace" autocomplete="off" required value="<?= htmlspecialchars($form_data['birthplace'] ?? '') ?>" pattern="[A-Za-z\s,.-]+" title="Please enter a valid location" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Gender *</label>
@@ -914,7 +1008,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-2 gap-6 mb-4">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Complete Address</label>
-                            <textarea name="address" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
+                            <textarea name="address" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
                         </div>
                     </div>
                     
@@ -922,23 +1016,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="space-y-4">
                         <h4 class="font-semibold text-gray-700">Father's Information</h4>
                         <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="father_name" placeholder="Name *" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="father_name" placeholder="Name *" autocomplete="off" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" pattern="[0-9+\-\s()]{11}" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" data-maxlen="11" inputmode="numeric" digits-only>
+                            <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
                         </div>
                         
                         <h4 class="font-semibold text-gray-700">Mother's Information</h4>
                         <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="mother_name" placeholder="Name *" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="mother_name" placeholder="Name *" autocomplete="off" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" pattern="[0-9+\-\s()]{11}" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" data-maxlen="11" inputmode="numeric" digits-only>
+                            <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
                         </div>
                         
                         <h4 class="font-semibold text-gray-700">Guardian's Information</h4>
                         <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="guardian_name" placeholder="Name" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="guardian_name" placeholder="Name" autocomplete="off" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="tel" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" pattern="[0-9+\-\s()]{11}" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" data-maxlen="11" inputmode="numeric" digits-only>
+                            <input type="tel" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
                         </div>
                     </div>
                     
@@ -946,11 +1040,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-2 gap-6 mt-4">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last School Attended</label>
-                            <input type="text" name="last_school" placeholder="School Name" value="<?= htmlspecialchars($form_data['last_school'] ?? '') ?>" pattern="[A-Za-z\s.-]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="last_school" placeholder="School Name" autocomplete="off" value="<?= htmlspecialchars($form_data['last_school'] ?? '') ?>" pattern="[A-Za-z\s.-]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">School Year</label>
-                            <input type="text" name="last_school_year" placeholder="School Year (e.g. 2023-2024)" value="<?= htmlspecialchars($form_data['last_school_year'] ?? '') ?>" pattern="[0-9\-]*" title="Please enter numbers and dash only (e.g. 2023-2024)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <select id="lastSchoolYearSelect" name="last_school_year" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                <option value="">Select Year</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -966,11 +1062,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Parent Username *</label>
-                            <input type="text" name="parent_username" required value="<?= htmlspecialchars($form_data['parent_username'] ?? '') ?>" pattern="[A-Za-z0-9_]+" title="Username can only contain letters, numbers, and underscores" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="parent_username" autocomplete="off" required value="<?= htmlspecialchars($form_data['parent_username'] ?? '') ?>" pattern="[A-Za-z0-9_]+" title="Username can only contain letters, numbers, and underscores" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= (!empty($error_msg) && stripos($error_msg, 'Parent username') !== false) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Parent Password *</label>
-                            <input type="text" name="parent_password" required value="<?= htmlspecialchars($form_data['parent_password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="password" name="parent_password" autocomplete="new-password" required value="<?= htmlspecialchars($form_data['parent_password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                         </div>
                     </div>
                 </div>
@@ -986,22 +1082,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-4 gap-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username *</label>
-                            <input type="text" name="username" required value="<?= htmlspecialchars($form_data['username'] ?? '') ?>" pattern="[A-Za-z0-9_]+" title="Username can only contain letters, numbers, and underscores" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="username" autocomplete="off" required value="<?= htmlspecialchars($form_data['username'] ?? '') ?>" pattern="^[A-Za-z0-9_]+$" title="Username can only contain letters, numbers, and underscores" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= (!empty($error_msg) && stripos($error_msg, 'Student username') !== false) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Student ID *</label>
-                            <input type="number" name="id_number" required value="<?= htmlspecialchars($old_id ?? '') ?>" pattern="[0-9]{11}" title="Please enter 11 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_id) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>" data-maxlen="11" inputmode="numeric" digits-only>
+                            <input type="text" name="id_number" autocomplete="off" required value="<?= htmlspecialchars($old_id ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter exactly 11 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_id) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="11" inputmode="numeric">
                             <?php if (!empty($error_id)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_id) ?></p>
                             <?php endif; ?>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password *</label>
-                            <input type="text" name="password" required value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="password" name="password" autocomplete="new-password" required value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">RFID Number *</label>
-                            <input type="number" name="rfid_uid" required value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="[0-9]{10}" title="Please enter 10 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>" data-maxlen="10" inputmode="numeric" digits-only>
+                            <input type="text" name="rfid_uid" autocomplete="off" required value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
                             <?php if (!empty($error_rfid)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
                             <?php endif; ?>
@@ -1071,6 +1167,32 @@ function populateGradeLevels(selectedTrack, selectedGrade = '') {
 }
 
 // Wait for DOM to be fully loaded
+// Populate helper: last school year (N years back)
+function populateLastSchoolYears(yearsBack = 5) {
+    const lastSySelect = document.getElementById('lastSchoolYearSelect');
+    if (!lastSySelect) return;
+    // Preserve the first placeholder option, clear the rest
+    while (lastSySelect.options.length > 1) lastSySelect.remove(1);
+    const now = new Date();
+    const year = now.getFullYear();
+    const savedLastSY = '<?= $form_data["last_school_year"] ?? "" ?>';
+    for (let i = yearsBack; i >= 1; i--) {
+        const start = year - i;
+        const end = year - i + 1;
+        const label = `${start}-${end}`;
+        const opt = document.createElement('option');
+        opt.value = label; opt.textContent = label;
+        if (savedLastSY && savedLastSY === label) opt.selected = true;
+        lastSySelect.appendChild(opt);
+    }
+    // Add current academic year as well (e.g., 2025-2026)
+    const currentLabel = `${year}-${year+1}`;
+    const curOpt = document.createElement('option');
+    curOpt.value = currentLabel; curOpt.textContent = currentLabel;
+    if (savedLastSY && savedLastSY === currentLabel) curOpt.selected = true;
+    lastSySelect.appendChild(curOpt);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Set up academic track change listener
     const academicTrack = document.querySelector('select[name="academic_track"]');
@@ -1085,6 +1207,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedGrade = '<?= $form_data["grade_level"] ?? "" ?>';
     if (savedTrack && academicTrack) {
         populateGradeLevels(savedTrack, savedGrade);
+    }
+
+    // Populate School Year dropdown: previous, current, next
+    const sySelect = document.getElementById('schoolYearSelect');
+    if (sySelect) {
+        // Determine academic year boundary (use calendar year; adjust if you have custom cutoff)
+        const now = new Date();
+        const year = now.getFullYear();
+        // Build labels like 2024-2025
+        const prev = `${year-1}-${year}`;
+        const curr = `${year}-${year+1}`;
+        const next = `${year+1}-${year+2}`;
+
+        const options = [prev, curr, next];
+        const savedSY = '<?= $form_data["school_year"] ?? "" ?>';
+        options.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val; opt.textContent = val;
+            if (savedSY && savedSY === val) opt.selected = true;
+            sySelect.appendChild(opt);
+        });
+        // If no saved selection, default to current
+        if (!savedSY) {
+            sySelect.value = curr;
+        }
     }
 });
 
@@ -1101,6 +1248,8 @@ function openModal(){
         if (savedTrack && academicTrack) {
             populateGradeLevels(savedTrack, savedGrade);
         }
+        // Ensure last school year is (re)populated when opening
+        populateLastSchoolYears(5);
     }, 100);
 }
 
