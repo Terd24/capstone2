@@ -16,19 +16,19 @@ $search_name = trim($_GET['search_name'] ?? '');
 $start_date  = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
 $end_date    = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
 
-// Build employee attendance query (teacher_attendance used for employees)
-$sql = "SELECT ta.*, e.first_name, e.last_name, e.id_number
-        FROM teacher_attendance ta
-        JOIN employees e ON e.id_number = ta.employee_id
-        WHERE (ta.time_in IS NOT NULL OR ta.time_out IS NOT NULL)";
+// Build employee attendance query (employee_attendance used for employees)
+$sql = "SELECT ea.*, e.first_name, e.last_name, e.id_number
+        FROM employee_attendance ea
+        JOIN employees e ON e.id_number = ea.employee_id
+        WHERE (ea.time_in IS NOT NULL OR ea.time_out IS NOT NULL)";
 $params = []; $types = '';
 
 if ($start_date !== '' && $end_date !== '') {
-    $sql .= " AND ta.date BETWEEN ? AND ?";
+    $sql .= " AND ea.date BETWEEN ? AND ?";
     $params[] = $start_date; $types .= 's';
     $params[] = $end_date;   $types .= 's';
 } else {
-    $sql .= " AND ta.date = ?";
+    $sql .= " AND ea.date = ?";
     $params[] = $today; $types .= 's';
 }
 
@@ -38,7 +38,7 @@ if ($search_name !== '') {
     $params[] = $like; $types .= 's';
 }
 
-$sql .= " ORDER BY ta.date DESC, ta.id DESC";
+$sql .= " ORDER BY ea.date DESC, ea.id DESC";
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) { $stmt->bind_param($types, ...$params); }
@@ -149,7 +149,23 @@ $records = $stmt->get_result();
                       $sd = $resWS->fetch_assoc();
                       $isVariableDays = (strcasecmp(trim((string)$sd['days']), 'Variable') === 0);
                       $placeholderTimes = ($sd['start_time'] === '00:00:00' && $sd['end_time'] === '23:59:59');
-                      $shiftType = ($isVariableDays || $placeholderTimes || $conn->query("SELECT COUNT(*) FROM employee_work_day_schedules WHERE schedule_id = {$sd['schedule_id']}")->fetch_assoc()['COUNT(*)'] > 0) ? 'Irregular' : 'Regular';
+                      // Check if there are day-specific schedules (with fallback if table doesn't exist)
+                      $dayScheduleCount = 0;
+                      try {
+                        $dayScheduleCheck = $conn->prepare("SELECT COUNT(*) as count FROM employee_work_day_schedules WHERE schedule_id = ?");
+                        if ($dayScheduleCheck) {
+                          $dayScheduleCheck->bind_param('i', $sd['schedule_id']);
+                          $dayScheduleCheck->execute();
+                          $dayResult = $dayScheduleCheck->get_result();
+                          if ($dayResult) {
+                            $dayScheduleCount = $dayResult->fetch_assoc()['count'];
+                          }
+                        }
+                      } catch (Exception $e) {
+                        // Table doesn't exist, assume regular schedule
+                        $dayScheduleCount = 0;
+                      }
+                      $shiftType = ($isVariableDays || $placeholderTimes || $dayScheduleCount > 0) ? 'Irregular' : 'Regular';
                       $shiftIn = $sd['start_time'];
                       $shiftOut = $sd['end_time'];
                       if (!empty($sd['days'])) {
@@ -157,15 +173,19 @@ $records = $stmt->get_result();
                         $hasDay = in_array($dayName, $daysArr, true) || $shiftType === 'Variable';
                       }
                       if (!empty($sd['schedule_id'])) {
-                        $ds = $conn->prepare("SELECT start_time, end_time FROM employee_work_day_schedules WHERE schedule_id = ? AND day_name = ? LIMIT 1");
-                        if ($ds) {
-                          $ds->bind_param('is', $sd['schedule_id'], $dayName);
-                          $ds->execute();
-                          $ovr = $ds->get_result();
-                          if ($ovr && $ovr->num_rows > 0) { $o=$ovr->fetch_assoc(); $shiftIn=$o['start_time']; $shiftOut=$o['end_time']; $hasDay=true; $shiftType = 'Irregular'; }
-                          // Also, if any day-specific rows exist at all, treat as Irregular
-                          $cntQ = $conn->prepare("SELECT COUNT(*) AS c FROM employee_work_day_schedules WHERE schedule_id = ?");
-                          if ($cntQ) { $cntQ->bind_param('i', $sd['schedule_id']); $cntQ->execute(); $cntRes = $cntQ->get_result(); if ($cntRes) { $rowCnt = $cntRes->fetch_assoc(); if ((int)$rowCnt['c'] > 0) { $shiftType = 'Irregular'; } } }
+                        try {
+                          $ds = $conn->prepare("SELECT start_time, end_time FROM employee_work_day_schedules WHERE schedule_id = ? AND day_name = ? LIMIT 1");
+                          if ($ds) {
+                            $ds->bind_param('is', $sd['schedule_id'], $dayName);
+                            $ds->execute();
+                            $ovr = $ds->get_result();
+                            if ($ovr && $ovr->num_rows > 0) { $o=$ovr->fetch_assoc(); $shiftIn=$o['start_time']; $shiftOut=$o['end_time']; $hasDay=true; $shiftType = 'Irregular'; }
+                            // Also, if any day-specific rows exist at all, treat as Irregular
+                            $cntQ = $conn->prepare("SELECT COUNT(*) AS c FROM employee_work_day_schedules WHERE schedule_id = ?");
+                            if ($cntQ) { $cntQ->bind_param('i', $sd['schedule_id']); $cntQ->execute(); $cntRes = $cntQ->get_result(); if ($cntRes) { $rowCnt = $cntRes->fetch_assoc(); if ((int)$rowCnt['c'] > 0) { $shiftType = 'Irregular'; } } }
+                          }
+                        } catch (Exception $e) {
+                          // Table doesn't exist, skip day-specific schedule lookup
                         }
                       }
                     }
@@ -190,8 +210,8 @@ $records = $stmt->get_result();
                 <td class="px-6 py-3 text-gray-800"><?= date('F j, Y', strtotime($r['date'])) ?></td>
                 <td class="px-6 py-3 text-gray-800"><?= htmlspecialchars($r['day'] ?: '-') ?></td>
                 <td class="px-6 py-3 text-gray-800"><?= htmlspecialchars($shiftType) ?></td>
-                <td class="px-6 py-3 text-gray-800"><?= $shiftIn ? date('g:i A', strtotime($shiftIn)) : '--' ?></td>
-                <td class="px-6 py-3 text-gray-800"><?= $shiftOut ? date('g:i A', strtotime($shiftOut)) : '--' ?></td>
+                <td class="px-6 py-3 text-gray-800"><?= ($hasDay && $shiftIn) ? date('g:i A', strtotime($shiftIn)) : '--' ?></td>
+                <td class="px-6 py-3 text-gray-800"><?= ($hasDay && $shiftOut) ? date('g:i A', strtotime($shiftOut)) : '--' ?></td>
                 <td class="px-6 py-3 "><?= $timeIn ? date('g:i A', strtotime($timeIn)) : '--' ?></td>
                 <td class="px-6 py-3 "><?= $timeOut ? date('g:i A', strtotime($timeOut)) : '--' ?></td>
                 <td class="px-6 py-3 "><?= number_format($reqHours, 2) ?></td>
@@ -202,7 +222,7 @@ $records = $stmt->get_result();
               </tr>
             <?php endwhile; ?>
           <?php else: ?>
-            <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">No attendance records found.</td></tr>
+            <tr><td colspan="13" class="px-6 py-8 text-center text-gray-500">No attendance records found.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>

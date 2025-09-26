@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 include("../StudentLogin/db_conn.php");
 
@@ -269,24 +269,29 @@ input[type=number] { -moz-appearance: textfield; }
                         PERSONAL INFORMATION
                     </h3>
                     <div class="grid grid-cols-3 gap-6">
-                        <!-- Row: ID Number, First Name, Last Name -->
+                        <!-- Row 1: ID Number, First Name, Middle Name -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Employee ID *</label>
-                            <input type="text" name="id_number" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="id_number" autocomplete="off" required maxlength="11" pattern="[0-9]{1,11}" title="Numbers only, maximum 11 digits" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] employee-id-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">First Name *</label>
-                            <input type="text" name="first_name" autocomplete="off" pattern="[A-Za-z\s]+" title="Letters only" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="first_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <input type="text" name="middle_name" autocomplete="off" pattern="[A-Za-z\s]*" maxlength="20" title="Letters only, maximum 20 characters" placeholder="Optional" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
+                        </div>
+                        
+                        <!-- Row 2: Last Name, Position, Department -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last Name *</label>
-                            <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\s]+" title="Letters only" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
 
-                        <!-- Row: Position, Department, Hire Date -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Position *</label>
-                            <input type="text" name="position" autocomplete="off" pattern="[A-Za-z\s]+" title="Letters only" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="text" name="position" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Department *</label>
@@ -301,26 +306,32 @@ input[type=number] { -moz-appearance: textfield; }
                                 <option value="Security">Security</option>
                             </select>
                         </div>
+                        
+                        <!-- Row 3: Hire Date, Email, Phone -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Hire Date *</label>
                             <input type="date" name="hire_date" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
 
-                        <!-- Row: Email, Phone -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Email </label>
-                            <input type="email" name="email" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <label class="block text-sm font-semibold mb-1">Email *</label>
+                            <input type="email" name="email" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Phone </label>
-                            <input type="text" name="phone" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" data-maxlen="11" title="Please enter exactly 11 digits (e.g., 09123456789)">
+                            <label class="block text-sm font-semibold mb-1">Phone *</label>
+                            <input type="text" name="phone" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] phone-input" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
                         </div>
-                        <div></div>
+                        
+                        <!-- Row 4: RFID -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">RFID *</label>
+                            <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] rfid-input" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" title="Please enter exactly 10 digits (numbers only)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
+                        </div>
 
                         <!-- Complete Address -->
                         <div class="col-span-3">
-                            <label class="block text-sm font-semibold mb-1">Complete Address </label>
-                            <textarea name="address" rows="3" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"></textarea>
+                            <label class="block text-sm font-semibold mb-1">Complete Address *</label>
+                            <textarea name="address" rows="3" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"></textarea>
                         </div>
                     </div>
                 </div>
@@ -360,14 +371,8 @@ input[type=number] { -moz-appearance: textfield; }
                                 <option value="cashier">Cashier</option>
                                 <option value="guidance">Guidance</option>
                                 <option value="attendance">Attendance</option>
-                                <option value="teacher">Teacher</option>
+                                <option value="employee">Employee</option>
                             </select>
-                        </div>
-
-                        <!-- RFID (required when role = Teacher) -->
-                        <div id="rfidField" class="col-span-1 hidden">
-                            <label class="block text-sm font-semibold mb-1">RFID</label>
-                            <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" placeholder="10 digits" data-maxlen="10" title="Please enter exactly 10 digits">
                         </div>
                     </div>
                 </div>
@@ -501,22 +506,23 @@ const rfidField = document.getElementById('rfidField');
 const rfidInput = document.getElementById('rfid_uid');
 
 function updateAccountFieldsVisibility() {
+    if (!createAccountChk || !accountFields) return;
     const show = createAccountChk.checked;
     accountFields.classList.toggle('hidden', !show);
     updateRFIDRequirement();
 }
 
 function updateRFIDRequirement() {
-    const isTeacher = roleSelect && roleSelect.value === 'teacher';
-    rfidField.classList.toggle('hidden', !(createAccountChk.checked && isTeacher));
-    if (rfidInput) {
-        rfidInput.required = createAccountChk.checked && isTeacher;
-    }
+    // After moving RFID into Personal Information, the old rfidField may not exist
+    if (!rfidField || !rfidInput) return;
+    // Always hide the old field if present and never require
+    rfidField.classList.add('hidden');
+    rfidInput.required = false;
 }
 
-createAccountChk.addEventListener('change', updateAccountFieldsVisibility);
+if (createAccountChk) createAccountFieldsBound = (createAccountChk.addEventListener('change', updateAccountFieldsVisibility), true);
 if (roleSelect) roleSelect.addEventListener('change', updateRFIDRequirement);
-updateAccountFieldsVisibility();
+try { updateAccountFieldsVisibility(); } catch(e) { /* no-op */ }
 
 // Show notification
 document.addEventListener('DOMContentLoaded', function() {
@@ -626,7 +632,10 @@ function showEmployeeDetailsModal(employee) {
                             <label class="block text-sm font-semibold mb-1">Hire Date</label>
                             <input type="date" id="hire_date_${employee.id_number}" value="${employee.hire_date}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
                         </div>
-                        <div></div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">RFID</label>
+                            <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" data-maxlen="10" title="Please enter exactly 10 digits">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -656,7 +665,7 @@ function showEmployeeDetailsModal(employee) {
                                 <option value="cashier" ${employee.account_role === 'cashier' ? 'selected' : ''}>Cashier</option>
                                 <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
                                 <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
-                                <option value="hr" ${employee.account_role === 'hr' ? 'selected' : ''}>HR</option>
+                                <option value="employee" ${employee.account_role === 'employee' ? 'selected' : ''}>Employee</option>
                             </select>
                         </div>
                         <div>
@@ -833,13 +842,21 @@ function closeDeleteEmployeeConfirmation() {
 }
 
 function removeEmployee(employeeId) {
+    console.log('Deleting employee:', employeeId);
     fetch('delete_employee.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `employee_id=${encodeURIComponent(employeeId)}`
     })
-    .then(r=>r.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data=>{
+        console.log('Response data:', data);
         if(data.success){
             closeDeleteEmployeeConfirmation();
             closeViewModal();
@@ -850,9 +867,10 @@ function removeEmployee(employeeId) {
             showToast(data.message || 'Error deleting employee', 'error');
         }
     })
-    .catch(()=>{
+    .catch(error=>{
+        console.error('Delete error:', error);
         closeDeleteEmployeeConfirmation();
-        showToast('Network error while deleting employee', 'error');
+        showToast('Network error while deleting employee: ' + error.message, 'error');
     });
 }
 
@@ -945,7 +963,7 @@ function showEditAccountModal(employee) {
                 <option value="cashier" ${employee.account_role === 'cashier' ? 'selected' : ''}>Cashier</option>
                 <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
                 <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
-                <option value="hr" ${employee.account_role === 'hr' ? 'selected' : ''}>HR</option>
+                <option value="employee" ${employee.account_role === 'employee' ? 'selected' : ''}>Employee</option>
             </select>
         </div>
     `;
@@ -975,7 +993,7 @@ function showCreateAccountModal(employee) {
                 <option value="cashier">Cashier</option>
                 <option value="guidance">Guidance</option>
                 <option value="attendance">Attendance</option>
-                <option value="hr">HR</option>
+                <option value="employee">Employee</option>
             </select>
         </div>
     `;
@@ -1242,7 +1260,28 @@ document.addEventListener('click', function(event) {
       clearTimeout(window.__toastTimer);
       window.__toastTimer = setTimeout(()=>{ t.classList.add('hidden'); }, 2000);
     }
+
+    // Additional input validation
+    document.addEventListener('DOMContentLoaded', function() {
+      // Restrict name inputs to letters only and max 20 characters
+      const nameInputs = document.querySelectorAll('.name-input');
+      nameInputs.forEach(input => {
+        input.addEventListener('input', function() {
+          this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 20);
+        });
+      });
+
+      // Employee ID validation - numbers only, max 11 digits
+      const empIdInput = document.querySelector('.employee-id-input');
+      if (empIdInput) {
+        empIdInput.addEventListener('input', function() {
+          this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+        });
+      }
+    });
   </script>
 </div>
 </body>
 </html>
+
+

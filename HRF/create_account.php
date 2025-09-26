@@ -48,7 +48,7 @@ if ($result->num_rows > 0) {
 }
 
 // Validate role
-$valid_roles = ['registrar', 'cashier', 'guidance', 'attendance', 'hr'];
+$valid_roles = ['registrar', 'cashier', 'guidance', 'attendance', 'employee'];
 if (!in_array($role, $valid_roles)) {
     echo json_encode(['success' => false, 'message' => 'Invalid role']);
     exit;

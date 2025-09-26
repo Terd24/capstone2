@@ -7,28 +7,27 @@ $today = date('Y-m-d');
 
 // Handle AJAX requests
 if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
-    // This is an AJAX request, only return the table content
     $ajax_request = true;
 } else {
     $ajax_request = false;
 }
 
-// Latest teacher for today (if someone just tapped)
-$latest_teacher = null;
-if (isset($_SESSION['show_latest_teacher']) && $_SESSION['show_latest_teacher']) {
-    $latest_teacher_query = $conn->prepare("\n        SELECT ta.*, e.first_name, e.last_name,\n               GREATEST(\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ta.date, ' ', ta.time_in)), 0),\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ta.date, ' ', ta.time_out)), 0)\n               ) as last_activity\n        FROM teacher_attendance ta\n        JOIN employees e ON ta.employee_id = e.id_number\n        WHERE ta.date = ? \n        ORDER BY last_activity DESC, ta.id DESC\n        LIMIT 1\n    ");
-    $latest_teacher_query->bind_param("s", $today);
-    $latest_teacher_query->execute();
-    $latest_teacher_result = $latest_teacher_query->get_result();
-    $latest_teacher = $latest_teacher_result->num_rows > 0 ? $latest_teacher_result->fetch_assoc() : null;
+// Latest employee for today (if someone just tapped)
+$latest_employee = null;
+if (isset($_SESSION['show_latest_employee']) && $_SESSION['show_latest_employee']) {
+    $latest_employee_query = $conn->prepare("\n        SELECT ea.*, e.first_name, e.last_name,\n               GREATEST(\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ea.date, ' ', ea.time_in)), 0),\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ea.date, ' ', ea.time_out)), 0)\n               ) as last_activity\n        FROM employee_attendance ea\n        JOIN employees e ON ea.employee_id = e.id_number\n        WHERE ea.date = ? \n        ORDER BY last_activity DESC, ea.id DESC\n        LIMIT 1\n    ");
+    $latest_employee_query->bind_param("s", $today);
+    $latest_employee_query->execute();
+    $latest_employee_result = $latest_employee_query->get_result();
+    $latest_employee = $latest_employee_result->num_rows > 0 ? $latest_employee_result->fetch_assoc() : null;
 }
 
-// Handle clearing the student/teacher display flags
+// Handle clearing the student/employee display flags
 if (isset($_GET['clear_student'])) {
     unset($_SESSION['show_latest_student']);
-    unset($_SESSION['show_latest_teacher']);
+    unset($_SESSION['show_latest_employee']);
     unset($_SESSION['view_role']);
-    unset($_SESSION['last_teacher_id']);
+    unset($_SESSION['last_employee_id']);
     unset($_SESSION['success']);
     unset($_SESSION['error']);
     exit();
@@ -39,33 +38,31 @@ if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['registrar', 'adm
     header("Location: ../login.php");
     exit();
 }
-
 // Handle RFID scanning
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
     $rfid = strtoupper(trim($_POST['rfid']));
     
-    // First, try TEACHER by RFID
-    $teacher_query = $conn->prepare("
+    // First, try EMPLOYEE by RFID (any role). We use the employee_attendance table for employees.
+    $employee_query = $conn->prepare("
         SELECT e.id_number, e.first_name, e.last_name, TRIM(UPPER(e.rfid_uid)) AS db_rfid
         FROM employees e
-        JOIN employee_accounts ea ON ea.employee_id = e.id_number AND ea.role = 'teacher'
         WHERE TRIM(UPPER(e.rfid_uid)) = ?
     ");
-    $teacher_query->bind_param("s", $rfid);
-    $teacher_query->execute();
-    $teacher_result = $teacher_query->get_result();
-    if ($teacher_result && $teacher_result->num_rows > 0) {
-        $teacher = $teacher_result->fetch_assoc();
-        $emp_id = $teacher['id_number'];
-        $teacher_name = trim($teacher['first_name'] . ' ' . $teacher['last_name']);
+    $employee_query->bind_param("s", $rfid);
+    $employee_query->execute();
+    $employee_result = $employee_query->get_result();
+    if ($employee_result && $employee_result->num_rows > 0) {
+        $employee = $employee_result->fetch_assoc();
+        $emp_id = $employee['id_number'];
+        $employee_name = trim($employee['first_name'] . ' ' . $employee['last_name']);
 
         date_default_timezone_set('Asia/Manila');
         $today = date("Y-m-d");
         $time = date("H:i:s");
         $day = date("l");
 
-        // Time in/out for teacher_attendance
-        $t_check = $conn->prepare("SELECT * FROM teacher_attendance WHERE employee_id = ? AND date = ? LIMIT 1");
+        // Time in/out for employee_attendance
+        $t_check = $conn->prepare("SELECT * FROM employee_attendance WHERE employee_id = ? AND date = ? LIMIT 1");
         $t_check->bind_param("ss", $emp_id, $today);
         $t_check->execute();
         $t_res = $t_check->get_result();
@@ -73,27 +70,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
             $row = $t_res->fetch_assoc();
             if (empty($row['time_in'])) {
                 // No time in yet -> record time in
-                $upd = $conn->prepare("UPDATE teacher_attendance SET time_in = ? WHERE id = ?");
+                $upd = $conn->prepare("UPDATE employee_attendance SET time_in = ? WHERE id = ?");
                 $upd->bind_param("si", $time, $row['id']);
                 $upd->execute();
-                $_SESSION['success'] = "Time In recorded for $teacher_name at " . date('g:i A', strtotime($time));
+                $_SESSION['success'] = "Time In recorded for $employee_name at " . date('g:i A', strtotime($time));
             } else {
                 // Has time in -> always update time out to latest tap (mirror student behavior)
-                $upd = $conn->prepare("UPDATE teacher_attendance SET time_out = ? WHERE id = ?");
+                $upd = $conn->prepare("UPDATE employee_attendance SET time_out = ? WHERE id = ?");
                 $upd->bind_param("si", $time, $row['id']);
                 $upd->execute();
-                $_SESSION['success'] = "Time Out recorded for $teacher_name at " . date('g:i A', strtotime($time));
+                $_SESSION['success'] = "Time Out recorded for $employee_name at " . date('g:i A', strtotime($time));
             }
         } else {
-            $ins = $conn->prepare("INSERT INTO teacher_attendance (employee_id, date, day, time_in) VALUES (?,?,?,?)");
+            $ins = $conn->prepare("INSERT INTO employee_attendance (employee_id, date, day, time_in) VALUES (?,?,?,?)");
             $ins->bind_param("ssss", $emp_id, $today, $day, $time);
             $ins->execute();
-            $_SESSION['success'] = "Time In recorded for $teacher_name at " . date('g:i A', strtotime($time));
+            $_SESSION['success'] = "Time In recorded for $employee_name at " . date('g:i A', strtotime($time));
         }
 
-        $_SESSION['show_latest_teacher'] = true;
-        $_SESSION['view_role'] = 'teacher';
-        $_SESSION['last_teacher_id'] = $emp_id;
+        $_SESSION['show_latest_employee'] = true;
+        $_SESSION['view_role'] = 'employee';
+        $_SESSION['last_employee_id'] = $emp_id;
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
@@ -109,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
     $student_result = $student_query->get_result();
     
     if ($student_result->num_rows === 0) {
-        $_SESSION['error'] = "RFID card not registered to any student or teacher.";
+        $_SESSION['error'] = "RFID card not registered to any student or employee.";
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
@@ -295,9 +292,9 @@ $end_date = $_GET['end_date'] ?? null;
 $view_role = $_SESSION['view_role'] ?? 'student';
 
 // Build query for attendance records depending on role (exclude absent records)
-if ($view_role === 'teacher') {
+if ($view_role === 'employee') {
     $sql = "SELECT ta.*, e.first_name, e.last_name 
-            FROM teacher_attendance ta
+            FROM employee_attendance ta
             JOIN employees e ON ta.employee_id = e.id_number
             WHERE (ta.time_in IS NOT NULL OR ta.time_out IS NOT NULL)";
 } else {
@@ -311,20 +308,20 @@ $param_types = "";
 
 // Add date filtering
 if ($start_date && $end_date) {
-    $sql .= ($view_role === 'teacher') ? " AND ta.date BETWEEN ? AND ?" : " AND ar.date BETWEEN ? AND ?";
+    $sql .= ($view_role === 'employee') ? " AND ta.date BETWEEN ? AND ?" : " AND ar.date BETWEEN ? AND ?";
     $params[] = $start_date;
     $params[] = $end_date;
     $param_types .= "ss";
 } else {
     // Default to today if no date range specified
-    $sql .= ($view_role === 'teacher') ? " AND ta.date = ?" : " AND ar.date = ?";
+    $sql .= ($view_role === 'employee') ? " AND ta.date = ?" : " AND ar.date = ?";
     $params[] = $today;
     $param_types .= "s";
 }
 
 // Add name search filtering
 if ($search_name) {
-    if ($view_role === 'teacher') {
+    if ($view_role === 'employee') {
         $sql .= " AND CONCAT(e.first_name, ' ', e.last_name) LIKE ?";
     } else {
         $sql .= " AND (CONCAT(sa.first_name, ' ', sa.middle_name, ' ', sa.last_name) LIKE ? 
@@ -332,13 +329,13 @@ if ($search_name) {
     }
     $search_param = "%" . $search_name . "%";
     $params[] = $search_param;
-    if ($view_role !== 'teacher') {
+    if ($view_role !== 'employee') {
         $params[] = $search_param;
     }
-    $param_types .= ($view_role === 'teacher') ? "s" : "ss";
+    $param_types .= ($view_role === 'employee') ? "s" : "ss";
 }
 
-$sql .= ($view_role === 'teacher') ? " ORDER BY ta.date DESC, ta.id DESC" : " ORDER BY ar.date DESC, ar.id DESC";
+$sql .= ($view_role === 'employee') ? " ORDER BY ta.date DESC, ta.id DESC" : " ORDER BY ar.date DESC, ar.id DESC";
 
 $attendance_query = $conn->prepare($sql);
 if (!empty($params)) {
@@ -472,10 +469,10 @@ $attendance_records = $attendance_query->get_result();
                 </div>
             </div>
             
-            <?php if (($view_role ?? 'student') === 'teacher' && isset($latest_teacher) && $latest_teacher): ?>
+            <?php if (($view_role ?? 'student') === 'employee' && isset($latest_employee) && $latest_employee): ?>
             <?php
               // Build employee display similar to HR logic
-              $empId = $latest_teacher['employee_id'];
+              $empId = $latest_employee['employee_id'];
               $dayName = date('l', strtotime($today));
               $shiftIn = null; $shiftOut = null; $hasDay = false;
               $ws = $conn->prepare("SELECT ws.start_time, ws.end_time, ws.days, ws.id AS schedule_id
@@ -501,8 +498,8 @@ $attendance_records = $attendance_query->get_result();
                   }
                 }
               }
-              $empTimeIn = $latest_teacher['time_in'];
-              $empTimeOut = $latest_teacher['time_out'];
+              $empTimeIn = $latest_employee['time_in'];
+              $empTimeOut = $latest_employee['time_out'];
               $empStatus = (!empty($empTimeIn) && !empty($empTimeOut)) ? 'Present' : ((!empty($empTimeIn)) ? 'Time In Only' : '—');
               $empStatusColor = ($empStatus==='Present') ? 'text-green-600' : (($empStatus==='Time In Only')?'text-blue-600':'text-gray-600');
             ?>
@@ -531,7 +528,7 @@ $attendance_records = $attendance_query->get_result();
                     <div class="bg-blue-50 rounded-lg p-2.5 border border-blue-100 md:col-span-2">
                         <p class="text-sm text-gray-600 mb-1">Employee</p>
                         <p class="font-semibold text-gray-900">
-                          <?= htmlspecialchars(trim(($latest_teacher['first_name'] ?? '') . ' ' . ($latest_teacher['last_name'] ?? ''))) ?>
+                          <?= htmlspecialchars(trim(($latest_employee['first_name'] ?? '') . ' ' . ($latest_employee['last_name'] ?? ''))) ?>
                         </p>
                     </div>
                 </div>
@@ -721,7 +718,7 @@ $attendance_records = $attendance_query->get_result();
             <!-- Search and Filter Form -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-6">
                 <div>
-                    <label for="search-name" class="text-sm font-medium text-gray-700 block mb-2"><?php echo ($view_role === 'teacher') ? 'Search Teacher' : 'Search Student'; ?></label>
+                    <label for="search-name" class="text-sm font-medium text-gray-700 block mb-2"><?php echo ($view_role === 'employee') ? 'Search Employee' : 'Search Student'; ?></label>
                     <input type="text" id="search-name" name="search_name" value="<?= htmlspecialchars($search_name) ?>" 
                            placeholder="Enter student name..."
                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
@@ -894,13 +891,13 @@ $attendance_records = $attendance_query->get_result();
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="<?= ($view_role === 'teacher') ? 13 : 8 ?>" class="px-6 py-12 text-center">
+                            <td colspan="<?= ($view_role === 'employee') ? 13 : 8 ?>" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center">
                                     <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                     </svg>
                                     <p class="text-gray-500 font-medium">No attendance records for today</p>
-                                    <p class="text-gray-400 text-sm mt-1"><?php echo ($view_role==='teacher') ? 'Teachers will appear here when they tap their RFID cards' : 'Students will appear here when they tap their RFID cards'; ?></p>
+                                    <p class="text-gray-400 text-sm mt-1"><?php echo ($view_role==='employee') ? 'Employees will appear here when they tap their RFID cards' : 'Students will appear here when they tap their RFID cards'; ?></p>
                                 </div>
                             </td>
                         </tr>
