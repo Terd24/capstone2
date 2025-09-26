@@ -9,7 +9,7 @@ if ($conn->connect_error) {
 
 // 🚫 If already logged in, redirect directly to dashboard
 if (isset($_SESSION['role'])) {
-    switch ($_SESSION['role']) {
+    switch (strtolower($_SESSION['role'])) {
         case 'student':
             header("Location: studentDashboard.php");
             exit;
@@ -31,6 +31,9 @@ if (isset($_SESSION['role'])) {
         case 'hr':
             header("Location: ../HRF/Dashboard.php");
             exit;
+        case 'employee':
+            header("Location: ../EmployeePortal/AttendanceRecords.php");
+            exit;
     }
 }
 
@@ -38,6 +41,28 @@ if (isset($_SESSION['role'])) {
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 header("Expires: 0");
+
+// Helper: log successful logins for reporting (Super Admin dashboard)
+function log_login($conn, $userType, $idNumber, $username, $role) {
+    // Create table if not exists (idempotent)
+    $conn->query("CREATE TABLE IF NOT EXISTS login_activity (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_type VARCHAR(20) NOT NULL,
+        id_number VARCHAR(50) NOT NULL,
+        username VARCHAR(100) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        login_time DATETIME NOT NULL,
+        session_id VARCHAR(128) NULL,
+        INDEX idx_login_date (login_time),
+        INDEX idx_id_number (id_number)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    if ($stmt = $conn->prepare("INSERT INTO login_activity (user_type, id_number, username, role, login_time, session_id) VALUES (?,?,?,?,NOW(),?)")) {
+        $sid = session_id();
+        $stmt->bind_param('sssss', $userType, $idNumber, $username, $role, $sid);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
 
 // 🔑 Handle login submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -50,14 +75,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit;
     }
 
-    // Use prepared statements for security
-    // 1️⃣ Check student account
+    $usernameFound = false;
+
+    // 1️⃣ Try student
     $stmt = $conn->prepare("SELECT * FROM student_account WHERE username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
-    
     if ($result->num_rows > 0) {
+        $usernameFound = true;
         $row = $result->fetch_assoc();
         if (password_verify($password, $row['password'])) {
             $_SESSION['student_id'] = $row['id'];
@@ -71,28 +97,61 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['last_name'] = $row['last_name'];
             $_SESSION['grade_level'] = $row['grade_level'];
             $_SESSION['role'] = 'student';
+            // Log student login
+            log_login($conn, 'student', $row['id_number'], $row['username'], 'student');
             echo json_encode(['status'=>'success','redirect'=>'studentDashboard.php']);
             exit;
-        } else { 
-            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
-            exit; 
         }
     }
 
-    // 2️⃣ Check employee accounts (registrar, cashier, guidance, attendance, hr)
+    // 2️⃣ Try super_admins (dedicated Super Admin table)
+    $stmt = $conn->prepare("CREATE TABLE IF NOT EXISTS super_admins (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        first_name VARCHAR(100) NULL,
+        last_name VARCHAR(100) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    if ($stmt) { $stmt->execute(); $stmt->close(); }
+
+    $stmt = $conn->prepare("SELECT * FROM super_admins WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $usernameFound = true;
+        $row = $result->fetch_assoc();
+        if (password_verify($password, $row['password'])) {
+            $full_name = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+            $_SESSION['superadmin_id'] = $row['id'];
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['first_name'] = $row['first_name'] ?? 'Super';
+            $_SESSION['last_name'] = $row['last_name'] ?? 'Admin';
+            $_SESSION['role'] = 'superadmin';
+
+            // Log superadmin login
+            log_login($conn, 'superadmin', 'SA001', $row['username'], 'superadmin');
+
+            echo json_encode(['status' => 'success','redirect' => '../AdminF/SuperAdminDashboard.php']);
+            exit;
+        }
+    }
+
+    // 3️⃣ Try employee_accounts (registrar, cashier, guidance, attendance, hr, teacher, employee)
     $stmt = $conn->prepare("SELECT ea.*, e.first_name, e.last_name, e.id_number FROM employee_accounts ea 
                            JOIN employees e ON ea.employee_id = e.id_number 
                            WHERE ea.username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
-    
     if ($result->num_rows > 0) {
+        $usernameFound = true;
         $row = $result->fetch_assoc();
         if (password_verify($password, $row['password'])) {
-            $role = $row['role'];
+            $role = strtolower(trim((string)$row['role']));
             $full_name = $row['first_name'] . ' ' . $row['last_name'];
-            
+
             // Set common session variables
             $_SESSION['employee_id'] = $row['id'];
             $_SESSION['id_number'] = $row['id_number'];
@@ -100,8 +159,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['first_name'] = $row['first_name'];
             $_SESSION['last_name'] = $row['last_name'];
             $_SESSION['role'] = $role;
-            
-            // Set role-specific session variables for backward compatibility
+
+            // Log employee/superadmin login
+            log_login($conn, 'employee', $row['id_number'], $row['username'], $role);
+
+            // Role routing
             switch($role) {
                 case 'registrar':
                     $_SESSION['registrar_id'] = $row['id'];
@@ -128,23 +190,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_SESSION['hr_name'] = $full_name;
                     echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
                     break;
+                case 'teacher':
+                    echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
+                    break;
+                case 'employee':
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
+                    break;
                 default:
-                    echo json_encode(['status'=>'error','message'=>'Invalid role assigned.']);
+                    // Fallback: treat any unexpected role as a generic employee portal access
+                    // Log for later clean-up
+                    error_log('Unknown employee role: ' . print_r($row['role'], true) . ' for username ' . $row['username']);
+                    $_SESSION['role'] = 'employee';
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
             }
             exit;
-        } else { 
-            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
-            exit; 
         }
     }
 
-    // 3️⃣ Check parent account
+    // 3️⃣ Try parent
     $stmt = $conn->prepare("SELECT * FROM parent_account WHERE username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
-    
     if ($result->num_rows > 0) {
+        $usernameFound = true;
         $row = $result->fetch_assoc();
         if (password_verify($password, $row['password'])) {
             $_SESSION['parent_id'] = $row['parent_id'];
@@ -158,13 +227,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['role'] = 'parent';
             echo json_encode(['status' => 'success','redirect' => '../ParentLogin/ParentDashboard.php']);
             exit;
-        } else { 
-            echo json_encode(['status'=>'error','message'=>'Incorrect password.']); 
-            exit; 
         }
     }
 
-    echo json_encode(['status'=>'error','message'=>'Username not found.']);
+    // Final decision
+    if ($usernameFound) {
+        echo json_encode(['status'=>'error','message'=>'Incorrect password.']);
+    } else {
+        echo json_encode(['status'=>'error','message'=>'Username not found.']);
+    }
     exit;
 }
 ?>
@@ -176,6 +247,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
   <title>Login - Cornerstone College Inc.</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" type="image/png" href="../images/LogoCCI.png">
+  <link rel="manifest" href="/onecci/manifest.webmanifest">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/onecci/sw.js').catch(console.error);
+      });
+    }
+  </script>
   <style>
     .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
     .card-shadow { box-shadow: 0 20px 40px rgba(0,0,0,0.1); }

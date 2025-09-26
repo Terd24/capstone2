@@ -1,4 +1,4 @@
-    <?php
+﻿<?php
 session_start();
 include("../StudentLogin/db_conn.php");
 

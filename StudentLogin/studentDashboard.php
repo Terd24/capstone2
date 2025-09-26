@@ -53,6 +53,14 @@ $all_stmt->close();
   <title>Student Portal - Cornerstone College Inc.</title>
   <link rel="icon" type="image/png" href="../images/LogoCCI.png">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="manifest" href="/onecci/manifest.webmanifest">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/onecci/sw.js').catch(console.error);
+      });
+    }
+  </script>
   <style>
 
     .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }

@@ -1,0 +1,22 @@
+{
+  "name": "OneCCI",
+  "short_name": "OneCCI",
+  "description": "Cornerstone College Inc. portal (Registrar, HR, Student)",
+  "start_url": "/onecci/StudentLogin/login.php",
+  "scope": "/onecci/",
+  "display": "standalone",
+  "background_color": "#0B2C62",
+  "theme_color": "#0B2C62",
+  "icons": [
+    {
+      "src": "/onecci/images/LogoCCI.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/onecci/images/LogoCCI.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
