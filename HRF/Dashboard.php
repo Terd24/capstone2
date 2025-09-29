@@ -2,8 +2,8 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Require HR login
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'hr') {
+// Require HR login or Super Admin (Principal/Owner) access
+if (!isset($_SESSION['role']) || ($_SESSION['role'] !== 'hr' && $_SESSION['role'] !== 'superadmin')) {
     header("Location: ../StudentLogin/login.php");
     exit;
 }

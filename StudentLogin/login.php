@@ -125,9 +125,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (password_verify($password, $row['password'])) {
             $full_name = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
             $_SESSION['superadmin_id'] = $row['id'];
+            $_SESSION['superadmin_name'] = $full_name ?: 'Principal/Owner';
             $_SESSION['username'] = $row['username'];
-            $_SESSION['first_name'] = $row['first_name'] ?? 'Super';
-            $_SESSION['last_name'] = $row['last_name'] ?? 'Admin';
+            $_SESSION['first_name'] = $row['first_name'] ?? 'Principal';
+            $_SESSION['last_name'] = $row['last_name'] ?? 'Owner';
             $_SESSION['role'] = 'superadmin';
 
             // Log superadmin login

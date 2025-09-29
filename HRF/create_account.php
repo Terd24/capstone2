@@ -2,8 +2,8 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Require HR login
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'hr') {
+// Require HR login or Super Admin access
+if (!isset($_SESSION['role']) || ($_SESSION['role'] !== 'hr' && $_SESSION['role'] !== 'superadmin')) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit;
 }

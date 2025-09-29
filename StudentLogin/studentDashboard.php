@@ -62,8 +62,100 @@ $all_stmt->close();
     }
   </script>
   <style>
-
     .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    
+    /* Mobile PWA optimizations - only applies on phones */
+    @media (max-width: 768px) {
+      /* Compact header for mobile */
+      header .container {
+        padding: 0.75rem 1rem !important;
+      }
+      
+      /* Smaller welcome text */
+      header .text-left p:first-child {
+        font-size: 0.75rem !important;
+      }
+      
+      header .text-left p:last-child {
+        font-size: 0.875rem !important;
+      }
+      
+      /* Mobile: Hide school name text, show only logo */
+      header .text-right {
+        display: none !important;
+      }
+      
+      /* Make logo more prominent on mobile */
+      header img {
+        height: 2.5rem !important;
+        width: 2.5rem !important;
+        margin-left: 0.5rem !important;
+      }
+      }
+      }
+      header button {
+        padding: 0.375rem !important;
+      }
+      
+      header button svg {
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+      }
+      
+      /* Smaller notification badge */
+      #notifBellCount {
+        height: 1rem !important;
+        width: 1rem !important;
+        font-size: 0.625rem !important;
+      }
+      
+      /* Reduce spacing between elements */
+      header .space-x-4 > * + * {
+        margin-left: 0.5rem !important;
+      }
+      
+      /* Stack profile info more compactly */
+      .lg\:col-span-1 .bg-white {
+        padding: 1rem !important;
+      }
+      
+      /* Smaller profile avatar on mobile */
+      .lg\:col-span-1 .w-20 {
+        width: 4rem !important;
+        height: 4rem !important;
+      }
+      
+      .lg\:col-span-1 .w-10 {
+        width: 2rem !important;
+        height: 2rem !important;
+      }
+      
+      /* Compact dashboard cards on mobile */
+      .lg\:col-span-3 .grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem !important;
+      }
+      
+      .lg\:col-span-3 .bg-white {
+        padding: 1rem !important;
+      }
+      
+      .lg\:col-span-3 .w-12 {
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+      }
+      
+      .lg\:col-span-3 .w-6 {
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+      }
+      
+      /* Smaller dashboard title */
+      .lg\:col-span-3 h2 {
+        font-size: 1.25rem !important;
+        margin-bottom: 1rem !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
