@@ -91,8 +91,8 @@ $all_stmt->close();
         width: 2.5rem !important;
         margin-left: 0.5rem !important;
       }
-      }
-      }
+      
+      /* Compact notification and menu buttons */
       header button {
         padding: 0.375rem !important;
       }
