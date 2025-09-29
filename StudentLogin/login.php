@@ -7,6 +7,63 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Check if system is in maintenance mode
+function is_maintenance_mode($conn) {
+    // Ensure system_config table exists
+    $conn->query("CREATE TABLE IF NOT EXISTS system_config (
+        config_key VARCHAR(50) PRIMARY KEY,
+        config_value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )");
+    
+    $result = $conn->query("SELECT config_value FROM system_config WHERE config_key = 'maintenance_mode'");
+    if ($result && $row = $result->fetch_assoc()) {
+        return (bool) $row['config_value'];
+    }
+    return false;
+}
+
+// Check maintenance mode for non-superadmin users
+if (is_maintenance_mode($conn)) {
+    // Allow superadmin to bypass maintenance mode
+    if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin') {
+        // Show maintenance page for all other users
+        ?><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Maintenance - Cornerstone College Inc.</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+        <div class="mb-6">
+            <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-20 w-20 mx-auto rounded-full bg-blue-100 p-2">
+        </div>
+        <div class="mb-6">
+            <svg class="w-16 h-16 mx-auto text-amber-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">System Under Maintenance</h1>
+            <p class="text-gray-600 mb-4">We're currently performing system maintenance to improve your experience.</p>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p class="text-blue-800 text-sm">
+                    <strong>Cornerstone College Inc.</strong><br>
+                    The system will be back online shortly. Please try again later.
+                </p>
+            </div>
+        </div>
+        <div class="text-sm text-gray-500">
+            <p>If you need immediate assistance, please contact the IT department.</p>
+        </div>
+    </div>
+</body>
+</html><?php
+        exit;
+    }
+}
+
 // 🚫 If already logged in, redirect directly to dashboard
 if (isset($_SESSION['role'])) {
     switch (strtolower($_SESSION['role'])) {

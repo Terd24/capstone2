@@ -53,16 +53,185 @@ $conn->query("CREATE TABLE IF NOT EXISTS login_activity (
   INDEX idx_id_number (id_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-// Metrics
-$total_students  = (int) ($conn->query("SELECT COUNT(*) FROM student_account")->fetch_row()[0] ?? 0);
+// Enhanced Metrics for System-Wide Overview
+
+// 1. ENROLLMENT STATISTICS
+$total_students = (int) ($conn->query("SELECT COUNT(*) FROM student_account")->fetch_row()[0] ?? 0);
 $total_employees = (int) ($conn->query("SELECT COUNT(*) FROM employees")->fetch_row()[0] ?? 0);
-$student_taps_td = (int) (q_scalar($conn, "SELECT COUNT(*) FROM attendance_record WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
-// Prefer employee_attendance; fall back to teacher_attendance
+
+// Enrollment by Grade Level
+$enrollment_by_grade = [];
+$grade_result = $conn->query("SELECT grade_level, COUNT(*) as count FROM student_account GROUP BY grade_level ORDER BY grade_level");
+if ($grade_result) {
+    while ($row = $grade_result->fetch_assoc()) {
+        $enrollment_by_grade[] = $row;
+    }
+}
+
+// Enrollment by Program/Track
+$enrollment_by_program = [];
+$program_result = $conn->query("SELECT academic_track, COUNT(*) as count FROM student_account GROUP BY academic_track ORDER BY count DESC");
+if ($program_result) {
+    while ($row = $program_result->fetch_assoc()) {
+        $enrollment_by_program[] = $row;
+    }
+}
+
+// 2. TUITION PAYMENT REPORTS
+$total_payments_today = 0;
+$total_revenue_today = 0;
+$pending_balances = 0;
+$total_revenue_month = 0;
+
+// Check if payment tables exist and get correct column names
+if (table_exists($conn, 'student_payments')) {
+    // Check what columns exist in student_payments table
+    $payment_date_col = null;
+    $amount_col = null;
+    
+    $columns_result = $conn->query("SHOW COLUMNS FROM student_payments");
+    $available_columns = [];
+    if ($columns_result) {
+        while ($col = $columns_result->fetch_assoc()) {
+            $available_columns[] = $col['Field'];
+        }
+        
+        // Determine correct date column
+        if (in_array('payment_date', $available_columns)) {
+            $payment_date_col = 'payment_date';
+        } elseif (in_array('created_at', $available_columns)) {
+            $payment_date_col = 'created_at';
+        } elseif (in_array('date_paid', $available_columns)) {
+            $payment_date_col = 'date_paid';
+        } elseif (in_array('timestamp', $available_columns)) {
+            $payment_date_col = 'timestamp';
+        } elseif (in_array('date', $available_columns)) {
+            $payment_date_col = 'date';
+        }
+        
+        // Determine correct amount column
+        if (in_array('amount_paid', $available_columns)) {
+            $amount_col = 'amount_paid';
+        } elseif (in_array('amount', $available_columns)) {
+            $amount_col = 'amount';
+        } elseif (in_array('payment_amount', $available_columns)) {
+            $amount_col = 'payment_amount';
+        } elseif (in_array('total_amount', $available_columns)) {
+            $amount_col = 'total_amount';
+        }
+    }
+    
+    // Only run queries if we found the required columns
+    if ($payment_date_col && $amount_col) {
+        try {
+            $total_payments_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM student_payments WHERE DATE($payment_date_col) = ?", 's', $today) ?? 0);
+            $total_revenue_today = (float) (q_scalar($conn, "SELECT SUM($amount_col) FROM student_payments WHERE DATE($payment_date_col) = ?", 's', $today) ?? 0);
+            $total_revenue_month = (float) (q_scalar($conn, "SELECT SUM($amount_col) FROM student_payments WHERE MONTH($payment_date_col) = MONTH(CURDATE()) AND YEAR($payment_date_col) = YEAR(CURDATE())", '') ?? 0);
+        } catch (Exception $e) {
+            // Fallback to 0 if queries fail
+            $total_payments_today = 0;
+            $total_revenue_today = 0;
+            $total_revenue_month = 0;
+        }
+    } else {
+        // Table exists but doesn't have expected columns - just count all records
+        try {
+            $total_payments_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM student_payments", '') ?? 0);
+        } catch (Exception $e) {
+            $total_payments_today = 0;
+        }
+    }
+}
+
+if (table_exists($conn, 'student_fee_items')) {
+    try {
+        // Check columns in student_fee_items table
+        $fee_columns_result = $conn->query("SHOW COLUMNS FROM student_fee_items");
+        $fee_columns = [];
+        if ($fee_columns_result) {
+            while ($col = $fee_columns_result->fetch_assoc()) {
+                $fee_columns[] = $col['Field'];
+            }
+        }
+        
+        // Build query based on available columns
+        if (in_array('amount_due', $fee_columns) && in_array('paid', $fee_columns)) {
+            $pending_balances = (float) (q_scalar($conn, "SELECT SUM(amount_due - paid) FROM student_fee_items WHERE amount_due > paid", '') ?? 0);
+        } elseif (in_array('amount_due', $fee_columns) && in_array('amount_paid', $fee_columns)) {
+            $pending_balances = (float) (q_scalar($conn, "SELECT SUM(amount_due - amount_paid) FROM student_fee_items WHERE amount_due > amount_paid", '') ?? 0);
+        } elseif (in_array('fee_amount', $fee_columns)) {
+            $pending_balances = (float) (q_scalar($conn, "SELECT SUM(fee_amount) FROM student_fee_items", '') ?? 0);
+        } elseif (in_array('amount', $fee_columns)) {
+            $pending_balances = (float) (q_scalar($conn, "SELECT SUM(amount) FROM student_fee_items", '') ?? 0);
+        } else {
+            $pending_balances = 0; // Fallback if columns don't match expected structure
+        }
+    } catch (Exception $e) {
+        $pending_balances = 0; // Fallback on any error
+    }
+}
+
+// 3. ATTENDANCE LOGS
+$student_attendance_today = 0;
+$student_present_today = 0;
+$student_absent_today = $total_students;
+
+if (table_exists($conn, 'attendance_record')) {
+    try {
+        $student_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM attendance_record WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
+        $student_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM attendance_record WHERE date = ? AND time_in IS NOT NULL", 's', $today) ?? 0);
+        $student_absent_today = $total_students - $student_present_today;
+    } catch (Exception $e) {
+        // Fallback values already set above
+    }
+}
+
+// Employee Attendance
 $empAttTable = table_exists($conn, 'employee_attendance') ? 'employee_attendance' : (table_exists($conn, 'teacher_attendance') ? 'teacher_attendance' : null);
+$employee_attendance_today = 0;
+$employee_present_today = 0;
 if ($empAttTable) {
-    $employee_taps_td= (int) (q_scalar($conn, "SELECT COUNT(*) FROM `$empAttTable` WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
-} else {
-    $employee_taps_td = 0;
+    $employee_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM `$empAttTable` WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
+    $employee_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM `$empAttTable` WHERE date = ? AND time_in IS NOT NULL", 's', $today) ?? 0);
+}
+$employee_absent_today = $total_employees - $employee_present_today;
+
+// 4. SYSTEM HEALTH MONITORING
+$db_size = 0;
+$table_count = 0;
+$total_records = 0;
+
+// Database size and health
+$db_info = $conn->query("SELECT 
+    ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS db_size_mb,
+    COUNT(*) as table_count
+    FROM information_schema.tables 
+    WHERE table_schema = DATABASE()");
+if ($db_info && $row = $db_info->fetch_assoc()) {
+    $db_size = $row['db_size_mb'];
+    $table_count = $row['table_count'];
+}
+
+// Total records across main tables
+$main_tables = ['student_account', 'employees', 'attendance_record', 'grades_record'];
+foreach ($main_tables as $table) {
+    if (table_exists($conn, $table)) {
+        $count = (int) ($conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0] ?? 0);
+        $total_records += $count;
+    }
+}
+
+// Server performance indicators
+$server_uptime = 0;
+$connections = 0;
+$uptime_result = $conn->query("SHOW STATUS LIKE 'Uptime'");
+if ($uptime_result && $row = $uptime_result->fetch_assoc()) {
+    $server_uptime = (int) $row['Value'];
+}
+
+$connections_result = $conn->query("SHOW STATUS LIKE 'Threads_connected'");
+if ($connections_result && $row = $connections_result->fetch_assoc()) {
+    $connections = (int) $row['Value'];
 }
 
 // Logins today
@@ -184,8 +353,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_hr'])) {
       </svg>
       <h1 class="text-2xl font-bold">System-Wide Overview</h1>
     </div>
-    <p class="text-blue-100 mb-2">IT Personnel Access for system maintenance, bug fixing, configuration updates, and comprehensive monitoring.</p>
-    <p class="text-blue-200 text-sm mb-4">⚠️ Important actions such as deleting major records or modifying settings require School Owner approval.</p>
+    <p class="text-blue-100 mb-2">Full Super Admin Access for system maintenance, bug fixing, configuration updates, and comprehensive monitoring.</p>
+    <p class="text-blue-200 text-sm mb-4">✅ Complete administrative control with full system access and management capabilities.</p>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="bg-white/10 rounded-lg p-4">
         <div class="text-blue-200 text-sm">System Status</div>
@@ -208,20 +377,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_hr'])) {
 
   <!-- IT Personnel Management Tools -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-2xl p-4 shadow-lg relative">
-      <div class="absolute top-2 right-2">
-        <span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full">Owner Approval Required</span>
-      </div>
-      <div class="flex items-center gap-3 mt-4">
+    <a href="ManageHRAccounts.php" class="bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
+      <div class="flex items-center gap-3">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
         </svg>
         <div>
           <div class="font-semibold">HR Account Management</div>
-          <div class="text-amber-100 text-sm">Requires School Owner Approval</div>
+          <div class="text-amber-100 text-sm">Create and manage HR accounts</div>
         </div>
       </div>
-    </div>
+    </a>
     
     <a href="../HRF/Dashboard.php" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
       <div class="flex items-center gap-3">
@@ -235,7 +401,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_hr'])) {
       </div>
     </a>
     
-    <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl p-4 shadow-lg">
+    <a href="SystemReports.php" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
       <div class="flex items-center gap-3">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -245,13 +411,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_hr'])) {
           <div class="text-purple-100 text-sm">Analytics & Logs</div>
         </div>
       </div>
-    </div>
+    </a>
     
-    <div class="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl p-4 shadow-lg relative">
-      <div class="absolute top-2 right-2">
-        <span class="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full">Owner Approval for Major Changes</span>
-      </div>
-      <div class="flex items-center gap-3 mt-4">
+    <a href="SystemMaintenance.php" class="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
+      <div class="flex items-center gap-3">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -261,45 +424,144 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_hr'])) {
           <div class="text-red-100 text-sm">Bug Fixes & Configuration</div>
         </div>
       </div>
+    </a>
+  </div>
+
+  <!-- Enhanced Key Metrics Dashboard -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Enrollment Statistics -->
+    <div class="bg-white rounded-2xl shadow p-5 border border-blue-100">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M12 7a3 3 0 110-6 3 3 0 010 6z"/></svg>
+        </div>
+        <div>
+          <div class="text-gray-500 text-sm">Total Enrollment</div>
+          <div class="text-2xl font-bold text-gray-800"><?= number_format($total_students) ?></div>
+        </div>
+      </div>
+      <div class="text-xs text-gray-600">
+        <div class="flex justify-between"><span>Employees:</span><span><?= number_format($total_employees) ?></span></div>
+      </div>
+    </div>
+
+    <!-- Tuition Payment Reports -->
+    <div class="bg-white rounded-2xl shadow p-5 border border-green-100">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+        </div>
+        <div>
+          <div class="text-gray-500 text-sm">Payments Today</div>
+          <div class="text-2xl font-bold text-gray-800"><?= number_format($total_payments_today) ?></div>
+        </div>
+      </div>
+      <div class="text-xs text-gray-600">
+        <div class="flex justify-between"><span>Revenue:</span><span>₱<?= number_format($total_revenue_today, 2) ?></span></div>
+        <div class="flex justify-between"><span>Pending:</span><span class="text-red-600">₱<?= number_format($pending_balances, 2) ?></span></div>
+      </div>
+    </div>
+
+    <!-- Attendance Logs -->
+    <div class="bg-white rounded-2xl shadow p-5 border border-amber-100">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <div class="text-gray-500 text-sm">Present Today</div>
+          <div class="text-2xl font-bold text-gray-800"><?= number_format($student_present_today) ?></div>
+        </div>
+      </div>
+      <div class="text-xs text-gray-600">
+        <div class="flex justify-between"><span>Students:</span><span><?= $student_present_today ?>/<?= $total_students ?></span></div>
+        <div class="flex justify-between"><span>Employees:</span><span><?= $employee_present_today ?>/<?= $total_employees ?></span></div>
+      </div>
+    </div>
+
+    <!-- System Health -->
+    <div class="bg-white rounded-2xl shadow p-5 border border-purple-100">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <div class="text-gray-500 text-sm">System Health</div>
+          <div class="text-2xl font-bold text-green-600">🟢 Optimal</div>
+        </div>
+      </div>
+      <div class="text-xs text-gray-600">
+        <div class="flex justify-between"><span>DB Size:</span><span><?= $db_size ?> MB</span></div>
+        <div class="flex justify-between"><span>Records:</span><span><?= number_format($total_records) ?></span></div>
+      </div>
     </div>
   </div>
 
-  <!-- Key Metrics Dashboard -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-2xl shadow p-5 border border-blue-100 flex items-center gap-4">
-      <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M12 7a3 3 0 110-6 3 3 0 010 6z"/></svg>
-      </div>
-      <div>
-        <div class="text-gray-500 text-sm">Enrollment Stats</div>
-        <div class="text-3xl font-bold text-gray-800 mt-1"><?= number_format($total_students) ?></div>
-      </div>
-    </div>
-    <div class="bg-white rounded-2xl shadow p-5 border border-blue-100 flex items-center gap-4">
-      <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-      </div>
-      <div>
-        <div class="text-gray-500 text-sm">Total Employees</div>
-        <div class="text-3xl font-bold text-gray-800 mt-1"><?= number_format($total_employees) ?></div>
+  <!-- Detailed Analytics Section -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Enrollment Breakdown -->
+    <div class="bg-white rounded-2xl shadow p-5 border border-blue-100">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Enrollment by Grade Level</h3>
+      <div class="space-y-2">
+        <?php foreach ($enrollment_by_grade as $grade): ?>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-700"><?= htmlspecialchars($grade['grade_level'] ?: 'Not Set') ?></span>
+            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium"><?= number_format($grade['count']) ?></span>
+          </div>
+        <?php endforeach; ?>
+        <?php if (empty($enrollment_by_grade)): ?>
+          <div class="text-gray-500 text-center py-4">No enrollment data available</div>
+        <?php endif; ?>
       </div>
     </div>
-    <div class="bg-white rounded-2xl shadow p-5 border border-blue-100 flex items-center gap-4">
-      <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
-      </div>
-      <div>
-        <div class="text-gray-500 text-sm">Tuition Payment Reports</div>
-        <div class="text-3xl font-bold text-gray-800 mt-1"><?= number_format($student_taps_td) ?></div>
+
+    <!-- Payment Analytics -->
+    <div class="bg-white rounded-2xl shadow p-5 border border-green-100">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Financial Overview</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Today's Revenue</span>
+          <span class="text-green-600 font-bold">₱<?= number_format($total_revenue_today, 2) ?></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Monthly Revenue</span>
+          <span class="text-blue-600 font-bold">₱<?= number_format($total_revenue_month, 2) ?></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Pending Balances</span>
+          <span class="text-red-600 font-bold">₱<?= number_format($pending_balances, 2) ?></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Payments Today</span>
+          <span class="text-gray-800 font-medium"><?= number_format($total_payments_today) ?></span>
+        </div>
       </div>
     </div>
-    <div class="bg-white rounded-2xl shadow p-5 border border-blue-100 flex items-center gap-4">
-      <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      </div>
-      <div>
-        <div class="text-gray-500 text-sm">Attendance Logs</div>
-        <div class="text-3xl font-bold text-gray-800 mt-1"><?= number_format($employee_taps_td) ?></div>
+
+    <!-- System Performance -->
+    <div class="bg-white rounded-2xl shadow p-5 border border-purple-100">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">System Performance</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Database Size</span>
+          <span class="text-gray-800 font-medium"><?= $db_size ?> MB</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Total Tables</span>
+          <span class="text-gray-800 font-medium"><?= number_format($table_count) ?></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Total Records</span>
+          <span class="text-gray-800 font-medium"><?= number_format($total_records) ?></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Server Uptime</span>
+          <span class="text-green-600 font-medium"><?= gmdate('H:i:s', $server_uptime) ?></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-700">Active Connections</span>
+          <span class="text-blue-600 font-medium"><?= number_format($connections) ?></span>
+        </div>
       </div>
     </div>
   </div>
