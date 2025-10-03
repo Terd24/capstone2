@@ -1,0 +1,113 @@
+/* Super Admin Dashboard Styles */
+.nav-item.active {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.section.hidden {
+    display: none !important;
+}
+
+.section.active {
+    display: block !important;
+}
+
+.section {
+    width: 100%;
+    min-height: 400px;
+}
+
+/* Custom gradient backgrounds */
+.gradient-blue {
+    background: linear-gradient(135deg, #0B2C62, #153e86);
+}
+
+/* Hover effects */
+.card-hover {
+    transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Button animations */
+.btn-animate {
+    transition: all 0.2s ease;
+}
+
+.btn-animate:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Sidebar animations */
+.sidebar-transition {
+    transition: transform 0.3s ease-in-out;
+}
+
+/* Status indicators */
+.status-online {
+    color: #10b981;
+}
+
+.status-offline {
+    color: #ef4444;
+}
+
+.status-warning {
+    color: #f59e0b;
+}
+
+/* Loading animations */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .section {
+        min-height: 300px;
+    }
+    
+    .grid-responsive {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Hide scrollbars while keeping scroll functionality */
+.no-scrollbar {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar { 
+    display: none;  /* Safari and Chrome */
+}

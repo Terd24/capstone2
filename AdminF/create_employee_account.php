@@ -4,16 +4,14 @@ include("../StudentLogin/db_conn.php");
 
 // Require Super Admin login
 if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin') {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    $_SESSION['error_msg'] = 'Unauthorized access';
+    header("Location: SuperAdminDashboard.php#hr-accounts");
     exit;
 }
 
-// Set content type to JSON
-header('Content-Type: application/json');
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+    $_SESSION['error_msg'] = 'Invalid request method';
+    header("Location: SuperAdminDashboard.php#hr-accounts");
     exit;
 }
 
@@ -24,7 +22,8 @@ try {
     $role = $_POST['role'] ?? '';
 
     if (empty($employee_id) || empty($username) || empty($password) || empty($role)) {
-        echo json_encode(['success' => false, 'message' => 'All fields are required']);
+        $_SESSION['error_msg'] = 'All fields are required';
+        header("Location: SuperAdminDashboard.php#hr-accounts");
         exit;
     }
 
@@ -35,7 +34,8 @@ try {
     $result = $stmt->get_result();
 
     if ($result->num_rows === 0) {
-        echo json_encode(['success' => false, 'message' => 'Employee not found']);
+        $_SESSION['error_msg'] = 'Employee not found';
+        header("Location: SuperAdminDashboard.php#hr-accounts");
         exit;
     }
 
@@ -46,7 +46,8 @@ try {
     $result = $stmt->get_result();
 
     if ($result->num_rows > 0) {
-        echo json_encode(['success' => false, 'message' => 'Username already taken']);
+        $_SESSION['error_msg'] = 'Username already taken';
+        header("Location: SuperAdminDashboard.php#hr-accounts");
         exit;
     }
 
@@ -57,7 +58,8 @@ try {
     $result = $stmt->get_result();
 
     if ($result->num_rows > 0) {
-        echo json_encode(['success' => false, 'message' => 'Employee already has an account']);
+        $_SESSION['error_msg'] = 'Employee already has an account';
+        header("Location: SuperAdminDashboard.php#hr-accounts");
         exit;
     }
 
@@ -67,12 +69,16 @@ try {
     $stmt->bind_param("ssss", $employee_id, $username, $hashed_password, $role);
 
     if ($stmt->execute()) {
-        echo json_encode(['success' => true, 'message' => 'Account created successfully']);
+        $_SESSION['success_msg'] = 'System account created successfully for Employee ID: ' . $employee_id;
     } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to create account']);
+        $_SESSION['error_msg'] = 'Failed to create account';
     }
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    $_SESSION['error_msg'] = 'Database error: ' . $e->getMessage();
 }
+
+// Redirect back to HR accounts
+header("Location: SuperAdminDashboard.php#hr-accounts");
+exit;
 ?>
