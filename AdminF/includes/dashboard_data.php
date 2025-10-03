@@ -57,7 +57,13 @@ $conn->query("CREATE TABLE IF NOT EXISTS login_activity (
 $total_students = (int) ($conn->query("SELECT COUNT(*) FROM student_account")->fetch_row()[0] ?? 0);
 $total_employees = 0;
 if (table_exists($conn, 'employees')) {
-    $total_employees = (int) ($conn->query("SELECT COUNT(*) FROM employees")->fetch_row()[0] ?? 0);
+    // Count only teachers from employee_accounts table
+    if (table_exists($conn, 'employee_accounts')) {
+        $total_employees = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_accounts WHERE role = 'teacher'") ?? 0);
+    } else {
+        // Fallback: count employees with role 'teacher' if employee_accounts doesn't exist
+        $total_employees = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employees WHERE role = 'teacher'") ?? 0);
+    }
 }
 
 // 2. ENROLLMENT BY GRADE LEVEL
@@ -134,21 +140,28 @@ if (table_exists($conn, 'attendance_record')) {
     }
 }
 
-// Employee Attendance
+// Teacher Attendance (only teachers, not all employees)
 $employee_attendance_today = 0;
 $employee_present_today = 0;
 $employee_absent_today = $total_employees;
 
-$empAttTable = table_exists($conn, 'employee_attendance') ? 'employee_attendance' : 
-               (table_exists($conn, 'teacher_attendance') ? 'teacher_attendance' : null);
-
-if ($empAttTable) {
+// Use teacher_attendance table if available, otherwise try employee_attendance with teacher filter
+if (table_exists($conn, 'teacher_attendance')) {
     try {
-        $employee_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM `$empAttTable` WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
-        $employee_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM `$empAttTable` WHERE date = ? AND time_in IS NOT NULL", 's', $today) ?? 0);
+        $employee_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM teacher_attendance WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
+        $employee_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM teacher_attendance WHERE date = ? AND time_in IS NOT NULL", 's', $today) ?? 0);
         $employee_absent_today = $total_employees - $employee_present_today;
     } catch (Exception $e) {
-        error_log("Employee attendance error: " . $e->getMessage());
+        error_log("Teacher attendance error: " . $e->getMessage());
+    }
+} elseif (table_exists($conn, 'employee_attendance') && table_exists($conn, 'employee_accounts')) {
+    try {
+        // Join with employee_accounts to filter only teachers
+        $employee_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_attendance ea JOIN employee_accounts acc ON ea.teacher_id = acc.employee_id WHERE ea.date = ? AND acc.role = 'teacher' AND (ea.time_in IS NOT NULL OR ea.time_out IS NOT NULL)", 's', $today) ?? 0);
+        $employee_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_attendance ea JOIN employee_accounts acc ON ea.teacher_id = acc.employee_id WHERE ea.date = ? AND acc.role = 'teacher' AND ea.time_in IS NOT NULL", 's', $today) ?? 0);
+        $employee_absent_today = $total_employees - $employee_present_today;
+    } catch (Exception $e) {
+        error_log("Teacher attendance error: " . $e->getMessage());
     }
 }
 

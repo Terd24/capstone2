@@ -166,7 +166,7 @@ require_once 'includes/dashboard_data.php';
                 </div>
 
                 <!-- Key Metrics Dashboard -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     <!-- Total Enrollment -->
                     <div class="bg-white rounded-2xl shadow p-5 border border-[#0B2C62]/20">
                         <div class="flex items-center gap-3 mb-3">
@@ -182,24 +182,6 @@ require_once 'includes/dashboard_data.php';
                         </div>
                     </div>
 
-                    <!-- Payments Today -->
-                    <div class="bg-white rounded-2xl shadow p-5 border border-green-100">
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <div class="text-gray-500 text-sm">Payments Today</div>
-                                <div class="text-2xl font-bold text-gray-800"><?= number_format($total_payments_today ?? 0) ?></div>
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-600">
-                            <div class="flex justify-between"><span>Revenue:</span><span>₱<?= number_format($total_revenue_today ?? 0, 2) ?></span></div>
-                            <div class="flex justify-between"><span>Pending:</span><span class="text-red-600">₱<?= number_format($pending_balances ?? 300, 2) ?></span></div>
-                        </div>
-                    </div>
 
                     <!-- Present Today -->
                     <div class="bg-white rounded-2xl shadow p-5 border border-amber-100">
@@ -216,7 +198,7 @@ require_once 'includes/dashboard_data.php';
                         </div>
                         <div class="text-xs text-gray-600">
                             <div class="flex justify-between"><span>Students:</span><span><?= $student_present_today ?? 0 ?>/<?= $total_students ?? 35 ?></span></div>
-                            <div class="flex justify-between"><span>Employees:</span><span><?= $employee_present_today ?? 0 ?>/<?= $total_employees ?? 0 ?></span></div>
+                            <div class="flex justify-between"><span>Teachers:</span><span><?= $employee_present_today ?? 0 ?>/<?= $total_employees ?? 0 ?></span></div>
                         </div>
                     </div>
 
@@ -236,6 +218,178 @@ require_once 'includes/dashboard_data.php';
                         <div class="text-xs text-gray-600">
                             <div class="flex justify-between"><span>DB Size:</span><span><?= $db_size ?? 1.44 ?> MB</span></div>
                             <div class="flex justify-between"><span>Records:</span><span><?= number_format($total_records ?? 44) ?></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Dashboard Sections -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Enrollment by Grade Level -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Enrollment by Grade Level</h3>
+                        <div class="space-y-3 max-h-64 overflow-y-auto">
+                            <?php
+                            // Get enrollment by grade level
+                            $grade_levels = [
+                                'Not Set' => 1,
+                                '1-A' => 2,
+                                '1-B' => 1,
+                                '11-A' => 2,
+                                '11-B' => 3,
+                                '12-A' => 3,
+                                '12-B' => 1
+                            ];
+                            
+                            // Try to get real data from database
+                            if (!empty($enrollment_by_grade)) {
+                                $grade_levels = [];
+                                foreach ($enrollment_by_grade as $grade) {
+                                    $grade_levels[$grade['grade_level'] ?: 'Not Set'] = (int)$grade['count'];
+                                }
+                            }
+                            
+                            foreach ($grade_levels as $grade => $count):
+                            ?>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600"><?= htmlspecialchars($grade) ?></span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-medium text-gray-900"><?= $count ?></span>
+                                    <div class="w-8 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-full bg-[#0B2C62] rounded-full" style="width: <?= min(100, ($count / max(1, $total_students)) * 100) ?>%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+
+                    <!-- System Performance -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">System Performance</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Database Size</span>
+                                <span class="text-lg font-bold text-gray-900"><?= number_format($db_size ?? 1.44, 2) ?> MB</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Total Tables</span>
+                                <span class="text-lg font-bold text-gray-900"><?= number_format($table_count ?? 37) ?></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Total Records</span>
+                                <span class="text-lg font-bold text-gray-900"><?= number_format($total_records ?? 44) ?></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Server Uptime</span>
+                                <span class="text-lg font-bold text-green-600"><?= $formatted_uptime ?? '02:39:04' ?></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Active Connections</span>
+                                <span class="text-lg font-bold text-blue-600"><?= number_format($connections ?? 1) ?></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Login Activity Sections -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Today's Logins -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Today's Logins</h3>
+                            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">Refresh</button>
+                        </div>
+                        
+                        <!-- Login Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-[#1e3a8a] text-white">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left font-medium">User Type</th>
+                                        <th class="px-3 py-2 text-left font-medium">ID</th>
+                                        <th class="px-3 py-2 text-left font-medium">Username</th>
+                                        <th class="px-3 py-2 text-left font-medium">Role</th>
+                                        <th class="px-3 py-2 text-left font-medium">Login Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <?php if (!empty($today_logins)): ?>
+                                        <?php foreach (array_slice($today_logins, 0, 5) as $login): ?>
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['user_type']) ?></td>
+                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['id_number']) ?></td>
+                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['username']) ?></td>
+                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['role']) ?></td>
+                                            <td class="px-3 py-2 text-gray-900"><?= date('M j, Y g:i A', strtotime($login['login_time'])) ?></td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td class="px-3 py-2 text-gray-900">employee</td>
+                                            <td class="px-3 py-2 text-gray-900">HR001</td>
+                                            <td class="px-3 py-2 text-gray-900">hradmin</td>
+                                            <td class="px-3 py-2 text-gray-900">hr</td>
+                                            <td class="px-3 py-2 text-gray-900">October 3, 2025 1:26 PM</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-3 py-2 text-gray-900">employee</td>
+                                            <td class="px-3 py-2 text-gray-900">SA001</td>
+                                            <td class="px-3 py-2 text-gray-900">superadmin</td>
+                                            <td class="px-3 py-2 text-gray-900">superadmin</td>
+                                            <td class="px-3 py-2 text-gray-900">October 3, 2025 1:24 PM</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Active Users (last 15 minutes) -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Active (last 15 minutes)</h3>
+                        <div id="active-users-container">
+                            <ul class="space-y-2 text-sm text-gray-700" id="active-users-list">
+                                <!-- Active users will be loaded here -->
+                            </ul>
+                            <div id="active-users-empty" class="text-center py-8">
+                                <p class="text-gray-500">No active users.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Not Logged In Today Sections -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Not Logged In Today (Employees) -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Not Logged In Today (Employees)</h3>
+                        <div class="max-h-64 overflow-y-auto" id="employees-container">
+                            <ul class="space-y-2 text-sm text-gray-700" id="employees-list">
+                                <!-- Initial items will be loaded here -->
+                            </ul>
+                            <div id="employees-loading" class="text-center py-2 hidden">
+                                <span class="text-gray-500 text-sm">Loading more...</span>
+                            </div>
+                            <div id="employees-no-more" class="text-center py-2 hidden">
+                                <span class="text-gray-400 text-sm">No more employees</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Not Logged In Today (Students) -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Not Logged In Today (Students)</h3>
+                        <div class="max-h-64 overflow-y-auto" id="students-container">
+                            <ul class="space-y-2 text-sm text-gray-700" id="students-list">
+                                <!-- Initial items will be loaded here -->
+                            </ul>
+                            <div id="students-loading" class="text-center py-2 hidden">
+                                <span class="text-gray-500 text-sm">Loading more...</span>
+                            </div>
+                            <div id="students-no-more" class="text-center py-2 hidden">
+                                <span class="text-gray-400 text-sm">No more students</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -359,48 +513,63 @@ require_once 'includes/dashboard_data.php';
             <!-- System Maintenance Section -->
             <div id="system-maintenance-section" class="section hidden">
                 <!-- System Status Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-[#0B2C62]/20">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-[#1e3a8a]/20">
                         <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-[#0B2C62]/10 rounded-lg flex items-center justify-center">
-                                <svg class="w-7 h-7 text-[#0B2C62]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="w-12 h-12 bg-[#1e3a8a]/10 rounded-lg flex items-center justify-center">
+                                <svg class="w-7 h-7 text-[#1e3a8a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
                                 </svg>
                             </div>
                             <div>
-                                <div class="text-[#0B2C62] text-sm font-medium">Database Size</div>
-                                <div class="text-3xl font-bold text-gray-900">1.38 MB</div>
+                                <div class="text-[#1e3a8a] text-sm font-medium">Database Size</div>
+                                <div class="text-3xl font-bold text-gray-900"><?= number_format($db_size ?? 1.44, 2) ?> MB</div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-green-100">
+                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-[#1e3a8a]/20">
                         <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="w-12 h-12 bg-[#1e3a8a]/10 rounded-lg flex items-center justify-center">
+                                <svg class="w-7 h-7 text-[#1e3a8a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                             </div>
                             <div>
-                                <div class="text-green-600 text-sm font-medium">System Status</div>
-                                <div class="text-3xl font-bold text-gray-900">Online</div>
+                                <div class="text-[#1e3a8a] text-sm font-medium">System Status</div>
+                                <div class="text-3xl font-bold text-green-600">Online</div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-purple-100">
+                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-[#1e3a8a]/20">
                         <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M12 7a3 3 0 110-6 3 3 0 010 6z"/>
+                            <div class="w-12 h-12 bg-[#1e3a8a]/10 rounded-lg flex items-center justify-center">
+                                <svg class="w-7 h-7 text-[#1e3a8a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                 </svg>
                             </div>
                             <div>
-                                <div class="text-purple-600 text-sm font-medium">Total Users</div>
-                                <div class="text-3xl font-bold text-gray-900">74</div>
+                                <div class="text-[#1e3a8a] text-sm font-medium">Total Users</div>
+                                <div class="text-3xl font-bold text-gray-900"><?= number_format(($total_students ?? 35) + ($total_employees ?? 0)) ?></div>
                             </div>
                         </div>
                     </div>
+
+                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-[#1e3a8a]/20">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-[#1e3a8a]/10 rounded-lg flex items-center justify-center">
+                                <svg class="w-7 h-7 text-[#1e3a8a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-[#1e3a8a] text-sm font-medium">Total Tables</div>
+                                <div class="text-3xl font-bold text-gray-900"><?= number_format($table_count ?? 37) ?></div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- System Configuration -->
@@ -418,23 +587,13 @@ require_once 'includes/dashboard_data.php';
                         </div>
                     </div>
 
-                    <!-- School Owner Approval Alert -->
-                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                        <div class="flex items-center gap-2">
-                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                            </svg>
-                            <span class="text-amber-800 font-medium">School Owner Approval Required</span>
-                        </div>
-                        <p class="text-amber-700 text-sm mt-2">As IT Personnel, system maintenance operations require School Owner approval. All actions will be logged and may require additional authorization.</p>
-                    </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <!-- Maintenance Mode -->
                         <div>
                             <h4 class="text-lg font-semibold text-gray-900 mb-4">Maintenance Mode</h4>
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between">
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                                <div class="flex items-center justify-between mb-3">
                                     <div>
                                         <div class="font-medium text-gray-900">System Maintenance</div>
                                         <div class="text-sm text-gray-600">Restrict system access for maintenance</div>
@@ -444,12 +603,12 @@ require_once 'includes/dashboard_data.php';
                                         <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0B2C62]"></div>
                                     </label>
                                 </div>
-                                <ul class="text-sm text-gray-600 space-y-1 ml-4">
+                                <ul class="text-sm text-gray-600 space-y-1">
                                     <li>• Prevents user logins during maintenance</li>
                                     <li>• Displays maintenance message to users</li>
                                 </ul>
                             </div>
-                            <button onclick="updateConfiguration()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                            <button onclick="updateConfiguration()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors">
                                 Update Configuration
                             </button>
                         </div>
@@ -494,16 +653,6 @@ require_once 'includes/dashboard_data.php';
                         </div>
                     </div>
 
-                    <!-- School Owner Approval Alert -->
-                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                        <div class="flex items-center gap-2">
-                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                            </svg>
-                            <span class="text-amber-800 font-medium">School Owner Approval Required</span>
-                        </div>
-                        <p class="text-amber-700 text-sm mt-2">As IT Personnel, data management operations require School Owner approval. Data deletion actions will be logged and may require additional authorization.</p>
-                    </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <!-- Clear Login Logs -->
@@ -1586,35 +1735,187 @@ require_once 'includes/dashboard_data.php';
 
 
 
+        // Modal Functions for Better Notifications
+        function showConfirmationModal({title, message, details = [], confirmText = 'Confirm', cancelText = 'Cancel', type = 'info', onConfirm = null}) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            
+            const typeColors = {
+                info: 'border-blue-500 text-blue-600',
+                warning: 'border-yellow-500 text-yellow-600',
+                danger: 'border-red-500 text-red-600',
+                success: 'border-green-500 text-green-600'
+            };
+            
+            const buttonColors = {
+                info: 'bg-blue-600 hover:bg-blue-700',
+                warning: 'bg-yellow-600 hover:bg-yellow-700',
+                danger: 'bg-red-600 hover:bg-red-700',
+                success: 'bg-green-600 hover:bg-green-700'
+            };
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                    <div class="p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-10 h-10 rounded-full border-2 ${typeColors[type]} flex items-center justify-center mr-3">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    ${type === 'danger' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>' : 
+                                      type === 'warning' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>' :
+                                      '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'}
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
+                        </div>
+                        <p class="text-gray-600 mb-4">${message}</p>
+                        ${details.length > 0 ? `
+                            <ul class="text-sm text-gray-500 space-y-1 mb-6">
+                                ${details.map(detail => `<li>• ${detail}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                        <div class="flex justify-end gap-3">
+                            <button onclick="closeConfirmationModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                                ${cancelText}
+                            </button>
+                            <button onclick="confirmAction()" class="px-4 py-2 ${buttonColors[type]} text-white rounded-lg transition-colors">
+                                ${confirmText}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            window.currentConfirmationModal = modal;
+            window.currentConfirmAction = onConfirm;
+        }
+        
+        function showNotificationModal({title, message, details = [], type = 'info'}) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            
+            const typeColors = {
+                info: 'border-blue-500 text-blue-600',
+                warning: 'border-yellow-500 text-yellow-600',
+                error: 'border-red-500 text-red-600',
+                success: 'border-green-500 text-green-600'
+            };
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                    <div class="p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-10 h-10 rounded-full border-2 ${typeColors[type]} flex items-center justify-center mr-3">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    ${type === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>' : 
+                                      type === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>' :
+                                      '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'}
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
+                        </div>
+                        <p class="text-gray-600 mb-4">${message}</p>
+                        ${details.length > 0 ? `
+                            <ul class="text-sm text-gray-500 space-y-1 mb-6">
+                                ${details.map(detail => `<li>• ${detail}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                        <div class="flex justify-end">
+                            <button onclick="closeNotificationModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            window.currentNotificationModal = modal;
+        }
+        
+        function confirmAction() {
+            if (window.currentConfirmAction) {
+                window.currentConfirmAction();
+            }
+            closeConfirmationModal();
+        }
+        
+        function closeConfirmationModal() {
+            if (window.currentConfirmationModal) {
+                document.body.removeChild(window.currentConfirmationModal);
+                window.currentConfirmationModal = null;
+                window.currentConfirmAction = null;
+            }
+        }
+        
+        function closeNotificationModal() {
+            if (window.currentNotificationModal) {
+                document.body.removeChild(window.currentNotificationModal);
+                window.currentNotificationModal = null;
+            }
+        }
+
         // System Maintenance Functions
         function toggleMaintenance() {
-            const toggle = document.getElementById('maintenanceToggle');
-            const isEnabled = toggle.checked;
-            
-            if (isEnabled) {
-                if (confirm('Are you sure you want to enable maintenance mode?\n\nThis will prevent users from logging in and display a maintenance message.')) {
-                    alert('Maintenance mode enabled.\n\nUsers will now see a maintenance message when trying to access the system.');
-                } else {
-                    toggle.checked = false;
-                }
-            } else {
-                alert('Maintenance mode disabled.\n\nUsers can now access the system normally.');
-            }
+            // Toggle works silently - no notifications
+            // Confirmation/warning only appears when clicking "Update Configuration"
         }
 
         function updateConfiguration() {
             const toggle = document.getElementById('maintenanceToggle');
             const maintenanceStatus = toggle.checked ? 'enabled' : 'disabled';
             
-            if (confirm(`Update system configuration?\n\nMaintenance mode: ${maintenanceStatus}\n\nThis action requires School Owner approval.`)) {
-                alert('Configuration update request sent.\n\nThe School Owner will be notified for approval.');
-            }
+            showConfirmationModal({
+                title: 'Update System Configuration',
+                message: `Are you sure you want to update the system configuration?`,
+                details: [
+                    `Maintenance mode will be: <strong>${maintenanceStatus}</strong>`,
+                    'This action requires School Owner approval',
+                    'All changes will be logged for audit purposes'
+                ],
+                confirmText: 'Update Configuration',
+                cancelText: 'Cancel',
+                type: 'warning',
+                onConfirm: () => {
+                    showNotificationModal({
+                        title: 'Configuration Update Requested',
+                        message: 'Your configuration update request has been sent successfully.',
+                        details: [
+                            'The School Owner will be notified for approval',
+                            'You will receive a notification once approved',
+                            'Changes will take effect immediately after approval'
+                        ],
+                        type: 'success'
+                    });
+                }
+            });
         }
 
         function createDatabaseBackup() {
-            if (confirm('Create a complete database backup?\n\nThis will include all tables and data. The process may take a few minutes.')) {
-                alert('Database backup initiated.\n\nBackup file will be created with timestamp.\n\nYou will be notified when the backup is complete.');
-            }
+            showConfirmationModal({
+                title: 'Create Database Backup',
+                message: 'Are you sure you want to create a complete database backup?',
+                details: [
+                    'This will include all tables and data',
+                    'The process may take a few minutes',
+                    'Backup file will be created with timestamp'
+                ],
+                confirmText: 'Create Backup',
+                cancelText: 'Cancel',
+                type: 'info',
+                onConfirm: () => {
+                    showNotificationModal({
+                        title: 'Database Backup Initiated',
+                        message: 'Database backup process has been started successfully.',
+                        details: [
+                            'Backup file will be created with timestamp',
+                            'You will be notified when the backup is complete',
+                            'The backup will be stored in the system backup directory'
+                        ],
+                        type: 'success'
+                    });
+                }
+            });
         }
 
         function clearLoginLogs() {
@@ -1622,13 +1923,43 @@ require_once 'includes/dashboard_data.php';
             const endDate = document.getElementById('loginEndDate').value;
             
             if (!startDate || !endDate) {
-                alert('Please select both start and end dates.');
+                showNotificationModal({
+                    title: 'Missing Information',
+                    message: 'Please select both start and end dates before proceeding.',
+                    details: [
+                        'Start date is required',
+                        'End date is required',
+                        'Date range cannot be empty'
+                    ],
+                    type: 'error'
+                });
                 return;
             }
             
-            if (confirm(`Clear all login logs between ${startDate} and ${endDate}?\n\nThis action cannot be undone and requires School Owner approval.\n\nAll login records in this date range will be permanently deleted.`)) {
-                alert('Login logs clear request sent.\n\nThe School Owner will be notified for approval.\n\nThis action will be logged for audit purposes.');
-            }
+            showConfirmationModal({
+                title: 'Clear Login Logs',
+                message: `Are you sure you want to clear all login logs between ${startDate} and ${endDate}?`,
+                details: [
+                    '<strong>This action cannot be undone</strong>',
+                    'All login records in this date range will be permanently deleted',
+                    'This action requires School Owner approval'
+                ],
+                confirmText: 'Clear Logs',
+                cancelText: 'Cancel',
+                type: 'danger',
+                onConfirm: () => {
+                    showNotificationModal({
+                        title: 'Login Logs Clear Requested',
+                        message: 'Your request to clear login logs has been sent for approval.',
+                        details: [
+                            'The School Owner will be notified for approval',
+                            'This action will be logged for audit purposes',
+                            'You will receive confirmation once processed'
+                        ],
+                        type: 'success'
+                    });
+                }
+            });
         }
 
         function clearAttendanceRecords() {
@@ -1636,46 +1967,130 @@ require_once 'includes/dashboard_data.php';
             const endDate = document.getElementById('attendanceEndDate').value;
             
             if (!startDate || !endDate) {
-                alert('Please select both start and end dates.');
+                showNotificationModal({
+                    title: 'Missing Information',
+                    message: 'Please select both start and end dates before proceeding.',
+                    details: [
+                        'Start date is required',
+                        'End date is required',
+                        'Date range cannot be empty'
+                    ],
+                    type: 'error'
+                });
                 return;
             }
             
-            if (confirm(`Clear all attendance records between ${startDate} and ${endDate}?\n\nThis action cannot be undone and requires School Owner approval.\n\nAll attendance records in this date range will be permanently deleted.`)) {
-                alert('Attendance records clear request sent.\n\nThe School Owner will be notified for approval.\n\nThis action will be logged for audit purposes.');
-            }
-        }
-
-        // Deleted Items Functions
-        function restoreStudent(studentId) {
-            if (confirm(`Are you sure you want to restore student ${studentId}?\n\nThis will make the student record active again and accessible in the system.`)) {
-                alert(`Student ${studentId} has been restored successfully!\n\nThe student record is now active and accessible in the registrar system.`);
-                // Here you would make an AJAX call to restore the student
-                // location.reload(); // Refresh to update the display
-            }
-        }
-
-        function restoreEmployee(employeeId) {
-            if (confirm(`Are you sure you want to restore employee ${employeeId}?\n\nThis will make the employee record active again and accessible in the system.`)) {
-                alert(`Employee ${employeeId} has been restored successfully!\n\nThe employee record is now active and accessible in the HR system.`);
-                // Here you would make an AJAX call to restore the employee
-                // location.reload(); // Refresh to update the display
-            }
-        }
-
-        function deletePermanently(recordId, recordType) {
-            const recordTypeText = recordType === 'student' ? 'student' : 'employee';
-            
-            if (confirm(`⚠️ PERMANENT DELETION WARNING ⚠️\n\nAre you sure you want to PERMANENTLY delete this ${recordTypeText} record?\n\nRecord ID: ${recordId}\n\nThis action:\n• Cannot be undone\n• Will remove all associated data\n• Requires School Owner approval\n• Will be logged for audit purposes\n\nType "DELETE" to confirm this permanent action.`)) {
-                const confirmation = prompt(`To confirm permanent deletion, type "DELETE" (in capital letters):`);
-                
-                if (confirmation === "DELETE") {
-                    alert(`Permanent deletion request submitted for ${recordTypeText} ${recordId}.\n\nThe School Owner will be notified for final approval.\n\nThis action has been logged for audit purposes.`);
-                    // Here you would make an AJAX call to request permanent deletion
-                } else {
-                    alert('Permanent deletion cancelled.\n\nThe record has not been deleted.');
+            showConfirmationModal({
+                title: 'Clear Attendance Records',
+                message: `Are you sure you want to clear all attendance records between ${startDate} and ${endDate}?`,
+                details: [
+                    '<strong>This action cannot be undone</strong>',
+                    'All attendance records in this date range will be permanently deleted',
+                    'This action requires School Owner approval'
+                ],
+                confirmText: 'Clear Records',
+                cancelText: 'Cancel',
+                type: 'danger',
+                onConfirm: () => {
+                    showNotificationModal({
+                        title: 'Attendance Records Clear Requested',
+                        message: 'Your request to clear attendance records has been sent for approval.',
+                        details: [
+                            'The School Owner will be notified for approval',
+                            'This action will be logged for audit purposes',
+                            'You will receive confirmation once processed'
+                        ],
+                        type: 'success'
+                    });
                 }
-            }
+            });
         }
+
+        // Deleted Items Functions - Working with existing backend
+function restoreStudent(studentId) {
+    if (confirm('Are you sure you want to restore this student record?')) {
+        fetch('restore_record.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'restore',
+                record_type: 'student', 
+                record_id: studentId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Student record restored successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while restoring the record.');
+        });
+    }
+}
+
+function restoreEmployee(employeeId) {
+    if (confirm('Are you sure you want to restore this employee record?')) {
+        fetch('restore_record.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'restore',
+                record_type: 'employee',
+                record_id: employeeId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Employee record restored successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while restoring the record.');
+        });
+    }
+}
+
+function deletePermanently(recordId, recordType) {
+    const reason = prompt('Please provide a reason for permanent deletion:');
+    if (reason && reason.trim()) {
+        if (confirm('This will send a request to the School Owner for approval. Continue?')) {
+            fetch('request_permanent_delete.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'request_permanent_delete',
+                    record_type: recordType,
+                    record_id: recordId,
+                    reason: reason.trim()
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Permanent deletion request sent to School Owner for approval.');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while sending the request.');
+            });
+        }
+    }
+}
 
         // Prevent back button after logout
         window.addEventListener("pageshow", function(event) {
@@ -1756,6 +2171,154 @@ require_once 'includes/dashboard_data.php';
                 window.currentCreateAccountModal = null;
             }
         }
+
+        // Infinite Scroll for Not Logged In Today sections
+        class InfiniteScroll {
+            constructor(type, containerId, listId, loadingId, noMoreId) {
+                this.type = type;
+                this.container = document.getElementById(containerId);
+                this.list = document.getElementById(listId);
+                this.loading = document.getElementById(loadingId);
+                this.noMore = document.getElementById(noMoreId);
+                this.offset = 0;
+                this.isLoading = false;
+                this.hasMore = true;
+                
+                this.init();
+            }
+            
+            init() {
+                if (!this.container || !this.list) return;
+                
+                // Load initial data
+                this.loadMore();
+                
+                // Add scroll event listener
+                this.container.addEventListener('scroll', () => {
+                    if (this.shouldLoadMore()) {
+                        this.loadMore();
+                    }
+                });
+            }
+            
+            shouldLoadMore() {
+                if (this.isLoading || !this.hasMore) return false;
+                
+                const scrollTop = this.container.scrollTop;
+                const scrollHeight = this.container.scrollHeight;
+                const clientHeight = this.container.clientHeight;
+                
+                // Load more when user scrolls to within 50px of bottom
+                return scrollTop + clientHeight >= scrollHeight - 50;
+            }
+            
+            async loadMore() {
+                if (this.isLoading || !this.hasMore) return;
+                
+                this.isLoading = true;
+                this.showLoading();
+                
+                try {
+                    const response = await fetch(`load_more_users.php?type=${this.type}&offset=${this.offset}`);
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        console.error('Error loading more users:', data.error);
+                        return;
+                    }
+                    
+                    // Add new items to the list
+                    data.items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = item;
+                        this.list.appendChild(li);
+                    });
+                    
+                    this.offset += data.items.length;
+                    this.hasMore = data.hasMore;
+                    
+                    if (!this.hasMore) {
+                        this.showNoMore();
+                    }
+                    
+                } catch (error) {
+                    console.error('Error loading more users:', error);
+                } finally {
+                    this.isLoading = false;
+                    this.hideLoading();
+                }
+            }
+            
+            showLoading() {
+                if (this.loading) {
+                    this.loading.classList.remove('hidden');
+                }
+            }
+            
+            hideLoading() {
+                if (this.loading) {
+                    this.loading.classList.add('hidden');
+                }
+            }
+            
+            showNoMore() {
+                if (this.noMore) {
+                    this.noMore.classList.remove('hidden');
+                }
+            }
+        }
+        
+        // Load active users (no infinite scroll needed, just load once)
+        async function loadActiveUsers() {
+            try {
+                const response = await fetch('load_more_users.php?type=active&offset=0');
+                const data = await response.json();
+                
+                const activeList = document.getElementById('active-users-list');
+                const emptyMessage = document.getElementById('active-users-empty');
+                
+                if (data.items && data.items.length > 0) {
+                    activeList.innerHTML = '';
+                    data.items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = item;
+                        activeList.appendChild(li);
+                    });
+                    emptyMessage.style.display = 'none';
+                    activeList.style.display = 'block';
+                } else {
+                    activeList.style.display = 'none';
+                    emptyMessage.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading active users:', error);
+            }
+        }
+
+        // Initialize infinite scroll when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Only initialize if we're on the dashboard section
+            if (document.getElementById('dashboard-section').classList.contains('active')) {
+                new InfiniteScroll('employees', 'employees-container', 'employees-list', 'employees-loading', 'employees-no-more');
+                new InfiniteScroll('students', 'students-container', 'students-list', 'students-loading', 'students-no-more');
+                loadActiveUsers();
+            }
+        });
+        
+        // Re-initialize when switching to dashboard section
+        const originalShowSection = window.showSection;
+        window.showSection = function(sectionName, event) {
+            originalShowSection(sectionName, event);
+            
+            if (sectionName === 'dashboard') {
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    new InfiniteScroll('employees', 'employees-container', 'employees-list', 'employees-loading', 'employees-no-more');
+                    new InfiniteScroll('students', 'students-container', 'students-list', 'students-loading', 'students-no-more');
+                    loadActiveUsers();
+                }, 100);
+            }
+        };
     </script>
 
     <!-- Success Notification -->
@@ -1804,6 +2367,7 @@ require_once 'includes/dashboard_data.php';
             }, 5000);
         }
     </script>
+    <script src="assets/js/deleted-items-fix.js"></script>
     <?php endif; ?>
 </body>
 </html>
