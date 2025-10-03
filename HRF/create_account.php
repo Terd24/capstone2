@@ -17,9 +17,17 @@ $employee_id = $_POST['employee_id'] ?? '';
 $username = $_POST['username'] ?? '';
 $password = $_POST['password'] ?? '';
 $role = $_POST['role'] ?? '';
+$rfid_uid = $_POST['rfid_uid'] ?? '';
 
+// Validate required fields
 if (empty($employee_id) || empty($username) || empty($password) || empty($role)) {
     echo json_encode(['success' => false, 'message' => 'All fields are required']);
+    exit;
+}
+
+// For teacher role, RFID is required
+if ($role === 'teacher' && empty($rfid_uid)) {
+    echo json_encode(['success' => false, 'message' => 'RFID number is required for teacher accounts']);
     exit;
 }
 
@@ -48,7 +56,7 @@ if ($result->num_rows > 0) {
 }
 
 // Validate role
-$valid_roles = ['registrar', 'cashier', 'guidance', 'attendance', 'employee'];
+$valid_roles = ['registrar', 'cashier', 'guidance', 'attendance', 'teacher'];
 if (!in_array($role, $valid_roles)) {
     echo json_encode(['success' => false, 'message' => 'Invalid role']);
     exit;
@@ -57,13 +65,29 @@ if (!in_array($role, $valid_roles)) {
 // Hash password
 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-// Insert into employee_accounts table only
-$stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
-$stmt->bind_param("ssss", $employee_id, $username, $hashed_password, $role);
+// Start transaction
+$conn->begin_transaction();
 
-if ($stmt->execute()) {
+try {
+    // Insert into employee_accounts table
+    $stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("ssss", $employee_id, $username, $hashed_password, $role);
+    $stmt->execute();
+    
+    // If teacher role, update RFID in employees table
+    if ($role === 'teacher' && !empty($rfid_uid)) {
+        $stmt = $conn->prepare("UPDATE employees SET rfid_uid = ? WHERE id_number = ?");
+        $stmt->bind_param("ss", $rfid_uid, $employee_id);
+        $stmt->execute();
+    }
+    
+    // Commit transaction
+    $conn->commit();
     echo json_encode(['success' => true, 'message' => 'Account created successfully']);
-} else {
-    echo json_encode(['success' => false, 'message' => 'Error creating account: ' . $conn->error]);
+    
+} catch (Exception $e) {
+    // Rollback transaction on error
+    $conn->rollback();
+    echo json_encode(['success' => false, 'message' => 'Error creating account: ' . $e->getMessage()]);
 }
 ?>

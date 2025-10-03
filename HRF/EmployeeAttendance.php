@@ -11,24 +11,39 @@ if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSIO
 date_default_timezone_set('Asia/Manila');
 $today = date('Y-m-d');
 
+// Check which column exists in teacher_attendance table
+$teacher_id_column = 'teacher_id'; // default
+$check_columns = $conn->query("SHOW COLUMNS FROM teacher_attendance LIKE '%id'");
+if ($check_columns && $check_columns->num_rows > 0) {
+    while ($col = $check_columns->fetch_assoc()) {
+        if ($col['Field'] === 'employee_id') {
+            $teacher_id_column = 'employee_id';
+            break;
+        } elseif ($col['Field'] === 'teacher_id') {
+            $teacher_id_column = 'teacher_id';
+            break;
+        }
+    }
+}
+
 // Filters
 $search_name = trim($_GET['search_name'] ?? '');
 $start_date  = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
 $end_date    = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
 
-// Build employee attendance query (employee_attendance used for employees)
-$sql = "SELECT ea.*, e.first_name, e.last_name, e.id_number
-        FROM employee_attendance ea
-        JOIN employees e ON e.id_number = ea.employee_id
-        WHERE (ea.time_in IS NOT NULL OR ea.time_out IS NOT NULL)";
+// Build teacher attendance query (teacher_attendance used for teachers)
+$sql = "SELECT ta.*, e.first_name, e.last_name, e.id_number
+        FROM teacher_attendance ta
+        JOIN employees e ON e.id_number = ta.$teacher_id_column
+        WHERE (ta.time_in IS NOT NULL OR ta.time_out IS NOT NULL)";
 $params = []; $types = '';
 
 if ($start_date !== '' && $end_date !== '') {
-    $sql .= " AND ea.date BETWEEN ? AND ?";
+    $sql .= " AND ta.date BETWEEN ? AND ?";
     $params[] = $start_date; $types .= 's';
     $params[] = $end_date;   $types .= 's';
 } else {
-    $sql .= " AND ea.date = ?";
+    $sql .= " AND ta.date = ?";
     $params[] = $today; $types .= 's';
 }
 
@@ -38,7 +53,7 @@ if ($search_name !== '') {
     $params[] = $like; $types .= 's';
 }
 
-$sql .= " ORDER BY ea.date DESC, ea.id DESC";
+$sql .= " ORDER BY ta.date DESC, ta.id DESC";
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) { $stmt->bind_param($types, ...$params); }

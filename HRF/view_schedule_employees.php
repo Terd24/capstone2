@@ -274,6 +274,8 @@ function loadAssignPage(append){
   params.set('limit', aLimit); params.set('offset', aOffset);
   // Exclude those already in this schedule
   params.set('exclude_schedule_id', SCHEDULE_ID);
+  // Only show teachers
+  params.set('role', 'teacher');
   fetch('SearchEmployee.php?' + params.toString())
     .then(r=>r.json())
     .then(d=>{

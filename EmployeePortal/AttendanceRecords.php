@@ -21,12 +21,27 @@ if ($employee_id_number === '') {
 date_default_timezone_set('Asia/Manila');
 $today = date('Y-m-d');
 
+// Check which column exists in teacher_attendance table
+$employee_id_column = 'teacher_id'; // default for teacher_attendance table
+$check_columns = $conn->query("SHOW COLUMNS FROM teacher_attendance LIKE '%id'");
+if ($check_columns && $check_columns->num_rows > 0) {
+    while ($col = $check_columns->fetch_assoc()) {
+        if ($col['Field'] === 'employee_id') {
+            $employee_id_column = 'employee_id';
+            break;
+        } elseif ($col['Field'] === 'teacher_id') {
+            $employee_id_column = 'teacher_id';
+            break;
+        }
+    }
+}
+
 // Filters
 $start_date  = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
 $end_date    = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
 
-// Build attendance query for this employee only (employee_attendance view/table)
-$sql = "SELECT * FROM employee_attendance WHERE employee_id = ?";
+// Build attendance query for this employee only (teacher_attendance table)
+$sql = "SELECT * FROM teacher_attendance WHERE $employee_id_column = ?";
 $params = [$employee_id_number];
 $types  = 's';
 
@@ -87,9 +102,6 @@ if ($ws) {
     <div class="container mx-auto px-6 py-4">
       <div class="flex justify-between items-center">
         <div class="flex items-center space-x-3">
-          <button onclick="history.back()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-          </button>
           <span class="text-lg font-bold">Attendance Records</span>
         </div>
         <div class="flex items-center space-x-3 relative">

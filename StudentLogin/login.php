@@ -54,8 +54,17 @@ if (is_maintenance_mode($conn)) {
                 </p>
             </div>
         </div>
-        <div class="text-sm text-gray-500">
+        <div class="text-sm text-gray-500 mb-6">
             <p>If you need immediate assistance, please contact the IT department.</p>
+        </div>
+        
+        <!-- Admin/Owner Login Button -->
+        <div class="border-t border-gray-200 pt-4">
+            <p class="text-gray-600 text-sm mb-2">System Administrator Access</p>
+            <button onclick="location.href='../admin_login.php'" 
+                    class="text-purple-600 hover:text-purple-700 font-medium text-sm hover:underline">
+                🔧 Admin/Owner Login
+            </button>
         </div>
     </div>
 </body>
@@ -88,8 +97,14 @@ if (isset($_SESSION['role'])) {
         case 'hr':
             header("Location: ../HRF/Dashboard.php");
             exit;
-        case 'employee':
-            header("Location: ../EmployeePortal/AttendanceRecords.php");
+        case 'teacher':
+            header("Location: ../EmployeePortal/Dashboard.php");
+            exit;
+        case 'owner':
+        case 'superadmin':
+            // SuperAdmin and Owner should only login through admin_login.php
+            session_destroy();
+            header("Location: ../admin_login.php");
             exit;
     }
 }
@@ -161,42 +176,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
-    // 2️⃣ Try super_admins (dedicated Super Admin table)
-    $stmt = $conn->prepare("CREATE TABLE IF NOT EXISTS super_admins (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(100) NOT NULL UNIQUE,
-        password VARCHAR(255) NOT NULL,
-        first_name VARCHAR(100) NULL,
-        last_name VARCHAR(100) NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    if ($stmt) { $stmt->execute(); $stmt->close(); }
+    // 2️⃣ SuperAdmin and Owner accounts are now handled in admin_login.php only
 
-    $stmt = $conn->prepare("SELECT * FROM super_admins WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $usernameFound = true;
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $full_name = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
-            $_SESSION['superadmin_id'] = $row['id'];
-            $_SESSION['superadmin_name'] = $full_name ?: 'Principal/Owner';
-            $_SESSION['username'] = $row['username'];
-            $_SESSION['first_name'] = $row['first_name'] ?? 'Principal';
-            $_SESSION['last_name'] = $row['last_name'] ?? 'Owner';
-            $_SESSION['role'] = 'superadmin';
-
-            // Log superadmin login
-            log_login($conn, 'superadmin', 'SA001', $row['username'], 'superadmin');
-
-            echo json_encode(['status' => 'success','redirect' => '../AdminF/SuperAdminDashboard.php']);
-            exit;
-        }
-    }
-
-    // 3️⃣ Try employee_accounts (registrar, cashier, guidance, attendance, hr, teacher, employee)
+    // 3️⃣ Try employee_accounts (registrar, cashier, guidance, attendance, hr, teacher)
     $stmt = $conn->prepare("SELECT ea.*, e.first_name, e.last_name, e.id_number FROM employee_accounts ea 
                            JOIN employees e ON ea.employee_id = e.id_number 
                            WHERE ea.username = ?");
@@ -249,17 +231,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
                     break;
                 case 'teacher':
-                    echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
-                    break;
-                case 'employee':
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
                     break;
                 default:
-                    // Fallback: treat any unexpected role as a generic employee portal access
+                    // Fallback: treat any unexpected role as a generic teacher portal access
                     // Log for later clean-up
                     error_log('Unknown employee role: ' . print_r($row['role'], true) . ' for username ' . $row['username']);
-                    $_SESSION['role'] = 'employee';
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
+                    $_SESSION['role'] = 'teacher';
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
             }
             exit;
         }
@@ -287,6 +266,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             exit;
         }
     }
+
 
     // Final decision
     if ($usernameFound) {
@@ -366,6 +346,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 class="text-blue-600 hover:text-blue-600 font-medium text-sm hover:underline">
           Parent/Guardian Portal
         </button>
+        
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <p class="text-gray-600 text-sm mb-2">Administrative Access</p>
+          <button onclick="location.href='../admin_login.php'" 
+                  class="text-blue-600 hover:text-blue-600 font-medium text-sm hover:underline">
+            Admin/Owner Login
+          </button>
+        </div>
       </div>
     </div>
   </div>

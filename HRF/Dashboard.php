@@ -2,13 +2,19 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Require HR login or Super Admin (Principal/Owner) access
-if (!isset($_SESSION['role']) || ($_SESSION['role'] !== 'hr' && $_SESSION['role'] !== 'superadmin')) {
+// Require HR login or Super Admin access
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['hr', 'superadmin'])) {
     header("Location: ../StudentLogin/login.php");
     exit;
 }
 
-// Handle form submission
+// Prevent caching (so back button after logout doesn't show dashboard)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+header("Expires: 0");
+
+// Handle form submission (like registrar)
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     include("add_employee.php");
 }
@@ -25,13 +31,18 @@ if ($error_msg) {
     unset($_SESSION['error_msg']);
 }
 
-// Fetch employees
+// Ensure soft delete columns exist
+$conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL DEFAULT NULL");
+$conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) NULL");
+$conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_reason TEXT NULL");
+
+// Fetch only active employees (not soft-deleted)
 $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, position, department, 
                        (SELECT username FROM employee_accounts WHERE employee_accounts.employee_id = employees.id_number) as username 
-                       FROM employees ORDER BY last_name ASC");
+                       FROM employees WHERE deleted_at IS NULL ORDER BY first_name ASC");
 
-// Get total employee count
-$count_result = $conn->query("SELECT COUNT(*) as total_employees FROM employees");
+// Get total active employee count
+$count_result = $conn->query("SELECT COUNT(*) as total_employees FROM employees WHERE deleted_at IS NULL");
 $total_employees = $count_result->fetch_assoc()['total_employees'];
 
 $columns = ['ID Number', 'Full Name', 'Position', 'Department', 'Account Status', 'Actions'];
@@ -146,10 +157,10 @@ input[type=number] { -moz-appearance: textfield; }
                 Add Employee
             </button>
             <button onclick="window.location.href='../HRF/ManageEmployeeSchedule.php'" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium whitespace-nowrap">
-                Manage Employee Schedule
+                Manage Teacher Schedule
             </button>
             <button onclick="window.location.href='../HRF/EmployeeAttendance.php'" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium whitespace-nowrap">
-                Employee Attendance
+                Teacher Attendance
             </button>
         </div>
     </div>
@@ -322,11 +333,6 @@ input[type=number] { -moz-appearance: textfield; }
                             <input type="text" name="phone" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] phone-input" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
                         </div>
                         
-                        <!-- Row 4: RFID -->
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">RFID *</label>
-                            <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] rfid-input" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" title="Please enter exactly 10 digits (numbers only)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
-                        </div>
 
                         <!-- Complete Address -->
                         <div class="col-span-3">
@@ -354,25 +360,37 @@ input[type=number] { -moz-appearance: textfield; }
                         </div>
                     </div>
                     
-                    <div id="accountFields" class="hidden grid grid-cols-3 gap-6">
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Username</label>
-                            <input type="text" name="username" autocomplete="off" pattern="^[A-Za-z0-9_]+$" title="Letters, numbers, underscores only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                    <div id="accountFields" class="hidden">
+                        <div class="grid grid-cols-3 gap-6 mb-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-1">Username</label>
+                                <input type="text" name="username" autocomplete="off" pattern="^[A-Za-z0-9_]+$" title="Letters, numbers, underscores only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1">Password</label>
+                                <input type="password" name="password" autocomplete="new-password" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1">Role</label>
+                                <select id="employeeRole" name="role" onchange="toggleRFIDField()" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                                    <option value="">-- Select Role --</option>
+                                    <option value="registrar">Registrar</option>
+                                    <option value="cashier">Cashier</option>
+                                    <option value="guidance">Guidance</option>
+                                    <option value="attendance">Attendance</option>
+                                    <option value="teacher">Teacher</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Password</label>
-                            <input type="password" name="password" autocomplete="new-password" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Role</label>
-                            <select id="employeeRole" name="role" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
-                                <option value="">-- Select Role --</option>
-                                <option value="registrar">Registrar</option>
-                                <option value="cashier">Cashier</option>
-                                <option value="guidance">Guidance</option>
-                                <option value="attendance">Attendance</option>
-                                <option value="employee">Employee</option>
-                            </select>
+                        
+                        <!-- RFID Field - Only shown for Teacher role -->
+                        <div id="rfidFieldContainer" class="hidden">
+                            <div class="grid grid-cols-1 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">RFID Number *</label>
+                                    <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] rfid-input" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" title="Please enter exactly 10 digits (numbers only)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -512,12 +530,50 @@ function updateAccountFieldsVisibility() {
     updateRFIDRequirement();
 }
 
+function toggleRFIDField() {
+    const roleSelect = document.getElementById('employeeRole');
+    const rfidContainer = document.getElementById('rfidFieldContainer');
+    const rfidInput = document.getElementById('rfid_uid');
+    
+    if (!roleSelect || !rfidContainer || !rfidInput) return;
+    
+    const selectedRole = roleSelect.value;
+    
+    // Show RFID field only for Teacher role
+    if (selectedRole === 'teacher') {
+        rfidContainer.classList.remove('hidden');
+        rfidInput.setAttribute('required', 'required');
+    } else {
+        rfidContainer.classList.add('hidden');
+        rfidInput.removeAttribute('required');
+        rfidInput.value = ''; // Clear the value when hidden
+    }
+}
+
 function updateRFIDRequirement() {
-    // After moving RFID into Personal Information, the old rfidField may not exist
-    if (!rfidField || !rfidInput) return;
-    // Always hide the old field if present and never require
-    rfidField.classList.add('hidden');
-    rfidInput.required = false;
+    // Call the new toggle function
+    toggleRFIDField();
+}
+
+// Toggle RFID field in Create Account modal
+function toggleCreateAccountRFID() {
+    const roleSelect = document.getElementById('ca_role');
+    const rfidContainer = document.getElementById('ca_rfid_container');
+    const rfidInput = document.getElementById('ca_rfid_uid');
+    
+    if (!roleSelect || !rfidContainer || !rfidInput) return;
+    
+    const selectedRole = roleSelect.value;
+    
+    // Show RFID field only for Teacher role
+    if (selectedRole === 'teacher') {
+        rfidContainer.classList.remove('hidden');
+        rfidInput.setAttribute('required', 'required');
+    } else {
+        rfidContainer.classList.add('hidden');
+        rfidInput.removeAttribute('required');
+        rfidInput.value = ''; // Clear the value when hidden
+    }
 }
 
 if (createAccountChk) createAccountFieldsBound = (createAccountChk.addEventListener('change', updateAccountFieldsVisibility), true);
@@ -632,10 +688,12 @@ function showEmployeeDetailsModal(employee) {
                             <label class="block text-sm font-semibold mb-1">Hire Date</label>
                             <input type="date" id="hire_date_${employee.id_number}" value="${employee.hire_date}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
                         </div>
+                        ${employee.account_role === 'teacher' ? `
                         <div>
                             <label class="block text-sm font-semibold mb-1">RFID</label>
                             <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" data-maxlen="10" title="Please enter exactly 10 digits">
                         </div>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -665,7 +723,7 @@ function showEmployeeDetailsModal(employee) {
                                 <option value="cashier" ${employee.account_role === 'cashier' ? 'selected' : ''}>Cashier</option>
                                 <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
                                 <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
-                                <option value="employee" ${employee.account_role === 'employee' ? 'selected' : ''}>Employee</option>
+                                <option value="teacher" ${employee.account_role === 'teacher' ? 'selected' : ''}>Teacher</option>
                             </select>
                         </div>
                         <div>
@@ -743,17 +801,21 @@ function toggleEditMode() {
         const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
         if (saveBtn) saveBtn.classList.remove('hidden');
         
-        // Enable fields
+        // Enable fields for editing
         fields.forEach(field => {
-            if (field.type === 'text' || field.type === 'email' || field.type === 'date' || field.tagName === 'SELECT') {
+            if (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type)) {
                 field.readOnly = false;
+                field.classList.remove('bg-gray-50');
+                field.classList.add('bg-white');
+                field.classList.add('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
+            } else if (['radio', 'checkbox'].includes(field.type) || field.tagName === 'SELECT') {
                 field.disabled = false;
                 field.classList.remove('bg-gray-50');
                 field.classList.add('bg-white');
             }
         });
     } else {
-        // Cancel editing - just reset without saving
+        // Cancel editing - reset to read-only mode
         editBtn.textContent = 'Edit';
         editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
         
@@ -761,52 +823,84 @@ function toggleEditMode() {
         const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
         if (saveBtn) saveBtn.classList.add('hidden');
         
-        // Disable fields
+        // Disable fields and restore read-only appearance
         fields.forEach(field => {
-            if (field.type === 'text' || field.type === 'email' || field.type === 'date' || field.tagName === 'SELECT') {
+            if (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type)) {
                 field.readOnly = true;
+                field.classList.add('bg-gray-50');
+                field.classList.remove('bg-white');
+                field.classList.remove('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
+            } else if (['radio', 'checkbox'].includes(field.type) || field.tagName === 'SELECT') {
                 field.disabled = true;
                 field.classList.add('bg-gray-50');
                 field.classList.remove('bg-white');
             }
         });
+        
+        // Reload the modal to restore original values
+        if (currentEmployeeId) {
+            const employee = employees.find(emp => emp.id_number === currentEmployeeId);
+            if (employee) {
+                showEmployeeDetailsModal(employee);
+            }
+        }
     }
 }
 
 function saveEmployeeChanges() {
-    // Get current employee ID from the modal
-    const employeeId = document.querySelector('[id^="username_"]').id.split('_')[1];
-    const username = document.getElementById(`username_${employeeId}`).value;
-    const password = document.getElementById(`password_${employeeId}`).value;
-    const role = document.getElementById(`role_${employeeId}`).value;
+    if (!currentEmployeeId) {
+        alert('No employee selected');
+        return;
+    }
+    
+    // Collect employee data from the form fields
+    const firstName = document.getElementById(`first_name_${currentEmployeeId}`)?.value;
+    const lastName = document.getElementById(`last_name_${currentEmployeeId}`)?.value;
+    const position = document.getElementById(`position_${currentEmployeeId}`)?.value;
+    const department = document.getElementById(`department_${currentEmployeeId}`)?.value;
+    const email = document.getElementById(`email_${currentEmployeeId}`)?.value;
+    const phone = document.getElementById(`phone_${currentEmployeeId}`)?.value;
+    const hireDate = document.getElementById(`hire_date_${currentEmployeeId}`)?.value;
+    
+    // Validate required fields
+    if (!firstName || !lastName || !position || !department || !hireDate) {
+        alert('Please fill in all required fields');
+        return;
+    }
     
     // Prepare form data
     const formData = new FormData();
-    formData.append('action', 'update_account');
-    formData.append('employee_id', employeeId);
-    formData.append('username', username);
-    formData.append('role', role);
+    formData.append('employee_id', currentEmployeeId);
+    formData.append('first_name', firstName);
+    formData.append('last_name', lastName);
+    formData.append('position', position);
+    formData.append('department', department);
+    formData.append('email', email || '');
+    formData.append('phone', phone || '');
+    formData.append('hire_date', hireDate);
     
-    if (password.trim()) {
-        formData.append('new_password', password);
-    }
-    
-    fetch('manage_account.php', {
+    fetch('edit_employee.php', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            alert('Account updated successfully');
-            location.reload();
+            alert('Employee updated successfully!');
+            toggleEditMode(); // Exit edit mode
+            location.reload(); // Refresh to show updated data
         } else {
             alert('Error: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error updating account');
+        alert('Error updating employee: ' + error.message);
     });
 }
 
@@ -963,7 +1057,7 @@ function showEditAccountModal(employee) {
                 <option value="cashier" ${employee.account_role === 'cashier' ? 'selected' : ''}>Cashier</option>
                 <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
                 <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
-                <option value="employee" ${employee.account_role === 'employee' ? 'selected' : ''}>Employee</option>
+                <option value="teacher" ${employee.account_role === 'teacher' ? 'selected' : ''}>Teacher</option>
             </select>
         </div>
     `;
@@ -987,14 +1081,18 @@ function showCreateAccountModal(employee) {
         </div>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
-            <select name="role" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500" tabindex="0">
+            <select name="role" id="ca_role" required onchange="toggleCreateAccountRFID()" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500" tabindex="0">
                 <option value="">Select Role</option>
                 <option value="registrar">Registrar</option>
                 <option value="cashier">Cashier</option>
                 <option value="guidance">Guidance</option>
                 <option value="attendance">Attendance</option>
-                <option value="employee">Employee</option>
+                <option value="teacher">Teacher</option>
             </select>
+        </div>
+        <div id="ca_rfid_container" class="mb-4 hidden">
+            <label class="block text-sm font-medium text-gray-700 mb-2">RFID Number *</label>
+            <input type="text" id="ca_rfid_uid" name="rfid_uid" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" title="Please enter exactly 10 digits (numbers only)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
         </div>
     `;
     document.getElementById('createAccountModal').classList.remove('hidden');
@@ -1278,6 +1376,11 @@ document.addEventListener('click', function(event) {
           this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
         });
       }
+    });
+    
+    // ===== PREVENT BACK BUTTON AFTER LOGOUT =====
+    window.addEventListener("pageshow", function(event) {
+      if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
     });
   </script>
 </div>

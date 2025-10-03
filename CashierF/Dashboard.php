@@ -7,8 +7,9 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'cashier') {
     exit;
 }
 
-// ✅ Prevent caching
+// ✅ Prevent caching (so back button after logout doesn't show dashboard)
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 header("Expires: 0");
 ?>
@@ -2575,13 +2576,17 @@ const items = slice.map(s => {
       // Clear search results and input
       document.getElementById('searchResults').innerHTML = '';
       document.getElementById('searchInput').value = '';
-      
       // Clear stored RFID
       window.currentStudentRFID = null;
     }
     
     // Focus RFID when page loads
     window.onload = focusRFID;
+    
+    // ===== PREVENT BACK BUTTON AFTER LOGOUT =====
+    window.addEventListener("pageshow", function(event) {
+      if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
+    });
   </script>
 
 </body>

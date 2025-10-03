@@ -5,6 +5,27 @@ include '../StudentLogin/db_conn.php';
 date_default_timezone_set('Asia/Manila');
 $today = date('Y-m-d');
 
+// Check which column exists in teacher_attendance table
+$teacher_id_column = 'teacher_id'; // default
+$check_columns = $conn->query("SHOW COLUMNS FROM teacher_attendance LIKE '%id'");
+if ($check_columns && $check_columns->num_rows > 0) {
+    while ($col = $check_columns->fetch_assoc()) {
+        if ($col['Field'] === 'employee_id') {
+            $teacher_id_column = 'employee_id';
+            break;
+        } elseif ($col['Field'] === 'teacher_id') {
+            $teacher_id_column = 'teacher_id';
+            break;
+        }
+    }
+}
+
+// Prevent caching (so back button after logout doesn't show dashboard)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+header("Expires: 0");
+
 // Handle AJAX requests
 if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
     $ajax_request = true;
@@ -15,7 +36,18 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
 // Latest employee for today (if someone just tapped)
 $latest_employee = null;
 if (isset($_SESSION['show_latest_employee']) && $_SESSION['show_latest_employee']) {
-    $latest_employee_query = $conn->prepare("\n        SELECT ea.*, e.first_name, e.last_name,\n               GREATEST(\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ea.date, ' ', ea.time_in)), 0),\n                   COALESCE(UNIX_TIMESTAMP(CONCAT(ea.date, ' ', ea.time_out)), 0)\n               ) as last_activity\n        FROM employee_attendance ea\n        JOIN employees e ON ea.employee_id = e.id_number\n        WHERE ea.date = ? \n        ORDER BY last_activity DESC, ea.id DESC\n        LIMIT 1\n    ");
+    $latest_employee_query = $conn->prepare("
+        SELECT ea.*, e.first_name, e.last_name,
+               GREATEST(
+                   COALESCE(UNIX_TIMESTAMP(CONCAT(ea.date, ' ', ea.time_in)), 0),
+                   COALESCE(UNIX_TIMESTAMP(CONCAT(ea.date, ' ', ea.time_out)), 0)
+               ) as last_activity
+        FROM teacher_attendance ea
+        JOIN employees e ON ea.$teacher_id_column = e.id_number
+        WHERE ea.date = ? 
+        ORDER BY last_activity DESC, ea.id DESC
+        LIMIT 1
+    ");
     $latest_employee_query->bind_param("s", $today);
     $latest_employee_query->execute();
     $latest_employee_result = $latest_employee_query->get_result();
@@ -42,7 +74,7 @@ if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['registrar', 'adm
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
     $rfid = strtoupper(trim($_POST['rfid']));
     
-    // First, try EMPLOYEE by RFID (any role). We use the employee_attendance table for employees.
+    // First, try TEACHER by RFID (any role). We use the teacher_attendance table for teachers.
     $employee_query = $conn->prepare("
         SELECT e.id_number, e.first_name, e.last_name, TRIM(UPPER(e.rfid_uid)) AS db_rfid
         FROM employees e
@@ -61,8 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
         $time = date("H:i:s");
         $day = date("l");
 
-        // Time in/out for employee_attendance
-        $t_check = $conn->prepare("SELECT * FROM employee_attendance WHERE employee_id = ? AND date = ? LIMIT 1");
+        // Time in/out for teacher_attendance
+        $t_check = $conn->prepare("SELECT * FROM teacher_attendance WHERE $teacher_id_column = ? AND date = ? LIMIT 1");
         $t_check->bind_param("ss", $emp_id, $today);
         $t_check->execute();
         $t_res = $t_check->get_result();
@@ -70,19 +102,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
             $row = $t_res->fetch_assoc();
             if (empty($row['time_in'])) {
                 // No time in yet -> record time in
-                $upd = $conn->prepare("UPDATE employee_attendance SET time_in = ? WHERE id = ?");
+                $upd = $conn->prepare("UPDATE teacher_attendance SET time_in = ? WHERE id = ?");
                 $upd->bind_param("si", $time, $row['id']);
                 $upd->execute();
                 $_SESSION['success'] = "Time In recorded for $employee_name at " . date('g:i A', strtotime($time));
             } else {
                 // Has time in -> always update time out to latest tap (mirror student behavior)
-                $upd = $conn->prepare("UPDATE employee_attendance SET time_out = ? WHERE id = ?");
+                $upd = $conn->prepare("UPDATE teacher_attendance SET time_out = ? WHERE id = ?");
                 $upd->bind_param("si", $time, $row['id']);
                 $upd->execute();
                 $_SESSION['success'] = "Time Out recorded for $employee_name at " . date('g:i A', strtotime($time));
             }
         } else {
-            $ins = $conn->prepare("INSERT INTO employee_attendance (employee_id, date, day, time_in) VALUES (?,?,?,?)");
+            $ins = $conn->prepare("INSERT INTO teacher_attendance ($teacher_id_column, date, day, time_in) VALUES (?,?,?,?)");
             $ins->bind_param("ssss", $emp_id, $today, $day, $time);
             $ins->execute();
             $_SESSION['success'] = "Time In recorded for $employee_name at " . date('g:i A', strtotime($time));
@@ -294,8 +326,8 @@ $view_role = $_SESSION['view_role'] ?? 'student';
 // Build query for attendance records depending on role (exclude absent records)
 if ($view_role === 'employee') {
     $sql = "SELECT ta.*, e.first_name, e.last_name 
-            FROM employee_attendance ta
-            JOIN employees e ON ta.employee_id = e.id_number
+            FROM teacher_attendance ta
+            JOIN employees e ON ta.$teacher_id_column = e.id_number
             WHERE (ta.time_in IS NOT NULL OR ta.time_out IS NOT NULL)";
 } else {
     $sql = "SELECT ar.*, sa.first_name, sa.last_name, sa.middle_name 
@@ -472,7 +504,7 @@ $attendance_records = $attendance_query->get_result();
             <?php if (($view_role ?? 'student') === 'employee' && isset($latest_employee) && $latest_employee): ?>
             <?php
               // Build employee display similar to HR logic
-              $empId = $latest_employee['employee_id'];
+              $empId = $latest_employee[$teacher_id_column];
               $dayName = date('l', strtotime($today));
               $shiftIn = null; $shiftOut = null; $hasDay = false;
               $ws = $conn->prepare("SELECT ws.start_time, ws.end_time, ws.days, ws.id AS schedule_id
@@ -1125,6 +1157,11 @@ document.addEventListener('click', function(event) {
     if (!burgerBtn.contains(event.target) && !burgerMenu.contains(event.target)) {
         burgerMenu.classList.add('hidden');
     }
+});
+
+// ===== PREVENT BACK BUTTON AFTER LOGOUT =====
+window.addEventListener("pageshow", function(event) {
+  if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
 });
 </script>
 

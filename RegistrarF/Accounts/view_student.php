@@ -48,12 +48,21 @@ if (!empty($student_id)) {
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_student'])) {
     // Prefer POSTed id_number; fallback to the id from query string if necessary
     $target_id = $_POST['id_number'] ?? $student_id;
-    $delete_stmt = $conn->prepare("DELETE FROM student_account WHERE id_number = ?");
-    $delete_stmt->bind_param("s", $target_id);
+    
+    // Ensure soft delete columns exist
+    $conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL DEFAULT NULL");
+    $conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) NULL");
+    $conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_reason TEXT NULL");
+    
+    // Use soft delete - mark as deleted but keep in database
+    $delete_stmt = $conn->prepare("UPDATE student_account SET deleted_at = NOW(), deleted_by = ?, deleted_reason = ? WHERE id_number = ?");
+    $deleted_by = $_SESSION['registrar_name'] ?? 'Registrar';
+    $deleted_reason = 'Deleted by registrar for administrative purposes';
+    $delete_stmt->bind_param("sss", $deleted_by, $deleted_reason, $target_id);
     
     if ($delete_stmt->execute()) {
         $_SESSION['success_msg'] = "Student account deleted successfully!";
-        header("Location: /onecci/RegistrarF/AccountList.php?type=student");
+        header("Location: /onecci/RegistrarF/AccountList.php");
         exit;
     } else {
         $error_msg = "Error deleting student account.";
@@ -112,35 +121,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             mother_name = ?, mother_occupation = ?, mother_contact = ?,
             guardian_name = ?, guardian_occupation = ?, guardian_contact = ?,
             last_school = ?, last_school_year = ?,
-            id_number = ?, rfid_uid = ?, password = ?
-            WHERE id_number = ?";
-        $update_stmt = $conn->prepare($update_sql);
-        $update_stmt->bind_param(
-            "sssssssssssssssssssssssssssssssss",
-            $lrn, $academic_track, $enrollment_status, $school_type,
-            $last_name, $first_name, $middle_name, $username,
-            $school_year, $grade_level, $semester,
-            $dob, $birthplace, $gender, $religion, $credentials,
-            $payment_mode, $address,
-            $father_name, $father_occupation, $father_contact,
-            $mother_name, $mother_occupation, $mother_contact,
-            $guardian_name, $guardian_occupation, $guardian_contact,
-            $last_school, $last_school_year,
-            $id_number, $rfid_uid, $hashed_password, $student_id
-        );
-    } else {
-        // Update without changing password
-        $update_sql = "UPDATE student_account SET 
-            lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
-            last_name = ?, first_name = ?, middle_name = ?, username = ?,
-            school_year = ?, grade_level = ?, semester = ?,
-            dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
-            payment_mode = ?, address = ?,
-            father_name = ?, father_occupation = ?, father_contact = ?,
-            mother_name = ?, mother_occupation = ?, mother_contact = ?,
-            guardian_name = ?, guardian_occupation = ?, guardian_contact = ?,
-            last_school = ?, last_school_year = ?,
-            id_number = ?, rfid_uid = ?
+            rfid_uid = ?, password = ?
             WHERE id_number = ?";
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bind_param(
@@ -154,7 +135,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             $mother_name, $mother_occupation, $mother_contact,
             $guardian_name, $guardian_occupation, $guardian_contact,
             $last_school, $last_school_year,
-            $id_number, $rfid_uid, $student_id
+            $rfid_uid, $hashed_password, $student_id
+        );
+    } else {
+        // Update without changing password
+        $update_sql = "UPDATE student_account SET 
+            lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
+            last_name = ?, first_name = ?, middle_name = ?, username = ?,
+            school_year = ?, grade_level = ?, semester = ?,
+            dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
+            payment_mode = ?, address = ?,
+            father_name = ?, father_occupation = ?, father_contact = ?,
+            mother_name = ?, mother_occupation = ?, mother_contact = ?,
+            guardian_name = ?, guardian_occupation = ?, guardian_contact = ?,
+            last_school = ?, last_school_year = ?,
+            rfid_uid = ?
+            WHERE id_number = ?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param(
+            "sssssssssssssssssssssssssssssss",
+            $lrn, $academic_track, $enrollment_status, $school_type,
+            $last_name, $first_name, $middle_name, $username,
+            $school_year, $grade_level, $semester,
+            $dob, $birthplace, $gender, $religion, $credentials,
+            $payment_mode, $address,
+            $father_name, $father_occupation, $father_contact,
+            $mother_name, $mother_occupation, $mother_contact,
+            $guardian_name, $guardian_occupation, $guardian_contact,
+            $last_school, $last_school_year,
+            $rfid_uid, $student_id
         );
     }
 
@@ -255,7 +264,11 @@ input[type=number] { -moz-appearance: textfield; }
             <h2 class="text-lg font-semibold text-white">Student Information</h2>
             <div class="flex gap-3">
                 <button type="button" id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
-                <button type="button" id="deleteBtn" onclick="confirmDelete()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>
+                <form method="post" action="<?= $_SERVER['PHP_SELF'] ?>?id=<?= htmlspecialchars($student_id) ?>" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this student account? This action cannot be undone.')">
+                    <input type="hidden" name="delete_student" value="1">
+                    <input type="hidden" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>">
+                    <button type="submit" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>
+                </form>
                 <button type="button" onclick="closeModal()" class="text-2xl font-bold text-white hover:text-gray-300">&times;</button>
             </div>
         </div>
@@ -717,7 +730,27 @@ function closeModal() {
 
 // Delete confirmation function
 function confirmDelete() {
-    showDeleteModal();
+    if (confirm('Are you sure you want to delete this student account? This action cannot be undone.')) {
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = window.location.href;
+        
+        const deleteInput = document.createElement('input');
+        deleteInput.type = 'hidden';
+        deleteInput.name = 'delete_student';
+        deleteInput.value = '1';
+        
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'id_number';
+        idInput.value = document.querySelector('input[name="id_number"]').value;
+        
+        form.appendChild(deleteInput);
+        form.appendChild(idInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 
 function showDeleteModal() {

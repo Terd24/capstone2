@@ -1,6 +1,9 @@
 <?php
 // This file handles adding new employees and optionally creating accounts
-session_start();
+// Note: session_start() is handled by the calling file (Dashboard.php)
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 include '../StudentLogin/db_conn.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -80,13 +83,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (empty($address)) {
             throw new Exception("Complete Address is required.");
         }
-        if (empty($rfid_uid) || !preg_match('/^[0-9]{10}$/', $rfid_uid)) {
-            throw new Exception("RFID must be exactly 10 digits (numbers only).");
+        // RFID validation - only required for teachers
+        if ($role === 'teacher') {
+            if (empty($rfid_uid) || !preg_match('/^[0-9]{10}$/', $rfid_uid)) {
+                throw new Exception("RFID must be exactly 10 digits (numbers only) for teacher accounts.");
+            }
+        } else {
+            // For non-teachers, RFID is optional but if provided must be valid
+            if (!empty($rfid_uid) && !preg_match('/^[0-9]{10}$/', $rfid_uid)) {
+                throw new Exception("RFID must be exactly 10 digits (numbers only) if provided.");
+            }
         }
 
-        // Insert employee
+        // Insert employee (set RFID to NULL if empty for non-teachers)
+        $rfid_value = ($role !== 'teacher' && empty($rfid_uid)) ? null : $rfid_uid;
         $stmt = $conn->prepare("INSERT INTO employees (id_number, first_name, middle_name, last_name, position, department, email, phone, address, rfid_uid, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssssssss", $id_number, $first_name, $middle_name, $last_name, $position, $department, $email, $phone, $address, $rfid_uid, $hire_date);
+        $stmt->bind_param("sssssssssss", $id_number, $first_name, $middle_name, $last_name, $position, $department, $email, $phone, $address, $rfid_value, $hire_date);
         if (!$stmt->execute()) {
             throw new Exception("Failed to add employee: " . $stmt->error);
         }
@@ -105,17 +117,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     employee_id VARCHAR(20) NOT NULL,
                     username VARCHAR(50) UNIQUE NOT NULL,
                     password VARCHAR(255) NOT NULL,
-                    role ENUM('registrar','cashier','guidance','attendance','hr','employee') NOT NULL,
+                    role ENUM('registrar','cashier','guidance','attendance','hr','teacher') NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (employee_id) REFERENCES employees(id_number) ON DELETE CASCADE
                 )";
                 $conn->query($create_accounts_table);
             }
-            // Ensure ENUM includes employee and hr
+            // Ensure ENUM includes teacher and hr
             $roleColumn = $conn->query("SHOW COLUMNS FROM employee_accounts LIKE 'role'")->fetch_assoc();
             if ($roleColumn && isset($roleColumn['Type'])) {
-                if (strpos($roleColumn['Type'], "'employee'") === false || strpos($roleColumn['Type'], "'hr'") === false) {
-                    $conn->query("ALTER TABLE employee_accounts MODIFY role ENUM('registrar','cashier','guidance','attendance','hr','employee') NOT NULL");
+                if (strpos($roleColumn['Type'], "'teacher'") === false || strpos($roleColumn['Type'], "'hr'") === false) {
+                    $conn->query("ALTER TABLE employee_accounts MODIFY role ENUM('registrar','cashier','guidance','attendance','hr','teacher') NOT NULL");
                 }
             }
 
@@ -144,7 +156,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         error_log("POST data: " . print_r($_POST, true));
     }
 
-    header("Location: Dashboard.php");
-    exit;
+    // Don't redirect when included - let Dashboard.php handle the display
+    return;
 }
 ?>

@@ -15,11 +15,11 @@ if (!isset($_GET['id'])) {
 
 $employee_id = $_GET['id'];
 
-// Fetch employee details
+// Fetch employee details (only active employees - not soft deleted)
 $stmt = $conn->prepare("SELECT e.*, ea.username, ea.role as account_role 
                        FROM employees e 
                        LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id 
-                       WHERE e.id_number = ?
+                       WHERE e.id_number = ? AND e.deleted_at IS NULL
                        LIMIT 1");
 $stmt->bind_param("s", $employee_id);
 $stmt->execute();

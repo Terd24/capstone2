@@ -5,20 +5,19 @@ include("../StudentLogin/db_conn.php");
 // Set correct timezone for Philippines
 date_default_timezone_set('Asia/Manila');
 
-// Prevent access if not logged in
 if (!isset($_SESSION['registrar_id'])) {
     header("Location: ../StudentLogin/login.html");
     exit;
 }
 
-// Prevent browser caching
+// Prevent browser caching (so back button after logout doesn't show dashboard)
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 header("Expires: 0");
 
 // Ensure column exists for read/unread
 $conn->query("ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS is_read TINYINT(1) DEFAULT 0");
-
 // Fetch all requests - prioritize oldest pending first, then other statuses, claimed last
 $result = $conn->query("SELECT * FROM document_requests ORDER BY 
     CASE 
@@ -921,6 +920,11 @@ function showToast(message){
   setTimeout(()=>{ toast.style.opacity='0'; }, 2000);
   setTimeout(()=>{ toast.remove(); }, 2600);
 }
+
+// ===== PREVENT BACK BUTTON AFTER LOGOUT =====
+window.addEventListener("pageshow", function(event) {
+  if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
+});
 </script>
 </body>
 </html>

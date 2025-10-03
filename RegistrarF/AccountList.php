@@ -20,10 +20,47 @@ if ($success_msg) {
 }
 
 
+// Get selected school year filter
+$selected_school_year = $_GET['school_year'] ?? '';
+
+// Get all available school years for dropdown
+$school_years = [];
+$year_query = $conn->query("SELECT DISTINCT school_year FROM student_account WHERE deleted_at IS NULL AND school_year IS NOT NULL AND school_year != '' ORDER BY school_year DESC");
+if ($year_query) {
+    while ($year_row = $year_query->fetch_assoc()) {
+        $school_years[] = $year_row['school_year'];
+    }
+}
+
 // Build student-only list
 $rows = [];
 
-$student_q = $conn->query("SELECT id_number, first_name, last_name, academic_track, grade_level FROM student_account");
+// Ensure soft delete columns exist
+$conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL DEFAULT NULL");
+$conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) NULL");
+$conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_reason TEXT NULL");
+
+// Build query with school year filter
+$where_clause = "WHERE deleted_at IS NULL";
+$params = [];
+$types = "";
+
+if (!empty($selected_school_year)) {
+    $where_clause .= " AND school_year = ?";
+    $params[] = $selected_school_year;
+    $types .= "s";
+}
+
+// Only show active students (not soft-deleted) with optional school year filter
+if (!empty($params)) {
+    $stmt = $conn->prepare("SELECT id_number, first_name, last_name, academic_track, grade_level, school_year FROM student_account $where_clause");
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $student_q = $stmt->get_result();
+} else {
+    $student_q = $conn->query("SELECT id_number, first_name, last_name, academic_track, grade_level, school_year FROM student_account $where_clause");
+}
+
 if ($student_q) {
     while ($s = $student_q->fetch_assoc()) {
         $rows[] = [
@@ -31,6 +68,7 @@ if ($student_q) {
             'full_name' => $s['first_name'] . ' ' . $s['last_name'],
             'academic_track' => $s['academic_track'],
             'grade_level' => $s['grade_level'],
+            'school_year' => $s['school_year'],
         ];
     }
 }
@@ -95,9 +133,23 @@ input[type=number] { -moz-appearance: textfield; }
 
     <!-- Top Controls -->
     <div class="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-[#0B2C62]/10">
-        <div class="flex items-center gap-3">
-            <label class="font-medium text-[#0B2C62] text-sm">Show entries:</label>
-            <input type="number" id="showEntries" min="1" value="10" class="w-20 border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3">
+                <label class="font-medium text-[#0B2C62] text-sm">Show entries:</label>
+                <input type="number" id="showEntries" min="1" value="10" class="w-20 border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <label class="font-medium text-[#0B2C62] text-sm">School Year:</label>
+                <select id="schoolYearFilter" onchange="filterBySchoolYear()" class="border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] min-w-[140px]">
+                    <option value="">All Years</option>
+                    <?php foreach ($school_years as $year): ?>
+                        <option value="<?= htmlspecialchars($year) ?>" <?= $selected_school_year === $year ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($year) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </div>
 
         <div class="flex items-center gap-3">
@@ -124,7 +176,7 @@ input[type=number] { -moz-appearance: textfield; }
             <tbody id="accountTable" class="divide-y divide-gray-200">
                 <?php if (!empty($rows)): ?>
                     <?php foreach ($rows as $r): ?>
-                        <tr class="hover:bg-[#FBB917]/20 transition cursor-pointer" onclick="viewStudent('<?= htmlspecialchars($r['id_number']) ?>');" >
+                        <tr class="hover:bg-[#FBB917]/20 transition cursor-pointer" onclick="viewStudent('<?= htmlspecialchars($r['id_number']) ?>')">
                             <td class="px-4 py-3"><?= htmlspecialchars($r['id_number']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($r['full_name']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($r['academic_track']) ?></td>
@@ -385,6 +437,20 @@ function updateEntries() {
 showEntriesInput.addEventListener('input', updateEntries);
 searchInput.addEventListener('input', updateEntries);
 updateEntries();
+
+// School Year Filter Function
+function filterBySchoolYear() {
+    const selectedYear = document.getElementById('schoolYearFilter').value;
+    const currentUrl = new URL(window.location.href);
+    
+    if (selectedYear) {
+        currentUrl.searchParams.set('school_year', selectedYear);
+    } else {
+        currentUrl.searchParams.delete('school_year');
+    }
+    
+    window.location.href = currentUrl.toString();
+}
 
 // Remove duplicate function definition since it's now at the top
 </script>

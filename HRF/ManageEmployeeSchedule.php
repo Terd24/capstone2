@@ -1010,6 +1010,7 @@ function loadStudentsPage(append){
     else { params.set('query', studentsQuery); }
     params.set('limit', studentsLimit);
     params.set('offset', studentsOffset);
+    params.set('role', 'teacher'); // Only show teachers
     fetch('SearchEmployee.php?' + params.toString())
         .then(r=>r.json())
         .then(d=>{

@@ -6,7 +6,7 @@ include '../StudentLogin/db_conn.php';
 echo "<h2>Delete Employee Test</h2>";
 
 // Check if tables exist
-$tables = ['employees', 'employee_accounts', 'employee_attendance'];
+$tables = ['employees', 'employee_accounts', 'teacher_attendance'];
 foreach ($tables as $table) {
     $result = $conn->query("SHOW TABLES LIKE '$table'");
     if ($result->num_rows > 0) {
