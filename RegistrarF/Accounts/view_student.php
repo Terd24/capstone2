@@ -296,27 +296,32 @@ input[type=number] { -moz-appearance: textfield; }
                             <label class="block text-sm font-semibold mb-1">Academic Track / Course</label>
                             <select name="academic_track" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
                                 <option value="">-- Select Academic Track / Course --</option>
+
+                                <optgroup label="Pre-Elementary">
+                                    <option value="Pre-Elementary" <?= ($student_data['academic_track'] ?? '') === 'Pre-Elementary' ? 'selected' : '' ?>>Kinder</option>
+                                </optgroup>
+
                                 <optgroup label="Elementary">
                                     <option value="Elementary" <?= ($student_data['academic_track'] ?? '') === 'Elementary' ? 'selected' : '' ?>>Elementary</option>
                                 </optgroup>
+
                                 <optgroup label="Junior High School">
                                     <option value="Junior High School" <?= ($student_data['academic_track'] ?? '') === 'Junior High School' ? 'selected' : '' ?>>Junior High School</option>
                                 </optgroup>
+
                                 <optgroup label="Senior High School Strands">
-                                    <option value="STEM" <?= ($student_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
                                     <option value="ABM" <?= ($student_data['academic_track'] ?? '') === 'ABM' ? 'selected' : '' ?>>ABM (Accountancy, Business & Management)</option>
-                                    <option value="HUMSS" <?= ($student_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
                                     <option value="GAS" <?= ($student_data['academic_track'] ?? '') === 'GAS' ? 'selected' : '' ?>>GAS (General Academic Strand)</option>
-                                    <option value="TVL" <?= ($student_data['academic_track'] ?? '') === 'TVL' ? 'selected' : '' ?>>TVL (Technical-Vocational-Livelihood)</option>
-                                    <option value="Arts and Design" <?= ($student_data['academic_track'] ?? '') === 'Arts and Design' ? 'selected' : '' ?>>Arts and Design</option>
+                                    <option value="HE" <?= ($student_data['academic_track'] ?? '') === 'HE' ? 'selected' : '' ?>>HE (Home Economics)</option>
+                                    <option value="HUMSS" <?= ($student_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
+                                    <option value="ICT" <?= ($student_data['academic_track'] ?? '') === 'ICT' ? 'selected' : '' ?>>ICT (Information and Communications Technology)</option>
+                                    <option value="SPORTS" <?= ($student_data['academic_track'] ?? '') === 'SPORTS' ? 'selected' : '' ?>>SPORTS</option>
+                                    <option value="STEM" <?= ($student_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
                                 </optgroup>
+
                                 <optgroup label="College Courses">
-                                    <option value="BS Information Technology" <?= ($student_data['academic_track'] ?? '') === 'BS Information Technology' ? 'selected' : '' ?>>BS Information Technology</option>
-                                    <option value="BS Computer Science" <?= ($student_data['academic_track'] ?? '') === 'BS Computer Science' ? 'selected' : '' ?>>BS Computer Science</option>
-                                    <option value="BS Business Administration" <?= ($student_data['academic_track'] ?? '') === 'BS Business Administration' ? 'selected' : '' ?>>BS Business Administration</option>
-                                    <option value="BS Accountancy" <?= ($student_data['academic_track'] ?? '') === 'BS Accountancy' ? 'selected' : '' ?>>BS Accountancy</option>
-                                    <option value="BS Hospitality Management" <?= ($student_data['academic_track'] ?? '') === 'BS Hospitality Management' ? 'selected' : '' ?>>BS Hospitality Management</option>
-                                    <option value="BS Education" <?= ($student_data['academic_track'] ?? '') === 'BS Education' ? 'selected' : '' ?>>BS Education</option>
+                                    <option value="Bachelor of Physical Education (BPed)" <?= ($student_data['academic_track'] ?? '') === 'Bachelor of Physical Education (BPed)' ? 'selected' : '' ?>>Bachelor of Physical Education (BPed)</option>
+                                    <option value="Bachelor of Early Childhood Education (BECEd)" <?= ($student_data['academic_track'] ?? '') === 'Bachelor of Early Childhood Education (BECEd)' ? 'selected' : '' ?>>Bachelor of Early Childhood Education (BECEd)</option>
                                 </optgroup>
                             </select>
                         </div>

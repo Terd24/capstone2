@@ -871,27 +871,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                             <label class="block text-sm font-semibold mb-1">Academic Track / Course *</label>
                             <select name="academic_track" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                                 <option value="">-- Select Academic Track / Course --</option>
+
+                                <optgroup label="Pre-Elementary">
+                                    <option value="Pre-Elementary" <?= ($form_data['academic_track'] ?? '') === 'Pre-Elementary' ? 'selected' : '' ?>>Kinder</option>
+                                </optgroup>
+
                                 <optgroup label="Elementary">
                                     <option value="Elementary" <?= ($form_data['academic_track'] ?? '') === 'Elementary' ? 'selected' : '' ?>>Elementary</option>
                                 </optgroup>
+
                                 <optgroup label="Junior High School">
                                     <option value="Junior High School" <?= ($form_data['academic_track'] ?? '') === 'Junior High School' ? 'selected' : '' ?>>Junior High School</option>
                                 </optgroup>
+
                                 <optgroup label="Senior High School Strands">
-                                    <option value="STEM" <?= ($form_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
                                     <option value="ABM" <?= ($form_data['academic_track'] ?? '') === 'ABM' ? 'selected' : '' ?>>ABM (Accountancy, Business & Management)</option>
-                                    <option value="HUMSS" <?= ($form_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
                                     <option value="GAS" <?= ($form_data['academic_track'] ?? '') === 'GAS' ? 'selected' : '' ?>>GAS (General Academic Strand)</option>
-                                    <option value="TVL" <?= ($form_data['academic_track'] ?? '') === 'TVL' ? 'selected' : '' ?>>TVL (Technical-Vocational-Livelihood)</option>
-                                    <option value="Arts and Design" <?= ($form_data['academic_track'] ?? '') === 'Arts and Design' ? 'selected' : '' ?>>Arts and Design</option>
+                                    <option value="HE" <?= ($form_data['academic_track'] ?? '') === 'HE' ? 'selected' : '' ?>>HE (Home Economics)</option>
+                                    <option value="HUMSS" <?= ($form_data['academic_track'] ?? '') === 'HUMSS' ? 'selected' : '' ?>>HUMSS (Humanities & Social Sciences)</option>
+                                    <option value="ICT" <?= ($form_data['academic_track'] ?? '') === 'ICT' ? 'selected' : '' ?>>ICT (Information and Communications Technology)</option>
+                                    <option value="SPORTS" <?= ($form_data['academic_track'] ?? '') === 'SPORTS' ? 'selected' : '' ?>>SPORTS</option>
+                                    <option value="STEM" <?= ($form_data['academic_track'] ?? '') === 'STEM' ? 'selected' : '' ?>>STEM (Science, Technology, Engineering & Mathematics)</option>
                                 </optgroup>
+
                                 <optgroup label="College Courses">
-                                    <option value="BS Information Technology" <?= ($form_data['academic_track'] ?? '') === 'BS Information Technology' ? 'selected' : '' ?>>BS Information Technology</option>
-                                    <option value="BS Computer Science" <?= ($form_data['academic_track'] ?? '') === 'BS Computer Science' ? 'selected' : '' ?>>BS Computer Science</option>
-                                    <option value="BS Business Administration" <?= ($form_data['academic_track'] ?? '') === 'BS Business Administration' ? 'selected' : '' ?>>BS Business Administration</option>
-                                    <option value="BS Accountancy" <?= ($form_data['academic_track'] ?? '') === 'BS Accountancy' ? 'selected' : '' ?>>BS Accountancy</option>
-                                    <option value="BS Hospitality Management" <?= ($form_data['academic_track'] ?? '') === 'BS Hospitality Management' ? 'selected' : '' ?>>BS Hospitality Management</option>
-                                    <option value="BS Education" <?= ($form_data['academic_track'] ?? '') === 'BS Education' ? 'selected' : '' ?>>BS Education</option>
+                                    <option value="Bachelor of Physical Education (BPed)" <?= ($form_data['academic_track'] ?? '') === 'Bachelor of Physical Education (BPed)' ? 'selected' : '' ?>>Bachelor of Physical Education (BPed)</option>
+                                    <option value="Bachelor of Early Childhood Education (BECEd)" <?= ($form_data['academic_track'] ?? '') === 'Bachelor of Early Childhood Education (BECEd)' ? 'selected' : '' ?>>Bachelor of Early Childhood Education (BECEd)</option>
                                 </optgroup>
                             </select>
                         </div>
@@ -1132,10 +1137,23 @@ function toggleNewOptions() {
 
 // Grade level options mapping
 const gradeOptions = {
-    "Elementary": ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
-    "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
-    "Senior High School Strands": ["Grade 11", "Grade 12"],
-    "College Courses": ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+  "Pre-Elementary": ["Kinder"],
+  "Elementary": ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"],
+  "Junior High School": ["Grade 7","Grade 8","Grade 9","Grade 10"],
+  "Senior High School Strands": ["Grade 11","Grade 12"],
+
+  // Allow direct strand selections to work too
+  "ABM": ["Grade 11","Grade 12"],
+  "GAS": ["Grade 11","Grade 12"],
+  "HE": ["Grade 11","Grade 12"],
+  "HUMSS": ["Grade 11","Grade 12"],
+  "ICT": ["Grade 11","Grade 12"],
+  "SPORTS": ["Grade 11","Grade 12"],
+  "STEM": ["Grade 11","Grade 12"],
+
+  "College Courses": ["1st Year","2nd Year","3rd Year","4th Year"],
+  "Bachelor of Physical Education (BPed)": ["1st Year","2nd Year","3rd Year","4th Year"],
+  "Bachelor of Early Childhood Education (BECEd)": ["1st Year","2nd Year","3rd Year","4th Year"]
 };
 
 // Function to populate grade levels

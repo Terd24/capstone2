@@ -54,6 +54,14 @@ if (isset($_GET['success'])) {
 $terms_query = "SELECT DISTINCT school_year_term FROM grades_record ORDER BY school_year_term DESC";
 $terms_result = $conn->query($terms_query);
 
+// Fetch available teachers (employees with teacher accounts)
+$teachers_sql = "SELECT e.id_number, CONCAT(e.first_name, ' ', e.last_name) AS full_name
+                 FROM employees e
+                 INNER JOIN employee_accounts a ON a.employee_id = e.id_number AND a.role = 'teacher'
+                 WHERE e.deleted_at IS NULL OR e.deleted_at IS NULL
+                 ORDER BY full_name";
+$teachers_result = $conn->query($teachers_sql);
+
 // Handle entries parameter
 $entries_limit = 10; // default
 if (isset($_GET['entries'])) {
@@ -159,7 +167,7 @@ $grades_result = $conn->query($grades_query);
                     <h2 class="text-2xl font-bold text-gray-800" id="student-name-display">Student Grades</h2>
                     <p class="text-gray-600" id="student-id-display">Academic Performance Overview</p>
                 </div>
-                <button onclick="showAddGradeModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                <button id="addGradeBtn" type="button" onclick="showAddGradeModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg relative z-10">
                     Add New Grade
                 </button>
             </div>
@@ -194,16 +202,55 @@ $grades_result = $conn->query($grades_query);
                 <input type="hidden" id="modal-student-id" name="student_id">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                    <input type="text" name="subject" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                    <select id="subjectSelect" name="subject" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <option value="">-- Select Subject --</option>
+                        <option>Filipino</option>
+                        <option>English</option>
+                        <option>Mathematics</option>
+                        <option>Science</option>
+                        <option>Araling Panlipunan</option>
+                        <option>MAPEH</option>
+                        <option>Edukasyon sa Pagpapakatao</option>
+                        <option>TLE</option>
+                        <option>EPP/TLE</option>
+                        <option>Oral Communication</option>
+                        <option>Reading and Writing</option>
+                        <option>General Mathematics</option>
+                        <option>Statistics and Probability</option>
+                        <option>Earth and Life Science</option>
+                        <option>Physical Science</option>
+                        <option>PE and Health</option>
+                        <option>UCSP</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Teacher</label>
-                    <input type="text" name="teacher" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                    <select id="teacherSelect" name="teacher" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <option value="">-- Select Teacher --</option>
+                        <?php if ($teachers_result && $teachers_result->num_rows > 0): ?>
+                            <?php while ($t = $teachers_result->fetch_assoc()): ?>
+                                <option value="<?= htmlspecialchars($t['full_name']) ?>" data-name="<?= htmlspecialchars($t['full_name']) ?>">
+                                    <?= htmlspecialchars($t['full_name']) ?>
+                                </option>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <option value="" disabled>No teachers found</option>
+                        <?php endif; ?>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">School Year & Term</label>
-                    <input type="text" name="school_year_term" placeholder="e.g., 2024-2025 1st Term" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                    <p class="text-xs text-gray-500 mt-1">Leave blank to use current term</p>
+                    <select id="modalTermSelect" name="school_year_term" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <?php if ($terms_result && $terms_result->num_rows > 0): ?>
+                            <?php 
+                              $terms_result->data_seek(0);
+                              while ($row = $terms_result->fetch_assoc()): 
+                                $term = $row['school_year_term'];
+                            ?>
+                              <option value="<?= htmlspecialchars($term) ?>"><?= htmlspecialchars($term) ?></option>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
+                    </select>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -258,6 +305,136 @@ $grades_result = $conn->query($grades_query);
 </div>
 
 <script>
+// --------- Dynamic Subject Options (course/grade/year + term aware) ---------
+
+// Parse grade text to detect Kinder, Grades, or College Year (encoded 101..104)
+function parseGradeLevel(glText){
+  if (!glText) return null;
+  if (/kinder/i.test(glText)) return 0;
+  // Grade N
+  const g = String(glText).match(/\b(?:Grade\s*(\d+)|G(\d+))\b/i);
+  if (g) return parseInt(g[1]||g[2], 10);
+  // College year like "1st Year", "2nd Year"
+  const y = String(glText).match(/(\d)\s*(st|nd|rd|th)\s*Year/i);
+  if (y) return 100 + parseInt(y[1],10); // 101..104 encode college year
+  return null;
+}
+
+// Read current term from the modal term dropdown
+function getTermNumber() {
+  const sel = document.getElementById('modalTermSelect');
+  if (!sel) return 1;
+  const val = sel.value || '';
+  return /2nd/i.test(val) ? 2 : 1;
+}
+
+// Return array of subject names based on student info + selected term
+function subjectListFor(info){
+  const gradeEncoded = parseGradeLevel(info?.gradeLevelText||'');
+  const programRaw = (info?.program||'').trim();
+  const program = programRaw.toUpperCase();
+  const term = getTermNumber();
+
+  // Pre-Elementary / Kinder
+  const kinder = ['Mother Tongue','Filipino','English','Mathematics','Science'];
+
+  // Elementary G1-3
+  const elem13 = ['Filipino','English','Mathematics','Science','Araling Panlipunan','MAPEH','Edukasyon sa Pagpapakatao'];
+  // Elementary G4-6 adds EPP/TLE
+  const elem46 = [...elem13, 'EPP/TLE'];
+
+  // Junior HS G7-10
+  const jhs = ['Filipino','English','Mathematics','Science','Araling Panlipunan','MAPEH','Edukasyon sa Pagpapakatao','TLE'];
+
+  // Senior HS core split by term
+  const shsCoreT1 = ['Oral Communication','General Mathematics','Earth and Life Science','Physical Education and Health','Understanding Culture, Society, and Politics'];
+  const shsCoreT2 = ['Reading and Writing','Statistics and Probability','Physical Science','Komunikasyon at Pananaliksik','21st Century Literature','Media and Information Literacy','Contemporary Philippine Arts'];
+
+  const shsSTEM_T1 = [...shsCoreT1, 'Pre-Calculus','Physics'];
+  const shsSTEM_T2 = [...shsCoreT2, 'Basic Calculus','Chemistry','Research Project'];
+
+  const shsABM_T1 = [...shsCoreT1, 'Business Math','Organization and Management'];
+  const shsABM_T2 = [...shsCoreT2, 'Applied Economics','Principles of Marketing'];
+
+  const shsHUMSS_T1 = [...shsCoreT1, 'Disciplines and Ideas in the Social Sciences','Creative Writing'];
+  const shsHUMSS_T2 = [...shsCoreT2, 'Disciplines and Ideas in the Applied Social Sciences','World Religions and Belief Systems','Introduction to World Politics'];
+
+  const shsHE_T1 = [...shsCoreT1, 'HE Specialization'];
+  const shsHE_T2 = [...shsCoreT2, 'HE Specialization'];
+  const shsICT_T1 = [...shsCoreT1, 'ICT Specialization'];
+  const shsICT_T2 = [...shsCoreT2, 'ICT Specialization'];
+  const shsSPORTS_T1 = [...shsCoreT1, 'Sports Specialization'];
+  const shsSPORTS_T2 = [...shsCoreT2, 'Sports Specialization'];
+
+  // College programs (Year 1..4, Term 1/2)
+  const college_BPED = {
+    1: { 1: ['Anatomy and Physiology','Foundations of Physical Education','Movement Fundamentals','Purposive Communication','Readings in Philippine History'],
+         2: ['Physical Fitness and Conditioning','Individual and Dual Sports','Team Sports','Science, Technology, and Society','The Contemporary World'] },
+    2: { 1: ['Exercise Physiology','Rhythmic Activities','Outdoor and Recreational Activities','Ethics','Art Appreciation'],
+         2: ['Assessment in PE','Sports Management','Dance and Games','Understanding the Self','PE Elective'] },
+    3: { 1: ['Research in PE 1','Coaching Principles','Officiating and Game Rules','Philippine History Readings'],
+         2: ['Research in PE 2','Fitness Testing and Programming','Adapted Physical Education','NSTP 2'] },
+    4: { 1: ['Teaching Internship 1'], 2: ['Teaching Internship 2'] }
+  };
+
+  const college_BECED = {
+    1: { 1: ['Child and Adolescent Development','Foundations of Early Childhood Education','Facilitating Learning','Purposive Communication','Mathematics in the Modern World'],
+         2: ['Curriculum in ECE','Play and Developmentally Appropriate Practices','Assessment in ECE','Science, Technology, and Society','The Contemporary World'] },
+    2: { 1: ['Language and Literacy in ECE','Guidance and Counseling in ECE','Technology for Teaching and Learning','Ethics','Art Appreciation'],
+         2: ['Health, Nutrition and Safety in ECE','Research in ECE 1','Family, School and Community Partnership','Understanding the Self','PE/NSTP'] },
+    3: { 1: ['Research in ECE 2','Social Studies in ECE','Science in ECE','Field Study 1'],
+         2: ['Math in ECE','Creative Arts and Music in ECE','Field Study 2'] },
+    4: { 1: ['Teaching Internship 1'], 2: ['Teaching Internship 2'] }
+  };
+
+  // Decision tree
+  if (gradeEncoded === 0) return kinder;
+  if (gradeEncoded && gradeEncoded >=1 && gradeEncoded <=3) return elem13;
+  if (gradeEncoded && gradeEncoded >=4 && gradeEncoded <=6) return elem46;
+  if (gradeEncoded && gradeEncoded >=7 && gradeEncoded <=10) return jhs;
+
+  // SHS (grade 11/12)
+  if (gradeEncoded === 11 || gradeEncoded === 12) {
+    if (program.includes('STEM')) return term === 1 ? shsSTEM_T1 : shsSTEM_T2;
+    if (program.includes('ABM')) return term === 1 ? shsABM_T1 : shsABM_T2;
+    if (program.includes('HUMSS')) return term === 1 ? shsHUMSS_T1 : shsHUMSS_T2;
+    if (program.includes('HE')) return term === 1 ? shsHE_T1 : shsHE_T2;
+    if (program.includes('ICT')) return term === 1 ? shsICT_T1 : shsICT_T2;
+    if (program.includes('SPORTS')) return term === 1 ? shsSPORTS_T1 : shsSPORTS_T2;
+    // Generic SHS core
+    return term === 1 ? shsCoreT1 : shsCoreT2;
+  }
+
+  // College (encoded 101..104)
+  if (gradeEncoded && gradeEncoded >= 101 && gradeEncoded <= 104) {
+    const year = gradeEncoded - 100; // 1..4
+    if (program.includes('PHYSICAL EDUCATION') || program.includes('BPED')) {
+      return (college_BPED[year] && college_BPED[year][term]) ? college_BPED[year][term] : [];
+    }
+    if (program.includes('EARLY CHILDHOOD') || program.includes('BECED')) {
+      return (college_BECED[year] && college_BECED[year][term]) ? college_BECED[year][term] : [];
+    }
+    // Default college GE if unmatched
+    const collegeGE = ['Purposive Communication','Mathematics in the Modern World','Science, Technology, and Society','The Contemporary World','Art Appreciation','Readings in Philippine History','Understanding the Self','Ethics','Physical Education','NSTP'];
+    return collegeGE;
+  }
+
+  return [];
+}
+
+function populateSubjectOptions(info, preselectSubject=null){
+  const sel = document.getElementById('subjectSelect');
+  if (!sel) return;
+  const subjects = subjectListFor(info);
+  sel.innerHTML = '<option value="">-- Select Subject --</option>';
+  subjects.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+  if (preselectSubject){
+    if (!subjects.includes(preselectSubject)){
+      const o=document.createElement('option'); o.value=preselectSubject; o.textContent=preselectSubject; sel.appendChild(o);
+    }
+    sel.value = preselectSubject;
+  }
+}
 let currentStudentId = null;
 
 // Search students function
@@ -296,15 +473,20 @@ function searchStudents() {
                 students.forEach(student => {
                     const displayName = student.full_name || `${student.first_name} ${student.last_name}`;
                     const gradeLevel = student.year_section || student.grade_level || 'N/A';
+                    const program = student.program || '';
+                    // Escape values for attribute context
+                    const safeName = String(displayName).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                    const safeGL = String(gradeLevel).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                    const safeProg = String(program).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
                     
                     resultsHTML += `
                         <div class="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg cursor-pointer transition-colors" 
-                             onclick="viewStudentGrades('${student.id_number}', '${displayName}')">
+                             onclick="viewStudentGrades('${student.id_number}', '${safeName}', '${safeGL}', '${safeProg}')">
                             <div class="flex justify-between items-center">
                                 <div>
                                     <h3 class="font-medium text-gray-800">${displayName}</h3>
                                     <p class="text-sm text-gray-600">ID: ${student.id_number} • ${gradeLevel}</p>
-                                    ${student.program ? `<p class="text-xs text-gray-500">${student.program}</p>` : ''}
+                                    ${program ? `<p class="text-xs text-gray-500">${program}</p>` : ''}
                                 </div>
                                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -327,10 +509,13 @@ function searchStudents() {
 
 
 // View student grades
-function viewStudentGrades(studentId, studentName) {
+let currentStudentInfo = { gradeLevelText: null, program: null };
+
+function viewStudentGrades(studentId, studentName, gradeLevelText = '', program = '') {
     currentStudentId = studentId;
     document.getElementById('student-name-display').textContent = studentName;
     document.getElementById('student-id-display').textContent = `ID: ${studentId} • Academic Performance Overview`;
+    currentStudentInfo = { gradeLevelText, program };
     
     document.getElementById('student-search-section').classList.add('hidden');
     document.getElementById('student-grades-view').classList.remove('hidden');
@@ -458,9 +643,44 @@ function editGradeModal(grade) {
     document.getElementById('addGradeForm').reset();
     
     // Populate the modal with grade data
-    document.querySelector('input[name="subject"]').value = grade.subject;
-    document.querySelector('input[name="teacher"]').value = grade.teacher_name || grade.teacher;
-    document.querySelector('input[name="school_year_term"]').value = grade.school_year_term || '';
+    // Populate subjects based on current student, then select existing subject
+    populateSubjectOptions(currentStudentInfo, grade.subject);
+    
+    // Ensure term change listener is active
+    const termSelect = document.getElementById('modalTermSelect');
+    if (termSelect && !termSelect.hasAttribute('data-listener-added')) {
+        termSelect.addEventListener('change', function() {
+            populateSubjectOptions(currentStudentInfo, grade.subject);
+        });
+        termSelect.setAttribute('data-listener-added', 'true');
+    }
+    // Set teacher dropdown selection by name
+    (function(){
+        const sel = document.getElementById('teacherSelect');
+        if (!sel) return;
+        const targetName = (grade.teacher_name || grade.teacher || '').trim();
+        let matched = false;
+        Array.from(sel.options).forEach(opt => {
+            if ((opt.dataset && (opt.dataset.name||'').trim()) === targetName) {
+                sel.value = opt.value;
+                matched = true;
+            }
+        });
+        if (!matched) sel.value = '';
+    })();
+    // Set term select for edit
+    (function(){
+        const sel = document.getElementById('modalTermSelect');
+        if (!sel) return;
+        const term = (grade.school_year_term || '').trim();
+        if (!term) { sel.value = ''; return; }
+        let found = false;
+        Array.from(sel.options).forEach(o => { if ((o.value||'') === term) found = true; });
+        if (!found) {
+            const opt = document.createElement('option'); opt.value = term; opt.textContent = term; sel.appendChild(opt);
+        }
+        sel.value = term;
+    })();
     document.querySelector('input[name="prelim"]').value = grade.prelim || '';
     document.querySelector('input[name="midterm"]').value = grade.midterm || '';
     document.querySelector('input[name="prefinals"]').value = grade.pre_finals || '';
@@ -542,6 +762,17 @@ function showAddGradeModal() {
         // Reset form for new grade
         document.getElementById('addGradeForm').reset();
         document.getElementById('modal-student-id').value = currentStudentId;
+        // Populate subjects for this student's level/track
+        populateSubjectOptions(currentStudentInfo);
+        
+        // Add term change listener if not already added
+        const termSelect = document.getElementById('modalTermSelect');
+        if (termSelect && !termSelect.hasAttribute('data-listener-added')) {
+            termSelect.addEventListener('change', function() {
+                populateSubjectOptions(currentStudentInfo);
+            });
+            termSelect.setAttribute('data-listener-added', 'true');
+        }
         
         // Get latest term and populate the field
         getLatestTermAndPopulate();
@@ -563,14 +794,49 @@ function getLatestTermAndPopulate() {
     })
     .then(response => response.json())
     .then(data => {
+        const sel = document.getElementById('modalTermSelect');
+        if (!sel) return;
         if (data.success && data.latest_term) {
-            document.querySelector('input[name="school_year_term"]').value = data.latest_term;
+            const latest = String(data.latest_term);
+            // Add latest if missing
+            if (!Array.from(sel.options).some(o=>o.value===latest)){
+                const opt = document.createElement('option'); opt.value = latest; opt.textContent = latest; sel.appendChild(opt);
+            }
+            // Build list of all terms
+            let terms = Array.from(sel.options).map(o=>o.value).filter(v=>v);
+            // Compute next (advance) term
+            const m = latest.match(/^(\d{4})-(\d{4})\s+(\d)(st|nd|rd|th)\s+Term$/i);
+            if (m){
+                let y1 = parseInt(m[1],10), y2 = parseInt(m[2],10);
+                let nth = parseInt(m[3],10);
+                let next;
+                if (nth === 1){ next = `${y1}-${y2} 2nd Term`; }
+                else { next = `${y1+1}-${y2+1} 1st Term`; }
+                if (!terms.includes(next)) terms.push(next);
+            }
+            // Sort: by start year desc, then 2nd before 1st
+            terms = Array.from(new Set(terms)).sort((a,b)=>{
+                const pa = a.match(/^(\d{4})-(\d{4})\s+(\d)/); const pb = b.match(/^(\d{4})-(\d{4})\s+(\d)/);
+                if (!pa || !pb) return 0;
+                const ya = parseInt(pa[1],10), yb = parseInt(pb[1],10);
+                if (yb !== ya) return yb - ya;
+                const ta = parseInt(pa[3],10), tb = parseInt(pb[3],10);
+                return tb - ta; // 2 before 1
+            });
+            // Rebuild options (advance term will naturally be first when latest is 1st Term; if latest is 2nd Term, next year's 1st comes first)
+            sel.innerHTML = '';
+            terms.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
+            // Select latest by default
+            sel.value = latest;
         }
     })
     .catch(error => {
         console.error('Error getting latest term:', error);
-        // Fallback to default term if fetch fails
-        document.querySelector('input[name="school_year_term"]').value = '2024-2025 2nd Term';
+        // Fallback: select the first option if available
+        const sel = document.getElementById('modalTermSelect');
+        if (sel) {
+            if (sel.options.length > 0) sel.value = sel.options[0].value;
+        }
     });
 }
 
@@ -728,6 +994,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     } else {
         console.error('Search elements not found on page load');
+    }
+    // Ensure Add New Grade button opens the modal even if inline onclick is interfered with
+    const addBtn = document.getElementById('addGradeBtn');
+    if (addBtn) {
+        addBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            showAddGradeModal();
+        });
     }
 });
 </script>

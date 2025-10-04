@@ -321,113 +321,117 @@ $all_stmt->close();
       <!-- Quick Access -->
       <div class="lg:col-span-3">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">Student Dashboard</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <!-- Balance Card -->
-          <div onclick="location.href='Balances.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-lg font-semibold text-gray-800">Balance</h4>
-                <p class="text-sm text-gray-600">View account balance</p>
+
+        <!-- Registrar Section -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Registrar</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Grades Card -->
+            <div onclick="location.href='Grades.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+              <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-800">Grades</h4>
+                  <p class="text-sm text-gray-600">View academic grades</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Grades Card -->
-          <div onclick="location.href='Grades.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-lg font-semibold text-gray-800">Grades</h4>
-                <p class="text-sm text-gray-600">View academic grades</p>
+            <!-- Documents Card -->
+            <div onclick="location.href='documents.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+              <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-800">Documents</h4>
+                  <p class="text-sm text-gray-600">View available documents</p>
+                </div>
               </div>
             </div>
-          </div>
 
-
-          <!-- Attendance Card -->
-          <div onclick="location.href='attendance/Attendance.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-lg font-semibold text-gray-800">Attendance</h4>
-                <p class="text-sm text-gray-600">View attendance record</p>
+            <!-- Request Document Card -->
+            <div onclick="location.href='request-document.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+              <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-800">Request Document</h4>
+                  <p class="text-sm text-gray-600">Submit new document request</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Guidance Card -->
-          <div onclick="location.href='GuidanceRecord.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-lg font-semibold text-gray-800">Guidance</h4>
-                <p class="text-sm text-gray-600">View guidance records</p>
+            <!-- Attendance Card (moved under Registrar) -->
+            <div onclick="location.href='attendance/Attendance.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+              <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-800">Attendance</h4>
+                  <p class="text-sm text-gray-600">View attendance record</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Documents Card -->
-          <div onclick="location.href='documents.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-lg font-semibold text-gray-800">Documents</h4>
-                <p class="text-sm text-gray-600">View available documents</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Request Document Card -->
-          <div onclick="location.href='request-document.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-lg font-semibold text-gray-800">Request Document</h4>
-                <p class="text-sm text-gray-600">Submit new document request</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Requested Documents Card -->
-          <div onclick="location.href='requested_document.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-lg font-semibold text-gray-800">Requested Documents</h4>
-                <p class="text-sm text-gray-600">Track document requests</p>
+            <!-- Requested Documents Card -->
+            <div onclick="location.href='requested_document.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+              <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-800">Requested Documents</h4>
+                  <p class="text-sm text-gray-600">Track document requests</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <!-- Cashier Section -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Cashier</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Balance Card -->
+            <div onclick="location.href='Balances.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+              <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path></svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-800">Balance</h4>
+                  <p class="text-sm text-gray-600">View account balance</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Guidance Section -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Guidance Office</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Guidance Card -->
+            <div onclick="location.href='GuidanceRecord.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
+              <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-800">Guidance</h4>
+                  <p class="text-sm text-gray-600">View guidance records</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendance Section removed (now under Registrar) -->
       </div>
     </div>
   </div>

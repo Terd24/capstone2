@@ -256,31 +256,39 @@ function setupStudentModalHandlers(studentId) {
     }
 
     // Helper to update grade levels based on academic track
+    // Helper to update grade levels based on academic track
     function updateGradeLevelsLocal() {
         if (!academicTrack || !gradeLevel) return;
         const gradeOptions = {
+            "Pre-Elementary": ["Kinder"],
             "Elementary": ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6"],
             "Junior High School": ["Grade 7","Grade 8","Grade 9","Grade 10"],
             "Senior High School Strands": ["Grade 11","Grade 12"],
-            "STEM": ["Grade 11","Grade 12"],
+
+            // Allow direct strand selections
             "ABM": ["Grade 11","Grade 12"],
-            "HUMSS": ["Grade 11","Grade 12"],
             "GAS": ["Grade 11","Grade 12"],
-            "TVL": ["Grade 11","Grade 12"],
-            "Arts and Design": ["Grade 11","Grade 12"],
-            "BS Information Technology": ["1st Year","2nd Year","3rd Year","4th Year"],
-            "BS Computer Science": ["1st Year","2nd Year","3rd Year","4th Year"],
-            "BS Business Administration": ["1st Year","2nd Year","3rd Year","4th Year"],
-            "BS Accountancy": ["1st Year","2nd Year","3rd Year","4th Year"],
-            "BS Hospitality Management": ["1st Year","2nd Year","3rd Year","4th Year"],
-            "BS Education": ["1st Year","2nd Year","3rd Year","4th Year"]
+            "HE": ["Grade 11","Grade 12"],
+            "HUMSS": ["Grade 11","Grade 12"],
+            "ICT": ["Grade 11","Grade 12"],
+            "SPORTS": ["Grade 11","Grade 12"],
+            "STEM": ["Grade 11","Grade 12"],
+
+            // College programs
+            "College Courses": ["1st Year","2nd Year","3rd Year","4th Year"],
+            "Bachelor of Physical Education (BPed)": ["1st Year","2nd Year","3rd Year","4th Year"],
+            "Bachelor of Early Childhood Education (BECEd)": ["1st Year","2nd Year","3rd Year","4th Year"]
         };
         const selectedTrack = academicTrack.value;
         const selectedGrade = gradeLevel.value;
+
+        // Get the optgroup label (e.g., "College Courses")
         const optgroupLabel = selectedTrack ? academicTrack.options[academicTrack.selectedIndex].parentNode?.label : '';
+
         let levels = [];
         if (gradeOptions[optgroupLabel]) levels = gradeOptions[optgroupLabel];
         else if (gradeOptions[selectedTrack]) levels = gradeOptions[selectedTrack];
+
         gradeLevel.innerHTML = '<option value="">-- Select Grade Level --</option>';
         levels.forEach(level => {
             const opt = document.createElement('option');
