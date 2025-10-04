@@ -84,6 +84,48 @@ $total_accounts = count($rows);
 <meta charset="UTF-8">
 <title>Account List - CCI</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<script>
+// Test QR library loading
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('QRious library loaded:', typeof QRious !== 'undefined');
+    if (typeof QRious !== 'undefined') {
+        console.log('QRious version available');
+    } else {
+        console.error('QRious library failed to load!');
+    }
+});
+
+// Test function you can run in console
+function testQRGeneration() {
+    console.log('Testing QR generation...');
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = 150;
+    testCanvas.height = 150;
+    document.body.appendChild(testCanvas);
+    
+    if (typeof QRious !== 'undefined') {
+        try {
+            const qr = new QRious({
+                element: testCanvas,
+                value: '1234567890',
+                size: 150
+            });
+            console.log('Test QR generation successful!');
+            testCanvas.style.position = 'fixed';
+            testCanvas.style.top = '10px';
+            testCanvas.style.right = '10px';
+            testCanvas.style.zIndex = '9999';
+            testCanvas.style.border = '2px solid red';
+            console.log('Test QR code displayed in top-right corner');
+        } catch (error) {
+            console.error('Test QR generation failed:', error);
+        }
+    } else {
+        console.error('QRious library not available for test');
+    }
+}
+</script>
 <style>
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -461,6 +503,197 @@ function filterBySchoolYear() {
 }
 
 // Remove duplicate function definition since it's now at the top
+
+// Add RFID instruction and QR code functionality when modal opens
+function openModal() {
+    // Your existing modal opening code here
+    document.getElementById('addAccountModal').classList.remove('hidden');
+    
+    // Add instruction and QR code functionality with longer delay and retry
+    setTimeout(setupQRCodeFunctionality, 200);
+    setTimeout(setupQRCodeFunctionality, 500); // Retry after 500ms
+    setTimeout(setupQRCodeFunctionality, 1000); // Retry after 1s
+}
+
+function setupQRCodeFunctionality() {
+    const rfidInput = document.querySelector('input[name="rfid_uid"]');
+    console.log('Looking for RFID input:', rfidInput); // Debug log
+    
+    if (rfidInput) {
+        console.log('RFID input found, setting up QR functionality'); // Debug log
+        
+        // Add RFID instruction if not exists
+        if (!document.getElementById('rfidInstruction')) {
+            const instruction = document.createElement('small');
+            instruction.id = 'rfidInstruction';
+            instruction.className = 'text-black text-xs mt-1 block';
+            instruction.innerHTML = 'Please tap the ID card on the RFID reader';
+            rfidInput.parentNode.appendChild(instruction);
+        }
+        
+        // Add QR code container if not exists
+        if (!document.getElementById('qrCodeContainer')) {
+            const qrContainer = document.createElement('div');
+            qrContainer.id = 'qrCodeContainer';
+            qrContainer.className = 'mt-3 p-3 bg-gray-50 border border-gray-300 rounded text-center';
+            qrContainer.style.display = 'none';
+            qrContainer.innerHTML = `
+                <p class="text-sm font-medium text-gray-700 mb-2">Student RFID QR Code</p>
+                <div class="canvas-container">
+                    <canvas id="qrCodeCanvas" width="150" height="150" class="mx-auto bg-white p-2 border border-gray-300"></canvas>
+                </div>
+                <p class="text-xs text-gray-600 mt-2">Ready for printing on student RFID</p>
+                <button type="button" onclick="printQRCode()" class="mt-2 px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded">
+                    Print QR Code
+                </button>
+            `;
+            rfidInput.parentNode.appendChild(qrContainer);
+            console.log('QR container added'); // Debug log
+        }
+        
+        // Add event listener for RFID input
+        rfidInput.removeEventListener('input', handleRFIDInput); // Remove existing listener
+        rfidInput.addEventListener('input', handleRFIDInput);
+        console.log('Event listener added to RFID input'); // Debug log
+    } else {
+        console.log('RFID input not found yet'); // Debug log
+    }
+}
+
+// Handle RFID input and generate QR code
+function handleRFIDInput(event) {
+    const rfid = event.target.value.trim();
+    const qrContainer = document.getElementById('qrCodeContainer');
+    
+    console.log('RFID input changed:', rfid, 'Length:', rfid.length); // Debug log
+    
+    if (rfid.length === 10 && /^\d{10}$/.test(rfid)) {
+        console.log('Valid RFID detected, generating QR code'); // Debug log
+        // Valid 10-digit RFID, show container first then generate QR code
+        if (qrContainer) {
+            qrContainer.style.display = 'block';
+            console.log('QR container shown'); // Debug log
+            
+            // Small delay to ensure canvas is rendered before generating QR
+            setTimeout(() => {
+                generateQRCode(rfid);
+            }, 100);
+        } else {
+            console.log('QR container not found!'); // Debug log
+        }
+    } else {
+        console.log('Invalid RFID, hiding QR container'); // Debug log
+        // Invalid or incomplete RFID, hide QR code
+        if (qrContainer) qrContainer.style.display = 'none';
+    }
+}
+
+// Generate QR code
+function generateQRCode(rfid) {
+    const canvas = document.getElementById('qrCodeCanvas');
+    console.log('Generating QR code for:', rfid, 'Canvas found:', !!canvas); // Debug log
+    console.log('QRious library available:', typeof QRious); // Debug log
+    
+    if (!canvas) {
+        console.log('Canvas not found!'); // Debug log
+        return;
+    }
+    
+    // Check if QRious library is loaded
+    if (typeof QRious === 'undefined') {
+        console.error('QRious library not loaded!');
+        // Fallback: show text instead of QR code
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#0B2C62';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('QR Library Loading...', 75, 75);
+        return;
+    }
+    
+    try {
+        // Generate new QR code using QRious
+        const qr = new QRious({
+            element: canvas,
+            value: rfid,
+            size: 150,
+            foreground: '#000000',
+            background: '#FFFFFF'
+        });
+        console.log('QR Code generated successfully!'); // Debug log
+    } catch (e) {
+        console.error('QR Code generation exception:', e);
+        // Show RFID number as fallback
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000000';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('RFID:', 75, 65);
+        ctx.fillText(rfid, 75, 85);
+    }
+}
+
+// Print QR code
+function printQRCode() {
+    const canvas = document.getElementById('qrCodeCanvas');
+    const rfidInput = document.querySelector('input[name="rfid_uid"]');
+    
+    if (!canvas || !rfidInput) {
+        alert('No QR code to print');
+        return;
+    }
+    
+    const rfid = rfidInput.value.trim();
+    const studentName = document.querySelector('input[name="first_name"]')?.value + ' ' + 
+                       document.querySelector('input[name="last_name"]')?.value;
+    
+    // Create print window
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Student QR Code - RFID ${rfid}</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    text-align: center; 
+                    margin: 20px;
+                    background: white;
+                }
+                .header { margin-bottom: 30px; }
+                .qr-container {
+                    margin: 30px 0;
+                    padding: 20px;
+                    border: 2px solid #0B2C62;
+                    border-radius: 10px;
+                    display: inline-block;
+                }
+                .info { margin-top: 20px; font-size: 14px; color: #666; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1 style="color: #0B2C62;">🏫 Cornerstone College Inc.</h1>
+                <h2>Student RFID QR Code</h2>
+            </div>
+            
+            <div class="qr-container">
+                <img src="${canvas.toDataURL()}" alt="QR Code">
+            </div>
+            
+            <div class="info">
+                <p><strong>Student:</strong> ${studentName || 'New Student'}</p>
+                <p><strong>RFID Number:</strong> ${rfid}</p>
+                <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+                <p>✅ Compatible with RFID and QR scanners</p>
+            </div>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+}
 </script>
 </body>
 </html>

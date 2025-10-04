@@ -4,7 +4,7 @@ include("../StudentLogin/db_conn.php");
 
 // Require owner login
 if (!isset($_SESSION['owner_id']) || $_SESSION['role'] !== 'owner') {
-    header("Location: login.php");
+    header("Location: ../admin_login.php");
     exit;
 }
 
@@ -14,6 +14,43 @@ header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 header("Expires: 0");
 
+// Create necessary tables if they don't exist
+$conn->query("CREATE TABLE IF NOT EXISTS system_notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type ENUM('info', 'warning', 'success', 'error', 'critical') DEFAULT 'info',
+    module VARCHAR(50) NOT NULL,
+    performed_by VARCHAR(100) NOT NULL,
+    user_role VARCHAR(50) NOT NULL,
+    target_table VARCHAR(50),
+    target_id VARCHAR(50),
+    action_type VARCHAR(50) NOT NULL,
+    old_data JSON,
+    new_data JSON,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)");
+
+$conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    request_title VARCHAR(255) NOT NULL,
+    request_description TEXT NOT NULL,
+    request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'other') NOT NULL,
+    priority ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
+    requester_name VARCHAR(100) NOT NULL,
+    requester_role VARCHAR(50) NOT NULL,
+    requester_module VARCHAR(50) NOT NULL,
+    target_table VARCHAR(50),
+    target_id VARCHAR(50),
+    target_data JSON,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    owner_comments TEXT,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP NULL,
+    reviewed_by VARCHAR(100)
+)");
+
 // Handle approval/rejection actions
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     $request_id = intval($_POST['request_id']);
@@ -22,16 +59,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     
     if ($action === 'approve' || $action === 'reject') {
         $status = ($action === 'approve') ? 'approved' : 'rejected';
-        $stmt = $conn->prepare("UPDATE owner_requests SET status = ?, reviewed_at = NOW(), reviewed_by = ?, owner_comments = ? WHERE id = ?");
-        $stmt->bind_param("sssi", $status, $_SESSION['owner_username'], $comments, $request_id);
+        $stmt = $conn->prepare("UPDATE owner_approval_requests SET status = ?, reviewed_at = NOW(), reviewed_by = ?, owner_comments = ? WHERE id = ?");
+        $stmt->bind_param("sssi", $status, $_SESSION['owner_name'], $comments, $request_id);
         
         if ($stmt->execute()) {
-            // Log the action
-            $log_stmt = $conn->prepare("INSERT INTO system_logs (action_type, performed_by, user_role, description, affected_record_id) VALUES (?, ?, ?, ?, ?)");
-            $log_action = "request_" . $action;
-            $log_desc = "Owner {$action}d request ID: {$request_id}";
-            $log_stmt->bind_param("sssss", $log_action, $_SESSION['owner_username'], $_SESSION['role'], $log_desc, $request_id);
-            $log_stmt->execute();
+            // Get request details for notification
+            $req_stmt = $conn->prepare("SELECT * FROM owner_approval_requests WHERE id = ?");
+            $req_stmt->bind_param("i", $request_id);
+            $req_stmt->execute();
+            $request_data = $req_stmt->get_result()->fetch_assoc();
+            
+            // Create notification
+            $notif_title = "Request " . ucfirst($action) . "d";
+            $notif_message = "Owner has {$action}d request: {$request_data['request_title']}";
+            $notif_type = ($action === 'approve') ? 'success' : 'warning';
+            
+            $notif_stmt = $conn->prepare("INSERT INTO system_notifications (title, message, type, module, performed_by, user_role, action_type, target_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $notif_stmt->bind_param("ssssssss", $notif_title, $notif_message, $notif_type, 'Owner', $_SESSION['owner_name'], 'owner', 'request_' . $action, $request_id);
+            $notif_stmt->execute();
             
             $_SESSION['success_msg'] = "Request has been " . $action . "d successfully.";
         } else {
@@ -43,6 +88,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     exit;
 }
 
+// Handle notification mark as read
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['mark_read'])) {
+    $notif_id = intval($_POST['notification_id']);
+    $stmt = $conn->prepare("UPDATE system_notifications SET is_read = TRUE WHERE id = ?");
+    $stmt->bind_param("i", $notif_id);
+    $stmt->execute();
+    
+    header("Location: Dashboard.php");
+    exit;
+}
+
+// Handle mark all notifications as read
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['mark_all_read'])) {
+    $conn->query("UPDATE system_notifications SET is_read = TRUE WHERE is_read = FALSE");
+    header("Location: Dashboard.php");
+    exit;
+}
+
 // Handle success/error messages
 $success_msg = $_SESSION['success_msg'] ?? '';
 if ($success_msg) unset($_SESSION['success_msg']);
@@ -50,19 +113,19 @@ if ($success_msg) unset($_SESSION['success_msg']);
 $error_msg = $_SESSION['error_msg'] ?? '';
 if ($error_msg) unset($_SESSION['error_msg']);
 
-// Get statistics - excluding superadmin requests
+// Get approval request statistics
 $stats_query = "SELECT 
     COUNT(*) as total_requests,
     SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_requests,
     SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_requests,
     SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_requests,
     SUM(CASE WHEN priority = 'critical' AND status = 'pending' THEN 1 ELSE 0 END) as critical_pending
-FROM owner_requests WHERE requester_role != 'superadmin'";
+FROM owner_approval_requests";
 $stats_result = $conn->query($stats_query);
 $stats = $stats_result->fetch_assoc();
 
-// Get pending requests (priority order) - excluding superadmin requests
-$pending_query = "SELECT * FROM owner_requests WHERE status = 'pending' AND requester_role != 'superadmin' ORDER BY 
+// Get pending approval requests (priority order)
+$pending_query = "SELECT * FROM owner_approval_requests WHERE status = 'pending' ORDER BY 
     CASE priority 
         WHEN 'critical' THEN 1 
         WHEN 'high' THEN 2 
@@ -71,29 +134,55 @@ $pending_query = "SELECT * FROM owner_requests WHERE status = 'pending' AND requ
     END, requested_at ASC";
 $pending_result = $conn->query($pending_query);
 
-// Get recent activity - excluding superadmin requests
-$recent_query = "SELECT * FROM owner_requests WHERE status IN ('approved', 'rejected') AND requester_role != 'superadmin' ORDER BY reviewed_at DESC LIMIT 5";
+// Get recent approval activity
+$recent_query = "SELECT * FROM owner_approval_requests WHERE status IN ('approved', 'rejected') ORDER BY reviewed_at DESC LIMIT 5";
 $recent_result = $conn->query($recent_query);
 
-// Get soft-deleted students count
+// Get system notifications (unread first)
+$notifications_query = "SELECT * FROM system_notifications ORDER BY is_read ASC, created_at DESC LIMIT 20";
+$notifications_result = $conn->query($notifications_query);
+
+// Get notification statistics
+$notif_stats_query = "SELECT 
+    COUNT(*) as total_notifications,
+    SUM(CASE WHEN is_read = FALSE THEN 1 ELSE 0 END) as unread_notifications,
+    SUM(CASE WHEN type = 'critical' AND is_read = FALSE THEN 1 ELSE 0 END) as critical_unread
+FROM system_notifications";
+$notif_stats_result = $conn->query($notif_stats_query);
+$notif_stats = $notif_stats_result->fetch_assoc();
+
+// Get soft-deleted accounts count (for dashboard overview only)
 $deleted_students_query = "SELECT COUNT(*) as count FROM student_account WHERE deleted_at IS NOT NULL";
 $deleted_students_result = $conn->query($deleted_students_query);
 $deleted_students_count = $deleted_students_result ? $deleted_students_result->fetch_assoc()['count'] : 0;
 
-// Get soft-deleted employees count  
 $deleted_employees_query = "SELECT COUNT(*) as count FROM employees WHERE deleted_at IS NOT NULL";
 $deleted_employees_result = $conn->query($deleted_employees_query);
 $deleted_employees_count = $deleted_employees_result ? $deleted_employees_result->fetch_assoc()['count'] : 0;
+
+$total_deleted_accounts = $deleted_students_count + $deleted_employees_count;
+
+// Get module activity statistics
+$module_stats_query = "SELECT 
+    module,
+    user_role,
+    COUNT(*) as activity_count,
+    MAX(created_at) as last_activity
+FROM system_notifications 
+WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY module, user_role
+ORDER BY activity_count DESC";
+$module_stats_result = $conn->query($module_stats_query);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School Owner Dashboard - Cornerstone College Inc.</title>
+    <title>Owner Dashboard - Cornerstone College Inc.</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
+        .nav-item.active { background: rgba(255,255,255,0.1); }
         .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         .priority-critical { border-left: 4px solid #dc2626; background: #fef2f2; }
         .priority-high { border-left: 4px solid #ea580c; background: #fff7ed; }
@@ -101,100 +190,145 @@ $deleted_employees_count = $deleted_employees_result ? $deleted_employees_result
         .priority-low { border-left: 4px solid #65a30d; background: #f7fee7; }
     </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+<body class="min-h-screen bg-gray-50 flex">
 
-<!-- Header -->
-<header class="bg-[#0B2C62] text-white shadow-lg">
-    <div class="container mx-auto px-6 py-4">
-        <div class="flex justify-between items-center">
-            <div class="flex items-center space-x-4">
-                <div class="text-left">
-                    <p class="text-sm text-blue-200">Welcome,</p>
-                    <p class="font-semibold"><?= htmlspecialchars($_SESSION['owner_name'] ?? 'School Owner') ?></p>
+    <!-- Sidebar -->
+    <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#0B2C62] to-[#153e86] text-white transform -translate-x-full transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0">
+        <div class="flex items-center justify-between h-16 px-6 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <img src="../images/LogoCCI.png" class="h-8 w-8 rounded-full bg-white p-1" alt="Logo">
+                <div class="leading-tight">
+                    <div class="font-bold text-sm">Cornerstone College</div>
+                    <div class="text-xs text-blue-200">Owner Portal</div>
                 </div>
             </div>
-            
-            <div class="flex items-center space-x-4">
-                <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-                <div class="text-right">
-                    <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-                    <p class="text-blue-200 text-sm">School Owner Portal</p>
-                </div>
-                <div class="relative">
-                    <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </div>
+        
+        <nav class="mt-8 px-4">
+            <div class="space-y-2">
+                <!-- Dashboard -->
+                <a href="#dashboard" onclick="showSection('dashboard', event)" class="nav-item active flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                
+                <!-- Management Tools -->
+                <div class="pt-4">
+                    <div class="text-xs font-semibold text-blue-200 uppercase tracking-wider px-4 mb-2">Management</div>
+                    <a href="#notifications" onclick="showSection('notifications', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h8v-2H4v2zM4 11h8V9H4v2z"/>
                         </svg>
-                    </button>
-                    <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
-                        <a href="SystemLogs.php" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
-                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            System Logs
-                        </a>
-                        <a href="logout.php" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
-                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        <span>System Notifications</span>
+                        <?php if ($notif_stats['unread_notifications'] > 0): ?>
+                            <span class="bg-red-500 text-white text-xs rounded-full px-2 py-1 ml-auto"><?= $notif_stats['unread_notifications'] ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <a href="#approval-requests" onclick="showSection('approval-requests', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Approval Requests</span>
+                        <?php if ($stats['pending_requests'] > 0): ?>
+                            <span class="bg-yellow-500 text-white text-xs rounded-full px-2 py-1 ml-auto"><?= $stats['pending_requests'] ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <a href="#module-activity" onclick="showSection('module-activity', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        <span>Module Activity</span>
+                    </a>
+                    
+                    <!-- User Info & Logout -->
+                    <div class="mt-6 pt-4 border-t border-white/10">
+                        <div class="flex items-center gap-3 mb-3 px-4">
+                            <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                                <span class="text-sm font-semibold"><?= substr($_SESSION['owner_name'] ?? 'OW', 0, 2) ?></span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['owner_name'] ?? 'School Owner') ?></div>
+                                <div class="text-xs text-blue-200">Owner</div>
+                            </div>
+                        </div>
+                        <a href="../StudentLogin/logout.php" class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 rounded-lg transition mx-4">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                             </svg>
                             Logout
                         </a>
                     </div>
                 </div>
             </div>
-        </div>
+        </nav>
     </div>
-</header>
 
-<div class="container mx-auto px-6 py-8">
-    <!-- Alert Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <!-- Pending Approvals Alert -->
-        <div class="bg-white rounded-xl card-shadow p-6 border-l-4 border-yellow-500">
+    <!-- Main Content -->
+    <div class="flex-1 lg:ml-0">
+        <!-- Top Header -->
+        <header class="bg-white shadow-sm border-b border-gray-200">
+            <div class="flex items-center justify-between px-6 py-4">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden p-2 rounded-md hover:bg-gray-100">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                    <h1 id="page-title" class="text-2xl font-bold text-gray-900">Dashboard</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="location.reload()" class="p-2 rounded-md hover:bg-gray-100 text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="p-6">
+            <!-- Dashboard Section -->
+            <div id="dashboard-section" class="section-content">
+    <!-- Top Overview Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Deleted Accounts Overview -->
+        <div class="bg-white rounded-xl card-shadow p-6 border border-gray-200">
             <div class="flex items-center">
-                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                <div class="p-3 rounded-lg bg-gray-100 text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M12 7a3 3 0 110-6 3 3 0 010 6z"/>
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Pending Approvals</p>
-                    <p class="text-2xl font-bold text-yellow-600"><?= $stats['pending_requests'] ?></p>
-                    <?php if ($stats['critical_pending'] > 0): ?>
-                        <p class="text-xs text-red-600 font-medium"><?= $stats['critical_pending'] ?> Critical</p>
-                    <?php endif; ?>
+                    <p class="text-sm font-medium text-gray-600">Deleted Accounts</p>
+                    <p class="text-3xl font-bold text-gray-800"><?= $total_deleted_accounts ?></p>
+                    <p class="text-xs text-gray-500">Students: <?= $deleted_students_count ?> • Employees: <?= $deleted_employees_count ?></p>
                 </div>
             </div>
         </div>
 
-        <!-- Deleted Students Alert -->
-        <div class="bg-white rounded-xl card-shadow p-6 border-l-4 border-red-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-red-100 text-red-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                    </svg>
+        <!-- System Overview -->
+        <div class="bg-white rounded-xl card-shadow p-6 border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">System Overview</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">Total Requests</span>
+                    <span class="font-bold text-gray-800"><?= $stats['total_requests'] ?></span>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Deleted Students</p>
-                    <p class="text-2xl font-bold text-red-600"><?= $deleted_students_count ?></p>
-                    <p class="text-xs text-gray-500">Awaiting permanent deletion</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">Pending Approvals</span>
+                    <span class="font-bold text-gray-800"><?= $stats['pending_requests'] ?></span>
                 </div>
-            </div>
-        </div>
-
-        <!-- Deleted Employees Alert -->
-        <div class="bg-white rounded-xl card-shadow p-6 border-l-4 border-orange-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-orange-100 text-orange-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">Unread Notifications</span>
+                    <span class="font-bold text-gray-800"><?= $notif_stats['unread_notifications'] ?></span>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Deleted Employees</p>
-                    <p class="text-2xl font-bold text-orange-600"><?= $deleted_employees_count ?></p>
-                    <p class="text-xs text-gray-500">Awaiting permanent deletion</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">System Status</span>
+                    <span class="font-medium text-gray-800">🟢 Online</span>
                 </div>
             </div>
         </div>
@@ -315,27 +449,216 @@ $deleted_employees_count = $deleted_employees_result ? $deleted_employees_result
                 </div>
             </div>
 
-            <!-- System Status -->
-            <div class="bg-white rounded-xl card-shadow p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">📊 System Overview</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">Total Requests</span>
-                        <span class="font-bold text-gray-900"><?= $stats['total_requests'] ?></span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">Approved</span>
-                        <span class="font-bold text-green-600"><?= $stats['approved_requests'] ?></span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">Rejected</span>
-                        <span class="font-bold text-red-600"><?= $stats['rejected_requests'] ?></span>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
+
+            <!-- System Notifications Section -->
+            <div id="notifications-section" class="section-content hidden">
+                <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">🔔 System Notifications</h2>
+                        <div class="flex gap-3">
+                            <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                                <?= $notif_stats['unread_notifications'] ?> Unread
+                            </span>
+                            <form method="POST" class="inline">
+                                <button type="submit" name="mark_all_read" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                                    Mark All Read
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                        <?php if ($notifications_result && $notifications_result->num_rows > 0): ?>
+                            <?php while ($notification = $notifications_result->fetch_assoc()): ?>
+                                <div class="border rounded-lg p-4 <?= $notification['is_read'] ? 'bg-gray-50' : 'bg-white border-l-4 border-blue-500' ?>">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <h3 class="font-semibold text-gray-900"><?= htmlspecialchars($notification['title']) ?></h3>
+                                                <span class="px-2 py-1 rounded-full text-xs font-medium
+                                                    <?= $notification['type'] === 'critical' ? 'bg-red-100 text-red-800' : 
+                                                       ($notification['type'] === 'error' ? 'bg-red-100 text-red-800' : 
+                                                       ($notification['type'] === 'warning' ? 'bg-yellow-100 text-yellow-800' : 
+                                                       ($notification['type'] === 'success' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'))) ?>">
+                                                    <?= strtoupper($notification['type']) ?>
+                                                </span>
+                                                <?php if (!$notification['is_read']): ?>
+                                                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mb-2">
+                                                <strong>From:</strong> <?= htmlspecialchars($notification['performed_by']) ?> 
+                                                (<?= ucfirst($notification['user_role']) ?>) • 
+                                                <strong>Module:</strong> <?= htmlspecialchars($notification['module']) ?>
+                                            </p>
+                                            <p class="text-sm text-gray-700 mb-3"><?= htmlspecialchars($notification['message']) ?></p>
+                                            <p class="text-xs text-gray-500">
+                                                <?= date('M j, Y g:i A', strtotime($notification['created_at'])) ?>
+                                            </p>
+                                        </div>
+                                        <?php if (!$notification['is_read']): ?>
+                                            <form method="POST" class="ml-4">
+                                                <input type="hidden" name="notification_id" value="<?= $notification['id'] ?>">
+                                                <button type="submit" name="mark_read" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                                    Mark Read
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <div class="text-center py-12">
+                                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h8v-2H4v2zM4 11h8V9H4v2z"></path>
+                                </svg>
+                                <p class="text-gray-500 text-lg font-medium">No notifications</p>
+                                <p class="text-gray-400 text-sm">All system notifications will appear here</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approval Requests Section -->
+            <div id="approval-requests-section" class="section-content hidden">
+                <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">✅ Approval Requests</h2>
+                        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                            <?= $stats['pending_requests'] ?> Pending
+                        </span>
+                    </div>
+
+                    <!-- Statistics Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div class="text-gray-600 text-sm font-medium">Pending</div>
+                            <div class="text-2xl font-bold text-gray-800"><?= $stats['pending_requests'] ?></div>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div class="text-gray-600 text-sm font-medium">Approved</div>
+                            <div class="text-2xl font-bold text-gray-800"><?= $stats['approved_requests'] ?></div>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div class="text-gray-600 text-sm font-medium">Rejected</div>
+                            <div class="text-2xl font-bold text-gray-800"><?= $stats['rejected_requests'] ?></div>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div class="text-gray-600 text-sm font-medium">Total</div>
+                            <div class="text-2xl font-bold text-gray-800"><?= $stats['total_requests'] ?></div>
+                        </div>
+                    </div>
+
+                    <!-- Pending Requests List -->
+                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                        <?php 
+                        // Reset the result pointer for pending requests
+                        $pending_result = $conn->query($pending_query);
+                        if ($pending_result && $pending_result->num_rows > 0): 
+                        ?>
+                            <?php while ($request = $pending_result->fetch_assoc()): ?>
+                                <div class="border rounded-lg p-4 priority-<?= $request['priority'] ?>">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <h3 class="font-semibold text-gray-900"><?= htmlspecialchars($request['request_title']) ?></h3>
+                                                <span class="px-2 py-1 rounded-full text-xs font-medium
+                                                    <?= $request['priority'] === 'critical' ? 'bg-red-100 text-red-800' : 
+                                                       ($request['priority'] === 'high' ? 'bg-orange-100 text-orange-800' : 
+                                                       ($request['priority'] === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800')) ?>">
+                                                    <?= strtoupper($request['priority']) ?>
+                                                </span>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mb-2">
+                                                <strong>Requested by:</strong> <?= htmlspecialchars($request['requester_name']) ?> 
+                                                (<?= ucfirst($request['requester_role']) ?>) • 
+                                                <strong>Type:</strong> <?= ucwords(str_replace('_', ' ', $request['request_type'])) ?>
+                                            </p>
+                                            <p class="text-sm text-gray-700 mb-3"><?= htmlspecialchars($request['request_description']) ?></p>
+                                            <p class="text-xs text-gray-500">
+                                                Submitted: <?= date('M j, Y g:i A', strtotime($request['requested_at'])) ?>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex space-x-2 pt-3 border-t border-gray-200">
+                                        <button onclick="showApprovalModal(<?= $request['id'] ?>, 'approve', '<?= htmlspecialchars($request['request_title']) ?>')" 
+                                                class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition font-medium">
+                                            ✅ Approve
+                                        </button>
+                                        <button onclick="showApprovalModal(<?= $request['id'] ?>, 'reject', '<?= htmlspecialchars($request['request_title']) ?>')" 
+                                                class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition font-medium">
+                                            ❌ Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <div class="text-center py-12">
+                                <svg class="w-16 h-16 mx-auto text-green-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <p class="text-gray-500 text-lg font-medium">All caught up!</p>
+                                <p class="text-gray-400 text-sm">No pending approval requests</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Module Activity Section -->
+            <div id="module-activity-section" class="section-content hidden">
+                <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">📊 Module Activity</h2>
+                        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                            Last 7 Days
+                        </span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <?php if ($module_stats_result && $module_stats_result->num_rows > 0): ?>
+                            <?php while ($module = $module_stats_result->fetch_assoc()): ?>
+                                <div class="border rounded-lg p-4 hover:bg-gray-50 transition">
+                                    <div class="flex justify-between items-center">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h3 class="font-semibold text-gray-900"><?= htmlspecialchars($module['module']) ?></h3>
+                                                <p class="text-sm text-gray-600">
+                                                    Role: <?= ucfirst($module['user_role']) ?> • 
+                                                    Last Activity: <?= date('M j, Y g:i A', strtotime($module['last_activity'])) ?>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-2xl font-bold text-gray-900"><?= $module['activity_count'] ?></div>
+                                            <div class="text-sm text-gray-500">Activities</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <div class="text-center py-12">
+                                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                                <p class="text-gray-500 text-lg font-medium">No recent activity</p>
+                                <p class="text-gray-400 text-sm">Module activity from the last 7 days will appear here</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
 
 <!-- Approval Modal -->
 <div id="approvalModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -384,19 +707,48 @@ $deleted_employees_count = $deleted_employees_result ? $deleted_employees_result
 <?php endif; ?>
 
 <script>
-// Menu toggle
-document.getElementById('menuBtn').addEventListener('click', function() {
-    document.getElementById('dropdownMenu').classList.toggle('hidden');
-});
+// Sidebar toggle for mobile
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('-translate-x-full');
+}
 
-// Close menu when clicking outside
-document.addEventListener('click', function(event) {
-    const menu = document.getElementById('dropdownMenu');
-    const button = document.getElementById('menuBtn');
-    if (!menu.contains(event.target) && !button.contains(event.target)) {
-        menu.classList.add('hidden');
+// Section navigation
+function showSection(sectionId, event) {
+    if (event) {
+        event.preventDefault();
     }
-});
+    
+    // Hide all sections
+    document.querySelectorAll('.section-content').forEach(section => {
+        section.classList.add('hidden');
+    });
+    
+    // Remove active class from all nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Show selected section
+    const targetSection = document.getElementById(sectionId + '-section');
+    if (targetSection) {
+        targetSection.classList.remove('hidden');
+    }
+    
+    // Add active class to clicked nav item
+    if (event) {
+        event.target.closest('.nav-item').classList.add('active');
+    }
+    
+    // Update page title
+    const titles = {
+        'dashboard': 'Dashboard',
+        'notifications': 'System Notifications',
+        'approval-requests': 'Approval Requests',
+        'module-activity': 'Module Activity'
+    };
+    document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
+}
 
 // Approval modal functions
 function showApprovalModal(requestId, action, title) {
@@ -444,10 +796,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Auto-refresh every 30 seconds to check for new requests
+// Auto-refresh every 30 seconds to check for new requests (only on dashboard)
 setInterval(function() {
-    // Only refresh if no modal is open
-    if (document.getElementById('approvalModal').classList.contains('hidden')) {
+    // Only refresh if no modal is open and we're on dashboard
+    if (document.getElementById('approvalModal').classList.contains('hidden') && 
+        !document.getElementById('dashboard-section').classList.contains('hidden')) {
         window.location.reload();
     }
 }, 30000);

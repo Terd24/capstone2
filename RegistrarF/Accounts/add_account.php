@@ -1102,7 +1102,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">RFID Number *</label>
-                            <input type="text" name="rfid_uid" autocomplete="off" required value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
+                            <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" required value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
                             <?php if (!empty($error_rfid)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
                             <?php endif; ?>

@@ -93,9 +93,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )");
             
-            // Insert default owner if not exists
+            // Insert default owner if not exists (password: 'password')
+            $default_password = password_hash('password', PASSWORD_DEFAULT);
             $conn->query("INSERT IGNORE INTO owner_accounts (username, password, full_name, email) 
-                         VALUES ('owner', '$2y$10\$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'School Owner', 'owner@cornerstonecollegeinc.com')");
+                         VALUES ('owner', '$default_password', 'School Owner', 'owner@cornerstonecollegeinc.com')");
             
             $owner_stmt = $conn->prepare("SELECT * FROM owner_accounts WHERE username = ?");
             $owner_stmt->bind_param("s", $username);
@@ -108,17 +109,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 if (password_verify($password, $owner['password'])) {
                     // Set Owner session
                     $_SESSION['owner_id'] = $owner['id'];
-                    $_SESSION['owner_username'] = $owner['username'];
                     $_SESSION['owner_name'] = $owner['full_name'];
+                    $_SESSION['username'] = $owner['username'];
+                    $_SESSION['first_name'] = explode(' ', $owner['full_name'])[0] ?? 'Owner';
+                    $_SESSION['last_name'] = explode(' ', $owner['full_name'])[1] ?? '';
                     $_SESSION['role'] = 'owner';
                     
                     $login_success = true;
-                    $redirect_url = "AdminF/SuperAdminDashboard.php"; // Use existing SuperAdmin dashboard
+                    $redirect_url = "OwnerF/Dashboard.php"; // Go to Owner dashboard
                 }
             }
         }
         
         if ($login_success) {
+            // Update last login time for owner if logged in as owner
+            if (isset($_SESSION['owner_id']) && isset($owner)) {
+                $conn->query("UPDATE owner_accounts SET last_login = NOW() WHERE id = " . $_SESSION['owner_id']);
+            }
+            
             // Disable maintenance mode when admin/owner logs in
             $conn->query("DELETE FROM system_config WHERE config_key = 'maintenance_mode'");
             $conn->query("UPDATE system_config SET config_value = '0' WHERE config_key = 'maintenance_mode'");
