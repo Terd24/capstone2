@@ -399,7 +399,7 @@ input[type=number] { -moz-appearance: textfield; }
             <!-- Submit Buttons -->
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
                 <button type="button" onclick="closeModal()" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Cancel</button>
-                <button type="submit" class="px-5 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700 transition">
+                <button type="button" onclick="confirmAddEmployee()" class="px-5 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700 transition">
                     Add Employee
                 </button>
             </div>
@@ -1339,6 +1339,170 @@ document.addEventListener('click', function(event) {
         dropdown.classList.add('hidden');
     }
 });
+
+// =========================
+// Add Employee Confirmation (mirrors Super Admin)
+// =========================
+function confirmAddEmployee() {
+    const modal = document.getElementById('addEmployeeModal');
+    if (!modal) return;
+
+    const form = modal.querySelector('form');
+    if (!form) return;
+
+    // Clear previous error states and messages
+    clearFieldErrors(form);
+
+    // Gather values
+    const idNumber = (form.querySelector('input[name="id_number"]')?.value || '').trim();
+    const firstName = (form.querySelector('input[name="first_name"]')?.value || '').trim();
+    const middleName = (form.querySelector('input[name="middle_name"]')?.value || '').trim();
+    const lastName = (form.querySelector('input[name="last_name"]')?.value || '').trim();
+    const position = (form.querySelector('input[name="position"]')?.value || '').trim();
+    const department = (form.querySelector('select[name="department"]')?.value || '').trim();
+    const hireDate = (form.querySelector('input[name="hire_date"]')?.value || '').trim();
+    const email = (form.querySelector('input[name="email"]')?.value || '').trim();
+    const phone = (form.querySelector('input[name="phone"]')?.value || '').trim();
+    const address = (form.querySelector('textarea[name="address"]')?.value || '').trim();
+    const createAccount = !!form.querySelector('#createAccount')?.checked;
+    const username = (form.querySelector('input[name="username"]')?.value || '').trim();
+    const password = (form.querySelector('input[name="password"]')?.value || '');
+    const role = (form.querySelector('#employeeRole')?.value || '').trim();
+    const rfid = (form.querySelector('#rfid_uid')?.value || '').trim();
+
+    // Validate with inline messages
+    let hasErrors = false;
+    const need = (selector, msg) => { const el = form.querySelector(selector); if (!el || !el.value.trim()) { highlightFieldError(el, msg); hasErrors = true; } };
+    const invalid = (selector, testFn, msg) => { const el = form.querySelector(selector); if (!testFn(el?.value?.trim() || '')) { highlightFieldError(el, msg); hasErrors = true; } };
+
+    need('input[name="id_number"]', 'Employee ID is required');
+    need('input[name="first_name"]', 'First name is required');
+    need('input[name="last_name"]', 'Last name is required');
+    need('input[name="position"]', 'Position is required');
+    need('input[name="hire_date"]', 'Hire date is required');
+    need('input[name="email"]', 'Email is required');
+    invalid('input[name="email"]', v => /^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(v), 'Please enter a valid email address');
+    need('input[name="phone"]', 'Phone is required');
+    invalid('input[name="phone"]', v => /^\d{11}$/.test(v), 'Phone must be exactly 11 digits');
+    need('textarea[name="address"]', 'Address is required');
+
+    if (createAccount) {
+        need('input[name="username"]', 'Username is required when creating system account');
+        need('input[name="password"]', 'Password is required when creating system account');
+        if (!role) { highlightFieldError(form.querySelector('#employeeRole'), 'Role is required'); hasErrors = true; }
+        if (role === 'teacher') {
+            const r = form.querySelector('#rfid_uid');
+            if (!r || !/^\d{10}$/.test((r.value || '').trim())) { highlightFieldError(r, 'RFID must be exactly 10 digits'); hasErrors = true; }
+        }
+    }
+    if (hasErrors) return;
+
+    const fullName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`;
+    const formattedDate = hireDate ? new Date(hireDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+
+    showHRConfirmationModal({ idNumber, fullName, position, department, email, phone, address, hireDate: formattedDate, createAccount, username, password, role, rfid, form });
+}
+
+function showHRConfirmationModal(data) {
+    const existing = document.getElementById('hr-confirm-modal');
+    if (existing) existing.remove();
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'hr-confirm-modal';
+    wrapper.className = 'fixed inset-0 bg-black bg-opacity-70 z-[6000] flex items-center justify-center p-4';
+    wrapper.innerHTML = `
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border-2 border-gray-200">
+      <div class="bg-gradient-to-r from-[#0B2C62] to-[#153e86] text-white px-6 py-5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h3 class="text-xl font-bold">Confirm Employee Creation</h3>
+        </div>
+        <button onclick="closeHRConfirmationModal()" class="text-white hover:text-gray-200 p-2 rounded-lg hover:bg-white/10 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-6 max-h-[calc(90vh-160px)] overflow-y-auto bg-gray-50">
+        <div class="mb-6">
+          <div class="flex items-center gap-3 mb-4 p-3 bg-[#0B2C62]/5 rounded-lg">
+            <div class="w-8 h-8 bg-[#0B2C62] rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <h4 class="text-lg font-bold text-[#0B2C62]">Personal Information</h4>
+          </div>
+          <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200 space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Employee ID:</span><span class="text-[#0B2C62] font-medium text-lg">${escapeHtml(data.idNumber)}</span></div>
+              <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Full Name:</span><span class="text-[#0B2C62] font-medium text-lg">${escapeHtml(data.fullName)}</span></div>
+              <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Position:</span><span class="text-gray-900 font-medium">${escapeHtml(data.position)}</span></div>
+              <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Department:</span><span class="text-gray-900 font-medium">${escapeHtml(data.department)}</span></div>
+              <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Email:</span><span class="text-gray-900 font-medium">${escapeHtml(data.email)}</span></div>
+              <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Phone:</span><span class="text-gray-900 font-medium">${escapeHtml(data.phone)}</span></div>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Address:</span><span class="text-gray-900 font-medium">${escapeHtml(data.address)}</span></div>
+            <div class="p-3 bg-gray-50 rounded-lg"><span class="font-semibold text-gray-800 block">Hire Date:</span><span class="text-gray-900 font-medium">${escapeHtml(data.hireDate)}</span></div>
+          </div>
+        </div>
+        <div class="mb-6">
+          <div class="flex items-center gap-3 mb-4 p-3 bg-[#0B2C62]/5 rounded-lg">
+            <div class="w-8 h-8 bg-[#0B2C62] rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            </div>
+            <h4 class="text-lg font-bold text-[#0B2C62]">System Account</h4>
+          </div>
+          <div class="bg-white rounded-lg p-5 shadow-sm border-2 border-gray-300 space-y-4">
+            ${data.createAccount ? `
+              <div class="flex items-center gap-3 mb-4"><svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span class="font-semibold text-gray-900">System account will be created</span></div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div><span class="font-semibold text-gray-700 block">Username:</span><span class="text-gray-900 font-medium">${escapeHtml(data.username)}</span></div>
+                <div><span class="font-semibold text-gray-700 block">Password:</span><span class="text-gray-900 font-medium">${'•'.repeat(data.password.length)} (${data.password.length} chars)</span></div>
+                <div><span class="font-semibold text-gray-700 block">Role:</span><span class="text-gray-900 font-medium">${escapeHtml(data.role || 'N/A')}</span></div>
+              </div>
+              ${data.role === 'teacher' ? `<div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div><span class=\"font-semibold text-gray-700 block\">RFID:</span><span class=\"text-gray-900 font-medium\">${escapeHtml(data.rfid)}</span></div></div>` : ''}
+              <p class="text-gray-700 text-sm pt-2 border-t border-gray-200">This employee will have login access to the selected role.</p>
+            ` : `
+              <div class="flex items-center gap-3 mb-2"><svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg><span class="font-semibold text-gray-900">Employee record only</span></div>
+              <p class="text-gray-700 text-sm">No system account will be created. Employee will NOT have login access.</p>
+            `}
+          </div>
+        </div>
+      </div>
+      <div class="bg-white border-t-2 border-gray-200 px-6 py-5 pb-8 flex justify-end gap-4">
+        <button onclick="closeHRConfirmationModal()" class="px-8 py-3 border-2 border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium text-lg">Cancel</button>
+        <button onclick="proceedWithCreation()" class="px-8 py-3 bg-gradient-to-r from-[#0B2C62] to-[#153e86] hover:from-[#153e86] hover:to-[#1e40af] text-white rounded-lg transition-all duration-200 flex items-center gap-3 font-bold text-lg shadow-lg hover:shadow-xl">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <span>Confirm & Create Employee</span>
+        </button>
+      </div>
+    </div>`;
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    document.body.appendChild(wrapper);
+    window.__hrAddEmpForm = data.form; // store ref
+}
+
+function closeHRConfirmationModal() {
+    const modal = document.getElementById('hr-confirm-modal');
+    if (modal) modal.remove();
+    window.__hrAddEmpForm = null;
+}
+
+function proceedWithCreation() {
+    if (window.__hrAddEmpForm) {
+        const f = window.__hrAddEmpForm;
+        closeHRConfirmationModal();
+        f.submit();
+    }
+}
 
 </script>
 <!-- Toast Notification -->

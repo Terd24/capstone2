@@ -13,8 +13,16 @@ $actorId = $_SESSION['id_number'] ?? 0;
 // Handle form submission for creating/editing schedules
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     if ($_POST['action'] == 'create_schedule') {
-        $section_name = $_POST['section_name'];
+        // Teacher context
+        $teacher_id = $_POST['teacher_id'] ?? '';
+        $section_name = $_POST['section_name'] ?? '';
         $schedule_type = $_POST['schedule_type'];
+        if (empty($teacher_id) || empty($section_name)) {
+            $response = ['success' => false, 'message' => 'Please select a teacher.'];
+            header('Content-Type: application/json');
+            echo json_encode($response);
+            exit;
+        }
         
         if ($schedule_type == 'same') {
             // Same time for all days
@@ -35,8 +43,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             $stmt->bind_param("ssssi", $section_name, $start_time, $end_time, $days, $actorId);
             
             if ($stmt->execute()) {
+                // Auto-assign teacher to this schedule
+                $new_schedule_id = $conn->insert_id;
+                $rem = $conn->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
+                $rem->bind_param("s", $teacher_id);
+                $rem->execute();
+                $ins = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
+                $ins->bind_param("sii", $teacher_id, $new_schedule_id, $actorId);
+                $ins->execute();
                 $response['success'] = true;
-                $response['message'] = "Schedule created successfully!";
+                $response['message'] = "Schedule created and teacher assigned successfully!";
             } else {
                 $response['message'] = "Error creating schedule.";
             }
@@ -82,8 +98,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                 $update_stmt->bind_param("si", $days_string, $schedule_id);
                 $update_stmt->execute();
                 
+                // Auto-assign teacher to this schedule
+                $rem = $conn->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
+                $rem->bind_param("s", $teacher_id);
+                $rem->execute();
+                $ins = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
+                $ins->bind_param("sii", $teacher_id, $schedule_id, $actorId);
+                $ins->execute();
+
                 $response['success'] = true;
-                $response['message'] = "Day-specific schedule created successfully!";
+                $response['message'] = "Day-specific schedule created and teacher assigned successfully!";
             } else {
                 $response['message'] = "Error creating schedule.";
             }
@@ -239,6 +263,15 @@ $schedules_query = "SELECT cs.*, COUNT(es.id) as employee_count
                    GROUP BY cs.id 
                    ORDER BY cs.schedule_name";
 $schedules_result = $conn->query($schedules_query);
+
+// Fetch available teachers for dropdown (active employees with teacher accounts)
+// Uses unified employee_accounts with role = 'teacher'
+$teachers_sql = "SELECT e.id_number, CONCAT(e.first_name, ' ', e.last_name) AS full_name
+                 FROM employees e
+                 INNER JOIN employee_accounts a ON a.employee_id = e.id_number AND a.role = 'teacher'
+                 WHERE e.deleted_at IS NULL OR e.deleted_at IS NULL
+                 ORDER BY full_name";
+$teachers_result = $conn->query($teachers_sql);
 ?>
 
 <!DOCTYPE html>
@@ -306,12 +339,7 @@ $schedules_result = $conn->query($schedules_query);
             </svg>
             Create Schedule
         </button>
-        <button onclick="showAssignScheduleModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-            </svg>
-            Assign Schedule to Employees
-        </button>
+        <!-- Removed Assign Schedule to Employees button -->
     </div>
 
     <!-- Schedules List -->
@@ -394,18 +422,13 @@ $schedules_result = $conn->query($schedules_query);
                             </div>
                             <div class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
-                                <span><?= (int)$schedule['employee_count'] ?> employee(s) assigned</span>
+                                <span>Teacher: <?= htmlspecialchars($schedule['schedule_name']) ?></span>
                             </div>
                         </div>
                         
-                        <div class="mt-4 pt-3 border-t">
-                            <a href="view_schedule_employees.php?schedule_id=<?= (int)$schedule['id'] ?>&schedule_name=<?= urlencode($schedule['schedule_name']) ?>" 
-                               class="block text-center bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg text-sm font-medium">
-                                View Employees
-                            </a>
-                        </div>
+                        <!-- Removed View Employees button as each schedule is for a single teacher -->
                     </div>
                 <?php endwhile; ?>
             <?php else: ?>
@@ -475,10 +498,23 @@ $schedules_result = $conn->query($schedules_query);
         </div>
         <form id="createScheduleForm" class="space-y-4">
             <input type="hidden" id="scheduleId" name="schedule_id">
+            <!-- Hidden field to keep schedule_name (teacher full name) for backend compatibility -->
+            <input type="hidden" id="sectionNameHidden" name="section_name">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Schedule Name</label>
-                <input type="text" id="sectionName" name="section_name" placeholder="" required 
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Teacher Name</label>
+                <select id="sectionName" name="teacher_id" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- Select Teacher --</option>
+                    <?php if ($teachers_result && $teachers_result->num_rows > 0): ?>
+                        <?php while ($t = $teachers_result->fetch_assoc()): ?>
+                            <option value="<?= htmlspecialchars($t['id_number']) ?>" data-name="<?= htmlspecialchars($t['full_name']) ?>">
+                                <?= htmlspecialchars($t['full_name']) ?>
+                            </option>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <option value="" disabled>No teachers found</option>
+                    <?php endif; ?>
+                </select>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -714,6 +750,8 @@ let studentsLoading = false;
 // Preserve previous page overflow so we can restore after Assign modal closes
 let __prevBodyOverflow = '';
 let __prevHtmlOverflow = '';
+// Remember last clicked teacher name so Create Schedule can auto-fill
+let lastTeacherClickedName = '';
 
 // Show/Hide Modals
 function showCreateScheduleModal() {
@@ -726,7 +764,17 @@ function showCreateScheduleModal() {
     const submitEl = document.getElementById('submitBtn'); if (submitEl) submitEl.textContent = 'Create Schedule';
     // Hidden id and basic fields
     const idEl = document.getElementById('scheduleId'); if (idEl) idEl.value = '';
-    const nameEl = document.getElementById('sectionName'); if (nameEl) nameEl.value = '';
+    const nameEl = document.getElementById('sectionName'); if (nameEl) {
+        // Default clear
+        nameEl.value = '';
+        const hiddenName = document.getElementById('sectionNameHidden'); if (hiddenName) hiddenName.value = '';
+        // If a teacher was recently clicked, preselect them
+        if (lastTeacherClickedName) {
+            // Find option by data-name (full name)
+            const opt = Array.from(nameEl.options).find(o => (o.dataset && o.dataset.name) === lastTeacherClickedName);
+            if (opt) { nameEl.value = opt.value; if (hiddenName) hiddenName.value = opt.dataset.name || opt.textContent; }
+        }
+    }
     const stEl = document.getElementById('startTime'); if (stEl) stEl.value = '';
     const etEl = document.getElementById('endTime'); if (etEl) etEl.value = '';
     // Force schedule type to 'same'
@@ -763,7 +811,8 @@ function hideCreateScheduleModal() {
     
     // Clear all form fields
     document.getElementById('scheduleId').value = '';
-    document.getElementById('sectionName').value = '';
+    const sectionEl = document.getElementById('sectionName');
+    if (sectionEl) sectionEl.value = '';
     document.getElementById('startTime').value = '';
     document.getElementById('endTime').value = '';
     
@@ -971,6 +1020,16 @@ document.getElementById('createScheduleForm').addEventListener('submit', functio
     }
     if (!valid) { if (formErrEl){ formErrEl.textContent = 'Please fix the highlighted fields.'; formErrEl.classList.remove('hidden'); } return; }
 
+    // Keep hidden section_name in sync with teacher select before submit
+    try {
+        const sel = document.getElementById('sectionName');
+        const hidden = document.getElementById('sectionNameHidden');
+        if (sel && hidden) {
+            const opt = sel.options[sel.selectedIndex];
+            hidden.value = (opt && (opt.dataset?.name || opt.textContent || ''));
+        }
+    } catch(_) {}
+
     const formData = new FormData(this);
     const action = currentScheduleId ? 'edit_schedule' : 'create_schedule';
     formData.append('action', action);
@@ -1079,6 +1138,8 @@ function toggleStudent(studentId, hasSchedule, studentName, currentSection) {
     } else {
         selectedStudents.push(studentId);
     }
+    // Record the last clicked teacher name for Create Schedule prefill
+    if (studentName) { lastTeacherClickedName = studentName; }
     updateSelectedCount();
     const cb = document.getElementById(`student_${studentId}`); if (cb) cb.checked = selectedStudents.includes(studentId);
 }
@@ -1296,7 +1357,20 @@ function editSchedule(id) {
                 
                 // Populate form with existing data
                 document.getElementById('scheduleId').value = schedule.id;
-                document.getElementById('sectionName').value = schedule.schedule_name;
+                // sectionName is a select of teacher_id; match by data-name (full name stored as schedule_name)
+                const sectionSel = document.getElementById('sectionName');
+                const hiddenName = document.getElementById('sectionNameHidden');
+                if (sectionSel) {
+                    const match = Array.from(sectionSel.options).find(o => (o.dataset && o.dataset.name) === schedule.schedule_name);
+                    if (match) {
+                        sectionSel.value = match.value;
+                        if (hiddenName) hiddenName.value = match.dataset.name || match.textContent;
+                    } else {
+                        // If no matching teacher present, clear selection but keep hidden name for display
+                        sectionSel.value = '';
+                        if (hiddenName) hiddenName.value = schedule.schedule_name;
+                    }
+                }
                 
                 // Set schedule type based on whether it has day-specific schedules
                 if (schedule.has_day_schedules) {

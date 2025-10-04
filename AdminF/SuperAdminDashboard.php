@@ -1440,8 +1440,8 @@ require_once 'includes/dashboard_data.php';
             // Build full name
             const fullName = firstName + (middleName ? ' ' + middleName : '') + ' ' + lastName;
             
-            // Show custom confirmation modal
-            showConfirmationModal({
+            // Show custom confirmation modal (use unique name to avoid collision with generic modal)
+            showEmployeeConfirmationModal({
                 idNumber,
                 fullName,
                 position,
@@ -1457,7 +1457,7 @@ require_once 'includes/dashboard_data.php';
             });
         }
 
-        function showConfirmationModal(data) {
+        function showEmployeeConfirmationModal(data) {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4';
             
