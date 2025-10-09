@@ -51,7 +51,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         $grade_level = trim($_POST['grade_level'] ?? '');
         $semester = trim($_POST['semester'] ?? '');
 
-        $dob = $_POST['dob'] ?? '';
+        // Handle separate date fields for student
+        $dob_day = $_POST['dob_day'] ?? '';
+        $dob_month = $_POST['dob_month'] ?? '';
+        $dob_year = $_POST['dob_year'] ?? '';
+        
+        // Combine into date format if all parts are provided
+        $dob = '';
+        if (!empty($dob_day) && !empty($dob_month) && !empty($dob_year)) {
+            $dob = sprintf('%04d-%02d-%02d', $dob_year, $dob_month, $dob_day);
+        }
+        
         $birthplace = trim($_POST['birthplace'] ?? '');
         $gender = trim($_POST['gender'] ?? '');
         $religion = trim($_POST['religion'] ?? '');
@@ -169,8 +179,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
             // Don't redirect - stay on current page to show error
         }
 
-        // Server-side validation for data types
-        $validation_errors = [];
+// DOB must be before today (not today or future)
+if (!empty($dob)) {
+    $dob_dt = DateTime::createFromFormat('Y-m-d', $dob);
+    $today_dt = new DateTime('today');
+    if (!$dob_dt) {
+        $error_msg = "Invalid Date of Birth.";
+        $form_data = $_POST;
+        $show_modal = true;
+        $_SESSION['error_msg'] = $error_msg;
+        $_SESSION['form_data'] = $form_data;
+        $_SESSION['show_modal'] = true;
+        // Don't redirect - stay on current page to show error
+    } elseif ($dob_dt >= $today_dt) {
+        $error_msg = "Date of Birth cannot be today or a future date.";
+        $form_data = $_POST;
+        $show_modal = true;
+        $_SESSION['error_msg'] = $error_msg;
+        $_SESSION['form_data'] = $form_data;
+        $_SESSION['show_modal'] = true;
+        // Don't redirect - stay on current page to show error
+    }
+}
+
+// Server-side validation for data types
+$validation_errors = [];
 
         // Validate LRN (numbers only)
         if (!preg_match('/^[0-9]+$/', $lrn)) {
@@ -968,7 +1001,59 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <div class="grid grid-cols-3 gap-6 mb-4">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Date of Birth *</label>
-                            <input type="date" name="dob" required value="<?= htmlspecialchars($form_data['dob'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <div class="grid grid-cols-3 gap-2">
+                                <select name="dob_month" required class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                    <option value="">Month</option>
+                                    <?php
+                                    $months = [
+                                        1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
+                                        5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
+                                        9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+                                    ];
+                                    $selected_month = '';
+                                    if (!empty($form_data['dob'])) {
+                                        $selected_month = date('n', strtotime($form_data['dob']));
+                                    } elseif (!empty($form_data['dob_month'])) {
+                                        $selected_month = $form_data['dob_month'];
+                                    }
+                                    foreach ($months as $num => $name) {
+                                        $selected = ($selected_month == $num) ? 'selected' : '';
+                                        echo "<option value='$num' $selected>$name</option>";
+                                    }
+                                    ?>
+                                </select>
+                                <select name="dob_day" required class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                    <option value="">Day</option>
+                                    <?php
+                                    $selected_day = '';
+                                    if (!empty($form_data['dob'])) {
+                                        $selected_day = date('j', strtotime($form_data['dob']));
+                                    } elseif (!empty($form_data['dob_day'])) {
+                                        $selected_day = $form_data['dob_day'];
+                                    }
+                                    for ($i = 1; $i <= 31; $i++) {
+                                        $selected = ($selected_day == $i) ? 'selected' : '';
+                                        echo "<option value='$i' $selected>$i</option>";
+                                    }
+                                    ?>
+                                </select>
+                                <select name="dob_year" required class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                                    <option value="">Year</option>
+                                    <?php
+                                    $current_year = date('Y');
+                                    $selected_year = '';
+                                    if (!empty($form_data['dob'])) {
+                                        $selected_year = date('Y', strtotime($form_data['dob']));
+                                    } elseif (!empty($form_data['dob_year'])) {
+                                        $selected_year = $form_data['dob_year'];
+                                    }
+                                    for ($year = $current_year; $year >= 1950; $year--) {
+                                        $selected = ($selected_year == $year) ? 'selected' : '';
+                                        echo "<option value='$year' $selected>$year</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Birthplace *</label>
@@ -1012,28 +1097,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <!-- Address -->
                     <div class="grid grid-cols-2 gap-6 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Complete Address</label>
+                            <label class="block text-sm font-semibold mb-1">Complete Address *</label>
                             <textarea name="address" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
                         </div>
                     </div>
                     
                     <!-- Family Information -->
                     <div class="space-y-4">
-                        <h4 class="font-semibold text-gray-700">Father's Information</h4>
+                        <h4 class="font-semibold text-gray-700">Father's Information *</h4>
                         <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="father_name" placeholder="Name *" autocomplete="off" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="father_name" placeholder="Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
                         </div>
                         
-                        <h4 class="font-semibold text-gray-700">Mother's Information</h4>
+                        <h4 class="font-semibold text-gray-700">Mother's Information *</h4>
                         <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="mother_name" placeholder="Name *" autocomplete="off" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <input type="text" name="mother_name" placeholder="Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
                         </div>
                         
-                        <h4 class="font-semibold text-gray-700">Guardian's Information</h4>
+                        <h4 class="font-semibold text-gray-700">Guardian's Information *</h4>
                         <div class="grid grid-cols-3 gap-6">
                             <input type="text" name="guardian_name" placeholder="Name" autocomplete="off" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                             <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
@@ -1044,11 +1129,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
                     <!-- Last School Attended -->
                     <div class="grid grid-cols-2 gap-6 mt-4">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Last School Attended</label>
+                            <label class="block text-sm font-semibold mb-1">Last School Attended *</label>
                             <input type="text" name="last_school" placeholder="School Name" autocomplete="off" value="<?= htmlspecialchars($form_data['last_school'] ?? '') ?>" pattern="[A-Za-z\s.-]*" title="Please enter letters only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">School Year</label>
+                            <label class="block text-sm font-semibold mb-1">School Year *</label>
                             <select id="lastSchoolYearSelect" name="last_school_year" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                                 <option value="">Select Year</option>
                             </select>
@@ -1282,10 +1367,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function closeModal(){ 
-    document.getElementById('addAccountModal').classList.add('hidden'); 
-}
-
 // Enforce digits-only and max length on inputs with class 'digits-only'
 document.addEventListener('input', function(e){
     const el = e.target;
@@ -1300,11 +1381,171 @@ document.addEventListener('input', function(e){
     }
 });
 
-</script>
-
-<?php
-// Clear session errors after JavaScript has read them
-if (!($_SERVER["REQUEST_METHOD"] == "POST")) {
-    unset($_SESSION['error_id'], $_SESSION['error_rfid'], $_SESSION['old_id'], $_SESSION['old_rfid'], $_SESSION['success_msg'], $_SESSION['error_msg'], $_SESSION['form_data'], $_SESSION['show_modal']);
+// ========== INPUT VALIDATION FOR TEXT-ONLY FIELDS ==========
+// Prevent numbers and special characters in name fields
+function preventNumbersInNames(event) {
+    const char = String.fromCharCode(event.which || event.keyCode);
+    // Allow only letters, spaces, hyphens, apostrophes, and periods
+    const namePattern = /^[a-zA-Z\s\-'.]+$/;
+    if (!namePattern.test(char)) {
+        event.preventDefault();
+        return false;
+    }
 }
-?>
+
+// Prevent numbers in religion field
+function preventNumbersInReligion(event) {
+    const char = String.fromCharCode(event.which || event.keyCode);
+    const religionPattern = /^[a-zA-Z\s\-'.&]+$/;
+    if (!religionPattern.test(char)) {
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Prevent invalid characters in birthplace
+function preventInvalidInBirthplace(event) {
+    const char = String.fromCharCode(event.which || event.keyCode);
+    // Allow letters, spaces, commas, periods, hyphens
+    const birthplacePattern = /^[a-zA-Z\s,.-]+$/;
+    if (!birthplacePattern.test(char)) {
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Initialize input validation for letters-only fields
+document.addEventListener('DOMContentLoaded', function() {
+    // Apply validation to all fields with 'letters-only' class
+    const lettersOnlyFields = document.querySelectorAll('.letters-only');
+    
+    lettersOnlyFields.forEach(field => {
+        field.addEventListener('keypress', preventNumbersInNames);
+        field.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                // Clean pasted content
+                const value = this.value;
+                const cleanValue = value.replace(/[^a-zA-Z\s\-'.]/g, '');
+                if (value !== cleanValue) {
+                    this.value = cleanValue;
+                    this.style.border = '2px solid #ef4444';
+                    setTimeout(() => {
+                        this.style.border = '';
+                    }, 1000);
+                }
+            }, 10);
+        });
+    });
+    
+    // Apply validation to religion field specifically
+    const religionField = document.querySelector('input[name="religion"]');
+    if (religionField) {
+        religionField.addEventListener('keypress', preventNumbersInReligion);
+        religionField.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const value = this.value;
+                const cleanValue = value.replace(/[^a-zA-Z\s\-'.&]/g, '');
+                if (value !== cleanValue) {
+                    this.value = cleanValue;
+                    this.style.border = '2px solid #ef4444';
+                    setTimeout(() => {
+                        this.style.border = '';
+                    }, 1000);
+                }
+            }, 10);
+        });
+    }
+    
+    // Apply validation to birthplace field specifically
+    const birthplaceField = document.querySelector('input[name="birthplace"]');
+    if (birthplaceField) {
+        birthplaceField.addEventListener('keypress', preventInvalidInBirthplace);
+        birthplaceField.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const value = this.value;
+                const cleanValue = value.replace(/[^a-zA-Z\s,.-]/g, '');
+                if (value !== cleanValue) {
+                    this.value = cleanValue;
+                    this.style.border = '2px solid #ef4444';
+                    setTimeout(() => {
+                        this.style.border = '';
+                    }, 1000);
+                }
+            }, 10);
+        });
+    }
+    
+    // Apply validation to parent name fields
+    const parentNameFields = [
+        'input[name="father_name"]',
+        'input[name="mother_name"]',
+        'input[name="guardian_name"]'
+    ];
+    
+    parentNameFields.forEach(selector => {
+        const field = document.querySelector(selector);
+        if (field) {
+            field.addEventListener('keypress', preventNumbersInNames);
+            field.addEventListener('paste', function(e) {
+                setTimeout(() => {
+                    const value = this.value;
+                    const cleanValue = value.replace(/[^a-zA-Z\s\-'.]/g, '');
+                    if (value !== cleanValue) {
+                        this.value = cleanValue;
+                        this.style.border = '2px solid #ef4444';
+                        setTimeout(() => {
+                            this.style.border = '';
+                        }, 1000);
+                    }
+                }, 10);
+            });
+        }
+    });
+    
+    // Date validation and dynamic day updating
+    const monthSelect = document.querySelector('select[name="dob_month"]');
+    const daySelect = document.querySelector('select[name="dob_day"]');
+    const yearSelect = document.querySelector('select[name="dob_year"]');
+    
+    function updateDaysInMonth() {
+        if (!monthSelect || !daySelect || !yearSelect) return;
+        
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearSelect.value);
+        const currentDay = daySelect.value;
+        
+        if (!month || !year) return;
+        
+        // Get number of days in the selected month/year
+        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        // Clear existing day options (except first placeholder)
+        while (daySelect.options.length > 1) {
+            daySelect.remove(1);
+        }
+        
+        // Add day options for the selected month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const option = document.createElement('option');
+            option.value = day;
+            option.textContent = day;
+            if (currentDay == day) {
+                option.selected = true;
+            }
+            daySelect.appendChild(option);
+        }
+    }
+    
+    if (monthSelect && yearSelect) {
+        monthSelect.addEventListener('change', updateDaysInMonth);
+        yearSelect.addEventListener('change', updateDaysInMonth);
+    }
+    
+    console.log('✅ Input validation initialized for text-only fields in add account form');
+    console.log('✅ Date validation and dynamic day updating initialized');
+};
+
+</script>
+<?php
+if ($_SERVER["REQUEST_METHOD"] != "POST") {
+}

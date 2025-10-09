@@ -1438,7 +1438,26 @@ function confirmDelete() {
 }
 
 function viewScheduleStudents(id, sectionName) {
-    window.location.href = `view_schedule_students.php?schedule_id=${id}&section_name=${encodeURIComponent(sectionName)}`;
+    // Use secure POST method to set session data instead of URL parameters
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'set_schedule_session.php';
+    form.style.display = 'none';
+    
+    const scheduleIdInput = document.createElement('input');
+    scheduleIdInput.type = 'hidden';
+    scheduleIdInput.name = 'schedule_id';
+    scheduleIdInput.value = id;
+    
+    const sectionNameInput = document.createElement('input');
+    sectionNameInput.type = 'hidden';
+    sectionNameInput.name = 'section_name';
+    sectionNameInput.value = sectionName;
+    
+    form.appendChild(scheduleIdInput);
+    form.appendChild(sectionNameInput);
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // View Schedule Details (Students)

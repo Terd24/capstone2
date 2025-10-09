@@ -234,6 +234,14 @@ if (!$student_data) {
     header("Location: /onecci/RegistrarF/AccountList.php?type=student");
     exit;
 }
+// Normalize gender value for display (handles 'M'/'F' or 'Male'/'Female', any case/spacing)
+$genderVal = '';
+if ($student_data) {
+    $g = strtoupper(trim($student_data['gender'] ?? ''));
+    if ($g === 'MALE') $g = 'M';
+    if ($g === 'FEMALE') $g = 'F';
+    if ($g === 'M' || $g === 'F') $genderVal = $g;
+}
 ?>
 <?php if (!$embed): ?>
 <!DOCTYPE html>
@@ -262,12 +270,14 @@ input[type=number] { -moz-appearance: textfield; }
         <!-- Header -->
         <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#0B2C62] rounded-t-2xl">
             <h2 class="text-lg font-semibold text-white">Student Information</h2>
-            <div class="flex gap-3">
+            <div class="flex gap-3 items-center">
+                <!-- Save on header (hidden until Edit is pressed) -->
+                <button type="submit" id="saveBtn" form="studentForm" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition hidden">Save Changes</button>
                 <button type="button" id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
                 <form method="post" action="<?= $_SERVER['PHP_SELF'] ?>?id=<?= htmlspecialchars($student_id) ?>" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this student account? This action cannot be undone.')">
                     <input type="hidden" name="delete_student" value="1">
                     <input type="hidden" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>">
-                    <button type="submit" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>
+                    <button type="submit" id="deleteBtn" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete</button>
                 </form>
                 <button type="button" onclick="closeModal()" class="text-2xl font-bold text-white hover:text-gray-300">&times;</button>
             </div>
@@ -385,14 +395,11 @@ input[type=number] { -moz-appearance: textfield; }
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Gender</label>
-                            <div class="flex items-center gap-6 mt-1">
-                                <label class="flex items-center gap-2">
-                                    <input type="radio" name="gender" value="M" <?= ($student_data['gender'] ?? '') === 'M' ? 'checked' : '' ?> disabled class="student-field"> Male
-                                </label>
-                                <label class="flex items-center gap-2">
-                                    <input type="radio" name="gender" value="F" <?= ($student_data['gender'] ?? '') === 'F' ? 'checked' : '' ?> disabled class="student-field"> Female
-                                </label>
-                            </div>
+                            <select name="gender" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field" data-initial="<?= htmlspecialchars($genderVal) ?>">
+                                <option value="">-- Select Gender --</option>
+                                <option value="M" <?= ($genderVal === 'M') ? 'selected' : '' ?>>Male</option>
+                                <option value="F" <?= ($genderVal === 'F') ? 'selected' : '' ?>>Female</option>
+                            </select>
                         </div>
 
                         <!-- Row: Religion, Credentials, Payment Mode -->
@@ -577,12 +584,9 @@ input[type=number] { -moz-appearance: textfield; }
                 </div>
             </div>
 
-            <!-- Submit Buttons -->
+            <!-- Footer Buttons (no Save here; Save moved to header) -->
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
                 <a href="/onecci/RegistrarF/AccountList.php?type=student" onclick="return closeModalEmbedAware(event);" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition inline-flex items-center justify-center">Back to List</a>
-                <button type="submit" id="saveBtn" class="px-5 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700 transition hidden">
-                    Save Changes
-                </button>
             </div>
         </form>
     </div>
@@ -639,9 +643,36 @@ function updateGradeLevels() {
     });
 }
 
+// Capture original form state (once per edit session)
+function captureOriginal() {
+    const fields = document.querySelectorAll('.student-field');
+    fields.forEach(f => {
+        if (f.dataset.origCaptured === '1') return;
+        if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+            f.dataset.originalValue = f.value;
+        } else if (f.type === 'radio' || f.type === 'checkbox') {
+            f.dataset.originalChecked = f.checked ? '1' : '0';
+        }
+        f.dataset.origCaptured = '1';
+    });
+}
+
+// Restore original form state
+function restoreOriginal() {
+    const fields = document.querySelectorAll('.student-field');
+    fields.forEach(f => {
+        if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+            if (f.dataset.originalValue !== undefined) f.value = f.dataset.originalValue;
+        } else if (f.type === 'radio' || f.type === 'checkbox') {
+            if (f.dataset.originalChecked !== undefined) f.checked = (f.dataset.originalChecked === '1');
+        }
+    });
+}
+
 function toggleEdit() {
     const editBtn = document.getElementById('editBtn');
     const saveBtn = document.getElementById('saveBtn');
+    const delBtn = document.getElementById('deleteBtn');
     const fields = document.querySelectorAll('.student-field');
     
     const isEditing = editBtn.textContent === 'Cancel';
@@ -650,7 +681,10 @@ function toggleEdit() {
         // Cancel editing
         editBtn.textContent = 'Edit';
         editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
+        // Revert any unsaved changes
+        restoreOriginal();
         saveBtn.classList.add('hidden');
+        if (delBtn) delBtn.classList.remove('hidden');
         
         // Make fields readonly
         fields.forEach(field => {
@@ -666,7 +700,10 @@ function toggleEdit() {
         // Enable editing
         editBtn.textContent = 'Cancel';
         editBtn.className = 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition';
+        // Snapshot current values once when entering edit mode
+        captureOriginal();
         saveBtn.classList.remove('hidden');
+        if (delBtn) delBtn.classList.add('hidden');
         
         // Make fields editable
         fields.forEach(field => {
@@ -691,6 +728,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const academicTrack = document.querySelector('select[name="academic_track"]');
     if (academicTrack) {
         academicTrack.addEventListener('change', updateGradeLevels);
+    }
+    // Force-initialize gender select if not pre-selected
+    const genderEl = document.querySelector('select[name="gender"]');
+    if (genderEl && !genderEl.value && genderEl.dataset.initial) {
+        genderEl.value = genderEl.dataset.initial;
     }
     // Reinforce click handlers to ensure they work in embedded contexts
     const editBtn = document.getElementById('editBtn');

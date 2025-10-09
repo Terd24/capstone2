@@ -22,6 +22,10 @@ if ($success_msg) {
 
 // Get selected school year filter
 $selected_school_year = $_GET['school_year'] ?? '';
+// Default to current academic year if no filter specified
+$current_year = (int)date('Y');
+$current_sy = $current_year . '-' . ($current_year + 1);
+if ($selected_school_year === '') { $selected_school_year = $current_sy; }
 
 // Get all available school years for dropdown
 $school_years = [];
@@ -30,6 +34,11 @@ if ($year_query) {
     while ($year_row = $year_query->fetch_assoc()) {
         $school_years[] = $year_row['school_year'];
     }
+}
+
+// Ensure current school year is present in dropdown
+if (!in_array($current_sy, $school_years, true)) {
+    array_unshift($school_years, $current_sy);
 }
 
 // Build student-only list
@@ -75,7 +84,7 @@ if ($student_q) {
 
 usort($rows, function($a, $b){ return strcasecmp($a['full_name'], $b['full_name']); });
 
-$columns = ['ID Number', 'Full Name', 'Academic Track', 'Grade Level'];
+$columns = ['No.', 'ID Number', 'Full Name', 'Academic Track', 'Grade Level'];
 $total_accounts = count($rows);
 ?>
 <!DOCTYPE html>
@@ -125,11 +134,20 @@ function testQRGeneration() {
         console.error('QRious library not available for test');
     }
 }
+
+// Populate school year selects on initial page load as a safety net
+document.addEventListener('DOMContentLoaded', function(){
+    try { setupSchoolYearOptions(); } catch (e) { console.warn('setupSchoolYearOptions init failed', e); }
+});
 </script>
 <style>
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type=number] { -moz-appearance: textfield; }
+/* HR-like inline error visuals for modal form */
+.field-error { border-color: #dc2626 !important; background-color: #fef2f2; box-shadow: 0 0 0 1px rgba(220,38,38,0.12); }
+.error-text { color: #dc2626; font-size: 0.75rem; margin-top: 0.25rem; display: flex; align-items: center; gap: 6px; }
+.error-text::before { content: ''; display: none; }
 </style>
 </head>
 <body class="bg-gradient-to-br from-[#f3f6fb] to-[#e6ecf7] font-sans min-h-screen text-gray-900">
@@ -174,17 +192,12 @@ input[type=number] { -moz-appearance: textfield; }
     </div>
 
     <!-- Top Controls -->
-    <div class="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-[#0B2C62]/10">
-        <div class="flex items-center gap-6">
-            <div class="flex items-center gap-3">
-                <label class="font-medium text-[#0B2C62] text-sm">Show entries:</label>
-                <input type="number" id="showEntries" min="1" value="10" class="w-20 border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
-            </div>
-            
-            <div class="flex items-center gap-3">
-                <label class="font-medium text-[#0B2C62] text-sm">School Year:</label>
-                <select id="schoolYearFilter" onchange="filterBySchoolYear()" class="border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] min-w-[140px]">
-                    <option value="">All Years</option>
+    <div class="mb-6 bg-white p-4 rounded-xl shadow-sm border border-[#0B2C62]/10">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <!-- School Year -->
+            <div>
+                <label class="block font-medium text-[#0B2C62] text-sm mb-1">School Year</label>
+                <select id="schoolYearFilter" onchange="filterBySchoolYear()" class="w-full border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                     <?php foreach ($school_years as $year): ?>
                         <option value="<?= htmlspecialchars($year) ?>" <?= $selected_school_year === $year ? 'selected' : '' ?>>
                             <?= htmlspecialchars($year) ?>
@@ -192,16 +205,70 @@ input[type=number] { -moz-appearance: textfield; }
                     <?php endforeach; ?>
                 </select>
             </div>
-        </div>
 
-        <div class="flex items-center gap-3">
-            <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-64 border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
-            <button onclick="openModal()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg shadow hover:bg-[#256f37] transition flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                Add Account
-            </button>
+            <!-- Track -->
+            <div>
+                <label class="block font-medium text-[#0B2C62] text-sm mb-1">Track</label>
+                <select id="trackFilter" class="w-full border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                    <option value="">All</option>
+                    <option>Kinder</option>
+                    <option>Elementary</option>
+                    <option>Junior High School</option>
+                    <option>Senior High School Strands</option>
+                    <option>ABM</option>
+                    <option>GAS</option>
+                    <option>HE</option>
+                    <option>HUMSS</option>
+                    <option>ICT</option>
+                    <option>SPORTS</option>
+                    <option>STEM</option>
+                    <option>College Courses</option>
+                    <option>Bachelor of Physical Education (BPed)</option>
+                    <option>Bachelor of Early Childhood Education (BECEd)</option>
+                </select>
+            </div>
+
+            <!-- Grade -->
+            <div>
+                <label class="block font-medium text-[#0B2C62] text-sm mb-1">Grade</label>
+                <select id="gradeFilter" class="w-full border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                    <option value="">All</option>
+                    <option>Kinder 1</option>
+                    <option>Kinder 2</option>
+                    <option>Grade 1</option>
+                    <option>Grade 2</option>
+                    <option>Grade 3</option>
+                    <option>Grade 4</option>
+                    <option>Grade 5</option>
+                    <option>Grade 6</option>
+                    <option>Grade 7</option>
+                    <option>Grade 8</option>
+                    <option>Grade 9</option>
+                    <option>Grade 10</option>
+                    <option>Grade 11</option>
+                    <option>Grade 12</option>
+                    <option>1st Year</option>
+                    <option>2nd Year</option>
+                    <option>3rd Year</option>
+                    <option>4th Year</option>
+                </select>
+            </div>
+
+            <!-- Search -->
+            <div>
+                <label class="block font-medium text-[#0B2C62] text-sm mb-1">Search</label>
+                <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-full border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
+            </div>
+
+            <!-- Add Account -->
+            <div class="flex md:justify-end">
+                <button id="addAccountBtn" type="button" onclick="(window.openAddAccountModal||window.openModal)()" class="w-full md:w-auto px-4 py-2 bg-[#2F8D46] text-white rounded-lg shadow hover:bg-[#256f37] transition flex items-center gap-2 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Account
+                </button>
+            </div>
         </div>
     </div>
 
@@ -218,7 +285,8 @@ input[type=number] { -moz-appearance: textfield; }
             <tbody id="accountTable" class="divide-y divide-gray-200">
                 <?php if (!empty($rows)): ?>
                     <?php foreach ($rows as $r): ?>
-                        <tr class="hover:bg-[#FBB917]/20 transition cursor-pointer" onclick="viewStudent('<?= htmlspecialchars($r['id_number']) ?>')">
+                        <tr class="hover:bg-[#FBB917]/20 transition cursor-pointer" data-track="<?= htmlspecialchars($r['academic_track']) ?>" data-grade="<?= htmlspecialchars($r['grade_level']) ?>" onclick="viewStudent('<?= htmlspecialchars($r['id_number']) ?>')">
+                            <td class="px-4 py-3 serial"></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($r['id_number']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($r['full_name']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($r['academic_track']) ?></td>
@@ -232,6 +300,12 @@ input[type=number] { -moz-appearance: textfield; }
                 <?php endif; ?>
             </tbody>
         </table>
+    </div>
+    <!-- Bottom Pagination (10 per page) -->
+    <div id="paginationBar" class="mt-4 flex items-center justify-center gap-2 text-sm">
+        <button id="prevPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40">Prev</button>
+        <span id="pageInfo" class="px-2 text-gray-600">Page 1 of 1</span>
+        <button id="nextPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40">Next</button>
     </div>
 </div>
 
@@ -297,6 +371,13 @@ function setupStudentModalHandlers(studentId) {
         form.action = `Accounts/view_student.php?id=${encodeURIComponent(studentId)}`;
     }
 
+    // Initialize gender select from data-initial if not selected (embedded content scripts don't run)
+    const genderSelect = root.querySelector('select[name="gender"]');
+    if (genderSelect && !genderSelect.value) {
+        const init = genderSelect.getAttribute('data-initial') || genderSelect.dataset.initial;
+        if (init) genderSelect.value = init;
+    }
+
     // Helper to update grade levels based on academic track
     // Helper to update grade levels based on academic track
     function updateGradeLevelsLocal() {
@@ -340,15 +421,43 @@ function setupStudentModalHandlers(studentId) {
         });
     }
 
+    // Helpers to snapshot and restore original values within this embedded root
+    function captureOriginalLocal() {
+        const fields = root.querySelectorAll('.student-field');
+        fields.forEach(f => {
+            if (f.dataset.origCaptured === '1') return;
+            if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+                f.dataset.originalValue = f.value;
+            } else if (f.type === 'radio' || f.type === 'checkbox') {
+                f.dataset.originalChecked = f.checked ? '1' : '0';
+            }
+            f.dataset.origCaptured = '1';
+        });
+    }
+    function restoreOriginalLocal() {
+        const fields = root.querySelectorAll('.student-field');
+        fields.forEach(f => {
+            if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+                if (f.dataset.originalValue !== undefined) f.value = f.dataset.originalValue;
+            } else if (f.type === 'radio' || f.type === 'checkbox') {
+                if (f.dataset.originalChecked !== undefined) f.checked = (f.dataset.originalChecked === '1');
+            }
+        });
+    }
+
     // Implement toggleEdit locally
     function toggleEditLocal() {
         if (!editBtn || !saveBtn) return;
         const fields = root.querySelectorAll('.student-field');
+        const delBtn = root.querySelector('#deleteBtn');
         const isCancel = editBtn.textContent.trim() === 'Cancel';
         if (isCancel) {
             editBtn.textContent = 'Edit';
             editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
             saveBtn.classList.add('hidden');
+            // Revert any unsaved changes
+            restoreOriginalLocal();
+            if (delBtn) delBtn.classList.remove('hidden');
             fields.forEach(field => {
                 if (['TEXTAREA'].includes(field.tagName) || ['text','number','date'].includes(field.type)) {
                     field.readOnly = true; field.classList.add('bg-gray-50'); field.classList.remove('bg-white');
@@ -360,6 +469,9 @@ function setupStudentModalHandlers(studentId) {
             editBtn.textContent = 'Cancel';
             editBtn.className = 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition';
             saveBtn.classList.remove('hidden');
+            // Snapshot current values once when entering edit mode
+            captureOriginalLocal();
+            if (delBtn) delBtn.classList.add('hidden');
             fields.forEach(field => {
                 if (['TEXTAREA'].includes(field.tagName) || ['text','number','date'].includes(field.type)) {
                     field.readOnly = false; field.classList.remove('bg-gray-50'); field.classList.add('bg-white');
@@ -469,24 +581,124 @@ if (notificationElement) {
 
 
 
+// Client-side pagination (10 per page) with search
 const searchInput = document.getElementById('searchInput');
-const showEntriesInput = document.getElementById('showEntries');
-let tableRows = Array.from(document.querySelectorAll('#accountTable tr'));
+const tableBody = document.getElementById('accountTable');
+const allRows = Array.from(tableBody.querySelectorAll('tr'));
+let filteredRows = allRows.slice();
+const trackFilter = document.getElementById('trackFilter');
+const gradeFilter = document.getElementById('gradeFilter');
+const pageSize = 10;
+let currentPage = 1;
 
-function updateEntries() {
-    const value = parseInt(showEntriesInput.value) || tableRows.length;
-    let shown = 0;
-    tableRows.forEach(row => row.style.display = '');
-    const query = searchInput.value.toLowerCase().trim();
-    tableRows.forEach(row => { if (!row.textContent.toLowerCase().includes(query)) row.style.display='none'; });
-    shown = 0;
-    tableRows.forEach(row => {
-        if(row.style.display !== 'none'){ if(shown<value) row.style.display=''; else row.style.display='none'; shown++; }
+const prevBtn = document.getElementById('prevPage');
+const nextBtn = document.getElementById('nextPage');
+const pageInfo = document.getElementById('pageInfo');
+
+function renderPage() {
+    // Hide all
+    allRows.forEach(r => r.style.display = 'none');
+    const total = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageRows = filteredRows.slice(start, end);
+    pageRows.forEach((r, idx) => {
+        r.style.display = '';
+        const serialCell = r.querySelector('.serial');
+        if (serialCell) serialCell.textContent = (start + idx + 1).toString();
     });
+    if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = (currentPage <= 1);
+    if (nextBtn) nextBtn.disabled = (currentPage >= totalPages);
 }
-showEntriesInput.addEventListener('input', updateEntries);
-searchInput.addEventListener('input', updateEntries);
-updateEntries();
+
+function applyFilter() {
+    const q = (searchInput?.value || '').toLowerCase().trim();
+    let track = (trackFilter?.value || '').toLowerCase().trim();
+    let grade = (gradeFilter?.value || '').toLowerCase().trim();
+    // Map UI 'kinder' to data value 'pre-elementary'
+    if (track === 'kinder') track = 'pre-elementary';
+    // Map UI 'kinder 1'/'kinder 2' to data value 'kinder' if your DB stores just 'Kinder'
+    if (grade === 'kinder 1' || grade === 'kinder 2') grade = 'kinder';
+    filteredRows = allRows.filter(r => {
+        const hay = r.textContent.toLowerCase();
+        const rTrack = (r.getAttribute('data-track') || '').toLowerCase();
+        const rGrade = (r.getAttribute('data-grade') || '').toLowerCase();
+        if (q && !hay.includes(q)) return false;
+        if (track && rTrack !== track) return false;
+        if (grade && rGrade !== grade) return false;
+        return true;
+    });
+    currentPage = 1;
+    renderPage();
+}
+
+if (searchInput) searchInput.addEventListener('input', applyFilter);
+if (trackFilter) trackFilter.addEventListener('change', applyFilter);
+if (gradeFilter) gradeFilter.addEventListener('change', applyFilter);
+if (prevBtn) prevBtn.addEventListener('click', () => { currentPage--; renderPage(); });
+if (nextBtn) nextBtn.addEventListener('click', () => { currentPage++; renderPage(); });
+
+// Initial render
+renderPage();
+
+// Dynamically update grade options based on selected track (like in Add Account)
+function updateGradeFilterOptions() {
+    if (!gradeFilter || !trackFilter) return;
+    const trackVal = trackFilter.value;
+    const sets = {
+        'Kinder': ['Kinder 1','Kinder 2'],
+        'Elementary': ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'],
+        'Junior High School': ['Grade 7','Grade 8','Grade 9','Grade 10'],
+        'Senior High School Strands': ['Grade 11','Grade 12'],
+        'ABM': ['Grade 11','Grade 12'],
+        'GAS': ['Grade 11','Grade 12'],
+        'HE': ['Grade 11','Grade 12'],
+        'HUMSS': ['Grade 11','Grade 12'],
+        'ICT': ['Grade 11','Grade 12'],
+        'SPORTS': ['Grade 11','Grade 12'],
+        'STEM': ['Grade 11','Grade 12'],
+        'College Courses': ['1st Year','2nd Year','3rd Year','4th Year'],
+        'Bachelor of Physical Education (BPed)': ['1st Year','2nd Year','3rd Year','4th Year'],
+        'Bachelor of Early Childhood Education (BECEd)': ['1st Year','2nd Year','3rd Year','4th Year']
+    };
+    const current = gradeFilter.value;
+    const levels = trackVal && sets[trackVal] ? sets[trackVal] : null;
+    // Rebuild options
+    gradeFilter.innerHTML = '';
+    const optAll = document.createElement('option');
+    optAll.value = '';
+    optAll.textContent = 'All';
+    gradeFilter.appendChild(optAll);
+    if (levels) {
+        levels.forEach(g => {
+            const o = document.createElement('option');
+            o.value = g; o.textContent = g;
+            if (g === current) o.selected = true;
+            gradeFilter.appendChild(o);
+        });
+    } else {
+        // Default full list when no track selected
+        ['Kinder 1','Kinder 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12','1st Year','2nd Year','3rd Year','4th Year']
+        .forEach(g => {
+            const o = document.createElement('option');
+            o.value = g; o.textContent = g;
+            if (g === current) o.selected = true;
+            gradeFilter.appendChild(o);
+        });
+    }
+}
+
+if (trackFilter) {
+    trackFilter.addEventListener('change', function(){
+        updateGradeFilterOptions();
+        applyFilter();
+    });
+    // Initialize on load
+    updateGradeFilterOptions();
+}
 
 // School Year Filter Function
 function filterBySchoolYear() {
@@ -513,6 +725,192 @@ function openModal() {
     setTimeout(setupQRCodeFunctionality, 200);
     setTimeout(setupQRCodeFunctionality, 500); // Retry after 500ms
     setTimeout(setupQRCodeFunctionality, 1000); // Retry after 1s
+    // Initialize simple digit-prevention for occupation fields
+    setTimeout(setupOccupationValidation, 200);
+    setTimeout(setupOccupationValidation, 500);
+    setTimeout(setupOccupationValidation, 1000);
+    // Populate school year dropdowns (last 10 years)
+    setTimeout(setupSchoolYearOptions, 200);
+    setTimeout(setupSchoolYearOptions, 500);
+    setTimeout(setupSchoolYearOptions, 1000);
+    // Initialize HR-like inline validation
+    setTimeout(initRegistrarInlineValidation, 200);
+}
+
+// Close Add Account modal (used by the × button inside the modal markup)
+function closeModal() {
+    const modal = document.getElementById('addAccountModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    document.body.style.overflow = '';
+}
+
+// Inline validation for Add Account modal (HR-style red feedback)
+function initRegistrarInlineValidation() {
+    const form = document.querySelector('#addAccountModal #unifiedForm form');
+    if (!form) return;
+    // Disable native browser validation popups/tooltips
+    form.setAttribute('novalidate', 'novalidate');
+    form.addEventListener('invalid', function(e){ e.preventDefault(); }, true);
+
+    const requiredNames = [
+        'lrn','last_name','first_name','dob','birthplace','gender','religion',
+        'academic_track','grade_level','semester','school_year','enrollment_status',
+        'payment_mode','address',
+        'father_name','father_occupation','father_contact',
+        'mother_name','mother_occupation','mother_contact',
+        'guardian_name','guardian_occupation','guardian_contact',
+        'last_school','last_school_year',
+        'id_number','password','rfid_uid','username','parent_username','parent_password'
+    ];
+
+    const findField = (name) => form.querySelector(`[name="${name}"]`);
+    const containerFor = (el) => el?.closest('div') || el?.parentElement || form;
+    const ensureMsg = (containerEl) => { const c = containerEl || form; let m = c.querySelector(':scope > .error-text'); if (!m) { m = document.createElement('div'); m.className = 'error-text'; c.appendChild(m); } return m; };
+    const labelMap = {
+        lrn: 'LRN', last_name: 'Last name', first_name: 'First name', middle_name: 'Middle name',
+        dob: 'Date of birth', birthplace: 'Birthplace', gender: 'Gender', religion: 'Religion',
+        academic_track: 'Academic track / course', grade_level: 'Grade level', semester: 'Semester',
+        school_year: 'School year', enrollment_status: 'Enrollment status', payment_mode: 'Mode of payment',
+        address: 'Address',
+        father_name: "Father's name", father_occupation: "Father's occupation", father_contact: "Father's contact",
+        mother_name: "Mother's name", mother_occupation: "Mother's occupation", mother_contact: "Mother's contact",
+        guardian_name: "Guardian's name", guardian_occupation: "Guardian's occupation", guardian_contact: "Guardian's contact",
+        last_school: 'Last school attended', last_school_year: 'School year',
+        id_number: 'Student ID', password: 'Password',
+        rfid_uid: 'RFID number', username: 'Username', parent_username: 'Parent username', parent_password: 'Parent password'
+    };
+    function readableLabel(el, name){
+        // Try nearest preceding label
+        const cont = containerFor(el);
+        const lab = cont ? cont.querySelector(':scope > label') : null;
+        if (lab && lab.textContent) return lab.textContent.replace('*','').trim();
+        return labelMap[name] || 'This field';
+    }
+    function setError(el, text, explicitContainer){
+        if(!el && !explicitContainer) return;
+        const cont = explicitContainer || containerFor(el);
+        if (el) el.classList.add('field-error');
+        const m = ensureMsg(cont);
+        m.textContent = text || 'This field is required.';
+    }
+    const clearError = (el) => { if(!el) return; el.classList.remove('field-error'); const c = containerFor(el); const m = c.querySelector(':scope > .error-text'); if (m) m.remove(); };
+
+    function validate() {
+        let ok = true;
+        requiredNames.forEach(n => { const f = findField(n); if (f) clearError(f); });
+
+        requiredNames.forEach(name => {
+            if (['enrollment_status','payment_mode','gender'].includes(name)) {
+                const group = form.querySelectorAll(`[name="${name}"]`);
+                let checked = false; group.forEach(r => { if (r.checked) checked = true; });
+                if (!checked && group.length) {
+                    const cont = group[0].closest('div') || form; // place message under the radio group container
+                    setError(null, `${labelMap[name]} is required`, cont);
+                    ok = false;
+                }
+                return;
+            }
+            const el = findField(name); if (!el) return;
+            const val = (el.value || '').trim(); if (!val) { setError(el, `${readableLabel(el, name)} is required`); ok = false; }
+        });
+
+        const patterns = [
+            { n:'lrn', re:/^[0-9]+$/, msg:'LRN must contain numbers only.' },
+            { n:'last_name', re:/^[A-Za-z\s]+$/, msg:'Last name must contain letters only.' },
+            { n:'first_name', re:/^[A-Za-z\s]+$/, msg:'First name must contain letters only.' },
+            { n:'middle_name', re:/^[A-Za-z\s]*$/, msg:'Middle name must contain letters only.' },
+            { n:'birthplace', re:/^[A-Za-z\s,.-]+$/, msg:'Birthplace must contain valid characters only.' },
+            { n:'religion', re:/^[A-Za-z\s]+$/, msg:'Religion must contain letters only.' },
+            { n:'school_year', re:/^[0-9\-]+$/, msg:'School year must be like 2024-2025.' },
+            { n:'id_number', re:/^[0-9]{11}$/, msg:'Student ID must be exactly 11 digits.' },
+            { n:'rfid_uid', re:/^[0-9]{10}$/, msg:'RFID must be exactly 10 digits.' },
+            { n:'username', re:/^[A-Za-z0-9_]+$/, msg:'Username can only contain letters, numbers, and underscores.' },
+            { n:'parent_username', re:/^[A-Za-z0-9_]+$/, msg:'Parent username can only contain letters, numbers, and underscores.' }
+        ];
+        patterns.forEach(p => { const el = findField(p.n); if (el && el.value && !p.re.test(el.value.trim())) { setError(el, p.msg); ok = false; } });
+
+        ['father_contact','mother_contact','guardian_contact'].forEach(n => { const el = findField(n); if (el && el.value && !/^[0-9]{11}$/.test(el.value.trim())) { setError(el, 'Contact must be exactly 11 digits.'); ok = false; } });
+
+        return ok;
+    }
+
+    // Bind once per open
+    if (!form.__validatorBound) {
+        form.addEventListener('submit', function(e){ if (!validate()) { e.preventDefault(); const firstErr = form.querySelector('.field-error'); if (firstErr) firstErr.scrollIntoView({behavior:'smooth', block:'center'}); }});
+        form.addEventListener('input', (e) => clearError(e.target));
+        form.addEventListener('change', (e) => clearError(e.target));
+        form.__validatorBound = true;
+    }
+
+    // If server rendered error box, show inline highlights too
+    const hasServerErrors = !!document.querySelector('#addAccountModal .bg-red-100');
+    if (hasServerErrors) setTimeout(validate, 0);
+}
+
+// Enforce Kinder + Kinder 2 grade levels for Pre-Elementary/Kinder
+(function() {
+    document.addEventListener('DOMContentLoaded', function(){
+        const originalPopulate = window.populateGradeLevels;
+        window.populateGradeLevels = function(selectedTrack, selectedGrade = '') {
+            if (typeof originalPopulate === 'function') {
+                try { originalPopulate(selectedTrack, selectedGrade); } catch (e) {}
+            }
+            try {
+                const academicTrack = document.querySelector('select[name="academic_track"]');
+                const gradeLevel = document.getElementById('gradeLevel');
+                if (!academicTrack || !gradeLevel) return;
+                const groupLabel = academicTrack.options[academicTrack.selectedIndex]?.parentNode?.label || '';
+                if (groupLabel === 'Pre-Elementary' || selectedTrack === 'Pre-Elementary' || (academicTrack.value || '').toLowerCase().includes('kinder')) {
+                    // Force Kinder options (Kinder 1 and Kinder 2)
+                    const opts = ['Kinder 1', 'Kinder 2'];
+                    gradeLevel.innerHTML = '<option value="">-- Select Grade Level --</option>';
+                    // If an older saved value was simply 'Kinder', map it to 'Kinder 1'
+                    const normalizedSelected = (selectedGrade === 'Kinder') ? 'Kinder 1' : selectedGrade;
+                    opts.forEach(level => {
+                        const opt = document.createElement('option');
+                        opt.value = level; opt.textContent = level;
+                        if (level === normalizedSelected) opt.selected = true;
+                        gradeLevel.appendChild(opt);
+                    });
+                }
+            } catch (e) { console.warn('Kinder options override failed', e); }
+        };
+
+        // Also enforce after modal opens
+        const origOpen = window.openModal;
+        if (typeof origOpen === 'function') {
+            window.openModal = function() {
+                origOpen.apply(this, arguments);
+                setTimeout(() => {
+                    const academicTrack = document.querySelector('select[name="academic_track"]');
+                    if (academicTrack) {
+                        window.populateGradeLevels(academicTrack.value);
+                    }
+                }, 150);
+            };
+        }
+    });
+})();
+
+// Wrapper for the Add Account button to ensure school years are populated
+function openAddAccountModal() {
+    if (typeof openModal === 'function') {
+        openModal();
+    }
+    // Populate years after modal exists
+    setTimeout(setupSchoolYearOptions, 50);
+    setTimeout(setupSchoolYearOptions, 200);
+    // Add focus-based fallback: if still empty, populate on first focus
+    setTimeout(() => {
+        ['schoolYearSelect','lastSchoolYearSelect'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const handler = () => { if (el.options.length <= 1) setupSchoolYearOptions(); el.removeEventListener('focus', handler); };
+            el.addEventListener('focus', handler, { once: true });
+        });
+    }, 300);
 }
 
 function setupQRCodeFunctionality() {
@@ -557,6 +955,75 @@ function setupQRCodeFunctionality() {
         console.log('Event listener added to RFID input'); // Debug log
     } else {
         console.log('RFID input not found yet'); // Debug log
+    }
+}
+
+// Prevent digits in occupation fields (frontend only, keep it simple)
+function setupOccupationValidation() {
+    const selectors = [
+        'input[name="father_occupation"]',
+        'input[name="mother_occupation"]',
+        'input[name="guardian_occupation"]'
+    ];
+    selectors.forEach(sel => {
+        const el = document.querySelector(sel);
+        if (!el) return;
+        // Add a pattern/title for HTML validation too
+        el.setAttribute('pattern', '^[^0-9]*$');
+        el.setAttribute('title', 'Digits are not allowed');
+        // Block typing digits
+        el.addEventListener('keypress', (e) => {
+            const ch = String.fromCharCode(e.which || e.keyCode);
+            if (/\d/.test(ch)) e.preventDefault();
+        }, { once: false });
+        // Strip digits on paste or programmatic input
+        const strip = (e) => { e.target.value = e.target.value.replace(/\d/g, ''); };
+        el.addEventListener('input', strip, { once: false });
+    });
+}
+
+// Populate School Year selects with the last 10 academic years
+function setupSchoolYearOptions() {
+    try {
+        const now = new Date();
+        const y = now.getFullYear();
+
+        // Helper to ensure placeholder remains (keep the first option)
+        function resetKeepPlaceholder(selectEl) {
+            if (!selectEl) return;
+            while (selectEl.options.length > 1) selectEl.remove(1);
+        }
+
+        // Main School Year (required) - CURRENT YEAR ONLY (auto-updates yearly)
+    const schoolYearSelect = document.getElementById('schoolYearSelect');
+    console.log('setupSchoolYearOptions: schoolYearSelect found?', !!schoolYearSelect);
+    if (schoolYearSelect) {
+        const currentDesired = `${y}-${y+1}`;
+        // Remove ALL options then add only current academic year
+        while (schoolYearSelect.options.length > 0) schoolYearSelect.remove(0);
+        const opt = document.createElement('option');
+        opt.value = currentDesired; opt.textContent = currentDesired;
+        schoolYearSelect.appendChild(opt);
+        schoolYearSelect.value = currentDesired;
+    }
+
+    // Last School Year (optional)
+    const lastSySelect = document.getElementById('lastSchoolYearSelect');
+    console.log('setupSchoolYearOptions: lastSchoolYearSelect found?', !!lastSySelect);
+    if (lastSySelect) {
+        resetKeepPlaceholder(lastSySelect);
+        // Newest first: current down to (current-4) => total 5 years
+        for (let i = 0; i <= 4; i++) {
+            const start = y - i;
+            const end = start + 1;
+            const label = `${start}-${end}`;
+            const opt = document.createElement('option');
+            opt.value = label; opt.textContent = label;
+            lastSySelect.appendChild(opt);
+        }
+    }
+    } catch (e) {
+        console.error('setupSchoolYearOptions error:', e);
     }
 }
 
@@ -638,16 +1105,9 @@ function printQRCode() {
     const canvas = document.getElementById('qrCodeCanvas');
     const rfidInput = document.querySelector('input[name="rfid_uid"]');
     
-    if (!canvas || !rfidInput) {
-        alert('No QR code to print');
-        return;
-    }
-    
     const rfid = rfidInput.value.trim();
     const studentName = document.querySelector('input[name="first_name"]')?.value + ' ' + 
                        document.querySelector('input[name="last_name"]')?.value;
-    
-    // Create print window
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
         <html>

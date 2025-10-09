@@ -2,26 +2,115 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
+// Security headers
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: DENY");
+header("X-XSS-Protection: 1; mode=block");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+
 // Require registrar login
 if (!isset($_SESSION['registrar_id'])) {
     header("Location: ../StudentLogin/login.php");
     exit;
 }
 
-$schedule_id = $_GET['schedule_id'] ?? null;
-$section_name = $_GET['section_name'] ?? 'Unknown Section';
+// Generate CSRF token if not exists
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
-if (!$schedule_id) {
-    header("Location: ManageSchedule.php");
+// Input validation and sanitization
+$schedule_id = null;
+$section_name = 'Unknown Section';
+$error_msg = '';
+$success_msg = '';
+
+// SECURITY: Block all direct URL parameter access
+if (isset($_GET['schedule_id']) || isset($_GET['section_name']) || isset($_GET['notice']) || isset($_GET['msg'])) {
+    // Log unauthorized direct URL access attempt
+    $attempted_params = [];
+    if (isset($_GET['schedule_id'])) $attempted_params[] = 'schedule_id=' . $_GET['schedule_id'];
+    if (isset($_GET['section_name'])) $attempted_params[] = 'section_name=' . $_GET['section_name'];
+    if (isset($_GET['notice'])) $attempted_params[] = 'notice=' . $_GET['notice'];
+    if (isset($_GET['msg'])) $attempted_params[] = 'msg=' . $_GET['msg'];
+    
+    $registrar_id = $_SESSION['registrar_id'] ?? 'unknown';
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $attempted_url = implode('&', $attempted_params);
+    
+    error_log("SECURITY ALERT: Direct URL parameter access blocked - Registrar ID {$registrar_id} from IP {$ip_address} attempted: {$attempted_url}");
+    
+    // Redirect to manage schedules with security warning
+    header("Location: ManageSchedule.php?error=" . urlencode("Direct URL access not allowed. Please use the proper navigation."));
     exit;
 }
 
-// Get schedule details
-$schedule_stmt = $conn->prepare("SELECT * FROM class_schedules WHERE id = ?");
-$schedule_stmt->bind_param("i", $schedule_id);
-$schedule_stmt->execute();
-$schedule_result = $schedule_stmt->get_result();
+// Check if we have schedule info in session (only way to access)
+if (isset($_SESSION['current_schedule_id'])) {
+    $schedule_id = $_SESSION['current_schedule_id'];
+    $section_name = $_SESSION['current_section_name'] ?? 'Unknown Section';
+    
+    // Get any stored messages
+    if (isset($_SESSION['schedule_success_msg'])) {
+        $success_msg = $_SESSION['schedule_success_msg'];
+        unset($_SESSION['schedule_success_msg']);
+    }
+    if (isset($_SESSION['schedule_error_msg'])) {
+        $error_msg = $_SESSION['schedule_error_msg'];
+        unset($_SESSION['schedule_error_msg']);
+    }
+} else {
+    // No schedule info in session, log attempt and redirect
+    $registrar_id = $_SESSION['registrar_id'] ?? 'unknown';
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    error_log("SECURITY: Unauthorized access attempt to view_schedule_students.php - Registrar ID {$registrar_id} from IP {$ip_address} without proper session data");
+    
+    header("Location: ManageSchedule.php?error=" . urlencode("Access denied. Please select a schedule from the list."));
+    exit;
+}
+
+// SECURITY CHECK: Verify schedule exists and registrar has access
+$registrar_id = $_SESSION['registrar_id'];
+
+// First, check if the schedule exists
+$schedule_check_stmt = $conn->prepare("SELECT * FROM class_schedules WHERE id = ?");
+$schedule_check_stmt->bind_param("i", $schedule_id);
+$schedule_check_stmt->execute();
+$schedule_result = $schedule_check_stmt->get_result();
 $schedule = $schedule_result->fetch_assoc();
+
+if (!$schedule) {
+    // Log unauthorized access attempt
+    error_log("Schedule not found: Registrar ID {$registrar_id} tried to access non-existent Schedule ID {$schedule_id} from IP " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+    
+    header("Location: ManageSchedule.php?error=" . urlencode("Schedule not found."));
+    exit;
+}
+
+// Check if registrar has access to this schedule
+// For now, we'll allow access if the registrar is logged in and the schedule exists
+// You can add more specific authorization logic here based on your requirements
+$has_access = true; // Default to allow access for logged-in registrars
+
+// Optional: Add specific access control based on created_by field if it exists
+if (isset($schedule['created_by']) && $schedule['created_by'] != $registrar_id) {
+    // You can add role-based checks here if you have a role system
+    // For now, we'll log the access but still allow it
+    error_log("Cross-registrar access: Registrar ID {$registrar_id} accessing Schedule ID {$schedule_id} created by {$schedule['created_by']}");
+}
+
+if (!$has_access) {
+    // Log unauthorized access attempt
+    error_log("Unauthorized schedule access: Registrar ID {$registrar_id} tried to access Schedule ID {$schedule_id} from IP " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+    
+    header("Location: ManageSchedule.php?error=" . urlencode("Access denied. You don't have permission to view this schedule."));
+    exit;
+}
+
+// Update section name from database
+if ($schedule['section_name']) {
+    $section_name = htmlspecialchars($schedule['section_name'], ENT_QUOTES, 'UTF-8');
+}
 
 // Get assigned students
 $students_stmt = $conn->prepare("
@@ -37,31 +126,83 @@ $students_stmt->bind_param("i", $schedule_id);
 $students_stmt->execute();
 $students_result = $students_stmt->get_result();
 
-// Handle student removal
+// Handle student removal with security checks
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['action'] == 'remove_student') {
-    $student_id = $_POST['student_id'];
-    
-    // Remove from student_schedules
-    $remove_stmt = $conn->prepare("DELETE FROM student_schedules WHERE student_id = ? AND schedule_id = ?");
-    $remove_stmt->bind_param("si", $student_id, $schedule_id);
-    
-    if ($remove_stmt->execute()) {
-        // Clear schedule from student_account and attendance_record
-        $clear_student = $conn->prepare("UPDATE student_account SET class_schedule = NULL WHERE id_number = ?");
-        $clear_student->bind_param("s", $student_id);
-        $clear_student->execute();
-        $clear_attendance = $conn->prepare("UPDATE attendance_record SET schedule = NULL WHERE id_number = ?");
-        $clear_attendance->bind_param("s", $student_id);
-        $clear_attendance->execute();
-        $notice = 'success';
-        $msg = 'Removed student from schedule successfully!';
+    // CSRF token validation
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $error_msg = 'Security token mismatch. Please refresh the page and try again.';
     } else {
-        $notice = 'error';
-        $msg = 'Failed to remove student from schedule.';
+        $student_id = trim($_POST['student_id'] ?? '');
+        
+        // Validate student_id format
+        if (!preg_match('/^[A-Za-z0-9\-_]+$/', $student_id) || strlen($student_id) > 20) {
+            $error_msg = 'Invalid student ID format.';
+        } else {
+            // Double-check schedule access before allowing removal
+            $verify_access_stmt = $conn->prepare("SELECT 1 FROM class_schedules WHERE id = ?");
+            $verify_access_stmt->bind_param("i", $schedule_id);
+            $verify_access_stmt->execute();
+            $verify_result = $verify_access_stmt->get_result();
+            
+            if ($verify_result->num_rows === 0) {
+                error_log("Unauthorized removal attempt: Registrar ID {$registrar_id} tried to remove student from non-existent Schedule ID {$schedule_id}");
+                $error_msg = 'Schedule not found.';
+            } else {
+                // Verify student is actually assigned to this schedule
+                $student_check_stmt = $conn->prepare("SELECT student_id FROM student_schedules WHERE student_id = ? AND schedule_id = ?");
+                $student_check_stmt->bind_param("si", $student_id, $schedule_id);
+                $student_check_stmt->execute();
+                $student_check_result = $student_check_stmt->get_result();
+                
+                if ($student_check_result->num_rows === 0) {
+                    $error_msg = 'Student not found in this schedule.';
+                } else {
+                    // Begin transaction for data consistency
+                    $conn->begin_transaction();
+                    
+                    try {
+                        // Remove from student_schedules
+                        $remove_stmt = $conn->prepare("DELETE FROM student_schedules WHERE student_id = ? AND schedule_id = ?");
+                        $remove_stmt->bind_param("si", $student_id, $schedule_id);
+                        $remove_stmt->execute();
+                        
+                        // Clear schedule from student_account and attendance_record
+                        $clear_student = $conn->prepare("UPDATE student_account SET class_schedule = NULL WHERE id_number = ?");
+                        $clear_student->bind_param("s", $student_id);
+                        $clear_student->execute();
+                        
+                        $clear_attendance = $conn->prepare("UPDATE attendance_record SET schedule = NULL WHERE id_number = ?");
+                        $clear_attendance->bind_param("s", $student_id);
+                        $clear_attendance->execute();
+                        
+                        $conn->commit();
+                        
+                        $notice = 'success';
+                        $msg = 'Removed student from schedule successfully!';
+                        
+                        // Log successful removal
+                        error_log("Student removal: Registrar ID {$registrar_id} removed student {$student_id} from Schedule ID {$schedule_id} from IP " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+                    } catch (Exception $e) {
+                        $conn->rollback();
+                        $notice = 'error';
+                        $msg = 'Failed to remove student from schedule.';
+                        error_log("Student removal failed: " . $e->getMessage());
+                    }
+                }
+            }
+        }
     }
-    // Refresh the page with notice
-    header("Location: view_schedule_students.php?schedule_id=$schedule_id&section_name=" . urlencode($section_name) . "&notice=".$notice."&msg=".urlencode($msg));
-    exit;
+    
+    // Store message in session and redirect to clean URL
+    if (isset($notice) && isset($msg)) {
+        if ($notice === 'success') {
+            $_SESSION['schedule_success_msg'] = $msg;
+        } else {
+            $_SESSION['schedule_error_msg'] = $msg;
+        }
+        header("Location: view_schedule_students.php");
+        exit;
+    }
 }
 ?>
 
@@ -111,15 +252,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
 <!-- Main Content -->
 <div class="container mx-auto px-6 py-8">
     <!-- Success/Error Messages -->
-    <?php if (isset($success_msg)): ?>
+    <?php if (!empty($success_msg)): ?>
         <div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
-            <?= htmlspecialchars($success_msg) ?>
+            <?= $success_msg ?>
         </div>
     <?php endif; ?>
     
-    <?php if (isset($error_msg)): ?>
+    <?php if (!empty($error_msg)): ?>
         <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-            <?= htmlspecialchars($error_msg) ?>
+            <?= $error_msg ?>
         </div>
     <?php endif; ?>
 
@@ -187,7 +328,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                                     <?= date('M j, Y g:i A', strtotime($student['assigned_at'])) ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button onclick="removeStudent('<?= htmlspecialchars($student['id_number']) ?>', '<?= htmlspecialchars($student['full_name']) ?>')" 
+                                    <button onclick="removeStudent('<?= htmlspecialchars($student['id_number'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($student['full_name'], ENT_QUOTES, 'UTF-8') ?>')" 
                                             class="text-red-600 hover:text-red-900">
                                         Remove
                                     </button>
@@ -267,6 +408,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             <form id="removeForm" method="POST">
                 <input type="hidden" name="action" value="remove_student">
                 <input type="hidden" name="student_id" id="removeStudentId">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                 <div class="flex gap-3">
                     <button type="button" onclick="hideRemoveModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium">
                         Cancel
@@ -417,8 +559,23 @@ function doAssignStudents(ids){
 }
 
 function removeStudent(studentId, studentName) {
-    document.getElementById('removeStudentId').value = studentId;
-    document.getElementById('studentName').textContent = studentName;
+    // Validate input parameters
+    if (!studentId || !studentName || typeof studentId !== 'string' || typeof studentName !== 'string') {
+        showErrorBanner('Invalid student data');
+        return;
+    }
+    
+    // Sanitize inputs
+    const sanitizedId = studentId.replace(/[^A-Za-z0-9\-_]/g, '');
+    const sanitizedName = studentName.replace(/[<>"'&]/g, '');
+    
+    if (sanitizedId.length === 0 || sanitizedName.length === 0) {
+        showErrorBanner('Invalid student information');
+        return;
+    }
+    
+    document.getElementById('removeStudentId').value = sanitizedId;
+    document.getElementById('studentName').textContent = sanitizedName;
     document.getElementById('removeModal').classList.remove('hidden');
 }
 
