@@ -82,9 +82,33 @@ if ($student_q) {
     }
 }
 
-usort($rows, function($a, $b){ return strcasecmp($a['full_name'], $b['full_name']); });
+// Define grade level order for sorting
+function getGradeLevelOrder($grade_level) {
+    $order = [
+        'Kinder 1' => 1, 'Kinder 2' => 2, 'Kinder' => 3,
+        'Grade 1' => 4, 'Grade 2' => 5, 'Grade 3' => 6, 'Grade 4' => 7, 'Grade 5' => 8, 'Grade 6' => 9,
+        'Grade 7' => 10, 'Grade 8' => 11, 'Grade 9' => 12, 'Grade 10' => 13,
+        'Grade 11' => 14, 'Grade 12' => 15,
+        '1st Year' => 16, '2nd Year' => 17, '3rd Year' => 18, '4th Year' => 19
+    ];
+    return $order[$grade_level] ?? 999; // Unknown grades go to the end
+}
 
-$columns = ['No.', 'ID Number', 'Full Name', 'Academic Track', 'Grade Level'];
+// Sort by grade level first, then by full name within the same grade
+usort($rows, function($a, $b) {
+    $gradeOrderA = getGradeLevelOrder($a['grade_level']);
+    $gradeOrderB = getGradeLevelOrder($b['grade_level']);
+    
+    if ($gradeOrderA === $gradeOrderB) {
+        // Same grade level, sort by name
+        return strcasecmp($a['full_name'], $b['full_name']);
+    }
+    
+    // Different grade levels, sort by grade order
+    return $gradeOrderA - $gradeOrderB;
+});
+
+$columns = ['No.', 'Student ID', 'Full Name', 'Academic Track', 'Grade Level'];
 $total_accounts = count($rows);
 ?>
 <!DOCTYPE html>
@@ -223,8 +247,8 @@ input[type=number] { -moz-appearance: textfield; }
                     <option>SPORTS</option>
                     <option>STEM</option>
                     <option>College Courses</option>
-                    <option>Bachelor of Physical Education (BPed)</option>
-                    <option>Bachelor of Early Childhood Education (BECEd)</option>
+                    <option>BPEd (Bachelor of Physical Education)</option>
+                    <option>BECEd (Bachelor of Early Childhood Education)</option>
                 </select>
             </div>
 
@@ -262,7 +286,7 @@ input[type=number] { -moz-appearance: textfield; }
 
             <!-- Add Account -->
             <div class="flex md:justify-end">
-                <button id="addAccountBtn" type="button" onclick="(window.openAddAccountModal||window.openModal)()" class="w-full md:w-auto px-4 py-2 bg-[#2F8D46] text-white rounded-lg shadow hover:bg-[#256f37] transition flex items-center gap-2 justify-center">
+                <button id="addAccountBtn" type="button" onclick="openAddAccountModal()" class="w-full md:w-auto px-4 py-2 bg-[#2F8D46] text-white rounded-lg shadow hover:bg-[#256f37] transition flex items-center gap-2 justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
@@ -399,8 +423,8 @@ function setupStudentModalHandlers(studentId) {
 
             // College programs
             "College Courses": ["1st Year","2nd Year","3rd Year","4th Year"],
-            "Bachelor of Physical Education (BPed)": ["1st Year","2nd Year","3rd Year","4th Year"],
-            "Bachelor of Early Childhood Education (BECEd)": ["1st Year","2nd Year","3rd Year","4th Year"]
+            "BPEd (Bachelor of Physical Education)": ["1st Year","2nd Year","3rd Year","4th Year"],
+            "BECEd (Bachelor of Early Childhood Education)": ["1st Year","2nd Year","3rd Year","4th Year"]
         };
         const selectedTrack = academicTrack.value;
         const selectedGrade = gradeLevel.value;
@@ -661,8 +685,8 @@ function updateGradeFilterOptions() {
         'SPORTS': ['Grade 11','Grade 12'],
         'STEM': ['Grade 11','Grade 12'],
         'College Courses': ['1st Year','2nd Year','3rd Year','4th Year'],
-        'Bachelor of Physical Education (BPed)': ['1st Year','2nd Year','3rd Year','4th Year'],
-        'Bachelor of Early Childhood Education (BECEd)': ['1st Year','2nd Year','3rd Year','4th Year']
+        'BPEd (Bachelor of Physical Education)': ['1st Year','2nd Year','3rd Year','4th Year'],
+        'BECEd (Bachelor of Early Childhood Education)': ['1st Year','2nd Year','3rd Year','4th Year']
     };
     const current = gradeFilter.value;
     const levels = trackVal && sets[trackVal] ? sets[trackVal] : null;
@@ -725,7 +749,6 @@ function openModal() {
     setTimeout(setupQRCodeFunctionality, 200);
     setTimeout(setupQRCodeFunctionality, 500); // Retry after 500ms
     setTimeout(setupQRCodeFunctionality, 1000); // Retry after 1s
-    // Initialize simple digit-prevention for occupation fields
     setTimeout(setupOccupationValidation, 200);
     setTimeout(setupOccupationValidation, 500);
     setTimeout(setupOccupationValidation, 1000);
@@ -733,8 +756,326 @@ function openModal() {
     setTimeout(setupSchoolYearOptions, 200);
     setTimeout(setupSchoolYearOptions, 500);
     setTimeout(setupSchoolYearOptions, 1000);
+    // Initialize input validation for all fields
+    setTimeout(setupInputValidation, 200);
+    setTimeout(setupInputValidation, 500);
+    setTimeout(setupInputValidation, 1000);
+    // Setup auto-generated Student ID
+    setTimeout(setupAutoStudentId, 200);
+    setTimeout(setupAutoStudentId, 500);
+    setTimeout(setupAutoStudentId, 1000);
     // Initialize HR-like inline validation
     setTimeout(initRegistrarInlineValidation, 200);
+    // Setup username and password generation
+    setTimeout(setupUsernameAndPasswordGeneration, 200);
+    setTimeout(setupUsernameAndPasswordGeneration, 500);
+    setTimeout(setupUsernameAndPasswordGeneration, 1000);
+}
+
+// Setup comprehensive input validation
+function setupInputValidation() {
+    console.log('Setting up input validation...');
+    
+    // Prevent numbers in name fields
+    const nameFields = [
+        'input[name="first_name"]',
+        'input[name="last_name"]', 
+        'input[name="middle_name"]',
+        'input[name="religion"]',
+        'input[name="father_name"]',
+        'input[name="mother_name"]',
+        'input[name="guardian_name"]'
+    ];
+    
+    nameFields.forEach(selector => {
+        const field = document.querySelector(selector);
+        if (field) {
+            // Remove existing listeners to avoid duplicates
+            field.removeEventListener('keypress', preventNumbers);
+            field.removeEventListener('input', cleanNumbersFromInput);
+            
+            // Add new listeners
+            field.addEventListener('keypress', preventNumbers);
+            field.addEventListener('input', cleanNumbersFromInput);
+            field.addEventListener('paste', function(e) {
+                setTimeout(() => {
+                    const value = this.value;
+                    const cleanValue = value.replace(/[0-9]/g, '');
+                    if (value !== cleanValue) {
+                        this.value = cleanValue;
+                    }
+                }, 10);
+            });
+            console.log('Validation applied to:', selector);
+        }
+    });
+    
+    // Prevent letters in numeric fields
+    const numericFields = [
+        'input[name="lrn"]',
+        'input[name="id_number"]',
+        'input[name="rfid_uid"]',
+        'input[name="father_contact"]',
+        'input[name="mother_contact"]',
+        'input[name="guardian_contact"]'
+    ];
+    
+    numericFields.forEach(selector => {
+        const field = document.querySelector(selector);
+        if (field) {
+            // Remove existing listeners to avoid duplicates
+            field.removeEventListener('keypress', preventLetters);
+            field.removeEventListener('input', cleanLettersFromInput);
+            
+            // Add new listeners
+            field.addEventListener('keypress', preventLetters);
+            field.addEventListener('input', cleanLettersFromInput);
+            field.addEventListener('paste', function(e) {
+                setTimeout(() => {
+                    const value = this.value;
+                    const cleanValue = value.replace(/[^0-9]/g, '');
+                    if (value !== cleanValue) {
+                        this.value = cleanValue;
+                    }
+                }, 10);
+            });
+            console.log('Numeric validation applied to:', selector);
+        }
+    });
+}
+
+// Prevent numbers from being typed
+function preventNumbers(event) {
+    const char = String.fromCharCode(event.which || event.keyCode);
+    if (/[0-9]/.test(char)) {
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Prevent letters from being typed
+function preventLetters(event) {
+    const char = String.fromCharCode(event.which || event.keyCode);
+    if (/[^0-9]/.test(char) && event.keyCode !== 8 && event.keyCode !== 9 && event.keyCode !== 37 && event.keyCode !== 39 && event.keyCode !== 46) {
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Clean numbers from input value
+function cleanNumbersFromInput(event) {
+    const field = event.target;
+    const value = field.value;
+    const cleanValue = value.replace(/[0-9]/g, '');
+    if (value !== cleanValue) {
+        field.value = cleanValue;
+    }
+}
+
+// Clean letters from input value  
+function cleanLettersFromInput(event) {
+    const field = event.target;
+    const value = field.value;
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    if (value !== cleanValue) {
+        field.value = cleanValue;
+    }
+}
+
+// Setup auto-generated Student ID and Username
+function setupAutoStudentId() {
+    const studentIdField = document.querySelector('input[name="id_number"]');
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const usernameField = document.querySelector('input[name="username"]');
+    
+    if (studentIdField) {
+        // Fetch and display the next Student ID
+        fetch('get_next_student_id.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    studentIdField.value = data.next_id;
+                    studentIdField.readOnly = true;
+                    studentIdField.style.backgroundColor = '#f3f4f6';
+                    studentIdField.style.cursor = 'not-allowed';
+                    
+                    // Store the last6 digits for username generation
+                    window.studentIdLast6 = data.last6 || (data.next_id || '').replace(/\D/g, '').slice(-6).padStart(6, '0');
+                    
+                    // Setup username generation
+                    setupUsernameGeneration();
+                } else {
+                    studentIdField.placeholder = 'Auto-generated (e.g., 02200000001)';
+                    studentIdField.readOnly = true;
+                    studentIdField.style.backgroundColor = '#f3f4f6';
+                    studentIdField.style.cursor = 'not-allowed';
+                }
+            })
+            .catch(error => {
+                console.log('Error fetching next ID, using placeholder');
+                studentIdField.placeholder = 'Auto-generated (e.g., 02200000001)';
+                studentIdField.readOnly = true;
+                studentIdField.style.backgroundColor = '#f3f4f6';
+                studentIdField.style.cursor = 'not-allowed';
+            });
+        
+        console.log('Student ID field set to auto-generate mode');
+    }
+}
+
+// Setup username and password auto-generation
+function setupUsernameAndPasswordGeneration() {
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const usernameField = document.querySelector('input[name="username"]');
+    const parentUsernameField = document.querySelector('input[name="parent_username"]');
+    const passwordField = document.querySelector('input[name="password"]');
+    const parentPasswordField = document.querySelector('input[name="parent_password"]');
+    const dobMonthField = document.querySelector('select[name="dob_month"]');
+    const dobDayField = document.querySelector('select[name="dob_day"]');
+    const dobYearField = document.querySelector('select[name="dob_year"]');
+    
+    if (!lastNameField || !usernameField) {
+        console.log('Username generation: Required fields not found');
+        return;
+    }
+    
+    const generateCredentials = () => {
+        const lastName = (lastNameField.value || '').toLowerCase().replace(/[^a-z]/g, '');
+        const last6 = window.studentIdLast6 || '000000';
+        
+        // Always keep username fields readonly
+        usernameField.readOnly = true;
+        usernameField.style.backgroundColor = '#f3f4f6';
+        usernameField.style.cursor = 'not-allowed';
+        
+        if (parentUsernameField) {
+            parentUsernameField.readOnly = true;
+            parentUsernameField.style.backgroundColor = '#f3f4f6';
+            parentUsernameField.style.cursor = 'not-allowed';
+        }
+        
+        // Generate usernames
+        if (lastName && last6.length === 6) {
+            // Generate student username
+            const username = `${lastName}${last6}muzon@student.cci.edu.ph`;
+            usernameField.value = username;
+            console.log('Student username generated:', username);
+            
+            // Generate parent username if field exists
+            if (parentUsernameField) {
+                const parentUsername = `${lastName}${last6}muzon@parent.cci.edu.ph`;
+                parentUsernameField.value = parentUsername;
+                console.log('Parent username generated:', parentUsername);
+            }
+        } else {
+            // Clear usernames if last name is empty but keep readonly
+            usernameField.value = '';
+            
+            if (parentUsernameField) {
+                parentUsernameField.value = '';
+            }
+        }
+        
+        // Generate passwords ONLY when date of birth is complete
+        if (lastName && dobMonthField && dobDayField && dobYearField && 
+            dobMonthField.value && dobDayField.value && dobYearField.value) {
+            
+            const months = ['', 'january', 'february', 'march', 'april', 'may', 'june',
+                          'july', 'august', 'september', 'october', 'november', 'december'];
+            const monthName = months[parseInt(dobMonthField.value)] || '';
+            const day = dobDayField.value;
+            const year = dobYearField.value;
+            
+            if (monthName && day && year) {
+                const password = `${lastName}${monthName}${day}${year}`;
+                console.log('Generated password:', password);
+                
+                // Set student password
+                if (passwordField) {
+                    passwordField.value = password;
+                    passwordField.readOnly = true;
+                    passwordField.style.backgroundColor = '#f3f4f6';
+                    passwordField.style.cursor = 'not-allowed';
+                    console.log('Student password set:', password);
+                }
+                
+                // Set parent password
+                if (parentPasswordField) {
+                    parentPasswordField.value = password;
+                    parentPasswordField.readOnly = true;
+                    parentPasswordField.style.backgroundColor = '#f3f4f6';
+                    parentPasswordField.style.cursor = 'not-allowed';
+                    console.log('Parent password set:', password);
+                }
+            }
+        } else {
+            // Keep passwords readonly but empty if date of birth is not complete
+            if (passwordField) {
+                passwordField.value = '';
+                passwordField.readOnly = true;
+                passwordField.style.backgroundColor = '#f3f4f6';
+                passwordField.style.cursor = 'not-allowed';
+            }
+            if (parentPasswordField) {
+                parentPasswordField.value = '';
+                parentPasswordField.readOnly = true;
+                parentPasswordField.style.backgroundColor = '#f3f4f6';
+                parentPasswordField.style.cursor = 'not-allowed';
+            }
+        }
+    };
+    
+    // Generate credentials when last name or date fields change
+    lastNameField.addEventListener('input', generateCredentials);
+    lastNameField.addEventListener('blur', generateCredentials);
+    
+    // Also update when date fields change
+    if (dobMonthField) dobMonthField.addEventListener('change', generateCredentials);
+    if (dobDayField) dobDayField.addEventListener('change', generateCredentials);
+    if (dobYearField) dobYearField.addEventListener('change', generateCredentials);
+    
+    // Initialize username fields as readonly immediately
+    usernameField.readOnly = true;
+    usernameField.style.backgroundColor = '#f3f4f6';
+    usernameField.style.cursor = 'not-allowed';
+    
+    if (parentUsernameField) {
+        parentUsernameField.readOnly = true;
+        parentUsernameField.style.backgroundColor = '#f3f4f6';
+        parentUsernameField.style.cursor = 'not-allowed';
+    }
+    
+    // Initial generation if fields already have values
+    if (lastNameField.value) {
+        generateCredentials();
+    }
+    
+    // Add manual trigger for testing
+    setTimeout(() => {
+        generateCredentials();
+    }, 1000);
+    
+    console.log('Username and password generation setup complete');
+}
+
+// Test function for password generation
+function testPasswordGeneration() {
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const dobMonthField = document.querySelector('select[name="dob_month"]');
+    const dobDayField = document.querySelector('select[name="dob_day"]');
+    const dobYearField = document.querySelector('select[name="dob_year"]');
+    
+    console.log('Test - Found fields:', {
+        lastName: lastNameField?.value,
+        month: dobMonthField?.value,
+        day: dobDayField?.value,
+        year: dobYearField?.value
+    });
+    
+    // Trigger the generation function
+    if (window.setupUsernameAndPasswordGeneration) {
+        setupUsernameAndPasswordGeneration();
+    }
 }
 
 // Close Add Account modal (used by the × button inside the modal markup)
@@ -758,11 +1099,11 @@ function initRegistrarInlineValidation() {
         'lrn','last_name','first_name','dob','birthplace','gender','religion',
         'academic_track','grade_level','semester','school_year','enrollment_status',
         'payment_mode','address',
-        'father_name','father_occupation','father_contact',
-        'mother_name','mother_occupation','mother_contact',
-        'guardian_name','guardian_occupation','guardian_contact',
+        'father_first_name','father_last_name','father_occupation','father_contact',
+        'mother_first_name','mother_last_name','mother_occupation','mother_contact',
+        'guardian_first_name','guardian_last_name','guardian_occupation','guardian_contact',
         'last_school','last_school_year',
-        'id_number','password','rfid_uid','username','parent_username','parent_password'
+        'rfid_uid'
     ];
 
     const findField = (name) => form.querySelector(`[name="${name}"]`);
@@ -774,12 +1115,11 @@ function initRegistrarInlineValidation() {
         academic_track: 'Academic track / course', grade_level: 'Grade level', semester: 'Semester',
         school_year: 'School year', enrollment_status: 'Enrollment status', payment_mode: 'Mode of payment',
         address: 'Address',
-        father_name: "Father's name", father_occupation: "Father's occupation", father_contact: "Father's contact",
-        mother_name: "Mother's name", mother_occupation: "Mother's occupation", mother_contact: "Mother's contact",
-        guardian_name: "Guardian's name", guardian_occupation: "Guardian's occupation", guardian_contact: "Guardian's contact",
+        father_first_name: "Father's first name", father_last_name: "Father's last name", father_middle_name: "Father's middle name", father_occupation: "Father's occupation", father_contact: "Father's contact",
+        mother_first_name: "Mother's first name", mother_last_name: "Mother's last name", mother_middle_name: "Mother's middle name", mother_occupation: "Mother's occupation", mother_contact: "Mother's contact",
+        guardian_first_name: "Guardian's first name", guardian_last_name: "Guardian's last name", guardian_middle_name: "Guardian's middle name", guardian_occupation: "Guardian's occupation", guardian_contact: "Guardian's contact",
         last_school: 'Last school attended', last_school_year: 'School year',
-        id_number: 'Student ID', password: 'Password',
-        rfid_uid: 'RFID number', username: 'Username', parent_username: 'Parent username', parent_password: 'Parent password'
+        rfid_uid: 'RFID number'
     };
     function readableLabel(el, name){
         // Try nearest preceding label
@@ -802,13 +1142,26 @@ function initRegistrarInlineValidation() {
         requiredNames.forEach(n => { const f = findField(n); if (f) clearError(f); });
 
         requiredNames.forEach(name => {
-            if (['enrollment_status','payment_mode','gender'].includes(name)) {
+            if (['enrollment_status','payment_mode'].includes(name)) {
                 const group = form.querySelectorAll(`[name="${name}"]`);
                 let checked = false; group.forEach(r => { if (r.checked) checked = true; });
                 if (!checked && group.length) {
                     const cont = group[0].closest('div') || form; // place message under the radio group container
                     setError(null, `${labelMap[name]} is required`, cont);
                     ok = false;
+                }
+                return;
+            }
+            // Special handling for date of birth (separate fields)
+            if (name === 'dob') {
+                const monthEl = findField('dob_month');
+                const dayEl = findField('dob_day');
+                const yearEl = findField('dob_year');
+                
+                if (!monthEl?.value || !dayEl?.value || !yearEl?.value) {
+                    if (monthEl && !monthEl.value) { setError(monthEl, 'Birth month is required'); ok = false; }
+                    if (dayEl && !dayEl.value) { setError(dayEl, 'Birth day is required'); ok = false; }
+                    if (yearEl && !yearEl.value) { setError(yearEl, 'Birth year is required'); ok = false; }
                 }
                 return;
             }
@@ -821,17 +1174,41 @@ function initRegistrarInlineValidation() {
             { n:'last_name', re:/^[A-Za-z\s]+$/, msg:'Last name must contain letters only.' },
             { n:'first_name', re:/^[A-Za-z\s]+$/, msg:'First name must contain letters only.' },
             { n:'middle_name', re:/^[A-Za-z\s]*$/, msg:'Middle name must contain letters only.' },
+            { n:'father_first_name', re:/^[A-Za-z\s]+$/, msg:"Father's first name must contain letters only." },
+            { n:'father_last_name', re:/^[A-Za-z\s]+$/, msg:"Father's last name must contain letters only." },
+            { n:'father_middle_name', re:/^[A-Za-z\s]*$/, msg:"Father's middle name must contain letters only." },
+            { n:'father_occupation', re:/^[A-Za-z\s]+$/, msg:"Father's occupation must contain letters only." },
+            { n:'mother_first_name', re:/^[A-Za-z\s]+$/, msg:"Mother's first name must contain letters only." },
+            { n:'mother_last_name', re:/^[A-Za-z\s]+$/, msg:"Mother's last name must contain letters only." },
+            { n:'mother_middle_name', re:/^[A-Za-z\s]*$/, msg:"Mother's middle name must contain letters only." },
+            { n:'mother_occupation', re:/^[A-Za-z\s]+$/, msg:"Mother's occupation must contain letters only." },
+            { n:'guardian_first_name', re:/^[A-Za-z\s]+$/, msg:"Guardian's first name must contain letters only." },
+            { n:'guardian_last_name', re:/^[A-Za-z\s]+$/, msg:"Guardian's last name must contain letters only." },
+            { n:'guardian_middle_name', re:/^[A-Za-z\s]*$/, msg:"Guardian's middle name must contain letters only." },
+            { n:'guardian_occupation', re:/^[A-Za-z\s]+$/, msg:"Guardian's occupation must contain letters only." },
             { n:'birthplace', re:/^[A-Za-z\s,.-]+$/, msg:'Birthplace must contain valid characters only.' },
             { n:'religion', re:/^[A-Za-z\s]+$/, msg:'Religion must contain letters only.' },
             { n:'school_year', re:/^[0-9\-]+$/, msg:'School year must be like 2024-2025.' },
-            { n:'id_number', re:/^[0-9]{11}$/, msg:'Student ID must be exactly 11 digits.' },
-            { n:'rfid_uid', re:/^[0-9]{10}$/, msg:'RFID must be exactly 10 digits.' },
-            { n:'username', re:/^[A-Za-z0-9_]+$/, msg:'Username can only contain letters, numbers, and underscores.' },
-            { n:'parent_username', re:/^[A-Za-z0-9_]+$/, msg:'Parent username can only contain letters, numbers, and underscores.' }
+            { n:'address', re:/^.{20,500}$/, msg:'Complete address must be 20-500 characters long.' },
+            { n:'rfid_uid', re:/^[0-9]{10}$/, msg:'RFID must be exactly 10 digits.' }
         ];
         patterns.forEach(p => { const el = findField(p.n); if (el && el.value && !p.re.test(el.value.trim())) { setError(el, p.msg); ok = false; } });
 
         ['father_contact','mother_contact','guardian_contact'].forEach(n => { const el = findField(n); if (el && el.value && !/^[0-9]{11}$/.test(el.value.trim())) { setError(el, 'Contact must be exactly 11 digits.'); ok = false; } });
+
+        // Additional address validation for completeness
+        const addressEl = findField('address');
+        if (addressEl && addressEl.value) {
+            const address = addressEl.value.trim();
+            if (address.length >= 20) {
+                // Check if address contains multiple components (at least 2 commas or multiple words)
+                const components = address.split(/[,\s]+/).filter(part => part.length > 0);
+                if (components.length < 4) {
+                    setError(addressEl, 'Complete address must include street, barangay, city/municipality, and province.');
+                    ok = false;
+                }
+            }
+        }
 
         return ok;
     }
@@ -902,6 +1279,21 @@ function openAddAccountModal() {
     // Populate years after modal exists
     setTimeout(setupSchoolYearOptions, 50);
     setTimeout(setupSchoolYearOptions, 200);
+    // Setup input validation
+    setTimeout(setupInputValidation, 50);
+    setTimeout(setupInputValidation, 200);
+    setTimeout(setupInputValidation, 500);
+    // Setup auto-generated Student ID and Username
+    setTimeout(setupAutoStudentId, 50);
+    setTimeout(setupAutoStudentId, 200);
+    setTimeout(setupAutoStudentId, 500);
+    // Additional setup for username generation
+    setTimeout(() => {
+        // Ensure username generation is set up even if Student ID is already loaded
+        if (window.studentIdLast6) {
+            setupUsernameGeneration();
+        }
+    }, 600);
     // Add focus-based fallback: if still empty, populate on first focus
     setTimeout(() => {
         ['schoolYearSelect','lastSchoolYearSelect'].forEach(id => {

@@ -202,19 +202,22 @@
             <h3 class="text-lg font-semibold mb-4 text-[#1E4D92]">Personal Account</h3>
         </div>
 
-<div class="col-span-3 grid grid-cols-3 gap-6 mt-6">
-
-<!-- Usernama-->
+<!-- Row 1: Username (full width) -->
+<div class="col-span-3 grid grid-cols-1 gap-6 mt-6">
     <div>
-        <label class="block text-sm font-semibold mb-1">Username</label>
+        <label class="block text-sm font-semibold mb-1">Username *</label>
         <input type="text" name="username" required
                value="<?= htmlspecialchars($form_data['username'] ?? '') ?>"
                pattern="[A-Za-z0-9_]+" title="Username can only contain letters, numbers, and underscores"
                class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
     </div>
+</div>
+
+<!-- Row 2: Student ID, Password, RFID Number -->
+<div class="col-span-3 grid grid-cols-3 gap-6 mt-6">
     <!-- Student ID -->
     <div>
-        <label class="block text-sm font-semibold mb-1">Student ID</label>
+        <label class="block text-sm font-semibold mb-1">Student ID *</label>
         <input type="number" name="id_number" required
                value="<?= htmlspecialchars($old_id ?? '') ?>"
                pattern="[0-9]+" title="Please enter numbers only" oninput="this.value = this.value.replace(/[^0-9]/g, '')"
@@ -226,7 +229,7 @@
 
     <!-- Password -->
     <div>
-        <label class="block text-sm font-semibold mb-1">Password</label>
+        <label class="block text-sm font-semibold mb-1">Password *</label>
         <div class="relative">
             <input type="text" name="password" required value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
         </div>
@@ -234,7 +237,7 @@
 
     <!-- RFID Number -->
     <div>
-        <label class="block text-sm font-semibold mb-1">RFID Number</label>
+        <label class="block text-sm font-semibold mb-1">RFID Number *</label>
         <input type="number" name="rfid_uid" required
                value="<?= htmlspecialchars($old_rfid ?? '') ?>"
                pattern="[0-9]+" title="Please enter numbers only" oninput="this.value = this.value.replace(/[^0-9]/g, '')"

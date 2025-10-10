@@ -25,6 +25,27 @@ if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
+// Function to generate next Student ID
+function generateNextStudentId($conn) {
+    // Get the highest existing student ID
+    $query = "SELECT id_number FROM student_account WHERE id_number LIKE '022%' ORDER BY id_number DESC LIMIT 1";
+    $result = $conn->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $lastId = $row['id_number'];
+        // Extract the numeric part and increment
+        $numericPart = intval(substr($lastId, 3)); // Remove '022' prefix
+        $nextNumber = $numericPart + 1;
+    } else {
+        // First student, start with 1
+        $nextNumber = 1;
+    }
+    
+    // Format as 02200000001, 02200000002, etc.
+    return '022' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
     define('ADD_ACCOUNT_HANDLED', true);
     $account_type = $_POST['account_type'] ?? '';
@@ -65,34 +86,43 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         $birthplace = trim($_POST['birthplace'] ?? '');
         $gender = trim($_POST['gender'] ?? '');
         $religion = trim($_POST['religion'] ?? '');
-
         $credentials = isset($_POST['credentials']) ? implode(",", $_POST['credentials']) : '';
 
         $payment_mode = trim($_POST['payment_mode'] ?? '');
         $address = trim($_POST['address'] ?? '');
 
-        $father_name = trim($_POST['father_name'] ?? '');
+        // Father's Information
+        $father_first_name = trim($_POST['father_first_name'] ?? '');
+        $father_last_name = trim($_POST['father_last_name'] ?? '');
+        $father_middle_name = trim($_POST['father_middle_name'] ?? '');
+        $father_name = trim($father_first_name . ' ' . $father_middle_name . ' ' . $father_last_name);
         $father_occupation = trim($_POST['father_occupation'] ?? '');
         $father_contact = trim($_POST['father_contact'] ?? '');
 
-        $mother_name = trim($_POST['mother_name'] ?? '');
+        // Mother's Information  
+        $mother_first_name = trim($_POST['mother_first_name'] ?? '');
+        $mother_last_name = trim($_POST['mother_last_name'] ?? '');
+        $mother_middle_name = trim($_POST['mother_middle_name'] ?? '');
+        $mother_name = trim($mother_first_name . ' ' . $mother_middle_name . ' ' . $mother_last_name);
         $mother_occupation = trim($_POST['mother_occupation'] ?? '');
         $mother_contact = trim($_POST['mother_contact'] ?? '');
 
-        $guardian_name = trim($_POST['guardian_name'] ?? '');
+        // Guardian's Information
+        $guardian_first_name = trim($_POST['guardian_first_name'] ?? '');
+        $guardian_last_name = trim($_POST['guardian_last_name'] ?? '');
+        $guardian_middle_name = trim($_POST['guardian_middle_name'] ?? '');
+        $guardian_name = trim($guardian_first_name . ' ' . $guardian_middle_name . ' ' . $guardian_last_name);
         $guardian_occupation = trim($_POST['guardian_occupation'] ?? '');
         $guardian_contact = trim($_POST['guardian_contact'] ?? '');
 
         $last_school = trim($_POST['last_school'] ?? '');
         $last_school_year = trim($_POST['last_school_year'] ?? '');
-
-        $id_number = trim($_POST['id_number'] ?? '');
+        // Auto-generate Student ID
+        $id_number = generateNextStudentId($conn);
         $raw_password = $_POST['password'] ?? '';
         $password = password_hash($raw_password, PASSWORD_DEFAULT);
         $rfid_uid = trim($_POST['rfid_uid'] ?? '');
         $username = trim($_POST['username'] ?? '');
-        
-        // Parent account fields (parent has their own username, but links to the child via student ID internally)
         $parent_username = trim($_POST['parent_username'] ?? '');
         $parent_password = $_POST['parent_password'] ?? '';
         $parent_hashed_password = !empty($parent_password) ? password_hash($parent_password, PASSWORD_DEFAULT) : '';
@@ -103,17 +133,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         $old_id = $id_number;
         $old_rfid = $rfid_uid;
 
-        // Check duplicates - only if values are not empty
-        if (!empty($id_number)) {
-            $check_id = $conn->prepare("SELECT id_number FROM student_account WHERE id_number=?");
-            $check_id->bind_param("s", $id_number);
-            $check_id->execute();
-            $check_id->store_result();
-            if ($check_id->num_rows > 0) {
-                $error_id = "Student ID already in use!";
-            }
-            $check_id->close();
-        }
+        // Student ID is auto-generated, no need to check duplicates
 
         // Check username duplicates
         if (!empty($username)) {
@@ -162,15 +182,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
             $check_rfid->close();
         }
 
-        // Validate required fields (middle_name is optional)
+        // Validate required fields (middle_name and rfid_uid are optional)
         if (empty($lrn) || empty($last_name) || empty($first_name) || empty($dob) || 
             empty($birthplace) || empty($gender) || empty($religion) || empty($academic_track) || 
             empty($grade_level) || empty($semester) || empty($school_year) || empty($enrollment_status) || 
-            empty($payment_mode) || empty($father_name) || empty($mother_name) || 
-            empty($id_number) || empty($raw_password) || empty($rfid_uid) || empty($username) ||
-            empty($parent_username) || empty($parent_password)) {
+            empty($payment_mode) || empty($father_first_name) || empty($father_last_name) || 
+            empty($mother_first_name) || empty($mother_last_name) || empty($guardian_first_name) || empty($guardian_last_name)) {
             
-            $error_msg = "All required fields must be filled. (Middle name is optional)";
+            $error_msg = "All required fields must be filled. (Middle name, Student ID, username, and password are optional as they are auto-generated)";
             $form_data = $_POST;
             $show_modal = true;
             $_SESSION['error_msg'] = $error_msg;
@@ -236,12 +255,44 @@ $validation_errors = [];
             $validation_errors[] = "School year must be in format like 2024-2025.";
         }
 
-        // Validate parent names (letters and spaces only)
-        if (!preg_match('/^[A-Za-z\s]+$/', $father_name)) {
-            $validation_errors[] = "Father's name must contain letters only.";
+        // Validate complete address (minimum length and content requirements)
+        if (strlen($address) < 20) {
+            $validation_errors[] = "Complete address must be at least 20 characters long.";
+        } elseif (strlen($address) > 500) {
+            $validation_errors[] = "Complete address must not exceed 500 characters.";
+        } elseif (!preg_match('/.*[,\s].*/i', $address)) {
+            $validation_errors[] = "Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.";
         }
-        if (!preg_match('/^[A-Za-z\s]+$/', $mother_name)) {
-            $validation_errors[] = "Mother's name must contain letters only.";
+
+        // Validate parent names (letters and spaces only)
+        if (!preg_match('/^[A-Za-z\s]+$/', $father_first_name)) {
+            $validation_errors[] = "Father's first name must contain letters only.";
+        }
+        if (!preg_match('/^[A-Za-z\s]+$/', $father_last_name)) {
+            $validation_errors[] = "Father's last name must contain letters only.";
+        }
+        if (!empty($father_middle_name) && !preg_match('/^[A-Za-z\s]*$/', $father_middle_name)) {
+            $validation_errors[] = "Father's middle name must contain letters only.";
+        }
+        
+        if (!preg_match('/^[A-Za-z\s]+$/', $mother_first_name)) {
+            $validation_errors[] = "Mother's first name must contain letters only.";
+        }
+        if (!preg_match('/^[A-Za-z\s]+$/', $mother_last_name)) {
+            $validation_errors[] = "Mother's last name must contain letters only.";
+        }
+        if (!empty($mother_middle_name) && !preg_match('/^[A-Za-z\s]*$/', $mother_middle_name)) {
+            $validation_errors[] = "Mother's middle name must contain letters only.";
+        }
+        
+        if (!preg_match('/^[A-Za-z\s]+$/', $guardian_first_name)) {
+            $validation_errors[] = "Guardian's first name must contain letters only.";
+        }
+        if (!preg_match('/^[A-Za-z\s]+$/', $guardian_last_name)) {
+            $validation_errors[] = "Guardian's last name must contain letters only.";
+        }
+        if (!empty($guardian_middle_name) && !preg_match('/^[A-Za-z\s]*$/', $guardian_middle_name)) {
+            $validation_errors[] = "Guardian's middle name must contain letters only.";
         }
 
         // Validate contact numbers: digits only and exactly 11 if provided
@@ -267,21 +318,17 @@ $validation_errors = [];
             }
         }
 
-        // Validate occupations (letters and spaces only, optional)
-        if (!empty($father_occupation) && !preg_match('/^[A-Za-z\s]*$/', $father_occupation)) {
+        // Validate occupations (letters and spaces only, required)
+        if (!preg_match('/^[A-Za-z\s]+$/', $father_occupation)) {
             $validation_errors[] = "Father's occupation must contain letters only.";
         }
-        if (!empty($mother_occupation) && !preg_match('/^[A-Za-z\s]*$/', $mother_occupation)) {
+        if (!preg_match('/^[A-Za-z\s]+$/', $mother_occupation)) {
             $validation_errors[] = "Mother's occupation must contain letters only.";
         }
-        if (!empty($guardian_occupation) && !preg_match('/^[A-Za-z\s]*$/', $guardian_occupation)) {
+        if (!preg_match('/^[A-Za-z\s]+$/', $guardian_occupation)) {
             $validation_errors[] = "Guardian's occupation must contain letters only.";
         }
 
-        // Validate guardian name (letters and spaces only, optional)
-        if (!empty($guardian_name) && !preg_match('/^[A-Za-z\s]*$/', $guardian_name)) {
-            $validation_errors[] = "Guardian's name must contain letters only.";
-        }
 
         // Validate last school (letters, spaces, periods, dashes, optional)
         if (!empty($last_school) && !preg_match('/^[A-Za-z\s.-]*$/', $last_school)) {
@@ -300,21 +347,23 @@ $validation_errors = [];
             $validation_errors[] = "Student ID must be exactly 11 digits.";
         }
 
-        // Validate RFID: numbers only, exactly 10 digits
-        if (!preg_match('/^[0-9]+$/', $rfid_uid)) {
-            $validation_errors[] = "RFID must contain digits only.";
-        } elseif (strlen($rfid_uid) !== 10) {
-            $validation_errors[] = "RFID must be exactly 10 digits.";
+        // Validate RFID only if provided: numbers only, exactly 10 digits
+        if (!empty($rfid_uid)) {
+            if (!preg_match('/^[0-9]+$/', $rfid_uid)) {
+                $validation_errors[] = "RFID must contain digits only.";
+            } elseif (strlen($rfid_uid) !== 10) {
+                $validation_errors[] = "RFID must be exactly 10 digits.";
+            }
         }
 
-        // Validate username (letters, numbers, underscores only)
-        if (!preg_match('/^[A-Za-z0-9_]+$/', $username)) {
-            $validation_errors[] = "Student username can only contain letters, numbers, and underscores.";
-        }
+// Validate username (lastname + last6(id) + 'muzon' @ student.cci.edu.ph)
+if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
+    $validation_errors[] = "Student username must match format lastname000000muzon@student.cci.edu.ph.";
+}
         
         // Validate parent username (letters, numbers, underscores only)
-        if (!empty($parent_username) && !preg_match('/^[A-Za-z0-9_]+$/', $parent_username)) {
-            $validation_errors[] = "Parent username can only contain letters, numbers, and underscores.";
+        if (!empty($parent_username) && !preg_match('/^[A-Za-z0-9_@.-]+$/', $parent_username)) {
+            $validation_errors[] = "Parent username must be in valid email format.";
         }
 
         // If there are validation errors, return them
@@ -928,8 +977,8 @@ $validation_errors = [];
                                 </optgroup>
 
                                 <optgroup label="College Courses">
-                                    <option value="Bachelor of Physical Education (BPed)" <?= ($form_data['academic_track'] ?? '') === 'Bachelor of Physical Education (BPed)' ? 'selected' : '' ?>>Bachelor of Physical Education (BPed)</option>
-                                    <option value="Bachelor of Early Childhood Education (BECEd)" <?= ($form_data['academic_track'] ?? '') === 'Bachelor of Early Childhood Education (BECEd)' ? 'selected' : '' ?>>Bachelor of Early Childhood Education (BECEd)</option>
+                                    <option value="BPEd (Bachelor of Physical Education)" <?= ($form_data['academic_track'] ?? '') === 'BPEd (Bachelor of Physical Education)' ? 'selected' : '' ?>>BPEd (Bachelor of Physical Education)</option>
+                                    <option value="BECEd (Bachelor of Early Childhood Education)" <?= ($form_data['academic_track'] ?? '') === 'BECEd (Bachelor of Early Childhood Education)' ? 'selected' : '' ?>>BECEd (Bachelor of Early Childhood Education)</option>
                                 </optgroup>
                             </select>
                         </div>
@@ -1047,7 +1096,7 @@ $validation_errors = [];
                                     } elseif (!empty($form_data['dob_year'])) {
                                         $selected_year = $form_data['dob_year'];
                                     }
-                                    for ($year = $current_year; $year >= 1950; $year--) {
+                                    for ($year = ($current_year - 4); $year >= ($current_year - 70); $year--) {
                                         $selected = ($selected_year == $year) ? 'selected' : '';
                                         echo "<option value='$year' $selected>$year</option>";
                                     }
@@ -1098,32 +1147,44 @@ $validation_errors = [];
                     <div class="grid grid-cols-2 gap-6 mb-4">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Complete Address *</label>
-                            <textarea name="address" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
+                            <textarea name="address" autocomplete="off" required minlength="20" maxlength="500" placeholder="Enter complete address (e.g., Block 8, Lot 15, Subdivision Name, Barangay, City, Province)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" title="Please enter a complete address with at least 20 characters including street, barangay, city/municipality, and province"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Minimum 20 characters. Include street, barangay, city/municipality, and province.</p>
                         </div>
                     </div>
                     
                     <!-- Family Information -->
                     <div class="space-y-4">
-                        <h4 class="font-semibold text-gray-700">Father's Information *</h4>
-                        <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="father_name" placeholder="Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['father_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="text" name="father_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
-                        </div>
-                        
-                        <h4 class="font-semibold text-gray-700">Mother's Information *</h4>
-                        <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="mother_name" placeholder="Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['mother_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="text" name="mother_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
-                        </div>
-                        
-                        <h4 class="font-semibold text-gray-700">Guardian's Information *</h4>
-                        <div class="grid grid-cols-3 gap-6">
-                            <input type="text" name="guardian_name" placeholder="Name" autocomplete="off" value="<?= htmlspecialchars($form_data['guardian_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="text" name="guardian_occupation" placeholder="Occupation" value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
-                            <input type="tel" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
-                        </div>
+                    <h4 class="font-semibold text-gray-700">Father's Information *</h4>
+                    <div class="grid grid-cols-3 gap-6 mb-2">
+                        <input type="text" name="father_first_name" placeholder="First Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['father_first_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                        <input type="text" name="father_last_name" placeholder="Last Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['father_last_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                        <input type="text" name="father_middle_name" placeholder="Middle Name (Optional)" value="<?= htmlspecialchars($form_data['father_middle_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                    </div>
+                    <div class="grid grid-cols-3 gap-6">
+                        <input type="text" name="father_occupation" placeholder="Occupation" autocomplete="off" required value="<?= htmlspecialchars($form_data['father_occupation'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        <input type="tel" name="father_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['father_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
+                    </div>
+                                            
+                    <h4 class="font-semibold text-gray-700">Mother's Information *</h4>
+                    <div class="grid grid-cols-3 gap-6 mb-2">
+                        <input type="text" name="mother_first_name" placeholder="First Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['mother_first_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                        <input type="text" name="mother_last_name" placeholder="Last Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['mother_last_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                        <input type="text" name="mother_middle_name" placeholder="Middle Name (Optional)" value="<?= htmlspecialchars($form_data['mother_middle_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                    </div>
+                    <div class="grid grid-cols-3 gap-6">
+                        <input type="text" name="mother_occupation" placeholder="Occupation" autocomplete="off" required value="<?= htmlspecialchars($form_data['mother_occupation'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        <input type="tel" name="mother_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['mother_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
+                    </div>
+                                            
+                    <h4 class="font-semibold text-gray-700">Guardian's Information *</h4>
+                    <div class="grid grid-cols-3 gap-6 mb-2">
+                        <input type="text" name="guardian_first_name" placeholder="First Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['guardian_first_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                        <input type="text" name="guardian_last_name" placeholder="Last Name" autocomplete="off" required value="<?= htmlspecialchars($form_data['guardian_last_name'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                        <input type="text" name="guardian_middle_name" placeholder="Middle Name (Optional)" value="<?= htmlspecialchars($form_data['guardian_middle_name'] ?? '') ?>" pattern="[A-Za-z\s]*" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] letters-only">
+                    </div>
+                    <div class="grid grid-cols-3 gap-6">
+                        <input type="text" name="guardian_occupation" placeholder="Occupation" autocomplete="off" required value="<?= htmlspecialchars($form_data['guardian_occupation'] ?? '') ?>" pattern="[A-Za-z\s]+" title="Please enter letters only" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                        <input type="tel" name="guardian_contact" placeholder="Contact No." value="<?= htmlspecialchars($form_data['guardian_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" class="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric">
                     </div>
                     
                     <!-- Last School Attended -->
@@ -1151,12 +1212,13 @@ $validation_errors = [];
                     </h3>
                     <div class="grid grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Parent Username *</label>
-                            <input type="text" name="parent_username" autocomplete="off" required value="<?= htmlspecialchars($form_data['parent_username'] ?? '') ?>" pattern="[A-Za-z0-9_]+" title="Username can only contain letters, numbers, and underscores" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= (!empty($error_msg) && stripos($error_msg, 'Parent username') !== false) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
+                            <label class="block text-sm font-semibold mb-1">Parent Username <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="parent_username" autocomplete="off" value="<?= htmlspecialchars($form_data['parent_username'] ?? '') ?>" pattern="^[a-z]+[0-9]{6}muzon@parent\.cci\.edu\.ph$" title="Auto-generated: lastname000000muzon@parent.cci.edu.ph" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Parent Password *</label>
-                            <input type="password" name="parent_password" autocomplete="new-password" required value="<?= htmlspecialchars($form_data['parent_password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <label class="block text-sm font-semibold mb-1">Parent Password <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="parent_password" autocomplete="new-password" value="<?= htmlspecialchars($form_data['parent_password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;" title="Auto-generated when date of birth is entered: surnamemonthddyyyy">
+                            <p class="text-xs text-gray-500 mt-1">Format: <span class="font-medium">lastname + birthdate</span> (e.g., studentjanuary152003)</p>
                         </div>
                     </div>
                 </div>
@@ -1169,21 +1231,27 @@ $validation_errors = [];
                         </svg>
                         <span class="tracking-wide">PERSONAL ACCOUNT</span>
                     </h3>
-                    <div class="grid grid-cols-4 gap-6">
+                    <!-- Row 1: Username (full width) -->
+                    <div class="grid grid-cols-1 gap-6 mb-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Username *</label>
-                            <input type="text" name="username" autocomplete="off" required value="<?= htmlspecialchars($form_data['username'] ?? '') ?>" pattern="^[A-Za-z0-9_]+$" title="Username can only contain letters, numbers, and underscores" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= (!empty($error_msg) && stripos($error_msg, 'Student username') !== false) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?>">
+                            <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="username" autocomplete="off" value="<?= htmlspecialchars($form_data['username'] ?? '') ?>" pattern="^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$" title="Auto-generated: lastname000000muzon@student.cci.edu.ph" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                         </div>
+                    </div>
+                    
+                    <!-- Row 2: Student ID, Password, RFID Number -->
+                    <div class="grid grid-cols-3 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Student ID *</label>
-                            <input type="text" name="id_number" autocomplete="off" required value="<?= htmlspecialchars($old_id ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter exactly 11 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_id) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="11" inputmode="numeric">
+                            <label class="block text-sm font-semibold mb-1">Student ID <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="id_number" autocomplete="off" value="<?= htmlspecialchars($old_id ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Auto-generated Student ID" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                             <?php if (!empty($error_id)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_id) ?></p>
                             <?php endif; ?>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Password *</label>
-                            <input type="password" name="password" autocomplete="new-password" required value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
+                            <label class="block text-sm font-semibold mb-1">Password <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="password" autocomplete="new-password" value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;" title="Auto-generated when date of birth is entered: surnamemonthddyyyy">
+                            <p class="text-xs text-gray-500 mt-1">Format: <span class="font-medium">lastname + birthdate</span> (e.g., studentjanuary152003)</p>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">RFID Number *</label>
@@ -1237,8 +1305,8 @@ const gradeOptions = {
   "STEM": ["Grade 11","Grade 12"],
 
   "College Courses": ["1st Year","2nd Year","3rd Year","4th Year"],
-  "Bachelor of Physical Education (BPed)": ["1st Year","2nd Year","3rd Year","4th Year"],
-  "Bachelor of Early Childhood Education (BECEd)": ["1st Year","2nd Year","3rd Year","4th Year"]
+  "BPEd (Bachelor of Physical Education)": ["1st Year","2nd Year","3rd Year","4th Year"],
+  "BECEd (Bachelor of Early Childhood Education)": ["1st Year","2nd Year","3rd Year","4th Year"]
 };
 
 // Function to populate grade levels
@@ -1338,6 +1406,51 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Setup auto-generated Username
+function setupAutoUsername() {
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const idField = document.querySelector('input[name="id_number"]');
+    const usernameField = document.querySelector('input[name="username"]');
+    
+    if (!lastNameField || !idField || !usernameField) return;
+
+    const lettersOnly = (s) => (s || '').toLowerCase().replace(/[^a-z]/g, '');
+    const last6 = (s) => {
+        const digits = (s || '').replace(/\D/g, '');
+        return digits.slice(-6).padStart(6, '0');
+    };
+
+    const updateUsername = () => {
+        const lastName = lettersOnly(lastNameField.value);
+        const idNumber = idField.value;
+        const tail = last6(idNumber);
+        
+        if (lastName && tail.length === 6) {
+            const username = `${lastName}${tail}muzon@student.cci.edu.ph`;
+            usernameField.value = username;
+            usernameField.readOnly = true;
+            usernameField.style.backgroundColor = '#f3f4f6';
+            usernameField.style.cursor = 'not-allowed';
+        }
+    };
+
+    // Initial fill and listeners
+    updateUsername();
+    lastNameField.addEventListener('input', updateUsername);
+    idField.addEventListener('input', updateUsername);
+    
+    // Poll every 500ms to check if Student ID gets auto-filled
+    const pollForStudentId = setInterval(() => {
+        if (idField.value && idField.value.length === 11) {
+            updateUsername();
+            clearInterval(pollForStudentId);
+        }
+    }, 500);
+    
+    // Stop polling after 10 seconds
+    setTimeout(() => clearInterval(pollForStudentId), 10000);
+}
+
 function openModal(){ 
     document.getElementById('addAccountModal').classList.remove('hidden'); 
     document.getElementById('modalContent').classList.remove('scale-95');
@@ -1353,7 +1466,10 @@ function openModal(){
         }
         // Ensure last school year is (re)populated when opening
         populateLastSchoolYears(5);
-    }, 100);
+        setupAutoUsername();
+setTimeout(setupAutoUsername, 1000);
+setTimeout(setupAutoUsername, 2000);
+}, 100);
 }
 
 // Auto-open modal if there are errors from form submission
@@ -1477,9 +1593,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Apply validation to parent name fields
     const parentNameFields = [
-        'input[name="father_name"]',
-        'input[name="mother_name"]',
-        'input[name="guardian_name"]'
+        'input[name="father_first_name"]',
+        'input[name="father_last_name"]',
+        'input[name="father_middle_name"]',
+        'input[name="mother_first_name"]',
+        'input[name="mother_last_name"]',
+        'input[name="mother_middle_name"]',
+        'input[name="guardian_first_name"]',
+        'input[name="guardian_last_name"]',
+        'input[name="guardian_middle_name"]'
     ];
     
     parentNameFields.forEach(selector => {
@@ -1543,7 +1665,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('✅ Input validation initialized for text-only fields in add account form');
     console.log('✅ Date validation and dynamic day updating initialized');
-};
+});
 
 </script>
 <?php

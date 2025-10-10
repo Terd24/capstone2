@@ -84,7 +84,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     $school_year = $_POST['school_year'] ?? '';
     $grade_level = $_POST['grade_level'] ?? '';
     $semester = $_POST['semester'] ?? '';
-    $dob = $_POST['dob'] ?? '';
+    // Handle separate date fields for student
+    $dob_day = $_POST['dob_day'] ?? '';
+    $dob_month = $_POST['dob_month'] ?? '';
+    $dob_year = $_POST['dob_year'] ?? '';
+    
+    // Combine into date format if all parts are provided
+    $dob = '';
+    if (!empty($dob_day) && !empty($dob_month) && !empty($dob_year)) {
+        $dob = sprintf('%04d-%02d-%02d', $dob_year, $dob_month, $dob_day);
+    } else {
+        // Fallback to single dob field if separate fields not provided
+        $dob = $_POST['dob'] ?? '';
+    }
     $birthplace = $_POST['birthplace'] ?? '';
     $gender = $_POST['gender'] ?? '';
     $religion = $_POST['religion'] ?? '';
@@ -387,7 +399,53 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Row: Date of Birth, Birthplace, Gender -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Date of Birth</label>
-                            <input type="date" name="dob" value="<?= htmlspecialchars($student_data['dob'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <div class="grid grid-cols-3 gap-2">
+                                <select name="dob_month" disabled class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <option value="">Month</option>
+                                    <?php
+                                    $months = [
+                                        1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
+                                        5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
+                                        9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+                                    ];
+                                    $selected_month = '';
+                                    if (!empty($student_data['dob'])) {
+                                        $selected_month = date('n', strtotime($student_data['dob']));
+                                    }
+                                    foreach ($months as $num => $name) {
+                                        $selected = ($selected_month == $num) ? 'selected' : '';
+                                        echo "<option value='$num' $selected>$name</option>";
+                                    }
+                                    ?>
+                                </select>
+                                <select name="dob_day" disabled class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <option value="">Day</option>
+                                    <?php
+                                    $selected_day = '';
+                                    if (!empty($student_data['dob'])) {
+                                        $selected_day = date('j', strtotime($student_data['dob']));
+                                    }
+                                    for ($i = 1; $i <= 31; $i++) {
+                                        $selected = ($selected_day == $i) ? 'selected' : '';
+                                        echo "<option value='$i' $selected>$i</option>";
+                                    }
+                                    ?>
+                                </select>
+                                <select name="dob_year" disabled class="border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <option value="">Year</option>
+                                    <?php
+                                    $current_year = date('Y');
+                                    $selected_year = '';
+                                    if (!empty($student_data['dob'])) {
+                                        $selected_year = date('Y', strtotime($student_data['dob']));
+                                    }
+                                    for ($year = ($current_year - 4); $year >= ($current_year - 70); $year--) {
+                                        $selected = ($selected_year == $year) ? 'selected' : '';
+                                        echo "<option value='$year' $selected>$year</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Birthplace</label>
@@ -848,6 +906,47 @@ function proceedDelete() {
     document.body.appendChild(form);
     form.submit();
 }
+
+// Date validation and dynamic day updating
+document.addEventListener('DOMContentLoaded', function() {
+    const monthSelect = document.querySelector('select[name="dob_month"]');
+    const daySelect = document.querySelector('select[name="dob_day"]');
+    const yearSelect = document.querySelector('select[name="dob_year"]');
+    
+    function updateDaysInMonth() {
+        if (!monthSelect || !daySelect || !yearSelect) return;
+        
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearSelect.value);
+        const currentDay = daySelect.value;
+        
+        if (!month || !year) return;
+        
+        // Get number of days in the selected month/year
+        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        // Clear existing day options (except first placeholder)
+        while (daySelect.options.length > 1) {
+            daySelect.remove(1);
+        }
+        
+        // Add day options for the selected month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const option = document.createElement('option');
+            option.value = day;
+            option.textContent = day;
+            if (currentDay == day) {
+                option.selected = true;
+            }
+            daySelect.appendChild(option);
+        }
+    }
+    
+    if (monthSelect && yearSelect) {
+        monthSelect.addEventListener('change', updateDaysInMonth);
+        yearSelect.addEventListener('change', updateDaysInMonth);
+    }
+});
 </script>
 <?php if (!$embed): ?>
 </body>
