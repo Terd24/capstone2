@@ -73,25 +73,44 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     </div>
 </header>
 
-  <!-- Subjects by Level (grid) -->
-  <section id="levelGridSection" class="max-w-[1400px] mx-auto px-6 py-6">
-    <div class="bg-[#f8fbff] rounded-2xl card-shadow p-5 border border-gray-200">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5" id="levelCards">
-        <?php
-          $levels = array_merge(
-            ['Kinder 1','Kinder 2'],
-            array_map(function($n){ return 'Grade '.$n; }, range(1,12)),
-            ['1st Year','2nd Year','3rd Year','4th Year']
-          );
-          foreach ($levels as $lvl): ?>
-            <div class="bg-white rounded-2xl p-6 card-shadow flex flex-col justify-between border border-gray-100 hover:-translate-y-0.5 transition min-h-[170px]">
-              <div>
-                <h3 class="text-xl font-semibold text-gray-800 mb-1"><?= htmlspecialchars($lvl) ?></h3>
-                <p class="text-xs text-gray-500">Click to manage subjects for this level</p>
-              </div>
-              <button data-level="<?= htmlspecialchars($lvl) ?>" class="mt-4 manage-level-btn bg-[#0B2C62] hover:bg-blue-900 text-white w-full py-3.5 rounded-xl">Manage Subjects</button>
-            </div>
-        <?php endforeach; ?>
+  <!-- Subjects by Level (Option A: Tabs + Single Manage CTA) -->
+  <section id="levelGridSection" class="max-w-[1200px] mx-auto px-6 py-6">
+    <div class="bg-white rounded-2xl card-shadow p-5 border border-gray-200">
+      <!-- Tabs -->
+      <div class="flex flex-wrap gap-2 mb-4" id="levelTabs">
+        <button type="button" data-group="basic" class="tab-btn px-3 py-1.5 rounded-lg border bg-[#0B2C62] text-white">Basic Ed</button>
+        <button type="button" data-group="shs" class="tab-btn px-3 py-1.5 rounded-lg border text-gray-700 bg-gray-50">Senior High</button>
+        <button type="button" data-group="college" class="tab-btn px-3 py-1.5 rounded-lg border text-gray-700 bg-gray-50">College</button>
+      </div>
+
+      <!-- Section header + subtext -->
+      <div class="mb-3">
+        <h3 class="text-lg font-semibold text-gray-800">Select scope to manage subjects</h3>
+        <p class="text-sm text-gray-500">Choose a level, then (if applicable) select a strand/course and term.</p>
+      </div>
+
+      <!-- Selector Row -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        <div class="md:col-span-2">
+          <label class="text-sm text-gray-600">Level</label>
+          <select id="selLevel" class="w-full border rounded-lg px-3 py-2"></select>
+        </div>
+        <div id="selTrackWrap">
+          <label class="text-sm text-gray-600">Strand / Course</label>
+          <select id="selTrack" class="w-full border rounded-lg px-3 py-2"></select>
+        </div>
+        <div id="selSemWrap">
+          <label class="text-sm text-gray-600">Semester</label>
+          <select id="selSem" class="w-full border rounded-lg px-3 py-2">
+            <option value="1st">1st Term</option>
+            <option value="2nd">2nd Term</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="mt-4 flex justify-end">
+        <button id="goManageBtn" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-5 py-2.5 rounded-lg disabled:opacity-50">Manage Subjects</button>
       </div>
     </div>
   </section>
@@ -226,33 +245,6 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
           </button>
         </div>
         <div class="p-5 space-y-5">
-          <!-- Top controls for advanced levels: Strand + Semester -->
-          <div id="smTopControls" class="hidden grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div class="md:col-span-2">
-              <label class="text-sm text-gray-600">Select Strand/Course and Semester first.</label>
-              <div class="grid grid-cols-2 gap-3">
-                <div id="smTopStrandWrap">
-                  <label class="text-xs text-gray-600">Strand / Course</label>
-                  <select id="smTopStrand" class="w-full border rounded-lg px-3 py-2">
-                    <option value="">-- Any / Not Applicable --</option>
-                    <option>ABM</option>
-                    <option>STEM</option>
-                    <option>HUMSS</option>
-                    <option>GAS</option>
-                    <option>TVL-ICT</option>
-                    <option>TVL-HE</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="text-xs text-gray-600">Semester</label>
-                  <select id="smTopSem" class="w-full border rounded-lg px-3 py-2">
-                    <option value="1st">1st Term</option>
-                    <option value="2nd">2nd Term</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div class="md:col-span-2">
               <label class="text-sm text-gray-600">New Subject Name</label>
@@ -386,15 +378,132 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     const modalTitle = document.getElementById('modalTitle');
 
     // Assignment controls
-    const smTopControls = document.getElementById('smTopControls');
-    const smTopStrand = document.getElementById('smTopStrand');
-    const smTopStrandWrap = document.getElementById('smTopStrandWrap');
-    const smTopSem = document.getElementById('smTopSem');
+    // Modal strand/semester controls removed; rely on top-level selectors
+    const smTopControls = null;
+    const smTopStrand = null;
+    const smTopStrandWrap = null;
+    const smTopSem = null;
     const smAssignListBlock = document.getElementById('smAssignListBlock');
     const smAssignList = document.getElementById('smAssignList');
     const API_OFFERINGS = '../RegistrarF/api/subject_offerings.php';
 
     let currentManageLevel = '';
+
+    // ===== Option A: Tabs + Single Manage CTA =====
+    const levelTabs = document.getElementById('levelTabs');
+    const selLevel = document.getElementById('selLevel');
+    const selTrackWrap = document.getElementById('selTrackWrap');
+    const selTrack = document.getElementById('selTrack');
+    const selSem = document.getElementById('selSem');
+    const selSemWrap = document.getElementById('selSemWrap');
+    const goManageBtn = document.getElementById('goManageBtn');
+
+    const basicLevels = ['Kinder 1','Kinder 2', ...Array.from({length:10}, (_,i)=>`Grade ${i+1}`)];
+    const shsLevels = ['Grade 11','Grade 12'];
+    const collegeLevels = ['1st Year','2nd Year','3rd Year','4th Year'];
+    const shsStrands = [
+      { value: 'ABM',     label: 'ABM (Accountancy, Business & Management)' },
+      { value: 'GAS',     label: 'GAS (General Academic Strand)' },
+      { value: 'TVL-HE',  label: 'HE (Home Economics)' },
+      { value: 'HUMSS',   label: 'HUMSS (Humanities & Social Sciences)' },
+      { value: 'TVL-ICT', label: 'ICT (Information and Communications Technology)' },
+      { value: 'SPORTS',  label: 'SPORTS' },
+      { value: 'STEM',    label: 'STEM (Science, Technology, Engineering & Mathematics)' }
+    ];
+    const collegeCourses = [
+      { value: 'BPED', label: 'BPED (Bachelor of Physical Education)' },
+      { value: 'BECED', label: 'BECED (Bachelor of Early Childhood Education)' }
+    ];
+
+    let currentGroup = 'basic'; // default focus is Basic Ed
+
+    function renderTabStyles(){
+      if (!levelTabs) return;
+      levelTabs.querySelectorAll('.tab-btn').forEach(btn=>{
+        const active = btn.getAttribute('data-group') === currentGroup;
+        btn.className = 'tab-btn px-3 py-1.5 rounded-lg border ' + (active ? 'bg-[#0B2C62] text-white' : 'text-gray-700 bg-gray-50');
+      });
+    }
+
+    function populateLevels(){
+      if (!selLevel) return;
+      if (currentGroup==='basic'){
+        const kinder = ['Kinder 1','Kinder 2'];
+        const gs = Array.from({length:6}, (_,i)=>`Grade ${i+1}`); // 1-6
+        const jhs = ['Grade 7','Grade 8','Grade 9','Grade 10'];
+        selLevel.innerHTML = `
+          <option value="">-- Select Level --</option>
+          <optgroup label="Kindergarten">${kinder.map(v=>`<option>${v}</option>`).join('')}</optgroup>
+          <optgroup label="Grade School">${gs.map(v=>`<option>${v}</option>`).join('')}</optgroup>
+          <optgroup label="Junior High School">${jhs.map(v=>`<option>${v}</option>`).join('')}</optgroup>
+        `;
+      } else if (currentGroup==='shs'){
+        const items = shsLevels; // Grade 11, Grade 12
+        selLevel.innerHTML = '<option value="">-- Select Level --</option>' +
+          `<optgroup label="Senior High">${items.map(v=>`<option>${v}</option>`).join('')}</optgroup>`;
+      } else {
+        const items = collegeLevels; // 1st-4th Year
+        selLevel.innerHTML = '<option value="">-- Select Level --</option>' +
+          `<optgroup label="College">${items.map(v=>`<option>${v}</option>`).join('')}</optgroup>`;
+      }
+    }
+
+    function populateTrack(){
+      if (!selTrack || !selTrackWrap) return;
+      if (currentGroup==='shs'){
+        selTrackWrap.classList.remove('hidden');
+        selTrack.innerHTML = '<option value="">-- Select Strand --</option>' + shsStrands.map(s=>`<option value="${s.value}">${s.label}</option>`).join('');
+      } else if (currentGroup==='college'){
+        selTrackWrap.classList.remove('hidden');
+        selTrack.innerHTML = '<option value="">-- Select Course --</option>' + collegeCourses.map(c=>`<option value="${c.value}">${c.label}</option>`).join('');
+      } else {
+        selTrackWrap.classList.add('hidden');
+        selTrack.innerHTML = '';
+      }
+    }
+
+    function updateSemVisibility(){
+      if (!selSemWrap) return;
+      // Hide semester for Basic Ed; show for SHS/College
+      if (currentGroup==='basic') selSemWrap.classList.add('hidden');
+      else selSemWrap.classList.remove('hidden');
+    }
+
+    function setGroup(g){ currentGroup = g; renderTabStyles(); populateLevels(); populateTrack(); updateSemVisibility(); updateGoState(); }
+
+    function updateGoState(){
+      if (!goManageBtn) return;
+      const lvlOk = selLevel && selLevel.value;
+      const trackNeeded = (currentGroup==='shs' || currentGroup==='college');
+      const trackOk = !trackNeeded || (selTrack && selTrack.value);
+      const semNeeded = (currentGroup==='shs' || currentGroup==='college');
+      const semOk = !semNeeded || (selSem && selSem.value);
+      goManageBtn.disabled = !(lvlOk && trackOk && semOk);
+    }
+
+    if (levelTabs){
+      levelTabs.addEventListener('click', (e)=>{
+        const btn = e.target.closest('[data-group]');
+        if (!btn) return;
+        setGroup(btn.getAttribute('data-group'));
+      });
+    }
+    if (selLevel) selLevel.addEventListener('change', updateGoState);
+    if (selTrack) selTrack.addEventListener('change', updateGoState);
+    if (selSem) selSem.addEventListener('change', updateGoState);
+
+    if (goManageBtn){
+      goManageBtn.addEventListener('click', ()=>{
+        const levelVal = selLevel ? selLevel.value : '';
+        const trackVal = selTrack ? selTrack.value : '';
+        if (!levelVal) return toast('Please select a level', false);
+        if ((currentGroup==='shs' || currentGroup==='college') && !trackVal) return toast('Please select a strand/course', false);
+        openSubjectManager(levelVal);
+      });
+    }
+
+    // Initial render
+    setGroup('basic');
 
     function openSubjectManager(level){
       currentManageLevel = level || '';
@@ -404,11 +513,9 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
       smCode.value = '';
       if (smSearch) smSearch.value = '';
       loadSubjectManagerList();
-      // Toggle top controls for Grade 11–4th Year (hide Assigned list section permanently)
+      // Hide Assigned list section permanently
       const advanced = /^(Grade 11|Grade 12|1st Year|2nd Year|3rd Year|4th Year)$/i.test(currentManageLevel);
-      if (smTopControls) smTopControls.classList.toggle('hidden', !advanced);
       if (smAssignListBlock) smAssignListBlock.classList.add('hidden');
-      if (advanced) { setStrandOptionsForLevel(); }
     }
 
     function closeSubjectManager(){ subjectManagerModal.classList.add('hidden'); }
@@ -533,36 +640,9 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
       setTimeout(()=>t.classList.add('hidden'), 2000);
     }
 
-    // ===== Advanced modal helpers (SHS vs College) =====
+    // ===== Advanced helpers =====
     function isAdvancedLevel(level){
       return /^(Grade 11|Grade 12|1st Year|2nd Year|3rd Year|4th Year)$/i.test(String(level||''));
-    }
-
-    function setStrandOptionsForLevel(){
-      if (!smTopStrand) return;
-      // Always show the control for advanced levels
-      if (smTopStrandWrap) smTopStrandWrap.classList.remove('hidden');
-      const isSHS = /^(Grade 11|Grade 12)$/i.test(String(currentManageLevel||''));
-      if (isSHS){
-        // Senior High strands only
-        smTopStrand.innerHTML = `
-          <option value="">-- Any / Not Applicable --</option>
-          <option>ABM</option>
-          <option>STEM</option>
-          <option>HUMSS</option>
-          <option>GAS</option>
-          <option>TVL-ICT</option>
-          <option>TVL-HE</option>
-        `;
-      } else {
-        // College courses only
-        smTopStrand.innerHTML = `
-          <option value="">-- Any / Not Applicable --</option>
-          <option>BPED</option>
-          <option>BECED</option>
-        `;
-      }
-      smTopStrand.value = '';
     }
 
     async function loadAssignList(){
@@ -570,8 +650,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
       const params = new URLSearchParams({
         action: 'list',
         grade_level: currentManageLevel,
-        strand: smTopStrand ? (smTopStrand.value||'') : '',
-        semester: smTopSem ? (smTopSem.value||'1st') : '1st',
+        strand: selTrack ? (selTrack.value||'') : '',
+        semester: selSem ? (selSem.value||'1st') : '1st',
         sy: ''
       });
       try{
@@ -599,8 +679,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
 
     window.smQuickAssign = async function(subject_id){
       if (!isAdvancedLevel(currentManageLevel)) return;
-      const strandVal = smTopStrand ? (smTopStrand.value||null) : null;
-      const semVal = smTopSem ? (smTopSem.value||'1st') : '1st';
+      const strandVal = selTrack ? (selTrack.value||null) : null;
+      const semVal = selSem ? (selSem.value||'1st') : '1st';
       if (!subject_id){ toast('Select a subject', false); return; }
       try{
         const res = await fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id, grade_level: currentManageLevel, strand: strandVal, semester: semVal, sy: null})});
@@ -619,9 +699,9 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
       }catch(e){ console.error(e); toast('Error', false); }
     }
 
-    // React to top controls changes
-    if (smTopStrand) smTopStrand.addEventListener('change', loadAssignList);
-    if (smTopSem) smTopSem.addEventListener('change', loadAssignList);
+    // React to top-level controls changes
+    if (selTrack) selTrack.addEventListener('change', loadAssignList);
+    if (selSem) selSem.addEventListener('change', loadAssignList);
 
     function openSubjectModal(data){
       subjectModal.classList.remove('hidden');
