@@ -182,12 +182,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
             $check_rfid->close();
         }
 
-        // Validate required fields (middle_name and rfid_uid are optional)
+        // Validate required fields (middle_name is optional)
         if (empty($lrn) || empty($last_name) || empty($first_name) || empty($dob) || 
             empty($birthplace) || empty($gender) || empty($religion) || empty($academic_track) || 
             empty($grade_level) || empty($semester) || empty($school_year) || empty($enrollment_status) || 
             empty($payment_mode) || empty($father_first_name) || empty($father_last_name) || 
-            empty($mother_first_name) || empty($mother_last_name) || empty($guardian_first_name) || empty($guardian_last_name)) {
+            empty($mother_first_name) || empty($mother_last_name) || empty($guardian_first_name) || empty($guardian_last_name) ||
+            empty($rfid_uid)) {
             
             $error_msg = "All required fields must be filled. (Middle name, Student ID, username, and password are optional as they are auto-generated)";
             $form_data = $_POST;
@@ -347,13 +348,11 @@ $validation_errors = [];
             $validation_errors[] = "Student ID must be exactly 11 digits.";
         }
 
-        // Validate RFID only if provided: numbers only, exactly 10 digits
-        if (!empty($rfid_uid)) {
-            if (!preg_match('/^[0-9]+$/', $rfid_uid)) {
-                $validation_errors[] = "RFID must contain digits only.";
-            } elseif (strlen($rfid_uid) !== 10) {
-                $validation_errors[] = "RFID must be exactly 10 digits.";
-            }
+        // Validate RFID: numbers only, exactly 10 digits
+        if (!preg_match('/^[0-9]+$/', $rfid_uid)) {
+            $validation_errors[] = "RFID must contain digits only.";
+        } elseif (strlen($rfid_uid) !== 10) {
+            $validation_errors[] = "RFID must be exactly 10 digits.";
         }
 
 // Validate username (lastname + last6(id) + 'muzon' @ student.cci.edu.ph)
