@@ -339,13 +339,51 @@ function mapStrandFromProgram(program){
   if (/ICT/.test(p)) return 'TVL-ICT';
   if (/(HE|HOME ECONOMICS)/.test(p)) return 'TVL-HE';
   if (/SPORT/.test(p)) return 'SPORTS';
+  // College programs
+  if (/BPED/.test(p)) return 'BPED';
+  if (/BECED/.test(p)) return 'BECED';
+  // Generic fallback: short alphabetic code becomes the strand (e.g., "BSIT")
+  if (/^[A-Z]{2,6}$/.test(p)) return p;
   return '';
 }
 
+function normalizeGradeLabel(gl){
+  let s = String(gl||'').trim();
+  // Remove section parts like " - Section A" or " | ..."
+  s = s.replace(/\s*[-|].*$/, '');
+  const L = s.toLowerCase();
+  // Kinder
+  if (/kinder\s*1/.test(L)) return 'Kinder 1';
+  if (/kinder\s*2/.test(L)) return 'Kinder 2';
+  if (/^kinder$/.test(L)) return 'Kinder 1';
+  // Grades
+  const g = L.match(/grade\s*(\d{1,2})/);
+  if (g){ return `Grade ${parseInt(g[1],10)}`; }
+  // Year -> College year
+  // Worded forms
+  if (/first\s*year/.test(L)) return '1st Year';
+  if (/second\s*year/.test(L)) return '2nd Year';
+  if (/third\s*year/.test(L)) return '3rd Year';
+  if (/fourth\s*year/.test(L)) return '4th Year';
+  const y1 = L.match(/(1|2|3|4)\s*(st|nd|rd|th)?\s*year/);
+  if (y1){
+    const n = parseInt(y1[1],10);
+    return (n===1? '1st': n===2? '2nd': n===3? '3rd': '4th') + ' Year';
+  }
+  const y2 = L.match(/year\s*(1|2|3|4)/);
+  if (y2){
+    const n = parseInt(y2[1],10);
+    return (n===1? '1st': n===2? '2nd': n===3? '3rd': '4th') + ' Year';
+  }
+  return s; // fallback
+}
+
 async function fetchOfferedSubjects(gradeLevelText, program, termValue){
-  // Pass the grade level text as-is so it supports values like 'Kinder 1', 'Kinder 2', 'Grade 12', 'Year 4'
-  const gradeStr = String(gradeLevelText||'');
-  const strand = mapStrandFromProgram(program);
+  // Normalize to our canonical labels used by offerings
+  const gradeStr = normalizeGradeLabel(gradeLevelText);
+  // For College (1st–4th Year), ignore strand when querying to avoid mismatches with program labels
+  const isCollege = /(1st|2nd|3rd|4th)\s+Year$/i.test(gradeStr);
+  const strand = isCollege ? '' : mapStrandFromProgram(program);
   const semester = getSemesterFromTermString(termValue);
   const sy = termValue || '';
   const params = new URLSearchParams({action:'list', grade_level: gradeStr, strand, semester, sy});
@@ -356,6 +394,7 @@ async function fetchOfferedSubjects(gradeLevelText, program, termValue){
 }
 
 async function populateSubjectOptions(info, preselectSubject=null){
+  const reqId = ++subjectOptionsRequestId;
   const sel = document.getElementById('subjectSelect');
   if (!sel) return;
   const termSel = document.getElementById('modalTermSelect');
@@ -364,7 +403,17 @@ async function populateSubjectOptions(info, preselectSubject=null){
   sel.innerHTML = '<option value="">-- Select Subject --</option>';
   try{
     const items = await fetchOfferedSubjects(info?.gradeLevelText||'', info?.program||'', termValue);
-    items.forEach(it=>{
+    // Deduplicate by name+code
+    const norm = (s)=> String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    const uniq = new Map();
+    (items||[]).forEach(it=>{
+      const key = `${norm(it.name)}|${norm(it.code)}`;
+      if (!uniq.has(key)) uniq.set(key, it);
+    });
+    // If another request started after this one, abort applying results
+    if (reqId !== subjectOptionsRequestId) return;
+    sel.innerHTML = '<option value="">-- Select Subject --</option>';
+    Array.from(uniq.values()).forEach(it=>{
       const label = it.code ? `${it.name} (${it.code})` : it.name;
       const o = document.createElement('option'); o.value = it.name; o.textContent = label; sel.appendChild(o);
     });
@@ -377,6 +426,7 @@ async function populateSubjectOptions(info, preselectSubject=null){
   }catch(e){ console.error('Failed to load offered subjects', e); }
 }
 let currentStudentId = null;
+let subjectOptionsRequestId = 0;
 
 // Search students function
 function searchStudents() {

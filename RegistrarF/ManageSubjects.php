@@ -137,7 +137,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
           <label class="text-sm text-gray-600">Grade Level</label>
           <select id="gradeLevel" class="w-full border rounded-lg px-3 py-2">
             <option value="">-- Select Grade Level --</option>
-            <option>Kinder</option>
+            <option>Kinder 1</option>
+            <option>Kinder 2</option>
             <option>Grade 1</option>
             <option>Grade 2</option>
             <option>Grade 3</option>
@@ -363,7 +364,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     const gridSemester = document.getElementById('gridSemester');
     const gridSyterm = document.getElementById('gridSyterm');
     const levelCards = document.getElementById('levelCards');
-    const API_SUBJECTS = (window.apiSubjects || '../RegistrarF/api/subjects.php');
+    const API_SUBJECTS = 'api/subjects.php';
 
     // Subject Manager modal elements
     const subjectManagerModal = document.getElementById('subjectManagerModal');
@@ -385,7 +386,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     const smTopSem = null;
     const smAssignListBlock = document.getElementById('smAssignListBlock');
     const smAssignList = document.getElementById('smAssignList');
-    const API_OFFERINGS = '../RegistrarF/api/subject_offerings.php';
+    const API_OFFERINGS = 'api/subject_offerings.php';
 
     let currentManageLevel = '';
 
@@ -522,25 +523,50 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
 
     async function loadSubjectManagerList(){
       try{
-        const q = smSearch ? (smSearch.value || '').trim() : '';
-        const url = q ? `${API_SUBJECTS}?action=list&q=${encodeURIComponent(q)}` : `${API_SUBJECTS}?action=list`;
-        const res = await fetch(url);
-        const d = await res.json();
-        const items = (d.items || d.subjects || []).filter(s=>!q || (s.name||'').toLowerCase().includes(q.toLowerCase()) || (s.code||'').toLowerCase().includes(q.toLowerCase()));
-        if(!items.length){ smList.innerHTML = '<div class="p-4 text-gray-500 text-sm">No subjects found.</div>'; return; }
-        smList.innerHTML = items.map(s=>`
+        if (!currentManageLevel){ smList.innerHTML = '<div class="p-4 text-gray-500 text-sm">Select a level.</div>'; return; }
+        const isBasic = /^(Kinder\s*1|Kinder\s*2|Grade\s*(?:[1-9]|10))$/i.test(currentManageLevel);
+        const q = smSearch ? (smSearch.value || '').trim().toLowerCase() : '';
+        const buildUrl = (sem)=>{
+          const params = new URLSearchParams({action:'list', grade_level: currentManageLevel, semester: sem});
+          if (!isBasic){
+            const track = selTrack ? (selTrack.value||'') : '';
+            if (track) params.set('strand', track);
+          }
+          return `${API_OFFERINGS}?${params.toString()}`;
+        };
+        let items = [];
+        if (isBasic){
+          const [r1,r2] = await Promise.all([fetch(buildUrl('1st')), fetch(buildUrl('2nd'))]);
+          const [t1,t2] = await Promise.all([r1.text(), r2.text()]);
+          let d1={}, d2={};
+          try{ d1 = JSON.parse(t1);}catch(e){ console.error('Offerings 1st resp:', t1); throw e; }
+          try{ d2 = JSON.parse(t2);}catch(e){ console.error('Offerings 2nd resp:', t2); throw e; }
+          const map = new Map();
+          (d1.items||[]).forEach(o=> map.set(o.subject_id, o));
+          (d2.items||[]).forEach(o=> map.set(o.subject_id, o));
+          items = Array.from(map.values());
+        } else {
+          const semVal = selSem ? (selSem.value||'1st') : '1st';
+          const r = await fetch(buildUrl(semVal));
+          const txt = await r.text();
+          let d={};
+          try{ d = JSON.parse(txt);}catch(e){ console.error('Offerings resp:', txt); throw e; }
+          items = d.items || [];
+        }
+        if (q){ items = items.filter(o=> (o.name||'').toLowerCase().includes(q) || (o.code||'').toLowerCase().includes(q)); }
+        if (!items.length){ smList.innerHTML = '<div class="p-4 text-gray-500 text-sm">No subjects assigned for this selection.</div>'; return; }
+        smList.innerHTML = items.map(o=>`
           <div class="p-3 flex items-center justify-between">
             <div>
-              <div class="font-medium text-gray-800">${escapeHtml(s.name||'')}</div>
-              <div class="text-xs text-gray-500">${s.code? escapeHtml(s.code):''}</div>
+              <div class="font-medium text-gray-800">${escapeHtml(o.name||'')}</div>
+              <div class="text-xs text-gray-500">${o.code? escapeHtml(o.code):''}</div>
             </div>
             <div class="flex gap-2">
-              <button class="px-3 py-1 text-sm rounded-lg bg-gray-200 hover:bg-gray-300" onclick='smStartEdit(${s.id}, ${JSON.stringify(s.name||'')}, ${JSON.stringify(s.code||'')})'>Edit</button>
-              <button class="px-3 py-1 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700" onclick='smDelete(${s.id})'>Delete</button>
-              ${isAdvancedLevel(currentManageLevel) ? `<button class="px-3 py-1 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" onclick="smQuickAssign(${s.id})">Assign</button>` : ''}
+              <button class="px-3 py-1 text-sm rounded-lg bg-gray-200 hover:bg-gray-300" onclick='openSubjectModal({id:${o.subject_id}, code:${JSON.stringify(o.code||'')}, name:${JSON.stringify(o.name||'')}})'>Edit</button>
+              <button class="px-3 py-1 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700" onclick='smRemoveAssign(${o.id})'>Remove</button>
             </div>
           </div>`).join('');
-      }catch(e){ console.error(e); smList.innerHTML = '<div class="p-4 text-red-600 text-sm">Failed to load subjects.</div>'; }
+      }catch(e){ console.error(e); smList.innerHTML = '<div class="p-4 text-red-600 text-sm">Failed to load assigned subjects.</div>'; }
     }
 
     async function smAdd(){
@@ -551,6 +577,22 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
         const res = await fetch(API_SUBJECTS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'create', name, code})});
         const d = await res.json();
         if(!d.success){ toast(d.message||'Failed to add subject', false); return; }
+        // Auto-assign to the current selection so it appears in Manage Grades
+        try{
+          const lvl = String(currentManageLevel||'');
+          if (d.id && lvl){
+            const isBasic = /^(Kinder\s*1|Kinder\s*2|Grade\s*(?:[1-9]|10))$/i.test(lvl);
+            if (isBasic){
+              const p1 = fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id:d.id, grade_level:lvl, strand:null, semester:'1st', sy:null})});
+              const p2 = fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id:d.id, grade_level:lvl, strand:null, semester:'2nd', sy:null})});
+              await Promise.all([p1,p2]);
+            } else {
+              const strandVal = selTrack ? (selTrack.value||null) : null;
+              const semVal = selSem ? (selSem.value||'1st') : '1st';
+              await fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id:d.id, grade_level:lvl, strand: strandVal, semester: semVal, sy:null})});
+            }
+          }
+        }catch(e){ console.error('Auto-assign failed', e); }
         toast('Subject added');
         smName.value=''; smCode.value='';
         loadSubjectManagerList();
@@ -678,15 +720,23 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     }
 
     window.smQuickAssign = async function(subject_id){
-      if (!isAdvancedLevel(currentManageLevel)) return;
-      const strandVal = selTrack ? (selTrack.value||null) : null;
-      const semVal = selSem ? (selSem.value||'1st') : '1st';
       if (!subject_id){ toast('Select a subject', false); return; }
       try{
-        const res = await fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id, grade_level: currentManageLevel, strand: strandVal, semester: semVal, sy: null})});
-        const d = await res.json();
-        if (d.success){ toast('Assigned'); loadAssignList(); }
-        else toast(d.message||'Assign failed', false);
+        const lvl = String(currentManageLevel||'');
+        const isBasic = /^(Kinder\s*1|Kinder\s*2|Grade\s*(?:[1-9]|10))$/i.test(lvl);
+        if (isBasic){
+          const p1 = fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id, grade_level:lvl, strand:null, semester:'1st', sy:null})});
+          const p2 = fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id, grade_level:lvl, strand:null, semester:'2nd', sy:null})});
+          await Promise.all([p1,p2]);
+        } else {
+          const strandVal = selTrack ? (selTrack.value||null) : null;
+          const semVal = selSem ? (selSem.value||'1st') : '1st';
+          await fetch(API_OFFERINGS,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'assign', subject_id, grade_level:lvl, strand: strandVal, semester: semVal, sy: null})});
+        }
+        toast('Assigned');
+        // Refresh whichever list the user sees
+        try{ loadAssignList(); }catch(_){}
+        try{ loadSubjectManagerList(); }catch(_){}
       }catch(e){ console.error(e); toast('Error assigning', false); }
     }
 
@@ -878,7 +928,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     function escapeHtml(s){ return (s||'').replace(/[&<>"]+/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 
     // Quick Select chips
-    const quickGrades = ['Kinder','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12','Year 1','Year 2','Year 3','Year 4'];
+    const quickGrades = ['Kinder 1','Kinder 2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12','1st Year','2nd Year','3rd Year','4th Year'];
     const quickStrands = ['ABM','STEM','HUMSS','GAS','TVL-ICT','TVL-HE','SPORTS'];
     const quickCourses = ['BPED','BECED'];
 
@@ -923,7 +973,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
         if (manageMain) manageMain.classList.add('hidden');
         renderLevelCards();
         // Sync default grid filters with manage filters for consistency
-        gridSemester.value = semester.value;
+        if (gridSemester && semester) { gridSemester.value = semester.value; }
       }
       updateAssignButtons();
       if (isFilterReady()) loadOfferings();

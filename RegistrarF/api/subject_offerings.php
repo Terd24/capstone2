@@ -44,14 +44,23 @@ try{
     $sem = $_GET['semester'] ?? '';
     $sy = $_GET['sy'] ?? '';
 
-    $sql = "SELECT o.id, o.subject_id AS subject_id, s.name, s.code FROM subject_offerings o JOIN subjects s ON s.id=o.subject_id WHERE o.active=1 AND o.grade_level=? AND o.semester=?";
+    // Null-safe matching using COALESCE to avoid duplicates when columns are NULL/''
+    $sql = "SELECT MIN(o.id) AS id,
+                   MIN(o.subject_id) AS subject_id,
+                   MAX(s.name) AS name,
+                   MAX(s.code) AS code,
+                   LOWER(TRIM(s.name)) AS _nkey,
+                   LOWER(TRIM(COALESCE(s.code,''))) AS _ckey
+            FROM subject_offerings o
+            JOIN subjects s ON s.id=o.subject_id
+            WHERE o.active=1 AND o.grade_level=? AND o.semester=?";
     $types = 'ss';
     $params = [$grade, $sem];
 
-    if($strand !== ''){ $sql .= " AND (o.strand = ? OR o.strand IS NULL)"; $types.='s'; $params[]=$strand; }
-    if($sy !== ''){ $sql .= " AND (o.school_year_term = ? OR o.school_year_term IS NULL)"; $types.='s'; $params[]=$sy; }
+    if($strand !== ''){ $sql .= " AND COALESCE(o.strand,'') = ?"; $types.='s'; $params[]=$strand; }
+    // Do NOT filter by school_year_term so offerings show regardless of SY selection in ManageGrades
 
-    $sql .= " ORDER BY s.name ASC";
+    $sql .= " GROUP BY _nkey, _ckey ORDER BY name ASC";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
@@ -67,21 +76,28 @@ try{
   if($action === 'assign'){
     $sid = (int)($data['subject_id'] ?? 0);
     $grade = trim($data['grade_level'] ?? '');
-    $strand = $data['strand'] ?? null; if ($strand==='') $strand=null;
-    $sem = $data['semester'] ?? '';
-    $sy = $data['sy'] ?? null; if ($sy==='') $sy=null;
+    // Normalize to '' to avoid multiple NULL-allowed duplicates
+    $strand = trim((string)($data['strand'] ?? ''));
+    $sem = trim((string)($data['semester'] ?? ''));
+    $sy = trim((string)($data['sy'] ?? ''));
     if($sid<=0 || $grade==='' || $sem===''){ echo json_encode(['success'=>false,'message'=>'Missing fields']); exit; }
 
-    $stmt = $conn->prepare("INSERT INTO subject_offerings(subject_id, grade_level, strand, semester, school_year_term) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE active=VALUES(active)");
-    $active = 1;
+    // Prevent duplicates: check existing row using COALESCE null-safe comparison
+    $chk = $conn->prepare("SELECT id FROM subject_offerings WHERE subject_id=? AND grade_level=? AND COALESCE(strand,'')=? AND semester=? AND COALESCE(school_year_term,'')=? LIMIT 1");
+    $chk->bind_param('issss', $sid, $grade, $strand, $sem, $sy);
+    $chk->execute();
+    $existing = $chk->get_result()->fetch_assoc();
+    if ($existing) { echo json_encode(['success'=>true, 'id'=>$existing['id']]); exit; }
+
+    $stmt = $conn->prepare("INSERT INTO subject_offerings(subject_id, grade_level, strand, semester, school_year_term, active) VALUES(?,?,?,?,?,1)");
     $stmt->bind_param('issss', $sid, $grade, $strand, $sem, $sy);
     $stmt->execute();
-    echo json_encode(['success'=>true]);
+    echo json_encode(['success'=>true, 'id'=>$conn->insert_id]);
     exit;
   }
 
   if($action === 'remove'){
-    $id = (int)($data['id'] ?? 0); if($id<=0){ echo json_encode(['success'=>false,'message':'Invalid id']); exit; }
+    $id = (int)($data['id'] ?? 0); if($id<=0){ echo json_encode(['success'=>false,'message'=>'Invalid id']); exit; }
     $stmt = $conn->prepare("DELETE FROM subject_offerings WHERE id=?");
     $stmt->bind_param('i', $id);
     $stmt->execute();
