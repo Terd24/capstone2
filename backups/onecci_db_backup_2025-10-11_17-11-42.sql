@@ -1,5 +1,5 @@
 -- OneCCI Database Backup
--- Generated: 2025-10-11 12:02:28
+-- Generated: 2025-10-11 17:11:42
 -- Database: onecci_db
 
 SET FOREIGN_KEY_CHECKS=0;
@@ -68,7 +68,7 @@ CREATE TABLE `attendance_record` (
   `time_out` time DEFAULT NULL,
   `status` varchar(20) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=235 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=260 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Data for table: attendance_record
 INSERT INTO `attendance_record` VALUES ('224', '02000000001', '2025-09-30', 'Tuesday', 'ABM - 12A (7:30 AM -', '14:37:42', '14:37:46', 'Present');
@@ -78,10 +78,6 @@ INSERT INTO `attendance_record` VALUES ('227', '02000645645', '2025-10-04', 'Sat
 INSERT INTO `attendance_record` VALUES ('228', '02000534645', '2025-10-04', 'Saturday', 'BSIT - 601 (Variable', '08:54:39', NULL, 'Present');
 INSERT INTO `attendance_record` VALUES ('229', '80374985739845345', '2025-10-04', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
 INSERT INTO `attendance_record` VALUES ('230', '67867867866666786786', '2025-10-04', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('231', '02000645645', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('232', '80374985739845345', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('233', '67867867866666786786', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('234', '02000534645', '2025-10-11', 'Saturday', 'BSIT - 601 (Variable', '13:37:26', '13:37:29', 'Present');
 
 
 -- Table: class_schedules
@@ -499,7 +495,7 @@ CREATE TABLE `login_activity` (
   PRIMARY KEY (`id`),
   KEY `idx_login_date` (`login_time`),
   KEY `idx_id_number` (`id_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=225 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=229 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 -- Table: notifications
@@ -1141,6 +1137,7 @@ CREATE TABLE `system_config` (
 
 -- Data for table: system_config
 INSERT INTO `system_config` VALUES ('debug_mode', '0', '2025-09-29 21:38:55');
+INSERT INTO `system_config` VALUES ('maintenance_mode', '0', '2025-10-11 21:04:49');
 
 
 -- Table: system_logs

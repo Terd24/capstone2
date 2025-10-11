@@ -1,5 +1,5 @@
 -- OneCCI Database Backup
--- Generated: 2025-10-11 11:25:57
+-- Generated: 2025-10-11 17:08:29
 -- Database: onecci_db
 
 SET FOREIGN_KEY_CHECKS=0;
@@ -26,6 +26,18 @@ CREATE TABLE `approval_requests` (
 -- Data for table: approval_requests
 INSERT INTO `approval_requests` VALUES ('1', 'permanent_delete_employee', '71092124378', 'employees', 'Super Admin', 'need', 'pending', '2025-09-30 11:31:55', NULL, NULL, NULL);
 INSERT INTO `approval_requests` VALUES ('2', 'permanent_delete_student', 'S2025006', 'student_account', 'Super Admin', 'asdawdasd', 'pending', '2025-09-30 11:33:09', NULL, NULL, NULL);
+
+
+-- Table: attendance
+DROP TABLE IF EXISTS `attendance`;
+CREATE TABLE `attendance` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `student_id` varchar(50) DEFAULT NULL,
+  `date` date DEFAULT NULL,
+  `status` varchar(20) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 -- Table: attendance_account
@@ -56,7 +68,7 @@ CREATE TABLE `attendance_record` (
   `time_out` time DEFAULT NULL,
   `status` varchar(20) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=235 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=260 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Data for table: attendance_record
 INSERT INTO `attendance_record` VALUES ('224', '02000000001', '2025-09-30', 'Tuesday', 'ABM - 12A (7:30 AM -', '14:37:42', '14:37:46', 'Present');
@@ -66,10 +78,9 @@ INSERT INTO `attendance_record` VALUES ('227', '02000645645', '2025-10-04', 'Sat
 INSERT INTO `attendance_record` VALUES ('228', '02000534645', '2025-10-04', 'Saturday', 'BSIT - 601 (Variable', '08:54:39', NULL, 'Present');
 INSERT INTO `attendance_record` VALUES ('229', '80374985739845345', '2025-10-04', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
 INSERT INTO `attendance_record` VALUES ('230', '67867867866666786786', '2025-10-04', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('231', '02000645645', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('232', '80374985739845345', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('233', '67867867866666786786', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
-INSERT INTO `attendance_record` VALUES ('234', '02000534645', '2025-10-11', 'Saturday', 'BSIT - 601 (Variable', '13:37:26', '13:37:29', 'Present');
+INSERT INTO `attendance_record` VALUES ('257', '02000645645', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
+INSERT INTO `attendance_record` VALUES ('258', '80374985739845345', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
+INSERT INTO `attendance_record` VALUES ('259', '67867867866666786786', '2025-10-11', 'Saturday', 'BSIT - 702 (8:00 AM ', NULL, NULL, 'Absent');
 
 
 -- Table: class_schedules
@@ -453,14 +464,6 @@ CREATE TABLE `hr_activity_logs` (
   KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Data for table: hr_activity_logs
-INSERT INTO `hr_activity_logs` VALUES ('1', 'HR001', 'hr_admin', 'login', 'Successful login to HR dashboard', '192.168.1.100', 'Mozilla/5.0...', '2025-10-03 10:23:03');
-INSERT INTO `hr_activity_logs` VALUES ('2', 'HR001', 'hr_admin', 'account_created', 'Created new employee account for John Doe', '192.168.1.100', 'Mozilla/5.0...', '2025-10-03 11:23:03');
-INSERT INTO `hr_activity_logs` VALUES ('3', 'HR002', 'hr_manager', 'login', 'Successful login to HR dashboard', '192.168.1.101', 'Mozilla/5.0...', '2025-10-03 11:53:03');
-INSERT INTO `hr_activity_logs` VALUES ('4', 'HR001', 'hr_admin', 'permission_change', 'Modified permissions for employee EMP123', '192.168.1.100', 'Mozilla/5.0...', '2025-10-03 12:08:03');
-INSERT INTO `hr_activity_logs` VALUES ('5', 'HR003', 'hr_staff', 'failed_login', 'Failed login attempt - incorrect password', '192.168.1.102', 'Mozilla/5.0...', '2025-10-03 12:13:03');
-INSERT INTO `hr_activity_logs` VALUES ('6', 'HR002', 'hr_manager', 'logout', 'User logged out', '192.168.1.101', 'Mozilla/5.0...', '2025-10-03 12:18:03');
-
 
 -- Table: installment_schedule
 DROP TABLE IF EXISTS `installment_schedule`;
@@ -495,180 +498,10 @@ CREATE TABLE `login_activity` (
   PRIMARY KEY (`id`),
   KEY `idx_login_date` (`login_time`),
   KEY `idx_id_number` (`id_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=224 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=229 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Data for table: login_activity
-INSERT INTO `login_activity` VALUES ('53', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 00:04:13', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('54', 'employee', '545645645645', 'guidance', 'guidance', '2025-09-30 00:04:42', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('55', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 00:04:51', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('56', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 00:07:17', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('57', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 00:11:41', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('58', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 00:40:07', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('59', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 01:06:03', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('60', 'employee', '234234234234', 'hraccount', 'hr', '2025-09-30 01:28:26', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('61', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 01:28:52', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('62', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 02:16:41', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('63', 'employee', '789789678678', 'gesterdhr', 'hr', '2025-09-30 02:33:48', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('64', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 02:34:48', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('65', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 02:45:27', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('66', 'employee', '545645645645', 'guidance', 'guidance', '2025-09-30 02:45:39', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('67', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 02:46:01', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('68', 'employee', '545645645645', 'guidance', 'guidance', '2025-09-30 02:47:04', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('69', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 03:20:09', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('70', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 03:23:15', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('71', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 04:07:16', 'hiojpn7fnkkpmh8u9gv25oiivd');
-INSERT INTO `login_activity` VALUES ('72', 'superadmin', 'SA001', 'principal', 'superadmin', '2025-09-30 07:43:09', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('73', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 08:36:40', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('74', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 08:37:32', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('75', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 09:04:46', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('76', 'employee', '71092124374', 'mark', 'teacher', '2025-09-30 09:54:04', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('77', 'employee', '71092124374', 'mark', 'teacher', '2025-09-30 10:05:12', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('78', 'employee', '71092124374', 'mark', 'teacher', '2025-09-30 10:05:28', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('79', 'employee', '71092124374', 'mark', 'teacher', '2025-09-30 10:05:53', '5iecbo0hs2kjfv4kr4t86utv8a');
-INSERT INTO `login_activity` VALUES ('80', 'employee', '546464564', 'attendance', 'attendance', '2025-09-30 10:09:45', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('81', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 10:10:04', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('82', 'employee', '71092124374', 'mark', 'teacher', '2025-09-30 10:15:28', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('83', 'employee', '71092124374', 'mark', 'teacher', '2025-09-30 10:16:13', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('84', 'employee', '71092124374', 'mark', 'teacher', '2025-09-30 10:16:32', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('85', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 10:16:42', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('86', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 10:16:57', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('87', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 10:17:57', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('88', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 10:19:34', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('89', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 10:19:57', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('90', 'employee', '71092124374', 'mark', 'registrar', '2025-09-30 10:20:38', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('91', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 10:20:52', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('92', 'employee', '546464564', 'attendance', 'attendance', '2025-09-30 10:46:47', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('93', 'employee', '345345345345', 'lance', 'teacher', '2025-09-30 10:46:54', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('94', 'employee', '546464564', 'attendance', 'attendance', '2025-09-30 10:48:00', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('95', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 10:48:34', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('96', 'employee', '546464564', 'attendance', 'attendance', '2025-09-30 10:48:53', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('97', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 10:53:49', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('98', 'employee', '345345345345', 'lance', 'teacher', '2025-09-30 10:54:39', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('99', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 10:57:01', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('100', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 11:00:23', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('101', 'employee', '545645645645', 'guidance', 'guidance', '2025-09-30 11:02:26', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('102', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 11:03:41', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('103', 'employee', '54353453453', 'cashier', 'cashier', '2025-09-30 11:08:09', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('104', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 11:08:48', 'hgiqfqj7hdenrf836boh6pvgms');
-INSERT INTO `login_activity` VALUES ('105', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 11:10:38', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('106', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 11:10:49', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('107', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 11:11:37', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('108', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 11:21:29', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('109', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 11:21:39', 'dudbnvcqojpffvmcrcsan1tl96');
-INSERT INTO `login_activity` VALUES ('110', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 11:51:42', 'h7phboig0ammdkm7fukmlt0eih');
-INSERT INTO `login_activity` VALUES ('111', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 11:51:57', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('112', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 11:55:08', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('113', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 11:55:15', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('114', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 11:58:59', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('115', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 12:03:36', 'h7phboig0ammdkm7fukmlt0eih');
-INSERT INTO `login_activity` VALUES ('116', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 12:17:42', 'h7phboig0ammdkm7fukmlt0eih');
-INSERT INTO `login_activity` VALUES ('117', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 12:20:26', 'h7phboig0ammdkm7fukmlt0eih');
-INSERT INTO `login_activity` VALUES ('118', 'employee', '54353453453', 'cashier', 'cashier', '2025-09-30 12:22:48', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('119', 'employee', '54353453453', 'cashier', 'cashier', '2025-09-30 12:23:51', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('120', 'employee', '546464564', 'attendance', 'attendance', '2025-09-30 12:24:35', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('121', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 12:25:18', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('122', 'employee', '546464564', 'attendance', 'attendance', '2025-09-30 12:25:38', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('123', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 12:26:01', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('124', 'employee', '545645645645', 'guidance', 'guidance', '2025-09-30 12:27:37', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('125', 'student', '02000307705', 'gesterd', 'student', '2025-09-30 12:29:23', 'q84iku4atglvsi6s03lc6d7qao');
-INSERT INTO `login_activity` VALUES ('126', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 12:31:03', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('127', 'employee', '545645645645', 'guidance', 'guidance', '2025-09-30 12:35:04', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('128', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 12:35:10', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('129', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 12:35:15', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('130', 'employee', '54353453453', 'cashier', 'cashier', '2025-09-30 12:35:25', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('131', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 12:35:33', 'u6v2svaj155no2m6smgd582cd9');
-INSERT INTO `login_activity` VALUES ('132', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 13:31:37', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('133', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 13:51:38', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('134', 'superadmin', 'SA001', 'superadmin', 'superadmin', '2025-09-30 13:52:35', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('135', 'employee', 'HR001', 'hradmin', 'hr', '2025-09-30 14:06:28', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('136', 'employee', '546464564', 'attendance', 'attendance', '2025-09-30 14:19:03', '728gv28lg383shqphe2q23tlk1');
-INSERT INTO `login_activity` VALUES ('137', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 14:20:27', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('138', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 14:46:12', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('139', 'employee', '54353453453', 'cashier', 'cashier', '2025-09-30 14:48:23', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('140', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 14:53:28', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('141', 'employee', '54353453453', 'cashier', 'cashier', '2025-09-30 14:53:57', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('142', 'employee', '545645645645', 'guidance', 'guidance', '2025-09-30 14:54:20', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('143', 'employee', '645645645645', 'Registrar', 'registrar', '2025-09-30 14:54:50', 'r2rvkea7u8dbjiucs99bceoj5e');
-INSERT INTO `login_activity` VALUES ('144', 'student', '02000000001', 'deffrey', 'student', '2025-09-30 14:55:19', '728gv28lg383shqphe2q23tlk1');
-INSERT INTO `login_activity` VALUES ('145', 'employee', 'SA001', 'superadmin', '', '2025-10-03 13:24:00', 'i8ei45mri5l7if6lsd0mnj83ku');
-INSERT INTO `login_activity` VALUES ('146', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-03 13:26:22', 'm5g7snop7aad75af9bpb9ka2h6');
-INSERT INTO `login_activity` VALUES ('147', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-03 22:30:37', 'goo771qq35a33eeqvopnne4tol');
-INSERT INTO `login_activity` VALUES ('148', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-03 22:50:08', '2q3p6v3sm88lkh3vvknlhrsq96');
-INSERT INTO `login_activity` VALUES ('149', 'employee', '90900090909', 'Nicole', 'hr', '2025-10-03 23:15:54', '2kupknul11a3fpjihkhj1j181m');
-INSERT INTO `login_activity` VALUES ('150', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-03 23:17:16', '2q3p6v3sm88lkh3vvknlhrsq96');
-INSERT INTO `login_activity` VALUES ('151', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-03 23:27:02', '2q3p6v3sm88lkh3vvknlhrsq96');
-INSERT INTO `login_activity` VALUES ('152', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-04 05:35:46', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('153', 'employee', '08000012312', 'yeyeng', 'hr', '2025-10-04 06:21:09', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('154', 'employee', '546464564', 'attendance', 'attendance', '2025-10-04 06:34:18', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('155', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 06:43:36', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('156', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-04 07:27:19', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('157', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 07:48:53', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('158', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-04 08:34:54', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('159', 'employee', '546464564', 'attendance', 'attendance', '2025-10-04 08:54:03', 'j1cis87donq9m0cq7q6tc0f6t2');
-INSERT INTO `login_activity` VALUES ('160', 'student', '02000307705', 'gesterd', 'student', '2025-10-04 08:57:10', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('161', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 09:04:55', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('162', 'student', '02000307705', 'gesterd', 'student', '2025-10-04 10:36:43', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('163', 'student', '02000307705', 'gesterd', 'student', '2025-10-04 10:36:54', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('164', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 10:37:57', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('165', 'employee', '345345345345', 'lance', 'teacher', '2025-10-04 11:31:06', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('166', 'employee', '54353453453', 'cashier', 'cashier', '2025-10-04 11:50:08', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('167', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 11:51:36', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('168', 'employee', '54353453453', 'cashier', 'cashier', '2025-10-04 11:56:17', 'j1cis87donq9m0cq7q6tc0f6t2');
-INSERT INTO `login_activity` VALUES ('169', 'employee', '54353453453', 'cashier', 'cashier', '2025-10-04 13:03:05', 'j1cis87donq9m0cq7q6tc0f6t2');
-INSERT INTO `login_activity` VALUES ('170', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-04 13:17:24', 'j1cis87donq9m0cq7q6tc0f6t2');
-INSERT INTO `login_activity` VALUES ('171', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 13:19:57', 'j1cis87donq9m0cq7q6tc0f6t2');
-INSERT INTO `login_activity` VALUES ('172', 'employee', '54353453453', 'cashier', 'cashier', '2025-10-04 14:07:47', 'j6mocdrh4e6lkccko33ltqnped');
-INSERT INTO `login_activity` VALUES ('173', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 14:46:47', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('174', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-04 15:31:13', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('175', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 15:35:09', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('176', 'employee', '54353453453', 'cashier', 'cashier', '2025-10-04 15:39:13', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('177', 'employee', '545645645645', 'guidance', 'guidance', '2025-10-04 15:42:02', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('178', 'employee', '545645645645', 'guidance', 'guidance', '2025-10-04 15:43:24', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('179', 'student', '02000307705', 'gesterd', 'student', '2025-10-04 15:43:40', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('180', 'employee', '546464564', 'attendance', 'attendance', '2025-10-04 15:57:49', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('181', 'student', '02000307705', 'gesterd', 'student', '2025-10-04 16:03:41', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('182', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 16:21:01', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('183', 'student', '02000307705', 'gesterd', 'student', '2025-10-04 16:30:24', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('184', 'student', '02000307705', 'gesterd', 'student', '2025-10-04 16:39:43', 'lrgugbutheb97gas9ubt3rk43t');
-INSERT INTO `login_activity` VALUES ('185', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-04 16:54:31', 'a7md3nkbgmfnc96e2ifk6o84hq');
-INSERT INTO `login_activity` VALUES ('186', 'student', '02000307705', 'gesterd', 'student', '2025-10-05 22:59:46', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('187', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-05 23:00:02', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('188', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-05 23:00:32', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('189', 'student', '02000307705', 'gesterd', 'student', '2025-10-05 23:05:39', 'c0051cvajdf10m9nnk64i8r6pt');
-INSERT INTO `login_activity` VALUES ('190', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-05 23:14:53', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('191', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-05 23:15:15', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('192', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-05 23:40:26', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('193', 'employee', '54353453453', 'cashier', 'cashier', '2025-10-05 23:45:28', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('194', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-05 23:47:06', 'bggvuq0hpjj16qm78t1hn52pkl');
-INSERT INTO `login_activity` VALUES ('195', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-05 23:56:54', 'f5jclsnl4njf7qm9q9inccae1e');
-INSERT INTO `login_activity` VALUES ('196', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-05 23:57:26', 'lmp6bjbbsochlsqcg5tvf5bvp9');
-INSERT INTO `login_activity` VALUES ('197', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-06 00:15:19', 'lmp6bjbbsochlsqcg5tvf5bvp9');
-INSERT INTO `login_activity` VALUES ('198', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-06 00:16:04', 'lmp6bjbbsochlsqcg5tvf5bvp9');
-INSERT INTO `login_activity` VALUES ('199', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-07 16:57:06', '42lms17g70fqggl7o48m6o301e');
-INSERT INTO `login_activity` VALUES ('200', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-09 17:10:42', 'nubvcb45kgtvfbuttkio834j76');
-INSERT INTO `login_activity` VALUES ('201', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-10 09:34:14', 'qpglnv2er29k1t763egtevauo9');
-INSERT INTO `login_activity` VALUES ('202', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-10 10:12:11', 's894tieo3octiqv201vltgbm7h');
-INSERT INTO `login_activity` VALUES ('203', 'employee', '345345345345', 'lance', 'teacher', '2025-10-10 11:32:52', '6hno541pc5vjitr5nilkuh3h1n');
-INSERT INTO `login_activity` VALUES ('204', 'employee', '54353453453', 'cashier', 'cashier', '2025-10-10 15:40:05', '6hno541pc5vjitr5nilkuh3h1n');
-INSERT INTO `login_activity` VALUES ('205', 'employee', '545645645645', 'guidance', 'guidance', '2025-10-10 17:31:16', 's894tieo3octiqv201vltgbm7h');
-INSERT INTO `login_activity` VALUES ('206', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-10 17:31:46', 's894tieo3octiqv201vltgbm7h');
-INSERT INTO `login_activity` VALUES ('207', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-11 04:57:07', 't1bmu6g2doce7fdi8tj18ou3mh');
-INSERT INTO `login_activity` VALUES ('208', 'employee', '345345345345', 'lance', 'teacher', '2025-10-11 08:15:10', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('209', 'employee', '345345345345', 'lance', 'teacher', '2025-10-11 08:19:35', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('210', 'employee', '345345345345', 'lance', 'teacher', '2025-10-11 08:22:00', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('211', 'employee', '10000115605', 'herbert', 'teacher', '2025-10-11 08:47:45', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('212', 'employee', '345345345345', 'lance', 'teacher', '2025-10-11 08:48:22', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('213', 'employee', '345345345345', 'lance', 'teacher', '2025-10-11 09:49:18', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('214', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-11 10:17:37', 't1bmu6g2doce7fdi8tj18ou3mh');
-INSERT INTO `login_activity` VALUES ('215', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-11 10:20:06', 't1bmu6g2doce7fdi8tj18ou3mh');
-INSERT INTO `login_activity` VALUES ('216', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-11 11:43:20', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('217', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-11 11:44:03', 'il5jpunfpce9cnn0fohkv1bels');
-INSERT INTO `login_activity` VALUES ('218', 'student', '02000307705', 'gesterd', 'student', '2025-10-11 12:04:59', 'oli6m5n9ijv2j8k643ahi0i2e4');
-INSERT INTO `login_activity` VALUES ('219', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-11 13:14:05', 'dr57fva6l47gqvenqv3c1d1shq');
-INSERT INTO `login_activity` VALUES ('220', 'employee', '546464564', 'attendance', 'attendance', '2025-10-11 13:37:22', '4qjepph10vqqhgkc7uer1hbc0l');
-INSERT INTO `login_activity` VALUES ('221', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-11 14:11:31', 'rerlhrcjhti2sdk0c32bu0vrhj');
-INSERT INTO `login_activity` VALUES ('222', 'employee', 'HR001', 'hradmin', 'hr', '2025-10-11 15:35:49', '9nef0or201lnvblv755clk5ml6');
-INSERT INTO `login_activity` VALUES ('223', 'employee', '645645645645', 'Registrar', 'registrar', '2025-10-11 16:28:33', 'idphma1ot49u90jf8djgonba10');
+INSERT INTO `login_activity` VALUES ('228', 'employee', '546464564', 'attendance', 'attendance', '2025-10-11 19:30:39', 'n1prulaonk2huj3e33rjnfb772');
 
 
 -- Table: notifications
@@ -1310,6 +1143,7 @@ CREATE TABLE `system_config` (
 
 -- Data for table: system_config
 INSERT INTO `system_config` VALUES ('debug_mode', '0', '2025-09-29 21:38:55');
+INSERT INTO `system_config` VALUES ('maintenance_mode', '0', '2025-10-11 21:04:49');
 
 
 -- Table: system_logs
