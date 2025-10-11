@@ -44,7 +44,7 @@ try{
     $sem = $_GET['semester'] ?? '';
     $sy = $_GET['sy'] ?? '';
 
-    // Null-safe matching using COALESCE to avoid duplicates when columns are NULL/''
+    // Build dynamic filters; semester is optional
     $sql = "SELECT MIN(o.id) AS id,
                    MIN(o.subject_id) AS subject_id,
                    MAX(s.name) AS name,
@@ -53,15 +53,18 @@ try{
                    LOWER(TRIM(COALESCE(s.code,''))) AS _ckey
             FROM subject_offerings o
             JOIN subjects s ON s.id=o.subject_id
-            WHERE o.active=1 AND o.grade_level=? AND o.semester=?";
-    $types = 'ss';
-    $params = [$grade, $sem];
+            WHERE o.active=1 AND o.grade_level=?";
+    $types = 's';
+    $params = [$grade];
 
-    if($strand !== ''){ $sql .= " AND COALESCE(o.strand,'') = ?"; $types.='s'; $params[]=$strand; }
-    // Do NOT filter by school_year_term so offerings show regardless of SY selection in ManageGrades
+    if ($sem !== '') { $sql .= " AND o.semester=?"; $types .= 's'; $params[] = $sem; }
+    if ($strand !== '') { $sql .= " AND COALESCE(o.strand,'') = ?"; $types .= 's'; $params[] = $strand; }
+    // If school year provided, include both exact match and NULL (compatibility with old behavior)
+    if ($sy !== '') { $sql .= " AND COALESCE(o.school_year_term,'') IN ('', ?)"; $types .= 's'; $params[] = $sy; }
 
     $sql .= " GROUP BY _nkey, _ckey ORDER BY name ASC";
     $stmt = $conn->prepare($sql);
+    if(!$stmt){ echo json_encode(['success'=>false,'message'=>'Query error']); exit; }
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -98,9 +101,36 @@ try{
 
   if($action === 'remove'){
     $id = (int)($data['id'] ?? 0); if($id<=0){ echo json_encode(['success'=>false,'message'=>'Invalid id']); exit; }
+    $delete_orphan = !empty($data['delete_orphan']);
+    // Get subject_id before deletion
+    $sid = 0;
+    if ($get = $conn->prepare("SELECT subject_id FROM subject_offerings WHERE id=?")){
+      $get->bind_param('i', $id);
+      if ($get->execute()){
+        $res = $get->get_result();
+        if ($row = $res->fetch_assoc()) { $sid = (int)$row['subject_id']; }
+      }
+    }
+    // Delete the offering
     $stmt = $conn->prepare("DELETE FROM subject_offerings WHERE id=?");
     $stmt->bind_param('i', $id);
     $stmt->execute();
+    // Optionally delete subject if it has no more offerings
+    if ($delete_orphan && $sid > 0){
+      if ($chk = $conn->prepare("SELECT COUNT(*) AS c FROM subject_offerings WHERE subject_id=?")){
+        $chk->bind_param('i', $sid);
+        if ($chk->execute()){
+          $rc = $chk->get_result()->fetch_assoc();
+          if ((int)($rc['c'] ?? 0) === 0){
+            // Delete subject; CASCADE removes nothing further due to FK in offerings
+            if ($del = $conn->prepare("DELETE FROM subjects WHERE id=?")){
+              $del->bind_param('i', $sid);
+              $del->execute();
+            }
+          }
+        }
+      }
+    }
     echo json_encode(['success'=>true]);
     exit;
   }

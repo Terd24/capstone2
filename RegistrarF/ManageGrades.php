@@ -767,6 +767,19 @@ function showAddGradeModal() {
         
         // Get latest term and populate the field
         getLatestTermAndPopulate();
+        // Immediately default to 1st Term so newly added Term 1 subjects show
+        setTimeout(()=>{
+          try{
+            const yearSel = document.getElementById('modalSchoolYear');
+            const termOnlySel = document.getElementById('modalTermOnly');
+            const combinedSel = document.getElementById('modalTermSelect');
+            if (termOnlySel){ termOnlySel.value = '1st Term'; }
+            if (yearSel && termOnlySel && combinedSel){
+              combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
+            }
+            populateSubjectOptions(currentStudentInfo);
+          }catch(e){ console.error('Default to 1st term failed', e); }
+        }, 0);
         
         // Reset modal title and button text for adding
         document.querySelector('#addGradeModal h3').textContent = 'Add New Grade';
@@ -824,10 +837,20 @@ function showAddGradeModal() {
             const yearSel = document.getElementById('modalSchoolYear');
             const termOnlySel = document.getElementById('modalTermOnly');
             if (yMatch && yearSel && termOnlySel){
-              yearSel.value = yMatch[1];
-              termOnlySel.value = (yMatch[2].startsWith('2') ? '2nd Term' : '1st Term');
-              // Keep combined hidden in sync
+              // Determine current academic SY (August boundary) and ensure dropdown has both current and next SY
+              const now = new Date();
+              const month = now.getMonth() + 1; // 1..12
+              const startYear = (month >= 8) ? now.getFullYear() : (now.getFullYear() - 1);
+              const curSY = `${startYear}-${startYear+1}`;
+              // Ensure current SY option exists (do not add next SY)
+              const hasCur = Array.from(yearSel.options).some(o=> (o.value||'') === curSY);
+              if (!hasCur){ const o=document.createElement('option'); o.value=curSY; o.textContent=curSY; yearSel.insertBefore(o, yearSel.firstChild); }
+              // Select current SY automatically and default to 1st Term
+              yearSel.value = curSY;
+              termOnlySel.value = '1st Term';
+              // Keep combined hidden in sync and refresh subjects
               document.getElementById('modalTermSelect').value = `${yearSel.value} ${termOnlySel.value}`;
+              try { populateSubjectOptions(currentStudentInfo); } catch(_) {}
             }
             // Ensure current calendar year SY exists (auto-generate)
             ensureSchoolYearOptions();
