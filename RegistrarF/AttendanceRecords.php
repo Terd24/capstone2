@@ -152,45 +152,49 @@ if ($status_result) {
   <div class="container mx-auto px-6 py-4">
     <div class="bg-white rounded-2xl shadow-lg p-5 mb-4">
       <h2 class="text-xl font-bold text-gray-800 mb-4">Filter</h2>
-      <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-        <div>
-          <label class="text-sm font-medium text-gray-700 mb-2 block">Search Student</label>
-          <input type="text" name="search_name" value="<?= htmlspecialchars($search_name) ?>" placeholder="Enter student name..."
-                 class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+      <form method="get" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-8 gap-4 items-end">
+          <div class="md:col-span-2">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">Start Date</label>
+            <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" min="2025-01-01" max="<?= $today ?>" placeholder="Start date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="startDate">
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">End Date</label>
+            <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" max="<?= $today ?>" placeholder="End date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="endDate">
+          </div>
+          <div class="md:col-span-4 flex gap-2">
+            <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium whitespace-nowrap">Generate Report</button>
+            <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap">Clear</a>
+          </div>
         </div>
-        <div class="md:col-span-2">
-          <label class="text-sm font-medium text-gray-700 mb-2 block">Start Date</label>
-          <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" min="2025-01-01" max="<?= $today ?>" placeholder="Start date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="startDate">
-        </div>
-        <div class="md:col-span-2">
-          <label class="text-sm font-medium text-gray-700 mb-2 block">End Date</label>
-          <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" max="<?= $today ?>" placeholder="End date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="endDate">
-        </div>
-        <div class="flex gap-2">
-          <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium">Generate Report</button>
-          <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Clear</a>
-        </div>
-        <div>
-          <label class="text-sm font-medium text-gray-700 mb-2 block">Section</label>
-          <select name="filter_section" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
-            <option value="">All Sections</option>
-            <?php foreach ($sections as $section): ?>
-              <option value="<?= htmlspecialchars($section) ?>" <?= ($filter_section === $section) ? 'selected' : '' ?>>
-                <?= htmlspecialchars($section) ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div>
-          <label class="text-sm font-medium text-gray-700 mb-2 block">Status</label>
-          <select name="filter_status" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
-            <option value="">All Status</option>
-            <?php foreach ($statuses as $status): ?>
-              <option value="<?= htmlspecialchars($status) ?>" <?= ($filter_status === $status) ? 'selected' : '' ?>>
-                <?= htmlspecialchars($status) ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
+        <div class="grid grid-cols-1 md:grid-cols-8 gap-4 items-end">
+          <div class="md:col-span-4">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">Search Student</label>
+            <input type="text" name="search_name" value="<?= htmlspecialchars($search_name) ?>" placeholder="Enter student name..."
+                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">Section</label>
+            <select name="filter_section" onchange="this.form.submit()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+              <option value="">All Sections</option>
+              <?php foreach ($sections as $section): ?>
+                <option value="<?= htmlspecialchars($section) ?>" <?= ($filter_section === $section) ? 'selected' : '' ?>>
+                  <?= htmlspecialchars($section) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">Status</label>
+            <select name="filter_status" onchange="this.form.submit()" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+              <option value="">All Status</option>
+              <?php foreach ($statuses as $status): ?>
+                <option value="<?= htmlspecialchars($status) ?>" <?= ($filter_status === $status) ? 'selected' : '' ?>>
+                  <?= htmlspecialchars($status) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
         </div>
       </form>
       <p class="mt-4 text-gray-600">
