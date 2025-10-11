@@ -30,6 +30,16 @@ if ($error_msg) {
     unset($_SESSION['error_msg']);
 }
 
+// Check maintenance mode status
+$maintenance_result = $conn->query("SELECT config_value FROM system_config WHERE config_key = 'maintenance_mode'");
+$is_maintenance = false;
+if ($maintenance_result && $maintenance_result->num_rows > 0) {
+    $maintenance_row = $maintenance_result->fetch_assoc();
+    $is_maintenance = ($maintenance_row['config_value'] == '1');
+}
+$system_status = $is_maintenance ? '🔴 Maintenance' : '🟢 Online';
+$system_status_color = $is_maintenance ? 'text-red-600' : 'text-green-600';
+
 // Include dashboard data processing
 require_once 'includes/dashboard_data.php';
 ?>
@@ -148,7 +158,7 @@ require_once 'includes/dashboard_data.php';
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="bg-white/10 rounded-lg p-4">
                             <div class="text-blue-200 text-sm">System Status</div>
-                            <div class="text-xl font-semibold">🟢 Online</div>
+                            <div class="text-xl font-semibold system-status-display"><?= $system_status ?></div>
                         </div>
                         <div class="bg-white/10 rounded-lg p-4">
                             <div class="text-blue-200 text-sm">Data Usage</div>
@@ -524,7 +534,7 @@ require_once 'includes/dashboard_data.php';
                             </div>
                             <div>
                                 <div class="text-[#1e3a8a] text-sm font-medium">System Status</div>
-                                <div class="text-3xl font-bold text-green-600">Online</div>
+                                <div class="text-xl font-bold system-status-display <?= $system_status_color ?>"><?= $system_status ?></div>
                             </div>
                         </div>
                     </div>
@@ -1871,13 +1881,25 @@ require_once 'includes/dashboard_data.php';
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
+                            // Update system status displays dynamically
+                            const statusText = maintenanceStatus === 'enabled' ? '🔴 Maintenance' : '🟢 Online';
+                            const statusColor = maintenanceStatus === 'enabled' ? 'text-red-600' : 'text-green-600';
+                            
+                            // Update all system status displays on the page
+                            document.querySelectorAll('.system-status-display').forEach(el => {
+                                el.textContent = statusText;
+                                // Preserve existing classes and update color
+                                el.classList.remove('text-red-600', 'text-green-600');
+                                el.classList.add(statusColor.replace('text-', '').split('-')[0] === 'red' ? 'text-red-600' : 'text-green-600');
+                            });
+                            
                             showNotificationModal({
                                 title: 'Configuration Updated',
                                 message: data.message,
                                 details: [
                                     `Maintenance mode: ${data.maintenance_mode}`,
-                                    'Changes have been applied successfully',
-                                    'All actions are logged for audit purposes'
+                                    `System status updated to: ${statusText}`,
+                                    'Changes applied successfully'
                                 ],
                                 type: 'success'
                             });
@@ -2190,6 +2212,13 @@ function deletePermanently(recordId, recordType) {
 
         // Handle hash fragment on page load to show correct section
         document.addEventListener('DOMContentLoaded', function() {
+            // Set maintenance toggle based on current status
+            const isMaintenanceMode = <?= $is_maintenance ? 'true' : 'false' ?>;
+            const toggle = document.getElementById('maintenanceToggle');
+            if (toggle) {
+                toggle.checked = isMaintenanceMode;
+            }
+            
             const hash = window.location.hash;
             if (hash === '#hr-accounts') {
                 showSection('hr-accounts');
