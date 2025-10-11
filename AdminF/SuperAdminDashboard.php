@@ -664,7 +664,7 @@ require_once 'includes/dashboard_data.php';
                                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date:</label>
                                     <input type="date" id="loginEndDate" value="30/09/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
-                                <p class="text-sm text-gray-600">All login records between these dates will be deleted</p>
+                                <p class="text-sm text-gray-600">All login records between these dates will be deleted and saved to CSV</p>
                             </div>
                             <button onclick="clearLoginLogs()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -686,7 +686,7 @@ require_once 'includes/dashboard_data.php';
                                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date:</label>
                                     <input type="date" id="attendanceEndDate" value="30/09/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
-                                <p class="text-sm text-gray-600">All attendance records between these dates will be deleted</p>
+                                <p class="text-sm text-gray-600">All attendance records between these dates will be deleted and saved to CSV</p>
                             </div>
                             <button onclick="clearAttendanceRecords()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1995,8 +1995,9 @@ require_once 'includes/dashboard_data.php';
                 title: 'Clear Login Logs',
                 message: `Are you sure you want to clear all login logs between ${startDate} and ${endDate}?`,
                 details: [
-                    '<strong>This action cannot be undone</strong>',
-                    'All login records in this date range will be permanently deleted'
+                    'Records will be exported to CSV before deletion',
+                    'CSV file will download automatically',
+                    'Records will be permanently deleted from database'
                 ],
                 confirmText: 'Clear Logs',
                 cancelText: 'Cancel',
@@ -2013,20 +2014,34 @@ require_once 'includes/dashboard_data.php';
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
+                            // Trigger CSV download if data exists
+                            if (data.csv_data && data.filename) {
+                                const csvContent = atob(data.csv_data);
+                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = data.filename;
+                                link.click();
+                            }
+                            
+                            const details = [
+                                `Records deleted: ${data.records_deleted}`,
+                                `Date range: ${startDate} to ${endDate}`
+                            ];
+                            if (data.csv_data) {
+                                details.push(`✅ CSV file downloaded: ${data.filename}`);
+                                details.push('📥 Check your Downloads folder');
+                            }
                             showNotificationModal({
                                 title: 'Login Logs Cleared',
                                 message: data.message,
-                                details: [
-                                    `Records deleted: ${data.records_deleted}`,
-                                    `Date range: ${startDate} to ${endDate}`,
-                                    'Action logged for audit purposes'
-                                ],
+                                details: details,
                                 type: 'success'
                             });
                             // Clear the date inputs
                             document.getElementById('loginStartDate').value = '';
                             document.getElementById('loginEndDate').value = '';
-                        } else {
+                        } else{
                             showNotificationModal({
                                 title: 'Clear Failed',
                                 message: data.message,
@@ -2068,8 +2083,9 @@ require_once 'includes/dashboard_data.php';
                 title: 'Clear Attendance Records',
                 message: `Are you sure you want to clear all attendance records between ${startDate} and ${endDate}?`,
                 details: [
-                    '<strong>This action cannot be undone</strong>',
-                    'All attendance records in this date range will be permanently deleted'
+                    'Records will be exported to CSV before deletion',
+                    'CSV file will download automatically',
+                    'Records will be permanently deleted from database'
                 ],
                 confirmText: 'Clear Records',
                 cancelText: 'Cancel',
@@ -2086,14 +2102,28 @@ require_once 'includes/dashboard_data.php';
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
+                            // Trigger CSV download if data exists
+                            if (data.csv_data && data.filename) {
+                                const csvContent = atob(data.csv_data);
+                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = data.filename;
+                                link.click();
+                            }
+                            
+                            const details = [
+                                `Records deleted: ${data.records_deleted}`,
+                                `Date range: ${startDate} to ${endDate}`
+                            ];
+                            if (data.csv_data) {
+                                details.push(`✅ CSV file downloaded: ${data.filename}`);
+                                details.push('📥 Check your Downloads folder');
+                            }
                             showNotificationModal({
                                 title: 'Attendance Records Cleared',
                                 message: data.message,
-                                details: [
-                                    `Records deleted: ${data.records_deleted}`,
-                                    `Date range: ${startDate} to ${endDate}`,
-                                    'Action logged for audit purposes'
-                                ],
+                                details: details,
                                 type: 'success'
                             });
                             // Clear the date inputs

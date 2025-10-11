@@ -45,17 +45,56 @@ while ($col = $cols->fetch_assoc()) {
     }
 }
 
-$countStmt = $conn->prepare("SELECT COUNT(*) as count FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?");
-$countStmt->bind_param('ss', $start, $end);
-$countStmt->execute();
-$result = $countStmt->get_result();
-$count = $result->fetch_assoc()['count'];
+// Get records to export before deleting
+$exportStmt = $conn->prepare("SELECT * FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?");
+$exportStmt->bind_param('ss', $start, $end);
+$exportStmt->execute();
+$exportResult = $exportStmt->get_result();
+
+$records = [];
+while ($row = $exportResult->fetch_assoc()) {
+    $records[] = $row;
+}
+$count = count($records);
+
+// Generate CSV content
+$csvContent = '';
+$filename = "Attendance Record {$start} to {$end}.csv";
+
+if ($count > 0) {
+    // Add UTF-8 BOM
+    $csvContent .= chr(0xEF).chr(0xBB).chr(0xBF);
+    
+    // Add header
+    $csvContent .= implode(',', array_keys($records[0])) . "\n";
+    
+    // Add data rows
+    foreach ($records as $record) {
+        $row = [];
+        foreach ($record as $key => $value) {
+            // Format numeric IDs as text
+            if (in_array($key, ['id', 'id_number', 'student_id', 'employee_id']) && is_numeric($value)) {
+                $row[] = '"' . "'" . $value . '"';
+            } else {
+                $row[] = '"' . str_replace('"', '""', $value) . '"';
+            }
+        }
+        $csvContent .= implode(',', $row) . "\n";
+    }
+}
 
 $stmt = $conn->prepare("DELETE FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?");
 $stmt->bind_param('ss', $start, $end);
 
 if ($stmt->execute()) {
-    echo json_encode(['success' => true, 'message' => 'Cleared successfully', 'records_deleted' => $count]);
+    $message = $count > 0 ? "Exported $count records and deleted from system" : "No records found";
+    echo json_encode([
+        'success' => true, 
+        'message' => $message, 
+        'records_deleted' => $count, 
+        'csv_data' => base64_encode($csvContent),
+        'filename' => $filename
+    ]);
 } else {
     echo json_encode(['success' => false, 'message' => 'Clear failed']);
 }
