@@ -202,10 +202,31 @@ foreach ($main_tables as $table) {
 $today_logins = [];
 $active_users = [];
 
-// Get today's logins
+// Get today's logins with names
 if (table_exists($conn, 'login_activity')) {
     try {
-        if ($stmt = $conn->prepare("SELECT user_type, id_number, username, role, login_time FROM login_activity WHERE DATE(login_time)=? ORDER BY login_time DESC LIMIT 50")) {
+        // Query to get login activity with names from appropriate tables
+        $login_query = "
+            SELECT 
+                la.user_type, 
+                la.id_number, 
+                la.username, 
+                la.role, 
+                la.login_time,
+                CASE 
+                    WHEN la.user_type = 'student' THEN CONCAT(s.first_name, ' ', s.last_name)
+                    WHEN la.user_type = 'employee' THEN CONCAT(e.first_name, ' ', e.last_name)
+                    ELSE la.username
+                END as full_name
+            FROM login_activity la
+            LEFT JOIN student_account s ON la.id_number = s.id_number AND la.user_type = 'student'
+            LEFT JOIN employees e ON la.id_number = e.id_number AND la.user_type = 'employee'
+            WHERE DATE(la.login_time) = ?
+            ORDER BY la.login_time DESC 
+            LIMIT 50
+        ";
+        
+        if ($stmt = $conn->prepare($login_query)) {
             $stmt->bind_param('s', $today);
             $stmt->execute();
             $res = $stmt->get_result();

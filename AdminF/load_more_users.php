@@ -23,13 +23,15 @@ $today = date('Y-m-d');
 $response = ['items' => [], 'hasMore' => false];
 
 if ($type === 'employees') {
-    // Get employees who haven't logged in today
+    // Get teachers who haven't logged in today
+    // Check both employee_accounts table and employees table for teacher identification
     $query = "
         SELECT DISTINCT e.id_number, e.first_name, e.last_name, e.middle_name
         FROM employees e
         LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id
         LEFT JOIN login_activity la ON e.id_number = la.id_number AND DATE(la.login_time) = ?
-        WHERE la.id_number IS NULL
+        WHERE la.id_number IS NULL 
+        AND (ea.role = 'teacher' OR e.role = 'teacher' OR e.position LIKE '%teacher%' OR e.position LIKE '%Teacher%')
         ORDER BY e.last_name, e.first_name
         LIMIT ? OFFSET ?
     ";
@@ -40,7 +42,7 @@ if ($type === 'employees') {
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            $full_name = trim($row['first_name'] . ', ' . $row['last_name']);
+            $full_name = trim($row['first_name'] . ' ' . $row['last_name']);
             $response['items'][] = "• {$full_name} ({$row['id_number']})";
         }
         
@@ -50,49 +52,12 @@ if ($type === 'employees') {
             FROM employees e
             LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id
             LEFT JOIN login_activity la ON e.id_number = la.id_number AND DATE(la.login_time) = ?
-            WHERE la.id_number IS NULL
+            WHERE la.id_number IS NULL 
+            AND (ea.role = 'teacher' OR e.role = 'teacher' OR e.position LIKE '%teacher%' OR e.position LIKE '%Teacher%')
         ";
         
         if ($count_stmt = $conn->prepare($count_query)) {
             $count_stmt->bind_param('s', $today);
-            $count_stmt->execute();
-            $count_result = $count_stmt->get_result();
-            $total = $count_result->fetch_row()[0];
-            $response['hasMore'] = ($offset + $limit) < $total;
-            $count_stmt->close();
-        }
-        
-        $stmt->close();
-    }
-    
-} elseif ($type === 'active') {
-    // Get users active in the last 15 minutes
-    $query = "
-        SELECT DISTINCT la.user_type, la.id_number, la.username, la.role, la.login_time
-        FROM login_activity la
-        WHERE la.login_time >= (NOW() - INTERVAL 15 MINUTE)
-        ORDER BY la.login_time DESC
-        LIMIT ? OFFSET ?
-    ";
-    
-    if ($stmt = $conn->prepare($query)) {
-        $stmt->bind_param('ii', $limit, $offset);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        while ($row = $result->fetch_assoc()) {
-            $time_ago = date('g:i A', strtotime($row['login_time']));
-            $response['items'][] = "• {$row['username']} ({$row['role']}) - {$time_ago}";
-        }
-        
-        // Check if there are more items
-        $count_query = "
-            SELECT COUNT(DISTINCT la.id_number)
-            FROM login_activity la
-            WHERE la.login_time >= (NOW() - INTERVAL 15 MINUTE)
-        ";
-        
-        if ($count_stmt = $conn->prepare($count_query)) {
             $count_stmt->execute();
             $count_result = $count_stmt->get_result();
             $total = $count_result->fetch_row()[0];

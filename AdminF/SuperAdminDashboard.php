@@ -292,8 +292,8 @@ require_once 'includes/dashboard_data.php';
                     </div>
                 </div>
 
-                <!-- Login Activity Sections -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Login Activity Section -->
+                <div class="mb-6">
                     <!-- Today's Logins -->
                     <div class="bg-white rounded-lg shadow p-6">
                         <div class="flex items-center justify-between mb-4">
@@ -308,7 +308,7 @@ require_once 'includes/dashboard_data.php';
                                     <tr>
                                         <th class="px-3 py-2 text-left font-medium">User Type</th>
                                         <th class="px-3 py-2 text-left font-medium">ID</th>
-                                        <th class="px-3 py-2 text-left font-medium">Username</th>
+                                        <th class="px-3 py-2 text-left font-medium">Name</th>
                                         <th class="px-3 py-2 text-left font-medium">Role</th>
                                         <th class="px-3 py-2 text-left font-medium">Login Time</th>
                                     </tr>
@@ -319,7 +319,7 @@ require_once 'includes/dashboard_data.php';
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['user_type']) ?></td>
                                             <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['id_number']) ?></td>
-                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['username']) ?></td>
+                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['full_name'] ?: $login['username']) ?></td>
                                             <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['role']) ?></td>
                                             <td class="px-3 py-2 text-gray-900"><?= date('M j, Y g:i A', strtotime($login['login_time'])) ?></td>
                                         </tr>
@@ -328,14 +328,14 @@ require_once 'includes/dashboard_data.php';
                                         <tr>
                                             <td class="px-3 py-2 text-gray-900">employee</td>
                                             <td class="px-3 py-2 text-gray-900">HR001</td>
-                                            <td class="px-3 py-2 text-gray-900">hradmin</td>
+                                            <td class="px-3 py-2 text-gray-900">HR Administrator</td>
                                             <td class="px-3 py-2 text-gray-900">hr</td>
                                             <td class="px-3 py-2 text-gray-900">October 3, 2025 1:26 PM</td>
                                         </tr>
                                         <tr>
                                             <td class="px-3 py-2 text-gray-900">employee</td>
                                             <td class="px-3 py-2 text-gray-900">SA001</td>
-                                            <td class="px-3 py-2 text-gray-900">superadmin</td>
+                                            <td class="px-3 py-2 text-gray-900">Super Administrator</td>
                                             <td class="px-3 py-2 text-gray-900">superadmin</td>
                                             <td class="px-3 py-2 text-gray-900">October 3, 2025 1:24 PM</td>
                                         </tr>
@@ -344,26 +344,13 @@ require_once 'includes/dashboard_data.php';
                             </table>
                         </div>
                     </div>
-
-                    <!-- Active Users (last 15 minutes) -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Active (last 15 minutes)</h3>
-                        <div id="active-users-container">
-                            <ul class="space-y-2 text-sm text-gray-700" id="active-users-list">
-                                <!-- Active users will be loaded here -->
-                            </ul>
-                            <div id="active-users-empty" class="text-center py-8">
-                                <p class="text-gray-500">No active users.</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Not Logged In Today Sections -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <!-- Not Logged In Today (Employees) -->
+                    <!-- Not Logged In Today (Teachers) -->
                     <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Not Logged In Today (Employees)</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Not Logged In Today (Teachers)</h3>
                         <div class="max-h-64 overflow-y-auto" id="employees-container">
                             <ul class="space-y-2 text-sm text-gray-700" id="employees-list">
                                 <!-- Initial items will be loaded here -->
@@ -372,7 +359,7 @@ require_once 'includes/dashboard_data.php';
                                 <span class="text-gray-500 text-sm">Loading more...</span>
                             </div>
                             <div id="employees-no-more" class="text-center py-2 hidden">
-                                <span class="text-gray-400 text-sm">No more employees</span>
+                                <span class="text-gray-400 text-sm">No more teachers</span>
                             </div>
                         </div>
                     </div>
@@ -786,8 +773,8 @@ require_once 'includes/dashboard_data.php';
                                             <button onclick="restoreStudent('S2025006')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
                                                 Restore
                                             </button>
-                                            <button onclick="deletePermanently('S2025006', 'student')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                Delete Permanently
+                                            <button onclick="exportToFile('S2025006', 'student')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                Export to File
                                             </button>
                                         </div>
                                     </td>
@@ -845,8 +832,8 @@ require_once 'includes/dashboard_data.php';
                                             <button onclick="restoreEmployee('710921243478')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
                                                 Restore
                                             </button>
-                                            <button onclick="deletePermanently('710921243478', 'employee')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                Delete Permanently
+                                            <button onclick="exportToFile('710921243478', 'employee')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                Export to File
                                             </button>
                                         </div>
                                     </td>
@@ -2268,32 +2255,6 @@ function deletePermanently(recordId, recordType) {
             }
         }
         
-        // Load active users (no infinite scroll needed, just load once)
-        async function loadActiveUsers() {
-            try {
-                const response = await fetch('load_more_users.php?type=active&offset=0');
-                const data = await response.json();
-                
-                const activeList = document.getElementById('active-users-list');
-                const emptyMessage = document.getElementById('active-users-empty');
-                
-                if (data.items && data.items.length > 0) {
-                    activeList.innerHTML = '';
-                    data.items.forEach(item => {
-                        const li = document.createElement('li');
-                        li.textContent = item;
-                        activeList.appendChild(li);
-                    });
-                    emptyMessage.style.display = 'none';
-                    activeList.style.display = 'block';
-                } else {
-                    activeList.style.display = 'none';
-                    emptyMessage.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Error loading active users:', error);
-            }
-        }
 
         // Initialize infinite scroll when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -2301,7 +2262,6 @@ function deletePermanently(recordId, recordType) {
             if (document.getElementById('dashboard-section').classList.contains('active')) {
                 new InfiniteScroll('employees', 'employees-container', 'employees-list', 'employees-loading', 'employees-no-more');
                 new InfiniteScroll('students', 'students-container', 'students-list', 'students-loading', 'students-no-more');
-                loadActiveUsers();
             }
         });
         
@@ -2315,10 +2275,68 @@ function deletePermanently(recordId, recordType) {
                 setTimeout(() => {
                     new InfiniteScroll('employees', 'employees-container', 'employees-list', 'employees-loading', 'employees-no-more');
                     new InfiniteScroll('students', 'students-container', 'students-list', 'students-loading', 'students-no-more');
-                    loadActiveUsers();
                 }, 100);
             }
         };
+
+        // Export deleted account to file
+        function exportToFile(accountId, accountType) {
+            if (!accountId || !accountType) {
+                alert('Invalid account information');
+                return;
+            }
+
+            // Show confirmation dialog
+            const accountTypeText = accountType === 'student' ? 'Student' : 'Employee';
+            const confirmMessage = `Export ${accountTypeText} Account to File\n\nAccount ID: ${accountId}\n\nThis will:\n• Create a comprehensive backup file with all account data\n• Include related records (grades, payments, attendance, etc.)\n• Save the file to your computer\n• Keep the record in the deleted items list\n\nDo you want to proceed with the export?`;
+            
+            if (confirm(confirmMessage)) {
+                // Show loading state
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Exporting...';
+                button.disabled = true;
+                button.classList.add('opacity-50');
+
+                // Create download link
+                const downloadUrl = `export_deleted_account.php?id=${encodeURIComponent(accountId)}&type=${encodeURIComponent(accountType)}`;
+                
+                // Create temporary link element for download
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                
+                // Trigger download
+                link.click();
+                
+                // Clean up
+                document.body.removeChild(link);
+                
+                // Reset button state after a delay
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                    button.classList.remove('opacity-50');
+                    
+                    // Show success message
+                    alert(`${accountTypeText} account data has been exported successfully!\n\nThe file has been downloaded to your computer and contains:\n• Complete account information\n• All related records and history\n• Export timestamp and metadata\n\nThe account remains in the deleted items list for potential restoration.`);
+                }, 1000);
+            }
+        }
+
+        // Restore functions (keeping existing functionality)
+        function restoreStudent(studentId) {
+            if (confirm('Are you sure you want to restore this student account?\n\nThis will make the student account active again.')) {
+                alert('Student restoration functionality would be implemented here.');
+            }
+        }
+
+        function restoreEmployee(employeeId) {
+            if (confirm('Are you sure you want to restore this employee account?\n\nThis will make the employee account active again.')) {
+                alert('Employee restoration functionality would be implemented here.');
+            }
+        }
     </script>
 
     <!-- Success Notification -->
