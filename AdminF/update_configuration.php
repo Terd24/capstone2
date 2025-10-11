@@ -18,13 +18,12 @@ $input = file_get_contents('php://input');
 $data = json_decode($input, true);
 $mode = isset($data['maintenance_mode']) ? $data['maintenance_mode'] : 'disabled';
 
-$conn->query("CREATE TABLE IF NOT EXISTS system_config (config_key VARCHAR(50) PRIMARY KEY, config_value TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, updated_by VARCHAR(50))");
+$conn->query("CREATE TABLE IF NOT EXISTS system_config (config_key VARCHAR(50) PRIMARY KEY, config_value TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)");
 
 $val = ($mode === 'enabled') ? '1' : '0';
-$by = isset($_SESSION['superadmin_name']) ? $_SESSION['superadmin_name'] : 'Admin';
 
-$stmt = $conn->prepare("INSERT INTO system_config (config_key, config_value, updated_by) VALUES ('maintenance_mode', ?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_by = ?");
-$stmt->bind_param('ssss', $val, $by, $val, $by);
+$stmt = $conn->prepare("INSERT INTO system_config (config_key, config_value) VALUES ('maintenance_mode', ?) ON DUPLICATE KEY UPDATE config_value = ?");
+$stmt->bind_param('ss', $val, $val);
 
 $success = $stmt->execute();
 $stmt->close();
