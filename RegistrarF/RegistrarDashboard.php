@@ -18,18 +18,43 @@ header("Expires: 0");
 
 // Ensure column exists for read/unread
 $conn->query("ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS is_read TINYINT(1) DEFAULT 0");
-// Fetch all requests - prioritize oldest pending first, then other statuses, claimed last
-$result = $conn->query("SELECT * FROM document_requests ORDER BY 
+
+// Pagination for All Student Requests
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$limit = 10;
+$offset = ($page - 1) * $limit;
+
+// Status filter
+$statusFilter = isset($_GET['status']) ? $_GET['status'] : 'all';
+$whereClause = '';
+if ($statusFilter !== 'all') {
+    if ($statusFilter === 'Ready to Claim') {
+        $whereClause = "WHERE (status = 'Ready to Claim' OR status = 'Ready for Claiming')";
+    } else {
+        $whereClause = "WHERE status = '" . $conn->real_escape_string($statusFilter) . "'";
+    }
+}
+
+// Get total count for pagination
+$countQuery = "SELECT COUNT(*) as total FROM document_requests $whereClause";
+$countResult = $conn->query($countQuery);
+$totalRecords = $countResult->fetch_assoc()['total'];
+$totalPages = ceil($totalRecords / $limit);
+
+// Fetch paginated requests - prioritize oldest pending first, then other statuses, claimed last
+$query = "SELECT * FROM document_requests $whereClause ORDER BY 
     CASE 
         WHEN status = 'Pending' THEN 1
         WHEN status = 'Ready to Claim' OR status = 'Ready for Claiming' THEN 2
         WHEN status = 'Claimed' THEN 3
         ELSE 4
     END ASC,
-    date_requested ASC");
+    date_requested ASC
+    LIMIT $limit OFFSET $offset";
+$result = $conn->query($query);
 
-// Fetch recent requests - prioritize unread first, then oldest, exclude claimed
-$recent = $conn->query("SELECT * FROM document_requests WHERE status != 'Claimed' ORDER BY is_read ASC, date_requested ASC LIMIT 10");
+// Fetch recent requests - prioritize unread first, then oldest, exclude claimed and older than 3 days
+$recent = $conn->query("SELECT * FROM document_requests WHERE status != 'Claimed' AND date_requested >= DATE_SUB(NOW(), INTERVAL 3 DAY) ORDER BY is_read ASC, date_requested ASC LIMIT 10");
 // Helper function for PHP fallback time ago (optional)
 function timeAgo($time) {
     // Use MySQL timestamp directly to avoid timezone conversion issues
@@ -280,6 +305,23 @@ function timeAgo($time) {
                 </div>
             <?php endif; ?>
             </div>
+            
+            <!-- Recent Requests Pagination -->
+            <div id="recentPaginationBar" class="hidden mt-4 flex items-center justify-center gap-2 text-sm">
+                <button id="recentPrevPage" class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    Prev
+                </button>
+                <span id="recentPageInfo" class="px-2 text-gray-600">Page 1 of 1</span>
+                <button id="recentNextPage" class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    Next
+                    <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <div class="bg-white rounded-2xl card-shadow p-6">
@@ -344,6 +386,32 @@ function timeAgo($time) {
                     </tbody>
                 </table>
             </div>
+            
+            <!-- All Student Requests Pagination -->
+            <?php if ($totalPages > 1): ?>
+            <div class="mt-4 flex items-center justify-center gap-2 text-sm">
+                <?php 
+                $prevPage = max(1, $page - 1);
+                $nextPage = min($totalPages, $page + 1);
+                $statusParam = ($statusFilter !== 'all') ? '&status=' . urlencode($statusFilter) : '';
+                ?>
+                <a href="?page=<?= $prevPage ?><?= $statusParam ?>" 
+                   class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white <?= $page <= 1 ? 'opacity-40 cursor-not-allowed pointer-events-none' : '' ?> transition-colors">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    Prev
+                </a>
+                <span class="px-2 text-gray-600">Page <?= $page ?> of <?= $totalPages ?></span>
+                <a href="?page=<?= $nextPage ?><?= $statusParam ?>" 
+                   class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white <?= $page >= $totalPages ? 'opacity-40 cursor-not-allowed pointer-events-none' : '' ?> transition-colors">
+                    Next
+                    <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -455,10 +523,18 @@ recentToggle.addEventListener("click", () => {
     recentContent.classList.toggle("hidden");
     recentArrow.classList.toggle("rotate-180");
     
-    // Reset the view more functionality when reopening
+    const paginationBar = document.getElementById("recentPaginationBar");
+    
+    // Show/hide pagination when section is expanded/collapsed
     if (!recentContent.classList.contains("hidden")) {
-        shownRecent = 3;
-        renderRecent();
+        // Section is now expanded - reset to first page and show pagination if needed
+        currentRecentPage = 1;
+        renderRecentPage();
+    } else {
+        // Section is now collapsed - hide pagination
+        if (paginationBar) {
+            paginationBar.classList.add("hidden");
+        }
     }
 });
 
@@ -517,36 +593,78 @@ if (document.readyState === 'loading') {
     setInterval(updateTimeAgo, 5000);
 }
 
-// ===== Render Recent Requests with View More =====
+// ===== Recent Requests Pagination (3 per page) =====
 let recentRequests = Array.from(document.querySelectorAll('#recentContent > div'));
-let shownRecent = 3;
+let currentRecentPage = 1;
+const recentPageSize = 3;
 
-function renderRecent() {
-    recentRequests.forEach((el, idx) => {
-        el.style.display = idx < shownRecent ? '' : 'none';
-    });
-
-    if (shownRecent < recentRequests.length) {
-        if (!document.getElementById('viewMoreRecent')) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'mt-2 flex justify-center';
-            const btn = document.createElement('button');
-            btn.id = 'viewMoreRecent';
-            btn.className = 'inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full border border-[#0B2C62] text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white transition';
-            btn.innerHTML = 'View More <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>';
-            btn.addEventListener('click', () => {
-                shownRecent += 3;
-                renderRecent();
-            });
-            wrapper.appendChild(btn);
-            document.getElementById('recentContent').appendChild(wrapper);
+function renderRecentPage() {
+    const totalPages = Math.max(1, Math.ceil(recentRequests.length / recentPageSize));
+    currentRecentPage = Math.min(Math.max(1, currentRecentPage), totalPages);
+    
+    // Hide all requests first
+    recentRequests.forEach(request => request.style.display = 'none');
+    
+    // Show requests for current page
+    const startIndex = (currentRecentPage - 1) * recentPageSize;
+    const endIndex = startIndex + recentPageSize;
+    const pageRequests = recentRequests.slice(startIndex, endIndex);
+    
+    pageRequests.forEach(request => request.style.display = '');
+    
+    // Update pagination controls
+    const pageInfo = document.getElementById('recentPageInfo');
+    const prevBtn = document.getElementById('recentPrevPage');
+    const nextBtn = document.getElementById('recentNextPage');
+    const paginationBar = document.getElementById('recentPaginationBar');
+    
+    if (pageInfo) pageInfo.textContent = `Page ${currentRecentPage} of ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = currentRecentPage <= 1;
+    if (nextBtn) nextBtn.disabled = currentRecentPage >= totalPages;
+    
+    // Show/hide pagination based on number of pages and section visibility
+    if (paginationBar) {
+        const recentContent = document.getElementById('recentContent');
+        const isExpanded = recentContent && !recentContent.classList.contains('hidden');
+        
+        if (totalPages > 1 && recentRequests.length > 0 && isExpanded) {
+            paginationBar.classList.remove('hidden');
+        } else {
+            paginationBar.classList.add('hidden');
         }
-    } else {
-        const btn = document.getElementById('viewMoreRecent');
-        if (btn) btn.parentElement.remove();
     }
 }
-renderRecent();
+
+// Initialize pagination event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const prevBtn = document.getElementById('recentPrevPage');
+    const nextBtn = document.getElementById('recentNextPage');
+    
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentRecentPage > 1) {
+                currentRecentPage--;
+                renderRecentPage();
+            }
+        });
+    }
+    
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(recentRequests.length / recentPageSize);
+            if (currentRecentPage < totalPages) {
+                currentRecentPage++;
+                renderRecentPage();
+            }
+        });
+    }
+    
+    // Initial render
+    renderRecentPage();
+});
+
+// Call initial render for immediate execution (pagination will be hidden since section starts collapsed)
+renderRecentPage();
 
 // ===== Mark as Read when View clicked =====
 document.querySelectorAll('.view-link').forEach(link => {
@@ -627,19 +745,31 @@ searchInput.addEventListener('input', () => {
 
 searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); fetchStudents(searchInput.value.trim()); } });
 
-// ===== Status Filter =====
+// ===== Status Filter with Pagination =====
 const statusFilter = document.getElementById('statusFilter');
-const allRows = Array.from(document.querySelectorAll('table tbody tr'));
 statusFilter.addEventListener('change', () => {
     const value = statusFilter.value;
-    allRows.forEach(row => {
-        const statusCell = row.cells[4].textContent.trim();
-        if (value === 'all' || statusCell === value || (value === 'Ready to Claim' && statusCell === 'Ready for Claiming')) {
-            row.style.display = '';
-        } else row.style.display = 'none';
-    });
+    const currentUrl = new URL(window.location);
+    
+    // Reset to page 1 when filtering
+    currentUrl.searchParams.set('page', '1');
+    
+    if (value === 'all') {
+        currentUrl.searchParams.delete('status');
+    } else {
+        currentUrl.searchParams.set('status', value);
+    }
+    
+    window.location.href = currentUrl.toString();
+});
 
-    renderStudents();
+// Set filter dropdown to current status from URL
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentStatus = urlParams.get('status');
+    if (currentStatus && statusFilter) {
+        statusFilter.value = currentStatus;
+    }
 });
 
 // Add viewRequest function for clickable table rows

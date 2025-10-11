@@ -493,6 +493,23 @@ $schedules_result = $conn->query($schedules_query);
         <!-- No results message for search -->
         <div id="classNoResults" class="hidden col-span-full text-center py-8 text-gray-500">No schedules found</div>
     </div>
+    
+    <!-- Pagination Controls -->
+    <div id="paginationBar" class="mt-6 flex items-center justify-center gap-2 text-sm">
+        <button id="prevPage" class="px-4 py-2 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Previous
+        </button>
+        <span id="pageInfo" class="px-4 py-2 text-gray-600 font-medium">Page 1 of 1</span>
+        <button id="nextPage" class="px-4 py-2 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            Next
+            <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+    </div>
 </div>
 
 <!-- Reassign Confirmation Modal -->
@@ -1519,6 +1536,153 @@ function formatTime(t){ try{ const d = new Date(`1970-01-01T${t}`); return d.toL
   classSearchEl.addEventListener('focus', applyFilter);
   classSearchEl.addEventListener('blur', applyFilter);
   if(clearBtn){ clearBtn.addEventListener('click', ()=>{ classSearchEl.value=''; classSearchEl.focus(); applyFilter(); }); }
+})();
+
+// Schedule Pagination Logic (6 per page)
+(function(){
+  const scheduleGrid = document.getElementById('classSchedulesGrid');
+  const prevBtn = document.getElementById('prevPage');
+  const nextBtn = document.getElementById('nextPage');
+  const pageInfo = document.getElementById('pageInfo');
+  const paginationBar = document.getElementById('paginationBar');
+  
+  if (!scheduleGrid || !prevBtn || !nextBtn || !pageInfo) return;
+  
+  const pageSize = 6; // 6 schedules per page (2 rows of 3 in lg grid)
+  let currentPage = 1;
+  let allScheduleCards = [];
+  let filteredScheduleCards = [];
+  
+  // Initialize pagination
+  function initPagination() {
+    allScheduleCards = Array.from(scheduleGrid.querySelectorAll('.class-schedule-card'));
+    filteredScheduleCards = [...allScheduleCards];
+    
+    // Show pagination only if there are schedules
+    if (allScheduleCards.length > 0) {
+      paginationBar.classList.remove('hidden');
+      renderPage();
+    } else {
+      paginationBar.classList.add('hidden');
+    }
+  }
+  
+  // Render current page
+  function renderPage() {
+    const totalPages = Math.max(1, Math.ceil(filteredScheduleCards.length / pageSize));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+    
+    // Hide all cards first
+    allScheduleCards.forEach(card => card.style.display = 'none');
+    
+    // Show cards for current page
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageCards = filteredScheduleCards.slice(startIndex, endIndex);
+    
+    pageCards.forEach(card => card.style.display = '');
+    
+    // Update pagination controls
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+    
+    // Hide pagination if only one page
+    if (totalPages <= 1) {
+      paginationBar.classList.add('hidden');
+    } else {
+      paginationBar.classList.remove('hidden');
+    }
+  }
+  
+  // Update filtered cards based on search
+  function updateFilteredCards() {
+    const searchInput = document.getElementById('classScheduleSearch');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    
+    if (query.length === 0) {
+      filteredScheduleCards = [...allScheduleCards];
+    } else {
+      filteredScheduleCards = allScheduleCards.filter(card => {
+        const name = (card.querySelector('.class-schedule-name')?.textContent || '').toLowerCase();
+        const days = (card.querySelector('.class-schedule-days')?.textContent || '').toLowerCase();
+        return name.includes(query) || days.includes(query);
+      });
+    }
+    
+    currentPage = 1; // Reset to first page when filtering
+    renderPage();
+    
+    // Show/hide no results message
+    const noResults = document.getElementById('classNoResults');
+    if (noResults) {
+      noResults.classList.toggle('hidden', filteredScheduleCards.length > 0);
+    }
+  }
+  
+  // Event listeners
+  prevBtn.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderPage();
+    }
+  });
+  
+  nextBtn.addEventListener('click', () => {
+    const totalPages = Math.ceil(filteredScheduleCards.length / pageSize);
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderPage();
+    }
+  });
+  
+  // Override the existing search filter to work with pagination
+  const classSearchEl = document.getElementById('classScheduleSearch');
+  if (classSearchEl) {
+    // Remove existing event listeners by cloning the element
+    const newSearchEl = classSearchEl.cloneNode(true);
+    classSearchEl.parentNode.replaceChild(newSearchEl, classSearchEl);
+    
+    // Add new event listeners that work with pagination
+    newSearchEl.addEventListener('input', updateFilteredCards);
+    newSearchEl.addEventListener('focus', updateFilteredCards);
+    newSearchEl.addEventListener('blur', updateFilteredCards);
+    
+    // Update clear button functionality
+    const clearBtn = document.getElementById('classSearchClear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        newSearchEl.value = '';
+        newSearchEl.focus();
+        updateFilteredCards();
+      });
+    }
+    
+    // Update search icon and clear button visibility
+    const icon = document.getElementById('classSearchIcon');
+    const updateSearchUI = () => {
+      const q = newSearchEl.value.trim();
+      if (icon) icon.classList.toggle('hidden', q.length > 0);
+      if (clearBtn) clearBtn.classList.toggle('hidden', q.length === 0);
+      if (q.length > 0) {
+        newSearchEl.classList.remove('pl-10');
+        newSearchEl.classList.add('pl-3');
+      } else {
+        newSearchEl.classList.add('pl-10');
+        newSearchEl.classList.remove('pl-3');
+      }
+    };
+    
+    newSearchEl.addEventListener('input', updateSearchUI);
+    newSearchEl.addEventListener('focus', updateSearchUI);
+    newSearchEl.addEventListener('blur', updateSearchUI);
+  }
+  
+  // Initialize pagination on page load
+  initPagination();
+  
+  // Re-initialize pagination when schedules are added/removed dynamically
+  window.reinitializeSchedulePagination = initPagination;
 })();
 </script>
 

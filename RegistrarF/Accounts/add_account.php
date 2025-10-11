@@ -1256,7 +1256,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                             <p class="text-xs text-gray-500 mt-1">Format: <span class="font-medium">lastname + birthdate</span> (e.g., studentjanuary152003)</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">RFID Number</label>
+                            <label class="block text-sm font-semibold mb-1">RFID Number <span class="text-gray-500 text-xs">(Optional)</span></label>
                             <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
                             <?php if (!empty($error_rfid)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
