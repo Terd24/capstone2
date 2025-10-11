@@ -163,6 +163,70 @@ function testQRGeneration() {
 document.addEventListener('DOMContentLoaded', function(){
     try { setupSchoolYearOptions(); } catch (e) { console.warn('setupSchoolYearOptions init failed', e); }
 });
+
+// Define viewStudent function early so it's available when rows are clicked
+window.viewStudent = async function(studentId) {
+    console.log('viewStudent called with ID:', studentId);
+    const overlay = document.getElementById('studentViewOverlay');
+    const inner = document.getElementById('studentViewInner');
+    
+    if (!overlay || !inner) {
+        console.error('Modal elements not found!', {overlay, inner});
+        alert('Error: Modal not found. Please refresh the page.');
+        return;
+    }
+    
+    console.log('Modal elements found, opening...');
+    
+    // Show loading state
+    inner.innerHTML = '<div class="p-8 text-center text-gray-600"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>Loading student information...</div>';
+    
+    // Show the modal
+    overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    console.log('Modal should be visible now');
+    
+    try {
+        console.log('Fetching student data...');
+        const res = await fetch(`Accounts/view_student.php?embed=1&id=${encodeURIComponent(studentId)}`, { 
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const html = await res.text();
+        console.log('Student data loaded, length:', html.length);
+        
+        inner.innerHTML = html;
+        
+        // Wire up handlers
+        if (typeof setupStudentModalHandlers === 'function') {
+            setupStudentModalHandlers(studentId);
+        }
+    } catch (e) {
+        console.error('Error loading student:', e);
+        inner.innerHTML = '<div class="p-6 text-center"><div class="text-red-600 text-lg font-semibold mb-2">Failed to load student information</div><div class="text-gray-600">' + e.message + '</div><button onclick="closeStudentModal()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Close</button></div>';
+    }
+};
+
+function closeStudentModal() {
+    console.log('Closing modal...');
+    const overlay = document.getElementById('studentViewOverlay');
+    const inner = document.getElementById('studentViewInner');
+    if (inner) inner.innerHTML = '';
+    if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+    }
+    document.body.style.overflow = '';
+}
 </script>
 <style>
 input[type=number]::-webkit-inner-spin-button,
@@ -340,11 +404,8 @@ input[type=number] { -moz-appearance: textfield; }
 </div>
 <?php endif; ?>
 
-<!-- Include Modal -->
-<?php include("Accounts/add_account.php"); ?>
-
-<!-- Student View Modal (embedded content) -->
-<div id="studentViewOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+<!-- Student View Modal (embedded content) - MUST BE BEFORE add_account.php include -->
+<div id="studentViewOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden" style="z-index: 9999; display: none;">
   <div class="relative w-full max-w-6xl max-h-[90vh] mx-auto overflow-hidden">
     <div class="absolute -top-10 right-0 flex gap-2">
       <button aria-label="Close" onclick="closeStudentModal()" class="bg-white text-gray-700 px-3 py-1 rounded-lg shadow hover:bg-gray-100">Close</button>
@@ -353,27 +414,10 @@ input[type=number] { -moz-appearance: textfield; }
   </div>
 </div>
 
+<!-- Include Modal -->
+<?php include("Accounts/add_account.php"); ?>
+
 <script>
-// Define view functions at global scope immediately
-window.viewStudent = async function(studentId) {
-    const overlay = document.getElementById('studentViewOverlay');
-    const inner = document.getElementById('studentViewInner');
-    inner.innerHTML = '<div class="p-8 text-center text-gray-600">Loading student information...</div>';
-    overlay.classList.remove('hidden');
-    overlay.classList.add('flex');
-    document.body.style.overflow = 'hidden';
-    try {
-        const res = await fetch(`Accounts/view_student.php?embed=1&id=${encodeURIComponent(studentId)}`, { credentials: 'same-origin' });
-        const html = await res.text();
-        inner.innerHTML = html;
-
-        // Wire up handlers to the embedded student view (no inline script execution)
-        setupStudentModalHandlers(studentId);
-    } catch (e) {
-        inner.innerHTML = '<div class="p-6 text-red-600">Failed to load student information.</div>';
-    }
-};
-
 // Wire up the embedded Student View (no inline script execution needed)
 function setupStudentModalHandlers(studentId) {
     const overlay = document.getElementById('studentViewOverlay');
@@ -551,15 +595,6 @@ function setupStudentModalHandlers(studentId) {
     if (academicTrack) {
         academicTrack.addEventListener('change', updateGradeLevelsLocal);
     }
-}
-
-function closeStudentModal() {
-    const overlay = document.getElementById('studentViewOverlay');
-    const inner = document.getElementById('studentViewInner');
-    inner.innerHTML = '';
-    overlay.classList.add('hidden');
-    overlay.classList.remove('flex');
-    document.body.style.overflow = '';
 }
 
 // Disable outside-click to close for the student modal (close only via X/Back)
