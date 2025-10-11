@@ -714,7 +714,7 @@ require_once 'includes/dashboard_data.php';
                             </div>
                             <div>
                                 <div class="text-white/80 text-sm font-medium">Deleted Students</div>
-                                <div class="text-4xl font-bold text-white">1</div>
+                                <div class="text-4xl font-bold text-white"><?= count($deleted_students) ?></div>
                             </div>
                         </div>
                     </div>
@@ -729,7 +729,7 @@ require_once 'includes/dashboard_data.php';
                             </div>
                             <div>
                                 <div class="text-white/80 text-sm font-medium">Deleted Employees</div>
-                                <div class="text-4xl font-bold text-white">1</div>
+                                <div class="text-4xl font-bold text-white"><?= count($deleted_employees) ?></div>
                             </div>
                         </div>
                     </div>
@@ -740,7 +740,7 @@ require_once 'includes/dashboard_data.php';
                     <div class="px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                            <h3 class="text-lg font-bold text-gray-900">Deleted Students (1)</h3>
+                            <h3 class="text-lg font-bold text-gray-900">Deleted Students (<?= count($deleted_students) ?>)</h3>
                         </div>
                     </div>
                     
@@ -754,41 +754,60 @@ require_once 'includes/dashboard_data.php';
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white">
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                                <span class="text-red-600 font-medium text-sm">CM</span>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <?php if (count($deleted_students) > 0): ?>
+                                    <?php foreach ($deleted_students as $student): ?>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                                    <span class="text-red-600 font-medium text-sm">
+                                                        <?= strtoupper(substr($student['first_name'], 0, 1) . substr($student['last_name'], 0, 1)) ?>
+                                                    </span>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900">
+                                                        <?= htmlspecialchars($student['first_name'] . ' ' . $student['last_name']) ?>
+                                                    </div>
+                                                    <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($student['id_number']) ?></div>
+                                                </div>
                                             </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">Carla Mendoza</div>
-                                                <div class="text-sm text-gray-500">ID: S2025006</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900"><?= htmlspecialchars($student['academic_track'] ?: 'N/A') ?></div>
+                                            <div class="text-sm text-gray-500"><?= htmlspecialchars($student['grade_level'] ?: 'N/A') ?></div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-gray-900">
+                                                <div class="font-medium"><?= date('M j, Y g:i A', strtotime($student['deleted_at'])) ?></div>
+                                                <div class="text-gray-500">By: <?= htmlspecialchars($student['deleted_by'] ?: 'Unknown') ?></div>
+                                                <?php if ($student['deleted_reason']): ?>
+                                                    <div class="text-gray-500 text-xs mt-1">Reason: <?= htmlspecialchars($student['deleted_reason']) ?></div>
+                                                <?php endif; ?>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">ABM</div>
-                                        <div class="text-sm text-gray-500">11-B</div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-900">
-                                            <div class="font-medium">Sep 30, 2025 10:38 AM</div>
-                                            <div class="text-gray-500">By: Registrar Admin</div>
-                                            <div class="text-gray-500 text-xs mt-1">Reason: Deleted by registrar for administrative purposes</div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div class="flex gap-2">
-                                            <button onclick="restoreStudent('S2025006')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                Restore
-                                            </button>
-                                            <button onclick="exportToFile('S2025006', 'student')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                Export to File
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <div class="flex gap-2">
+                                                <button onclick="restoreStudent('<?= htmlspecialchars($student['id_number']) ?>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                    Restore
+                                                </button>
+                                                <button onclick="exportToFile('<?= htmlspecialchars($student['id_number']) ?>', 'student')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                    Export to File
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                                            <svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
+                                            </svg>
+                                            No deleted students found
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -799,7 +818,7 @@ require_once 'includes/dashboard_data.php';
                     <div class="px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                            <h3 class="text-lg font-bold text-gray-900">Deleted Employees (1)</h3>
+                            <h3 class="text-lg font-bold text-gray-900">Deleted Employees (<?= count($deleted_employees) ?>)</h3>
                         </div>
                     </div>
                     
@@ -813,41 +832,60 @@ require_once 'includes/dashboard_data.php';
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white">
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                                                <span class="text-orange-600 font-medium text-sm">TD</span>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <?php if (count($deleted_employees) > 0): ?>
+                                    <?php foreach ($deleted_employees as $employee): ?>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                                                    <span class="text-orange-600 font-medium text-sm">
+                                                        <?= strtoupper(substr($employee['first_name'], 0, 1) . substr($employee['last_name'], 0, 1)) ?>
+                                                    </span>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900">
+                                                        <?= htmlspecialchars($employee['first_name'] . ' ' . $employee['last_name']) ?>
+                                                    </div>
+                                                    <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($employee['id_number']) ?></div>
+                                                </div>
                                             </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">talaga dasdasdasd</div>
-                                                <div class="text-sm text-gray-500">ID: 710921243478</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900"><?= htmlspecialchars($employee['position'] ?: 'N/A') ?></div>
+                                            <div class="text-sm text-gray-500"><?= htmlspecialchars($employee['department'] ?: 'N/A') ?></div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-gray-900">
+                                                <div class="font-medium"><?= date('M j, Y g:i A', strtotime($employee['deleted_at'])) ?></div>
+                                                <div class="text-gray-500">By: <?= htmlspecialchars($employee['deleted_by'] ?: 'Unknown') ?></div>
+                                                <?php if ($employee['deleted_reason']): ?>
+                                                    <div class="text-gray-500 text-xs mt-1">Reason: <?= htmlspecialchars($employee['deleted_reason']) ?></div>
+                                                <?php endif; ?>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">dasdasdas</div>
-                                        <div class="text-sm text-gray-500">HR</div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-900">
-                                            <div class="font-medium">Sep 30, 2025 11:00 AM</div>
-                                            <div class="text-gray-500">By: HR Administrator</div>
-                                            <div class="text-gray-500 text-xs mt-1">Reason: Deleted by HR for administrative purposes</div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div class="flex gap-2">
-                                            <button onclick="restoreEmployee('710921243478')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                Restore
-                                            </button>
-                                            <button onclick="exportToFile('710921243478', 'employee')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                Export to File
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <div class="flex gap-2">
+                                                <button onclick="restoreEmployee('<?= htmlspecialchars($employee['id_number']) ?>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                    Restore
+                                                </button>
+                                                <button onclick="exportToFile('<?= htmlspecialchars($employee['id_number']) ?>', 'employee')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                    Export to File
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                                            <svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                            </svg>
+                                            No deleted employees found
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -2151,57 +2189,115 @@ require_once 'includes/dashboard_data.php';
 
         // Deleted Items Functions - Working with existing backend
 function restoreStudent(studentId) {
-    if (confirm('Are you sure you want to restore this student record?')) {
-        fetch('restore_record.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'restore',
-                record_type: 'student', 
-                record_id: studentId
+    showConfirmationModal({
+        title: 'Restore Student Record',
+        message: 'Are you sure you want to restore this student record?',
+        details: [
+            'The student will be reactivated',
+            'Student will appear in Registrar system',
+            'All data will be restored'
+        ],
+        confirmText: 'Restore',
+        cancelText: 'Cancel',
+        type: 'info',
+        onConfirm: () => {
+            fetch('restore_record.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'restore',
+                    record_type: 'student', 
+                    record_id: studentId
+                })
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Student record restored successfully!');
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while restoring the record.');
-        });
-    }
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotificationModal({
+                        title: 'Student Restored',
+                        message: data.message,
+                        details: [
+                            `Student ID: ${studentId}`,
+                            'Record is now active',
+                            'Visible in Registrar system'
+                        ],
+                        type: 'success'
+                    });
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showNotificationModal({
+                        title: 'Restore Failed',
+                        message: data.message,
+                        type: 'error'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotificationModal({
+                    title: 'Error',
+                    message: 'An error occurred while restoring the record',
+                    type: 'error'
+                });
+            });
+        }
+    });
 }
 
 function restoreEmployee(employeeId) {
-    if (confirm('Are you sure you want to restore this employee record?')) {
-        fetch('restore_record.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'restore',
-                record_type: 'employee',
-                record_id: employeeId
+    showConfirmationModal({
+        title: 'Restore Employee Record',
+        message: 'Are you sure you want to restore this employee record?',
+        details: [
+            'The employee will be reactivated',
+            'Employee will appear in HR system',
+            'All data will be restored'
+        ],
+        confirmText: 'Restore',
+        cancelText: 'Cancel',
+        type: 'info',
+        onConfirm: () => {
+            fetch('restore_record.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'restore',
+                    record_type: 'employee',
+                    record_id: employeeId
+                })
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Employee record restored successfully!');
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while restoring the record.');
-        });
-    }
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotificationModal({
+                        title: 'Employee Restored',
+                        message: data.message,
+                        details: [
+                            `Employee ID: ${employeeId}`,
+                            'Record is now active',
+                            'Visible in HR system'
+                        ],
+                        type: 'success'
+                    });
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showNotificationModal({
+                        title: 'Restore Failed',
+                        message: data.message,
+                        type: 'error'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotificationModal({
+                    title: 'Error',
+                    message: 'An error occurred while restoring the record',
+                    type: 'error'
+                });
+            });
+        }
+    });
 }
 
 function deletePermanently(recordId, recordType) {
@@ -2485,19 +2581,6 @@ function deletePermanently(recordId, recordType) {
                     // Show success message
                     alert(`${accountTypeText} account data has been exported successfully!\n\nThe file has been downloaded to your computer and contains:\n• Complete account information\n• All related records and history\n• Export timestamp and metadata\n\nThe account remains in the deleted items list for potential restoration.`);
                 }, 1000);
-            }
-        }
-
-        // Restore functions (keeping existing functionality)
-        function restoreStudent(studentId) {
-            if (confirm('Are you sure you want to restore this student account?\n\nThis will make the student account active again.')) {
-                alert('Student restoration functionality would be implemented here.');
-            }
-        }
-
-        function restoreEmployee(employeeId) {
-            if (confirm('Are you sure you want to restore this employee account?\n\nThis will make the employee account active again.')) {
-                alert('Employee restoration functionality would be implemented here.');
             }
         }
     </script>

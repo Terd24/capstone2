@@ -252,6 +252,7 @@ if (table_exists($conn, 'login_activity')) {
 
 // 7. DELETED RECORDS
 $deleted_students = [];
+$deleted_employees = [];
 
 // Get deleted students
 if (table_exists($conn, 'student_account')) {
@@ -268,6 +269,24 @@ if (table_exists($conn, 'student_account')) {
     } catch (Exception $e) {
         // Table might not have soft delete columns yet
         error_log("Deleted students error: " . $e->getMessage());
+    }
+}
+
+// Get deleted employees
+if (table_exists($conn, 'employees')) {
+    try {
+        $stmt = $conn->prepare("SELECT id_number, first_name, last_name, middle_name, position, department, deleted_at, deleted_by, deleted_reason FROM employees WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 100");
+        if ($stmt) {
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $deleted_employees[] = $row;
+            }
+            $stmt->close();
+        }
+    } catch (Exception $e) {
+        // Table might not have soft delete columns yet
+        error_log("Deleted employees error: " . $e->getMessage());
     }
 }
 

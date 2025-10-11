@@ -1,75 +1,108 @@
 <?php
 session_start();
+header('Content-Type: application/json');
 
-// Database connection
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
-    die('DB connection failed: ' . $conn->connect_error);
-}
-
-// Check if user is Super Admin
-if (!isset($_SESSION['superadmin_name'])) {
-    http_response_code(403);
+// Require Super Admin login
+if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin') {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit;
 }
 
-header('Content-Type: application/json');
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    $action = $input['action'] ?? '';
-    $record_type = $input['record_type'] ?? '';
-    $record_id = $input['record_id'] ?? '';
-    
-    if ($action === 'restore' && $record_type && $record_id) {
-        try {
-            $conn->begin_transaction();
-            
-            // Determine table based on record type
-            if ($record_type === 'student') {
-                $table = 'student_account';
-            } elseif ($record_type === 'employee') {
-                $table = 'employees';
-            } else {
-                throw new Exception('Invalid record type');
-            }
-            
-            // Get record data before restoration for logging
-            $stmt = $conn->prepare("SELECT * FROM $table WHERE id_number = ? AND deleted_at IS NOT NULL");
-            $stmt->bind_param("s", $record_id);
-            $stmt->execute();
-            $record_data = $stmt->get_result()->fetch_assoc();
-            
-            if (!$record_data) {
-                throw new Exception('Record not found or not deleted');
-            }
-            
-            // Restore the record (remove deleted_at timestamp)
-            $stmt = $conn->prepare("UPDATE $table SET deleted_at = NULL, deleted_by = NULL, deleted_reason = NULL WHERE id_number = ?");
-            $stmt->bind_param("s", $record_id);
-            $stmt->execute();
-            
-            // Log the restoration
-            $stmt = $conn->prepare("INSERT INTO deletion_log (action_type, record_id, record_table, performed_by, reason, record_data) VALUES ('restore', ?, ?, ?, 'Record restored by Super Admin', ?)");
-            $record_json = json_encode($record_data);
-            $performed_by = $_SESSION['superadmin_name'];
-            $stmt->bind_param("ssss", $record_id, $table, $performed_by, $record_json);
-            $stmt->execute();
-            
-            $conn->commit();
-            
-            echo json_encode(['success' => true, 'message' => ucfirst($record_type) . ' record restored successfully']);
-            
-        } catch (Exception $e) {
-            $conn->rollback();
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Invalid request parameters']);
-    }
-} else {
-    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+$conn = new mysqli('localhost', 'root', '', 'onecci_db');
+if ($conn->connect_error) {
+    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+    exit;
 }
+
+// Get JSON input
+$input = json_decode(file_get_contents('php://input'), true);
+$action = $input['action'] ?? '';
+$record_type = $input['record_type'] ?? '';
+$record_id = $input['record_id'] ?? '';
+
+if ($action !== 'restore' || empty($record_type) || empty($record_id)) {
+    echo json_encode(['success' => false, 'message' => 'Invalid request parameters']);
+    exit;
+}
+
+try {
+    if ($record_type === 'student') {
+        // Restore student record
+        $stmt = $conn->prepare("UPDATE student_account 
+                               SET deleted_at = NULL, 
+                                   deleted_by = NULL, 
+                                   deleted_reason = NULL 
+                               WHERE id_number = ? AND deleted_at IS NOT NULL");
+        $stmt->bind_param("s", $record_id);
+        
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+            // Log the restoration (optional - won't fail if table doesn't exist)
+            try {
+                $conn->query("CREATE TABLE IF NOT EXISTS system_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    action VARCHAR(100) NOT NULL,
+                    details TEXT,
+                    performed_by VARCHAR(100),
+                    performed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+                
+                $log_stmt = $conn->prepare("INSERT INTO system_logs (action, details, performed_by) 
+                                           VALUES ('RESTORE_STUDENT', ?, ?)");
+                $details = "Restored student record: " . $record_id;
+                $performed_by = $_SESSION['superadmin_name'] ?? 'Super Admin';
+                $log_stmt->bind_param("ss", $details, $performed_by);
+                $log_stmt->execute();
+            } catch (Exception $e) {
+                // Logging failed but restoration succeeded
+            }
+            
+            echo json_encode(['success' => true, 'message' => 'Student record restored successfully']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Student record not found or already restored']);
+        }
+        
+    } else if ($record_type === 'employee') {
+        // Restore employee record
+        $stmt = $conn->prepare("UPDATE employees 
+                               SET deleted_at = NULL, 
+                                   deleted_by = NULL, 
+                                   deleted_reason = NULL 
+                               WHERE id_number = ? AND deleted_at IS NOT NULL");
+        $stmt->bind_param("s", $record_id);
+        
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+            // Log the restoration (optional - won't fail if table doesn't exist)
+            try {
+                $conn->query("CREATE TABLE IF NOT EXISTS system_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    action VARCHAR(100) NOT NULL,
+                    details TEXT,
+                    performed_by VARCHAR(100),
+                    performed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+                
+                $log_stmt = $conn->prepare("INSERT INTO system_logs (action, details, performed_by) 
+                                           VALUES ('RESTORE_EMPLOYEE', ?, ?)");
+                $details = "Restored employee record: " . $record_id;
+                $performed_by = $_SESSION['superadmin_name'] ?? 'Super Admin';
+                $log_stmt->bind_param("ss", $details, $performed_by);
+                $log_stmt->execute();
+            } catch (Exception $e) {
+                // Logging failed but restoration succeeded
+            }
+            
+            echo json_encode(['success' => true, 'message' => 'Employee record restored successfully']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Employee record not found or already restored']);
+        }
+        
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Invalid record type']);
+    }
+    
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+}
+
+$conn->close();
 ?>
