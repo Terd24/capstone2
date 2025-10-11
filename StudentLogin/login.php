@@ -98,7 +98,7 @@ if (isset($_SESSION['role'])) {
             header("Location: ../HRF/Dashboard.php");
             exit;
         case 'teacher':
-            header("Location: ../EmployeePortal/Dashboard.php");
+            header("Location: ../EmployeePortal/AttendanceRecords.php");
             exit;
         case 'owner':
         case 'superadmin':
@@ -231,14 +231,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
                     break;
                 case 'teacher':
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
                     break;
                 default:
                     // Fallback: treat any unexpected role as a generic teacher portal access
                     // Log for later clean-up
                     error_log('Unknown employee role: ' . print_r($row['role'], true) . ' for username ' . $row['username']);
                     $_SESSION['role'] = 'teacher';
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
             }
             exit;
         }

@@ -389,8 +389,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
   </div>
 
   <script>
-    const apiSubjects = 'api/subjects.php';
-    const apiOfferings = 'api/subject_offerings.php';
+    const apiSubjects = '../EmployeePortal/api/subjects.php';
+    const apiOfferings = '../EmployeePortal/api/subject_offerings.php';
 
     const subjectList = document.getElementById('subjectList');
     const subjectSearch = document.getElementById('subjectSearch');
@@ -426,7 +426,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     const gridSemester = document.getElementById('gridSemester');
     const gridSyterm = document.getElementById('gridSyterm');
     const levelCards = document.getElementById('levelCards');
-    const API_SUBJECTS = 'api/subjects.php';
+    const API_SUBJECTS = '../EmployeePortal/api/subjects.php';
 
     // Subject Manager modal elements
     const subjectManagerModal = document.getElementById('subjectManagerModal');
@@ -533,7 +533,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     const smTopSemWrap = document.getElementById('smTopSemWrap');
     const smAssignListBlock = document.getElementById('smAssignListBlock');
     const smAssignList = document.getElementById('smAssignList');
-    const API_OFFERINGS = 'api/subject_offerings.php';
+    const API_OFFERINGS = '../EmployeePortal/api/subject_offerings.php';
 
     let currentManageLevel = '';
 

@@ -3,7 +3,12 @@ session_start();
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-if (!isset($_SESSION['registrar_id'])) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
+// Allow registrar or teacher to access this endpoint
+$role = $_SESSION['role'] ?? '';
+if (!isset($_SESSION['registrar_id']) && $role !== 'teacher') {
+  echo json_encode(['success'=>false,'message'=>'Unauthorized']);
+  exit;
+}
 
 require_once("../../StudentLogin/db_conn.php");
 

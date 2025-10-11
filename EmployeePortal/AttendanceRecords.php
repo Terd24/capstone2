@@ -2,8 +2,8 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Allow logged-in employees (registrar, cashier, guidance, attendance, teacher, hr)
-$allowed_roles = ['registrar','cashier','guidance','attendance','teacher','hr','employee'];
+// Allow only teachers on this dashboard
+$allowed_roles = ['teacher'];
 if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles, true)) {
     header("Location: ../StudentLogin/login.php");
     exit;
@@ -20,6 +20,12 @@ if ($employee_id_number === '') {
 
 date_default_timezone_set('Asia/Manila');
 $today = date('Y-m-d');
+
+// Cache prevention for secure back-button behavior
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+header("Expires: 0");
 
 // Check which column exists in teacher_attendance table
 $employee_id_column = 'teacher_id'; // default for teacher_attendance table
@@ -86,7 +92,7 @@ if ($ws) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attendance Records - Employee</title>
+  <title>Teacher Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="manifest" href="/onecci/manifest.webmanifest">
   <script>
@@ -101,14 +107,17 @@ if ($ws) {
   <header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
       <div class="flex justify-between items-center">
-        <div class="flex items-center space-x-3">
-          <span class="text-lg font-bold">Attendance Records</span>
+        <div class="flex items-center space-x-4">
+          <div class="text-left">
+            <p class="text-sm text-blue-200">Welcome,</p>
+            <p class="font-semibold"><?php echo htmlspecialchars($employee_name ?: 'Teacher'); ?></p>
+          </div>
         </div>
-        <div class="flex items-center space-x-3 relative">
-          <img src="../images/LogoCCI.png" class="h-10 w-10 rounded-full bg-white p-1" alt="Logo">
-          <div class="text-right leading-tight">
-            <div class="text-sm font-bold">Cornerstone College Inc.</div>
-            <div class="text-[11px] text-blue-200">Employee Portal</div>
+        <div class="flex items-center space-x-4 relative">
+          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
+          <div class="text-right">
+            <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
+            <p class="text-blue-200 text-sm">Teacher Portal</p>
           </div>
           <button id="empMenuBtn" class="ml-2 bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,8 +152,20 @@ if ($ws) {
       </div>
     </div>
 
+    <!-- Quick Actions (Dashboard) -->
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+      <h3 class="text-lg font-bold text-gray-800 mb-4">Quick Actions</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <?php if (($_SESSION['role'] ?? '') === 'teacher'): ?>
+          <a href="ManageGrades.php" class="block text-center bg-[#1E3A8A] hover:bg-[#0B2C62] text-white px-6 py-4 rounded-xl font-semibold shadow">
+            Manage Grades
+          </a>
+        <?php endif; ?>
+      </div>
+    </div>
+
     <!-- Filters & Records -->
-    <div class="bg-white rounded-2xl shadow-lg p-6">
+    <div id="attendance" class="bg-white rounded-2xl shadow-lg p-6">
       <h3 class="text-lg font-bold text-gray-800 mb-4">Attendance Records</h3>
       <form method="get" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4">
         <div>

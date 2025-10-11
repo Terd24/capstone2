@@ -2,11 +2,14 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Require registrar login
-if (!isset($_SESSION['registrar_id'])) {
+// Require TEACHER role only
+$role = $_SESSION['role'] ?? '';
+if ($role !== 'teacher') {
     header("Location: ../StudentLogin/login.php");
     exit;
 }
+// Current teacher name
+$teacher_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 
 // Handle form submission for adding/updating grades
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -208,18 +211,10 @@ $grades_result = $conn->query($grades_query);
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Teacher</label>
-                    <select id="teacherSelect" name="teacher" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                        <option value="">-- Select Teacher --</option>
-                        <?php if ($teachers_result && $teachers_result->num_rows > 0): ?>
-                            <?php while ($t = $teachers_result->fetch_assoc()): ?>
-                                <option value="<?= htmlspecialchars($t['full_name']) ?>" data-name="<?= htmlspecialchars($t['full_name']) ?>">
-                                    <?= htmlspecialchars($t['full_name']) ?>
-                                </option>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <option value="" disabled>No teachers found</option>
-                        <?php endif; ?>
-                    </select>
+                    <div class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                      <?= htmlspecialchars($teacher_name ?: 'Teacher') ?>
+                    </div>
+                    <input type="hidden" id="teacherHidden" name="teacher" value="<?= htmlspecialchars($teacher_name) ?>">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">School Year & Term</label>
@@ -400,6 +395,9 @@ async function populateSubjectOptions(info, preselectSubject=null){
   const termSel = document.getElementById('modalTermSelect');
   const termValue = termSel ? termSel.value : '';
 
+  // Preserve current selection if caller didn't provide one
+  const preserved = preselectSubject ?? sel.value ?? '';
+
   sel.innerHTML = '<option value="">-- Select Subject --</option>';
   try{
     const items = await fetchOfferedSubjects(info?.gradeLevelText||'', info?.program||'', termValue);
@@ -417,16 +415,56 @@ async function populateSubjectOptions(info, preselectSubject=null){
       const label = it.code ? `${it.name} (${it.code})` : it.name;
       const o = document.createElement('option'); o.value = it.name; o.textContent = label; sel.appendChild(o);
     });
-    if (preselectSubject){
-      if (!Array.from(sel.options).some(o=>o.value===preselectSubject)){
-        const o=document.createElement('option'); o.value=preselectSubject; o.textContent=preselectSubject; sel.appendChild(o);
+    // Restore selection if available
+    if (preserved){
+      if (!Array.from(sel.options).some(o=>o.value===preserved)){
+        const o=document.createElement('option'); o.value=preserved; o.textContent=preserved; sel.appendChild(o);
       }
-      sel.value = preselectSubject;
+      sel.value = preserved;
     }
+    // Attempt to prefill grade inputs after we know the current selection
+    prefillModalInputsFromExisting();
   }catch(e){ console.error('Failed to load offered subjects', e); }
 }
 let currentStudentId = null;
 let subjectOptionsRequestId = 0;
+
+// Prefill modal inputs based on current Subject + Term for current student
+async function prefillModalInputsFromExisting(){
+  try{
+    const subjSel = document.getElementById('subjectSelect');
+    const termSel = document.getElementById('modalTermSelect');
+    const prelimI = document.querySelector('input[name="prelim"]');
+    const midI = document.querySelector('input[name="midterm"]');
+    const prefiI = document.querySelector('input[name="prefinals"]');
+    const finI = document.querySelector('input[name="finals"]');
+    if (!subjSel || !termSel || !prelimI || !midI || !prefiI || !finI) return;
+    const subj = subjSel.value || '';
+    const term = termSel.value || '';
+    // Try from already loaded grades first
+    let match = (allGrades||[]).find(g=> String(g.subject||'')===subj && String(g.school_year_term||'')===term);
+    // If not found, fetch grades for the specific term and retry
+    if (!match && currentStudentId && term){
+      try{
+        const resp = await fetch('api/get_student_grades.php', {
+          method: 'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body: `student_id=${encodeURIComponent(currentStudentId)}&term=${encodeURIComponent(term)}`
+        });
+        const d = await resp.json();
+        if (d && d.success && Array.isArray(d.grades)){
+          match = d.grades.find(g=> String(g.subject||'')===subj && String(g.school_year_term||'')===term) || null;
+        }
+      }catch(e){ console.warn('Prefill fetch failed', e); }
+    }
+    const setVals = (g)=>{
+      prelimI.value = g && g.prelim != null ? g.prelim : '';
+      midI.value    = g && g.midterm != null ? g.midterm : '';
+      prefiI.value  = g && g.pre_finals != null ? g.pre_finals : '';
+      finI.value    = g && g.finals != null ? g.finals : '';
+    };
+    setVals(match || null);
+  }catch(e){ console.error('prefillModalInputsFromExisting error', e); }
+}
 
 // Search students function
 function searchStudents() {
@@ -449,7 +487,7 @@ function searchStudents() {
     resultsDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Searching...</p>';
 
     // Make AJAX call to search students in database
-    fetch('SearchStudent.php?query=' + encodeURIComponent(query))
+    fetch('api/SearchStudent.php?query=' + encodeURIComponent(query))
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -464,7 +502,7 @@ function searchStudents() {
                 students.forEach(student => {
                     const displayName = student.full_name || `${student.first_name} ${student.last_name}`;
                     const gradeLevel = student.year_section || student.grade_level || 'N/A';
-                    const program = student.program || '';
+                    const program = student.program || student.academic_track || '';
                     // Escape values for attribute context
                     const safeName = String(displayName).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
                     const safeGL = String(gradeLevel).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -526,7 +564,7 @@ function loadStudentGrades(studentId, selectedTerm = null) {
     }
     
     // Make AJAX call to get student grades from database
-    fetch('get_student_grades.php', {
+    fetch('api/get_student_grades.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: requestBody
@@ -681,6 +719,15 @@ function editGradeModal(grade) {
     // Change modal title and button text for editing
     document.querySelector('#addGradeModal h3').textContent = 'Edit Grade';
     document.querySelector('#addGradeModal button[type="submit"]').textContent = 'Update Grade';
+    // Make Subject and School Year & Term view-only in EDIT mode
+    (function(){
+        const subjSel = document.getElementById('subjectSelect');
+        const yearSel = document.getElementById('modalSchoolYear');
+        const termOnlySel = document.getElementById('modalTermOnly');
+        if (subjSel) subjSel.disabled = true;
+        if (yearSel) yearSel.disabled = true;
+        if (termOnlySel) termOnlySel.disabled = true;
+    })();
     
     // Show the modal
     document.getElementById('addGradeModal').classList.remove('hidden');
@@ -778,12 +825,42 @@ function showAddGradeModal() {
               combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
             }
             populateSubjectOptions(currentStudentInfo);
+            // Ensure listeners to sync term and prefill values
+            if (yearSel && !yearSel.hasAttribute('data-sync')){
+              yearSel.addEventListener('change', ()=>{
+                combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
+                populateSubjectOptions(currentStudentInfo);
+                prefillModalInputsFromExisting();
+              });
+              yearSel.setAttribute('data-sync','1');
+            }
+            if (termOnlySel && !termOnlySel.hasAttribute('data-sync')){
+              termOnlySel.addEventListener('change', ()=>{
+                combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
+                populateSubjectOptions(currentStudentInfo);
+                prefillModalInputsFromExisting();
+              });
+              termOnlySel.setAttribute('data-sync','1');
+            }
+            const subjSel = document.getElementById('subjectSelect');
+            if (subjSel && !subjSel.hasAttribute('data-prefill-listener')){
+              subjSel.addEventListener('change', prefillModalInputsFromExisting);
+              subjSel.setAttribute('data-prefill-listener','1');
+            }
           }catch(e){ console.error('Default to 1st term failed', e); }
         }, 0);
         
         // Reset modal title and button text for adding
         document.querySelector('#addGradeModal h3').textContent = 'Add New Grade';
         document.querySelector('#addGradeModal button[type="submit"]').textContent = 'Save Grade';
+
+        // Ensure fields are ENABLED in ADD mode
+        const subjSel = document.getElementById('subjectSelect');
+        const yearSel2 = document.getElementById('modalSchoolYear');
+        const termOnlySel2 = document.getElementById('modalTermOnly');
+        if (subjSel) subjSel.disabled = false;
+        if (yearSel2) yearSel2.disabled = false;
+        if (termOnlySel2) termOnlySel2.disabled = false;
         
         document.getElementById('addGradeModal').classList.remove('hidden');
     } else {
@@ -793,7 +870,7 @@ function showAddGradeModal() {
 
   // Get latest term from database and populate the field
   function getLatestTermAndPopulate() {
-    fetch('get_latest_term.php', {
+    fetch('api/get_latest_term.php', {
         method: 'GET'
     })
     .then(response => response.json())
