@@ -378,12 +378,6 @@ $schedules_result = $conn->query($schedules_query);
             </svg>
             Create Schedule
         </button>
-        <button onclick="showAssignScheduleModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-            </svg>
-            Assign Schedule to Students
-        </button>
     </div>
 
     <!-- Schedules List -->
@@ -512,25 +506,7 @@ $schedules_result = $conn->query($schedules_query);
     </div>
 </div>
 
-<!-- Reassign Confirmation Modal -->
-<div id="reassignConfirmModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-  <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-    <div class="flex justify-between items-center mb-3">
-      <h3 class="text-lg font-bold text-gray-800">Confirm Reassignment</h3>
-      <button onclick="hideReassignConfirm()" class="text-gray-500 hover:text-gray-700" aria-label="Close">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-      </button>
-    </div>
-    <div id="reassignConfirmBody" class="text-sm text-gray-700 space-y-2">
-      <!-- dynamic content -->
-    </div>
-    <div class="flex gap-3 pt-4">
-      <button onclick="hideReassignConfirm()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
-      <button onclick="confirmProceedReassign()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirm</button>
-    </div>
-  </div>
-  
-</div>
+
 
 <!-- View Schedule Details Modal (Students) -->
 <div id="classScheduleDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -724,87 +700,9 @@ $schedules_result = $conn->query($schedules_query);
     </div>
 </div>
 
-<!-- Assign Schedule Modal -->
-<div id="assignScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-gray-800">Assign Schedule to Students</h3>
-            <button onclick="hideAssignScheduleModal()" class="text-gray-500 hover:text-gray-700">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
-        </div>
-        
-        <!-- Schedule Selection -->
-        <div class="mb-2">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedule</label>
-          <input type="text" id="scheduleSearch" placeholder="Search by Schedule Name" 
-                 class="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" />
-          <div class="relative">
-            <!-- Trigger that looks like a select -->
-            <button type="button" id="scheduleTrigger" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-left bg-white focus:ring-2 focus:ring-green-500">
-              <span id="scheduleTriggerText">Choose a schedule...</span>
-              <span class="float-right">▾</span>
-            </button>
-            <!-- Scrollable menu (about 10 items tall) -->
-            <div id="scheduleMenu" class="hidden absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow max-h-64 overflow-y-auto">
-              <!-- items will be rendered by JS from the hidden select options -->
-              <div id="scheduleMenuList"></div>
-            </div>
-            <!-- Hidden native select preserved for logic -->
-            <select id="scheduleSelect" class="hidden">
-              <option value="">Choose a schedule...</option>
-              <?php 
-              $schedules_result->data_seek(0); // Reset result pointer
-              while ($s = $schedules_result->fetch_assoc()): ?>
-                <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['section_name']) ?> (<?= date('g:i A', strtotime($s['start_time'])) ?> - <?= date('g:i A', strtotime($s['end_time'])) ?>)</option>
-              <?php endwhile; ?>
-            </select>
-          </div>
-          <p id="assignInlineError" class="hidden text-sm text-red-600 mt-1"></p>
-        </div>
 
-        <!-- Search Students -->
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Search Students</label>
-            <input type="text" id="studentSearch" placeholder="Search by name or ID..." 
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-        </div>
-
-        <!-- Students List -->
-        <div id="studentsList" class="border rounded-lg h-72 overflow-y-auto">
-            <p class="text-gray-500 text-center py-4">Loading students...</p>
-        </div>
-        <!-- View More (replaced by infinite scroll) -->
-        <div id="studentsMoreContainer" class="mb-4 hidden text-center"></div>
-
-        <!-- Selected Students Count -->
-        <div class="mb-4">
-            <p class="text-sm text-gray-600">Selected: <span id="selectedCount">0</span> student(s)</p>
-        </div>
-
-        <div class="flex gap-3">
-            <button onclick="hideAssignScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
-            <button onclick="assignScheduleToStudents()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Assign Schedule</button>
-        </div>
-    </div>
-</div>
 
 <script>
-let selectedStudents = [];
-// Cache minimal info for students we've displayed so we can show them in confirmation even after search filters
-const studentsIndex = {}; // id -> { name, hasCurrent }
-// Pagination state for students
-let studentsLimit = 15;
-let studentsOffset = 0;
-let studentsQuery = '';
-let studentsHasMore = false;
-let studentsLoading = false;
-// Preserve previous page overflow so we can restore after modal closes
-let __prevBodyOverflow = '';
-let __prevHtmlOverflow = '';
-
 // Show/Hide Modals
 function showCreateScheduleModal() {
     // Reset to defaults every time the modal opens
@@ -863,67 +761,9 @@ function hideCreateScheduleModal() {
     });
 }
 
-function showAssignScheduleModal() {
-    document.getElementById('assignScheduleModal').classList.remove('hidden');
-    // Lock background scroll
-    try {
-        __prevBodyOverflow = document.body.style.overflow;
-        __prevHtmlOverflow = document.documentElement.style.overflow;
-        document.body.style.overflow = 'hidden';
-        document.documentElement.style.overflow = 'hidden';
-    } catch(e){}
-    selectedStudents = [];
-    updateSelectedCount();
-    // Reset search box and schedule selector
-    const searchEl = document.getElementById('studentSearch'); if (searchEl) searchEl.value = '';
-    const sel = document.getElementById('scheduleSelect'); if (sel) sel.value = '';
-    const schSearch = document.getElementById('scheduleSearch'); if (schSearch){ schSearch.value=''; filterScheduleOptions(''); }
-    // Render the custom dropdown from the hidden select
-    renderScheduleMenuFromSelect();
-    studentsQuery = '';
-    studentsOffset = 0;
-    const listC = document.getElementById('studentsList'); if (listC) listC.innerHTML = '<p class="text-gray-500 text-center py-4">Loading students...</p>';
-    loadStudentsPage(false);
-    // Attach infinite scroll listener
-    const listEl = document.getElementById('studentsList');
-    listEl.addEventListener('scroll', onStudentsScroll);
-    if (sel) {
-        sel.addEventListener('change', onScheduleChangeReload);
-    }
-    // Open/close custom dropdown
-    const trig = document.getElementById('scheduleTrigger');
-    if (trig) { trig.removeEventListener('click', toggleScheduleMenu); trig.addEventListener('click', toggleScheduleMenu); }
-    document.addEventListener('click', closeScheduleMenuOnOutside, { once: false });
-    document.addEventListener('keydown', onScheduleMenuKeyDown);
-    const schSearchEl = document.getElementById('scheduleSearch');
-    if (schSearchEl){
-        schSearchEl.removeEventListener('input', onScheduleSearchInput);
-        schSearchEl.addEventListener('input', onScheduleSearchInput);
-    }
-}
 
-function hideAssignScheduleModal() {
-    document.getElementById('assignScheduleModal').classList.add('hidden');
-    // Restore background scroll
-    try {
-        document.body.style.overflow = __prevBodyOverflow || '';
-        document.documentElement.style.overflow = __prevHtmlOverflow || '';
-    } catch(e){}
-    selectedStudents = [];
-    document.getElementById('studentsList').innerHTML = '<p class="text-gray-500 text-center py-4">Loading students...</p>';
-    const moreC = document.getElementById('studentsMoreContainer'); if(moreC) moreC.classList.add('hidden');
-    // Detach scroll listener
-    const listEl = document.getElementById('studentsList');
-    listEl.removeEventListener('scroll', onStudentsScroll);
-    const sel = document.getElementById('scheduleSelect'); if (sel) sel.removeEventListener('change', onScheduleChangeReload);
-    const trig = document.getElementById('scheduleTrigger'); if (trig) trig.removeEventListener('click', toggleScheduleMenu);
-    document.removeEventListener('click', closeScheduleMenuOnOutside);
-    document.removeEventListener('keydown', onScheduleMenuKeyDown);
-}
 
 let currentScheduleId = null;
-// State for pending assignment confirmation
-let pendingAssignment = null; // { scheduleId, movingIds }
 
 // Create/Edit Schedule Form Submission
 document.getElementById('createScheduleForm').addEventListener('submit', function(e) {
@@ -996,198 +836,16 @@ document.getElementById('createScheduleForm').addEventListener('submit', functio
 });
 
 
-// Load students page (supports search and pagination)
-function loadStudentsPage(append){
-    if (studentsLoading) return;
-    studentsLoading = true;
-    const params = new URLSearchParams();
-    if (studentsQuery === '') { params.set('all','1'); }
-    else { params.set('query', studentsQuery); }
-    params.set('limit', studentsLimit);
-    params.set('offset', studentsOffset);
-    const scheduleId = document.getElementById('scheduleSelect')?.value || '';
-    if (scheduleId) { params.set('exclude_schedule_id', scheduleId); }
-    fetch('SearchStudent.php?' + params.toString())
-        .then(r=>r.json())
-        .then(d=>{
-            const container = document.getElementById('studentsList');
-            if (d.error){ container.innerHTML = `<p class="text-red-500 text-center py-4">${d.error}</p>`; return; }
-            const list = d.students || [];
-            if (!append){ container.innerHTML = ''; }
-            displayStudents(list, append === true);
-            studentsHasMore = !!d.has_more;
-            const moreC = document.getElementById('studentsMoreContainer');
-            if (moreC){ moreC.classList.toggle('hidden', !studentsHasMore); }
-        })
-        .catch(err=>{
-            console.error('Error:', err);
-            document.getElementById('studentsList').innerHTML = '<p class="text-red-500 text-center py-4">Failed to load students</p>';
-            const moreC = document.getElementById('studentsMoreContainer'); if(moreC) moreC.classList.add('hidden');
-        })
-        .finally(()=>{ studentsLoading = false; });
-}
 
-// Display students in the list
-function displayStudents(students, append=false) {
-    const container = document.getElementById('studentsList');
-    
-    if (students.length === 0) {
-        if (!append) container.innerHTML = '<p class="text-gray-500 text-center py-4">No students found</p>';
-        return;
-    }
-    
-    let html = '';
-    students.forEach(s => {
-        const id = s.id_number;
-        const fullName = s.full_name || (s.first_name + ' ' + s.last_name);
-        const currentName = s.current_section || s.class_schedule;
-        const hasSchedule = !!currentName;
-        const isSelected = selectedStudents.includes(id);
-        const scheduleInfo = hasSchedule ? `<span class="text-orange-600 font-medium">Current: ${currentName}</span>` : '<span class="text-green-600">Available</span>';
-        // cache
-        studentsIndex[id] = { name: fullName, hasCurrent: !!hasSchedule };
-        
-        html += `
-            <div class="flex items-center p-3 border-b hover:bg-gray-50 cursor-pointer select-none" onclick="toggleStudent('${id}', ${hasSchedule ? 'true' : 'false'}, '${fullName}', '${currentName || ''}')">
-                <input type="checkbox" id="student_${id}" ${isSelected ? 'checked' : ''} class="mr-3 pointer-events-none">
-                <div class="flex-1">
-                    <div class="font-medium">${fullName}</div>
-                    <div class="text-sm text-gray-600">ID: ${id} • ${s.grade_level || s.year_section || 'N/A'}</div>
-                    <div class="text-sm">${scheduleInfo}</div>
-                </div>
-            </div>
-        `;
-    });
-    
-    if (append) container.insertAdjacentHTML('beforeend', html);
-    else container.innerHTML = html;
-}
 
-// Toggle student selection with confirmation for reassignment
-function toggleStudent(studentId, hasSchedule, studentName, currentSection) {
-    const index = selectedStudents.indexOf(studentId);
-    
-    if (index > -1) {
-        // Deselecting student
-        selectedStudents.splice(index, 1);
-    } else {
-        selectedStudents.push(studentId);
-    }
-    updateSelectedCount();
-    const cb = document.getElementById(`student_${studentId}`); if (cb) cb.checked = selectedStudents.includes(studentId);
-}
 
-// Update selected count
-function updateSelectedCount() {
-    document.getElementById('selectedCount').textContent = selectedStudents.length;
-}
 
-// Assign schedule to selected students
-function assignScheduleToStudents() {
-    const scheduleId = document.getElementById('scheduleSelect').value;
-    
-    const assignErr = document.getElementById('assignInlineError');
-    if (assignErr) { assignErr.classList.add('hidden'); assignErr.textContent=''; }
-    if (!scheduleId) { if(assignErr){ assignErr.textContent='Please select a schedule'; assignErr.classList.remove('hidden'); } return; }
-    if (selectedStudents.length === 0) { if(assignErr){ assignErr.textContent='Please select at least one student'; assignErr.classList.remove('hidden'); } return; }
-    
-    // Build confirmation from selectedStudents (not just visible rows), using cached info
-    try {
-        const items = selectedStudents.map(id => {
-            const meta = studentsIndex[id] || { name: id, hasCurrent: false };
-            return { id, name: meta.name, hasCurrent: !!meta.hasCurrent };
-        });
-        const movingCount = items.filter(i=>i.hasCurrent).length;
-        pendingAssignment = { scheduleId };
-        showReassignConfirmItems(items, items.length, movingCount);
-        return; // wait for user confirmation
-    } catch (e) { /* ignore */ }
-    
-    proceedAssign(scheduleId);
-}
 
-function showReassignConfirmItems(items, totalCount, movingCount){
-    const body = document.getElementById('reassignConfirmBody');
-    const modal = document.getElementById('reassignConfirmModal');
-    if(!body || !modal){ return; }
-    const titleLine = `You are about to move <strong>${totalCount}</strong> student(s) to the selected schedule.`;
-    const allNames = items.map(i=>i.name);
-    const currentNames = items.filter(i=>i.hasCurrent).map(i=>i.name);
-    const makeList = (names, cap=10) => {
-        const rows = names.slice(0, cap).map(n=>`<li>${n}</li>`).join('');
-        const extra = names.length > cap ? `<div class=\"text-xs text-gray-500 mt-1\">and ${names.length-cap} more…</div>` : '';
-        return `<ul class=\"list-disc ml-5 space-y-0.5\">${rows}</ul>${extra}`;
-    };
-    const note = movingCount > 0 ? `<p class=\"mt-2 text-gray-600\">Moving will replace their existing schedule.</p>` : '';
-    body.innerHTML = `
-      <p>${titleLine}</p>
-      <div class=\"mt-2 space-y-3\">
-        <div>
-          <div class=\"font-medium mb-1\">Selected students (${allNames.length}):</div>
-          ${makeList(allNames)}
-        </div>
-        <div>
-          <div class=\"font-medium mb-1\">Have current schedule (${currentNames.length}):</div>
-          ${currentNames.length ? makeList(currentNames) : '<div class=\"text-gray-500 text-sm\">None</div>'}
-        </div>
-      </div>
-      ${note}
-    `;
-    modal.classList.remove('hidden');
-}
 
-function hideReassignConfirm(){ const m=document.getElementById('reassignConfirmModal'); if(m) m.classList.add('hidden'); pendingAssignment=null; }
 
-function confirmProceedReassign(){
-    const data = pendingAssignment; hideReassignConfirm();
-    if(!data) return;
-    proceedAssign(data.scheduleId);
-}
 
-function proceedAssign(scheduleId){
-    const formData = new FormData();
-    formData.append('action', 'assign_schedule');
-    formData.append('schedule_id', scheduleId);
-    selectedStudents.forEach(studentId => formData.append('student_ids[]', studentId));
-    fetch('ManageSchedule.php', { method: 'POST', body: formData })
-      .then(r=>r.json())
-      .then(d=>{
-        if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); hideAssignScheduleModal(); location.reload(); }
-        else { showErrorMessage(d.message || 'Assign failed.'); }
-      })
-      .catch(()=>{ showErrorMessage('Failed to assign schedule. Please try again.'); });
-}
 
-// Student search functionality
-document.getElementById('studentSearch').addEventListener('input', function() {
-    const query = this.value.trim();
-    // When cleared, show all students again
-    if (query.length === 0) {
-        studentsQuery = '';
-        studentsOffset = 0;
-        loadStudentsPage(false);
-        return;
-    }
-    // Search even with a single character
-    studentsQuery = query;
-    studentsOffset = 0;
-    loadStudentsPage(false);
-});
 
-// Infinite scroll handler
-function onStudentsScroll(){
-    const el = document.getElementById('studentsList');
-    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
-    if (nearBottom && studentsHasMore && !studentsLoading){
-        studentsOffset += studentsLimit;
-        loadStudentsPage(true);
-    }
-}
-
-function onScheduleChangeReload(){
-    studentsOffset = 0; studentsQuery = '';
-    loadStudentsPage(false);
-}
 
 // Cache original schedule options and implement filtering for the dropdown
 let originalScheduleOptions = null; // Array<{value,text}>

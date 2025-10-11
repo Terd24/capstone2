@@ -38,21 +38,13 @@ try {
     $filename = '';
     
     if ($account_type === 'student') {
-        // Get student data including parent information
-        $query = "SELECT 
-                    s.*,
-                    p.parent_username,
-                    p.parent_password,
-                    p.relationship,
-                    p.parent_first_name,
-                    p.parent_last_name,
-                    p.parent_middle_name,
-                    p.parent_email,
-                    p.parent_phone,
-                    p.parent_address
-                  FROM student_account s
-                  LEFT JOIN parent_account p ON s.id_number = p.student_id
-                  WHERE s.id_number = ? AND s.deleted_at IS NOT NULL";
+        // Get student data only (removed parent information due to schema mismatch)
+        $query = "SELECT *
+                  FROM student_account 
+                  WHERE id_number = ?";
+        
+        // Debug information
+        error_log("Searching for student ID: " . $account_id);
         
         $stmt = $conn->prepare($query);
         $stmt->bind_param("s", $account_id);
@@ -60,7 +52,13 @@ try {
         $result = $stmt->get_result();
         
         if ($result->num_rows === 0) {
-            throw new Exception('Deleted student record not found');
+            // Return a more helpful error message
+            http_response_code(404);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Student record with ID ' . $account_id . ' not found in the database'
+            ]);
+            exit;
         }
         
         $student = $result->fetch_assoc();
@@ -99,6 +97,22 @@ try {
             'payment_history' => $payments
         ];
         
+        // Save to file in exports/deleted_records folder
+        $export_dir = '../exports/deleted_records/';
+        if (!file_exists($export_dir)) {
+            mkdir($export_dir, 0777, true);
+        }
+        
+        $filename = 'student_' . $account_id . '_' . date('Y-m-d_His') . '.json';
+        $file_path = $export_dir . $filename;
+        
+        // Save the data to file
+        file_put_contents($file_path, json_encode($account_data, JSON_PRETTY_PRINT));
+        
+        // Add file path to the response
+        $account_data['file_saved'] = true;
+        $account_data['file_path'] = $file_path;
+        
         $student_name = trim($student['first_name'] . ' ' . $student['last_name']);
         $filename = 'DELETED_STUDENT_' . $account_id . '_' . str_replace(' ', '_', $student_name) . '_' . date('Y-m-d_H-i-s') . '.json';
         
@@ -107,7 +121,7 @@ try {
         $query = "SELECT e.*, ea.username, ea.role, ea.created_at as account_created
                   FROM employees e
                   LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id
-                  WHERE e.id_number = ? AND e.deleted_at IS NOT NULL";
+                  WHERE e.id_number = ?";
         
         $stmt = $conn->prepare($query);
         $stmt->bind_param("s", $account_id);
@@ -115,7 +129,13 @@ try {
         $result = $stmt->get_result();
         
         if ($result->num_rows === 0) {
-            throw new Exception('Deleted employee record not found');
+            // Return a more helpful error message
+            http_response_code(404);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Employee record with ID ' . $account_id . ' not found in the database'
+            ]);
+            exit;
         }
         
         $employee = $result->fetch_assoc();
@@ -135,6 +155,22 @@ try {
             'employee_info' => $employee,
             'attendance_records' => $attendance
         ];
+        
+        // Save to file in exports/deleted_records folder
+        $export_dir = '../exports/deleted_records/';
+        if (!file_exists($export_dir)) {
+            mkdir($export_dir, 0777, true);
+        }
+        
+        $filename = 'employee_' . $account_id . '_' . date('Y-m-d_His') . '.json';
+        $file_path = $export_dir . $filename;
+        
+        // Save the data to file
+        file_put_contents($file_path, json_encode($account_data, JSON_PRETTY_PRINT));
+        
+        // Add file path to the response
+        $account_data['file_saved'] = true;
+        $account_data['file_path'] = $file_path;
         
         $employee_name = trim($employee['first_name'] . ' ' . $employee['last_name']);
         $filename = 'DELETED_EMPLOYEE_' . $account_id . '_' . str_replace(' ', '_', $employee_name) . '_' . date('Y-m-d_H-i-s') . '.json';

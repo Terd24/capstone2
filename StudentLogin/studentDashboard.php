@@ -7,6 +7,18 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'student') {
     exit;
 }
 
+// Check maintenance mode
+$maintenance_check = $conn->query("SELECT config_value FROM system_config WHERE config_key = 'maintenance_mode'");
+if ($maintenance_check && $maintenance_check->num_rows > 0) {
+    $maintenance_row = $maintenance_check->fetch_assoc();
+    if ($maintenance_row['config_value'] == '1') {
+        // Maintenance mode is ON - redirect students to login (which shows maintenance page)
+        session_destroy();
+        header("Location: login.php");
+        exit;
+    }
+}
+
 // Prevent browser from caching this page
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");

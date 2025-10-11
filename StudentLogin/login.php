@@ -18,7 +18,7 @@ function is_maintenance_mode($conn) {
     
     $result = $conn->query("SELECT config_value FROM system_config WHERE config_key = 'maintenance_mode'");
     if ($result && $row = $result->fetch_assoc()) {
-        return (bool) $row['config_value'];
+        return ($row['config_value'] == '1' || $row['config_value'] === 'enabled');
     }
     return false;
 }

@@ -71,7 +71,7 @@ if ($search_name !== '') {
 // Section filter
 if ($filter_section !== '') {
     $sql .= " AND ar.schedule LIKE ?";
-    $section_like = "%$filter_section%";
+    $section_like = "$filter_section%"; // Changed to match from beginning of string
     $params[] = $section_like; $types .= 's';
 }
 
@@ -158,13 +158,17 @@ if ($status_result) {
           <input type="text" name="search_name" value="<?= htmlspecialchars($search_name) ?>" placeholder="Enter student name..."
                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
         </div>
-        <div>
+        <div class="md:col-span-2">
           <label class="text-sm font-medium text-gray-700 mb-2 block">Start Date</label>
           <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" min="2025-01-01" max="<?= $today ?>" placeholder="Start date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="startDate">
         </div>
-        <div>
+        <div class="md:col-span-2">
           <label class="text-sm font-medium text-gray-700 mb-2 block">End Date</label>
           <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" max="<?= $today ?>" placeholder="End date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="endDate">
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium">Generate Report</button>
+          <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Clear</a>
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700 mb-2 block">Section</label>
@@ -187,10 +191,6 @@ if ($status_result) {
               </option>
             <?php endforeach; ?>
           </select>
-        </div>
-        <div class="flex gap-2">
-          <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium">Generate Report</button>
-          <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Clear</a>
         </div>
       </form>
       <p class="mt-4 text-gray-600">

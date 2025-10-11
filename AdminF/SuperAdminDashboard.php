@@ -1857,22 +1857,45 @@ require_once 'includes/dashboard_data.php';
                 message: `Are you sure you want to update the system configuration?`,
                 details: [
                     `Maintenance mode will be: <strong>${maintenanceStatus}</strong>`,
-                    'This action requires School Owner approval',
                     'All changes will be logged for audit purposes'
                 ],
                 confirmText: 'Update Configuration',
                 cancelText: 'Cancel',
                 type: 'warning',
                 onConfirm: () => {
-                    showNotificationModal({
-                        title: 'Configuration Update Requested',
-                        message: 'Your configuration update request has been sent successfully.',
-                        details: [
-                            'The School Owner will be notified for approval',
-                            'You will receive a notification once approved',
-                            'Changes will take effect immediately after approval'
-                        ],
-                        type: 'success'
+                    fetch('update_configuration.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ maintenance_mode: maintenanceStatus })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotificationModal({
+                                title: 'Configuration Updated',
+                                message: data.message,
+                                details: [
+                                    `Maintenance mode: ${data.maintenance_mode}`,
+                                    'Changes have been applied successfully',
+                                    'All actions are logged for audit purposes'
+                                ],
+                                type: 'success'
+                            });
+                        } else {
+                            showNotificationModal({
+                                title: 'Update Failed',
+                                message: data.message,
+                                type: 'error'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotificationModal({
+                            title: 'Error',
+                            message: 'An error occurred while updating configuration',
+                            type: 'error'
+                        });
                     });
                 }
             });
@@ -1891,15 +1914,38 @@ require_once 'includes/dashboard_data.php';
                 cancelText: 'Cancel',
                 type: 'info',
                 onConfirm: () => {
-                    showNotificationModal({
-                        title: 'Database Backup Initiated',
-                        message: 'Database backup process has been started successfully.',
-                        details: [
-                            'Backup file will be created with timestamp',
-                            'You will be notified when the backup is complete',
-                            'The backup will be stored in the system backup directory'
-                        ],
-                        type: 'success'
+                    fetch('create_backup.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotificationModal({
+                                title: 'Backup Created Successfully',
+                                message: data.message,
+                                details: [
+                                    `Filename: ${data.filename}`,
+                                    `Size: ${data.size}`,
+                                    'Backup stored in /backups directory'
+                                ],
+                                type: 'success'
+                            });
+                        } else {
+                            showNotificationModal({
+                                title: 'Backup Failed',
+                                message: data.message,
+                                type: 'error'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotificationModal({
+                            title: 'Error',
+                            message: 'An error occurred while creating backup',
+                            type: 'error'
+                        });
                     });
                 }
             });
@@ -1928,22 +1974,51 @@ require_once 'includes/dashboard_data.php';
                 message: `Are you sure you want to clear all login logs between ${startDate} and ${endDate}?`,
                 details: [
                     '<strong>This action cannot be undone</strong>',
-                    'All login records in this date range will be permanently deleted',
-                    'This action requires School Owner approval'
+                    'All login records in this date range will be permanently deleted'
                 ],
                 confirmText: 'Clear Logs',
                 cancelText: 'Cancel',
                 type: 'danger',
                 onConfirm: () => {
-                    showNotificationModal({
-                        title: 'Login Logs Clear Requested',
-                        message: 'Your request to clear login logs has been sent for approval.',
-                        details: [
-                            'The School Owner will be notified for approval',
-                            'This action will be logged for audit purposes',
-                            'You will receive confirmation once processed'
-                        ],
-                        type: 'success'
+                    fetch('clear_login_logs.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            start_date: startDate, 
+                            end_date: endDate 
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotificationModal({
+                                title: 'Login Logs Cleared',
+                                message: data.message,
+                                details: [
+                                    `Records deleted: ${data.records_deleted}`,
+                                    `Date range: ${startDate} to ${endDate}`,
+                                    'Action logged for audit purposes'
+                                ],
+                                type: 'success'
+                            });
+                            // Clear the date inputs
+                            document.getElementById('loginStartDate').value = '';
+                            document.getElementById('loginEndDate').value = '';
+                        } else {
+                            showNotificationModal({
+                                title: 'Clear Failed',
+                                message: data.message,
+                                type: 'error'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotificationModal({
+                            title: 'Error',
+                            message: 'An error occurred while clearing login logs',
+                            type: 'error'
+                        });
                     });
                 }
             });
@@ -1972,22 +2047,51 @@ require_once 'includes/dashboard_data.php';
                 message: `Are you sure you want to clear all attendance records between ${startDate} and ${endDate}?`,
                 details: [
                     '<strong>This action cannot be undone</strong>',
-                    'All attendance records in this date range will be permanently deleted',
-                    'This action requires School Owner approval'
+                    'All attendance records in this date range will be permanently deleted'
                 ],
                 confirmText: 'Clear Records',
                 cancelText: 'Cancel',
                 type: 'danger',
                 onConfirm: () => {
-                    showNotificationModal({
-                        title: 'Attendance Records Clear Requested',
-                        message: 'Your request to clear attendance records has been sent for approval.',
-                        details: [
-                            'The School Owner will be notified for approval',
-                            'This action will be logged for audit purposes',
-                            'You will receive confirmation once processed'
-                        ],
-                        type: 'success'
+                    fetch('clear_attendance_records.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            start_date: startDate, 
+                            end_date: endDate 
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotificationModal({
+                                title: 'Attendance Records Cleared',
+                                message: data.message,
+                                details: [
+                                    `Records deleted: ${data.records_deleted}`,
+                                    `Date range: ${startDate} to ${endDate}`,
+                                    'Action logged for audit purposes'
+                                ],
+                                type: 'success'
+                            });
+                            // Clear the date inputs
+                            document.getElementById('attendanceStartDate').value = '';
+                            document.getElementById('attendanceEndDate').value = '';
+                        } else {
+                            showNotificationModal({
+                                title: 'Clear Failed',
+                                message: data.message,
+                                type: 'error'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotificationModal({
+                            title: 'Error',
+                            message: 'An error occurred while clearing attendance records',
+                            type: 'error'
+                        });
                     });
                 }
             });

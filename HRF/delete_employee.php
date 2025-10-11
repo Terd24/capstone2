@@ -26,10 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_reason TEXT NULL");
         
         // Use soft delete instead of hard delete - mark as deleted but keep in database
-        $delete_employee = $conn->prepare("UPDATE employees SET deleted_at = NOW(), deleted_by = ?, deleted_reason = ? WHERE id_number = ? AND deleted_at IS NULL");
+        $delete_employee = $conn->prepare("UPDATE employees SET deleted_at = NOW(), deleted_by = ?, deleted_reason = ? WHERE id_number = ?");
         $deleted_by = $_SESSION['hr_name'] ?? $_SESSION['superadmin_name'] ?? 'HR User';
         $deleted_reason = 'Deleted by HR for administrative purposes';
         $delete_employee->bind_param("sss", $deleted_by, $deleted_reason, $employee_id);
+        
+        // Log the deletion attempt for debugging
+        error_log("Attempting to soft delete employee ID: " . $employee_id . " by " . $deleted_by);
         
         if ($delete_employee->execute()) {
             if ($delete_employee->affected_rows > 0) {

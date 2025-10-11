@@ -27,19 +27,21 @@ if (empty($employee_id)) {
 try {
     $conn->begin_transaction();
     
-    // Delete employee account first (if exists)
-    $stmt = $conn->prepare("DELETE FROM employee_accounts WHERE employee_id = ?");
-    $stmt->bind_param("s", $employee_id);
-    $stmt->execute();
+    // Ensure soft delete columns exist in employees table
+    $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL DEFAULT NULL");
+    $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) NULL");
+    $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_reason TEXT NULL");
     
-    // Delete employee record
-    $stmt = $conn->prepare("DELETE FROM employees WHERE id_number = ?");
-    $stmt->bind_param("s", $employee_id);
+    // Use soft delete instead of hard delete - mark as deleted but keep in database
+    $stmt = $conn->prepare("UPDATE employees SET deleted_at = NOW(), deleted_by = ?, deleted_reason = ? WHERE id_number = ?");
+    $deleted_by = $_SESSION['superadmin_name'] ?? 'Super Admin';
+    $deleted_reason = 'Deleted by Super Admin for administrative purposes';
+    $stmt->bind_param("sss", $deleted_by, $deleted_reason, $employee_id);
     
     if ($stmt->execute()) {
         if ($conn->affected_rows > 0) {
             $conn->commit();
-            echo json_encode(['success' => true, 'message' => 'Employee deleted successfully']);
+            echo json_encode(['success' => true, 'message' => 'Employee soft deleted successfully']);
         } else {
             $conn->rollback();
             echo json_encode(['success' => false, 'message' => 'Employee not found']);
