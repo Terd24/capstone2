@@ -172,12 +172,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
     $res = $check->get_result();
     
     if ($res->num_rows === 0) {
-        // Time In - Record time regardless of existing status
+        // First tap - Mark as Present immediately
         $insert = $conn->prepare("INSERT INTO attendance_record (id_number, date, day, time_in, status, schedule) VALUES (?, ?, ?, ?, ?, ?)");
-        $status = 'Time In Only';
+        $status = 'Present';
         $insert->bind_param("ssssss", $id_number, $today, $day, $time, $status, $student_schedule);
         $insert->execute();
-        $_SESSION['success'] = "Time In recorded for " . $student_name . " at " . date('g:i A', strtotime($time));
+        $_SESSION['success'] = "Present marked for " . $student_name . " at " . date('g:i A', strtotime($time));
         $_SESSION['show_latest_student'] = true; // Flag to show student info
         $_SESSION['view_role'] = 'student';
     } else {
@@ -193,14 +193,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
                 $update = $conn->prepare("UPDATE attendance_record SET time_in = ?, schedule = ? WHERE id = ?");
                 $update->bind_param("ssi", $time, $student_schedule, $record['id']);
             } else {
-                // For normal students, update to 'Time In Only'
+                // For normal students, update to 'Present'
                 $update = $conn->prepare("UPDATE attendance_record SET time_in = ?, status = ?, schedule = ? WHERE id = ?");
-                $status = 'Time In Only';
+                $status = 'Present';
                 $update->bind_param("sssi", $time, $status, $student_schedule, $record['id']);
             }
             
             $update->execute();
-            $_SESSION['success'] = "Time In recorded for " . $student_name . " at " . date('g:i A', strtotime($time));
+            $_SESSION['success'] = "Present marked for " . $student_name . " at " . date('g:i A', strtotime($time));
             $_SESSION['show_latest_student'] = true;
             $_SESSION['view_role'] = 'student';
         } else {
@@ -218,7 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
             }
             
             $update->execute();
-            $_SESSION['success'] = "Time Out recorded for " . $student_name . " at " . date('g:i A', strtotime($time));
+            $_SESSION['success'] = "Time Out recorded for " . $student_name . " at " . date('g:i A', strtotime($time)) . " (Status: Present)";
             $_SESSION['show_latest_student'] = true;
             $_SESSION['view_role'] = 'student';
         }
@@ -532,8 +532,8 @@ $attendance_records = $attendance_query->get_result();
               }
               $empTimeIn = $latest_employee['time_in'];
               $empTimeOut = $latest_employee['time_out'];
-              $empStatus = (!empty($empTimeIn) && !empty($empTimeOut)) ? 'Present' : ((!empty($empTimeIn)) ? 'Time In Only' : '—');
-              $empStatusColor = ($empStatus==='Present') ? 'text-green-600' : (($empStatus==='Time In Only')?'text-blue-600':'text-gray-600');
+              $empStatus = (!empty($empTimeIn)) ? 'Present' : '—';
+              $empStatusColor = ($empStatus==='Present') ? 'text-green-600' : 'text-gray-600';
             ?>
             <div class="p-2">
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2">
@@ -693,8 +693,6 @@ $attendance_records = $attendance_query->get_result();
                         $status = $latest_student['status'];
                         if ($status === 'Present') {
                             $status_color = 'text-green-600';
-                        } elseif ($status === 'Time In Only') {
-                            $status_color = 'text-blue-600';
                         } elseif ($status === 'Absent') {
                             $status_color = 'text-red-600';
                         } else {
@@ -909,8 +907,6 @@ $attendance_records = $attendance_query->get_result();
                                     $status = $record['status'];
                                     if ($status === 'Present') {
                                         echo '<span class="text-green-600 font-medium">Present</span>';
-                                    } elseif ($status === 'Time In Only') {
-                                        echo '<span class="text-blue-600 font-medium">Time In Only</span>';
                                     } elseif ($status === 'Absent') {
                                         echo '<span class="text-red-600 font-medium">Absent</span>';
                                     } else {

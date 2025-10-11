@@ -211,8 +211,7 @@ $result = $stmt->get_result();
                 $status = $today_attendance['status'];
                 if ($status === 'Present') {
                     echo 'text-green-600';
-                } elseif ($status === 'Time In Only' || $status === 'Time In On') {
-                    echo 'text-blue-600';
+                // Removed Time In Only status
                 } elseif ($status === 'Absent') {
                     echo 'text-red-600';
                 } else {
@@ -344,8 +343,7 @@ $result = $stmt->get_result();
                         $status = $row['status'];
                         if ($status === 'Present') {
                             echo '<span class="text-green-600 font-medium">Present</span>';
-                        } elseif ($status === 'Time In Only' || $status === 'Time In On') {
-                            echo '<span class="text-blue-600 font-medium">' . htmlspecialchars($status) . '</span>';
+                        // Removed Time In Only status
                         } elseif ($status === 'Absent') {
                             echo '<span class="text-red-600 font-medium">Absent</span>';
                         } else {

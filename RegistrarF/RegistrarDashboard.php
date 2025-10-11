@@ -19,38 +19,15 @@ header("Expires: 0");
 // Ensure column exists for read/unread
 $conn->query("ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS is_read TINYINT(1) DEFAULT 0");
 
-// Pagination for All Student Requests
-$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$limit = 10;
-$offset = ($page - 1) * $limit;
-
-// Status filter
-$statusFilter = isset($_GET['status']) ? $_GET['status'] : 'all';
-$whereClause = '';
-if ($statusFilter !== 'all') {
-    if ($statusFilter === 'Ready to Claim') {
-        $whereClause = "WHERE (status = 'Ready to Claim' OR status = 'Ready for Claiming')";
-    } else {
-        $whereClause = "WHERE status = '" . $conn->real_escape_string($statusFilter) . "'";
-    }
-}
-
-// Get total count for pagination
-$countQuery = "SELECT COUNT(*) as total FROM document_requests $whereClause";
-$countResult = $conn->query($countQuery);
-$totalRecords = $countResult->fetch_assoc()['total'];
-$totalPages = ceil($totalRecords / $limit);
-
-// Fetch paginated requests - prioritize oldest pending first, then other statuses, claimed last
-$query = "SELECT * FROM document_requests $whereClause ORDER BY 
+// Fetch all requests for client-side pagination - prioritize oldest pending first, then other statuses, claimed last
+$query = "SELECT * FROM document_requests ORDER BY 
     CASE 
         WHEN status = 'Pending' THEN 1
         WHEN status = 'Ready to Claim' OR status = 'Ready for Claiming' THEN 2
         WHEN status = 'Claimed' THEN 3
         ELSE 4
     END ASC,
-    date_requested ASC
-    LIMIT $limit OFFSET $offset";
+    date_requested ASC";
 $result = $conn->query($query);
 
 // Fetch recent requests - prioritize unread first, then oldest, exclude claimed and older than 3 days
@@ -333,8 +310,10 @@ function timeAgo($time) {
                     <select id="statusFilter" class="border border-gray-400 rounded px-2 py-1 text-sm">
                         <option value="all">All</option>
                         <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
                         <option value="Ready to Claim">Ready to Claim</option>
                         <option value="Claimed">Claimed</option>
+                        <option value="Decline">Decline</option>
                     </select>
                 </div>
             </div>
@@ -343,6 +322,7 @@ function timeAgo($time) {
                 <table class="min-w-full bg-white rounded-xl overflow-hidden text-sm">
                     <thead class="bg-[#0B2C62] text-white">
                         <tr>
+                            <th class="px-4 py-4 text-left font-semibold w-16">#</th>
                             <th class="px-6 py-4 text-left font-semibold">Student No</th>
                             <th class="px-6 py-4 text-left font-semibold">Document Name</th>
                             <th class="px-6 py-4 text-left font-semibold">Date Requested</th>
@@ -350,10 +330,15 @@ function timeAgo($time) {
                             <th class="px-6 py-4 text-left font-semibold">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="text-gray-800 divide-y divide-gray-200">
+                    <tbody id="allRequestsTableBody" class="text-gray-800 divide-y divide-gray-200">
                         <?php if ($result && $result->num_rows > 0): ?>
+                            <?php $rowNumber = 1; ?>
                             <?php while ($r = $result->fetch_assoc()): ?>
-                                <tr class="bg-white hover:bg-[#FBB917]/20 transition cursor-pointer" onclick="viewRequest('<?= htmlspecialchars($r['student_id']) ?>', '<?= htmlspecialchars($r['document_type']) ?>', '<?= $r['status'] ?>')">
+                                <tr class="all-request-row bg-white hover:bg-[#FBB917]/20 transition cursor-pointer" 
+                                    data-status="<?= htmlspecialchars($r['status']) ?>"
+                                    data-row-number="<?= $rowNumber ?>"
+                                    onclick="viewRequest('<?= htmlspecialchars($r['student_id']) ?>', '<?= htmlspecialchars($r['document_type']) ?>', '<?= $r['status'] ?>')">
+                                    <td class="px-4 py-4 text-gray-500 font-medium text-center"><?= $rowNumber ?></td>
                                     <td class="px-6 py-4 font-medium"><?= htmlspecialchars($r['student_id']) ?></td>
                                     <td class="px-6 py-4"><?= htmlspecialchars($r['document_type']) ?></td>
                                     <td class="px-6 py-4 text-gray-600"><?= date('M j, Y g:i:s A', strtotime($r['date_requested'])) ?></td>
@@ -363,19 +348,24 @@ function timeAgo($time) {
                                     <td class="px-6 py-4">
                                         <?php if ($r['status'] === 'Pending'): ?>
                                             <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                        <?php elseif ($r['status'] === 'Approved'): ?>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Approved</span>
                                         <?php elseif ($r['status'] === 'Ready to Claim' || $r['status'] === 'Ready for Claiming'): ?>
                                             <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ready to Claim</span>
                                         <?php elseif ($r['status'] === 'Claimed'): ?>
-                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Claimed</span>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Claimed</span>
+                                        <?php elseif ($r['status'] === 'Decline'): ?>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Decline</span>
                                         <?php else: ?>
                                             <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800"><?= htmlspecialchars($r['status']) ?></span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
+                                <?php $rowNumber++; ?>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr>
-                                <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                            <tr id="noRequestsRow">
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                                     <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                     </svg>
@@ -388,30 +378,21 @@ function timeAgo($time) {
             </div>
             
             <!-- All Student Requests Pagination -->
-            <?php if ($totalPages > 1): ?>
-            <div class="mt-4 flex items-center justify-center gap-2 text-sm">
-                <?php 
-                $prevPage = max(1, $page - 1);
-                $nextPage = min($totalPages, $page + 1);
-                $statusParam = ($statusFilter !== 'all') ? '&status=' . urlencode($statusFilter) : '';
-                ?>
-                <a href="?page=<?= $prevPage ?><?= $statusParam ?>" 
-                   class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white <?= $page <= 1 ? 'opacity-40 cursor-not-allowed pointer-events-none' : '' ?> transition-colors">
+            <div id="allRequestsPaginationBar" class="hidden mt-4 flex items-center justify-center gap-2 text-sm">
+                <button id="allRequestsPrevPage" class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                     Prev
-                </a>
-                <span class="px-2 text-gray-600">Page <?= $page ?> of <?= $totalPages ?></span>
-                <a href="?page=<?= $nextPage ?><?= $statusParam ?>" 
-                   class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white <?= $page >= $totalPages ? 'opacity-40 cursor-not-allowed pointer-events-none' : '' ?> transition-colors">
+                </button>
+                <span id="allRequestsPageInfo" class="px-2 text-gray-600">Page 1 of 1</span>
+                <button id="allRequestsNextPage" class="px-3 py-1 border border-[#0B2C62] rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                     Next
                     <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
-                </a>
+                </button>
             </div>
-            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -745,30 +726,125 @@ searchInput.addEventListener('input', () => {
 
 searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); fetchStudents(searchInput.value.trim()); } });
 
-// ===== Status Filter with Pagination =====
-const statusFilter = document.getElementById('statusFilter');
-statusFilter.addEventListener('change', () => {
-    const value = statusFilter.value;
-    const currentUrl = new URL(window.location);
+// ===== All Student Requests Pagination (10 per page) =====
+let allRequests = [];
+let filteredRequests = [];
+let currentAllRequestsPage = 1;
+const allRequestsPageSize = 10;
+
+function initializeAllRequests() {
+    allRequests = Array.from(document.querySelectorAll('.all-request-row'));
+    applyStatusFilter();
+}
+
+function applyStatusFilter() {
+    const statusFilter = document.getElementById('statusFilter');
+    const selectedStatus = statusFilter.value;
     
-    // Reset to page 1 when filtering
-    currentUrl.searchParams.set('page', '1');
-    
-    if (value === 'all') {
-        currentUrl.searchParams.delete('status');
+    if (selectedStatus === 'all') {
+        filteredRequests = [...allRequests];
     } else {
-        currentUrl.searchParams.set('status', value);
+        filteredRequests = allRequests.filter(row => {
+            const rowStatus = row.getAttribute('data-status');
+            if (selectedStatus === 'Ready to Claim') {
+                return rowStatus === 'Ready to Claim' || rowStatus === 'Ready for Claiming';
+            }
+            return rowStatus === selectedStatus;
+        });
     }
     
-    window.location.href = currentUrl.toString();
-});
+    // Reset to page 1 when filtering
+    currentAllRequestsPage = 1;
+    renderAllRequestsPage();
+}
 
-// Set filter dropdown to current status from URL
+function renderAllRequestsPage() {
+    const totalPages = Math.max(1, Math.ceil(filteredRequests.length / allRequestsPageSize));
+    currentAllRequestsPage = Math.min(Math.max(1, currentAllRequestsPage), totalPages);
+    
+    // Hide all requests first
+    allRequests.forEach(request => request.style.display = 'none');
+    
+    // Show "no requests" row if no filtered results
+    const noRequestsRow = document.getElementById('noRequestsRow');
+    if (filteredRequests.length === 0) {
+        if (noRequestsRow) {
+            noRequestsRow.style.display = '';
+            noRequestsRow.querySelector('td').innerHTML = `
+                <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                No document requests found for the selected filter.
+            `;
+        }
+    } else {
+        if (noRequestsRow) noRequestsRow.style.display = 'none';
+        
+        // Show requests for current page and update row numbers
+        const startIndex = (currentAllRequestsPage - 1) * allRequestsPageSize;
+        const endIndex = startIndex + allRequestsPageSize;
+        const pageRequests = filteredRequests.slice(startIndex, endIndex);
+        
+        pageRequests.forEach((request, index) => {
+            request.style.display = '';
+            // Update row number for current page
+            const rowNumberCell = request.querySelector('td:first-child');
+            if (rowNumberCell) {
+                rowNumberCell.textContent = startIndex + index + 1;
+            }
+        });
+    }
+    
+    // Update pagination controls
+    const pageInfo = document.getElementById('allRequestsPageInfo');
+    const prevBtn = document.getElementById('allRequestsPrevPage');
+    const nextBtn = document.getElementById('allRequestsNextPage');
+    const paginationBar = document.getElementById('allRequestsPaginationBar');
+    
+    if (pageInfo) pageInfo.textContent = `Page ${currentAllRequestsPage} of ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = currentAllRequestsPage <= 1;
+    if (nextBtn) nextBtn.disabled = currentAllRequestsPage >= totalPages;
+    
+    // Show/hide pagination based on number of pages
+    if (paginationBar) {
+        if (totalPages > 1 && filteredRequests.length > 0) {
+            paginationBar.classList.remove('hidden');
+        } else {
+            paginationBar.classList.add('hidden');
+        }
+    }
+}
+
+// ===== Status Filter =====
+const statusFilter = document.getElementById('statusFilter');
+statusFilter.addEventListener('change', applyStatusFilter);
+
+// Initialize All Student Requests pagination
 document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentStatus = urlParams.get('status');
-    if (currentStatus && statusFilter) {
-        statusFilter.value = currentStatus;
+    // Initialize all requests pagination
+    initializeAllRequests();
+    
+    // Add event listeners for pagination buttons
+    const prevBtn = document.getElementById('allRequestsPrevPage');
+    const nextBtn = document.getElementById('allRequestsNextPage');
+    
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentAllRequestsPage > 1) {
+                currentAllRequestsPage--;
+                renderAllRequestsPage();
+            }
+        });
+    }
+    
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredRequests.length / allRequestsPageSize);
+            if (currentAllRequestsPage < totalPages) {
+                currentAllRequestsPage++;
+                renderAllRequestsPage();
+            }
+        });
     }
 });
 

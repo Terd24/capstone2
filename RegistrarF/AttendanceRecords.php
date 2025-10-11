@@ -16,6 +16,30 @@ $search_name = trim($_GET['search_name'] ?? '');
 // Keep inputs empty by default; we will still filter to today if both are empty
 $start_date  = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
 $end_date    = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
+$filter_section = trim($_GET['filter_section'] ?? '');
+$filter_status = trim($_GET['filter_status'] ?? '');
+
+// Validate date restrictions
+if ($start_date !== '') {
+    // Start date must be from 2025-01-01 onwards and not in the future
+    if ($start_date < '2025-01-01') {
+        $start_date = '2025-01-01';
+    }
+    if ($start_date > $today) {
+        $start_date = $today;
+    }
+}
+
+if ($end_date !== '') {
+    // End date cannot be in the future
+    if ($end_date > $today) {
+        $end_date = $today;
+    }
+    // End date should not be before start date if both are provided
+    if ($start_date !== '' && $end_date < $start_date) {
+        $end_date = $start_date;
+    }
+}
 
 // Build query for STUDENT attendance only
 $sql = "SELECT ar.*, sa.first_name, sa.middle_name, sa.last_name
@@ -44,12 +68,57 @@ if ($search_name !== '') {
     $params[] = $like; $types .= 's';
 }
 
+// Section filter
+if ($filter_section !== '') {
+    $sql .= " AND ar.schedule LIKE ?";
+    $section_like = "%$filter_section%";
+    $params[] = $section_like; $types .= 's';
+}
+
+// Status filter
+if ($filter_status !== '') {
+    $sql .= " AND ar.status = ?";
+    $params[] = $filter_status; $types .= 's';
+}
+
 $sql .= " ORDER BY ar.date DESC, ar.id DESC";
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) { $stmt->bind_param($types, ...$params); }
 $stmt->execute();
 $records = $stmt->get_result();
+
+// Get unique sections for filter dropdown
+$sections_query = "SELECT DISTINCT ar.schedule FROM attendance_record ar WHERE ar.schedule IS NOT NULL AND ar.schedule != '' ORDER BY ar.schedule";
+$sections_result = $conn->query($sections_query);
+$sections = [];
+if ($sections_result) {
+    while ($row = $sections_result->fetch_assoc()) {
+        $schedule = trim($row['schedule']);
+        if ($schedule !== '') {
+            // Extract section name from schedule (before parentheses)
+            if (preg_match('/^([^\(]+)/', $schedule, $matches)) {
+                $section = trim($matches[1]);
+                if (!in_array($section, $sections)) {
+                    $sections[] = $section;
+                }
+            }
+        }
+    }
+}
+
+// Get unique statuses for filter dropdown
+$status_query = "SELECT DISTINCT status FROM attendance_record WHERE status IS NOT NULL AND status != '' ORDER BY status";
+$status_result = $conn->query($status_query);
+$statuses = [];
+if ($status_result) {
+    while ($row = $status_result->fetch_assoc()) {
+        $status = trim($row['status']);
+        if ($status !== '') {
+            $statuses[] = $status;
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -83,7 +152,7 @@ $records = $stmt->get_result();
   <div class="container mx-auto px-6 py-4">
     <div class="bg-white rounded-2xl shadow-lg p-5 mb-4">
       <h2 class="text-xl font-bold text-gray-800 mb-4">Filter</h2>
-      <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
         <div>
           <label class="text-sm font-medium text-gray-700 mb-2 block">Search Student</label>
           <input type="text" name="search_name" value="<?= htmlspecialchars($search_name) ?>" placeholder="Enter student name..."
@@ -91,11 +160,33 @@ $records = $stmt->get_result();
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700 mb-2 block">Start Date</label>
-          <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" placeholder="Start date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+          <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" min="2025-01-01" max="<?= $today ?>" placeholder="Start date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="startDate">
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700 mb-2 block">End Date</label>
-          <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" placeholder="End date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+          <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" max="<?= $today ?>" placeholder="End date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="endDate">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 mb-2 block">Section</label>
+          <select name="filter_section" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+            <option value="">All Sections</option>
+            <?php foreach ($sections as $section): ?>
+              <option value="<?= htmlspecialchars($section) ?>" <?= ($filter_section === $section) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($section) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 mb-2 block">Status</label>
+          <select name="filter_status" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+            <option value="">All Status</option>
+            <?php foreach ($statuses as $status): ?>
+              <option value="<?= htmlspecialchars($status) ?>" <?= ($filter_status === $status) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($status) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
         </div>
         <div class="flex gap-2">
           <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium">Generate Report</button>
@@ -103,13 +194,29 @@ $records = $stmt->get_result();
         </div>
       </form>
       <p class="mt-4 text-gray-600">
-        <?php if ($start_date !== '' && $end_date !== ''): ?>
-            Attendance records from <?= date('F j, Y', strtotime($start_date)) ?> to <?= date('F j, Y', strtotime($end_date)) ?>
-        <?php elseif ($search_name !== ''): ?>
-            Search results for "<?= htmlspecialchars($search_name) ?>" on <?= date('F j, Y', strtotime($today)) ?>
-        <?php else: ?>
-            Real-time attendance tracking for <?= date('F j, Y', strtotime($today)) ?>
-        <?php endif; ?>
+        <?php 
+        $filters = [];
+        if ($start_date !== '' && $end_date !== '') {
+            $filters[] = "from " . date('F j, Y', strtotime($start_date)) . " to " . date('F j, Y', strtotime($end_date));
+        } elseif ($start_date === '' && $end_date === '') {
+            $filters[] = "for " . date('F j, Y', strtotime($today));
+        }
+        if ($search_name !== '') {
+            $filters[] = "student: \"" . htmlspecialchars($search_name) . "\"";
+        }
+        if ($filter_section !== '') {
+            $filters[] = "section: " . htmlspecialchars($filter_section);
+        }
+        if ($filter_status !== '') {
+            $filters[] = "status: " . htmlspecialchars($filter_status);
+        }
+        
+        if (!empty($filters)) {
+            echo "Attendance records " . implode(", ", $filters);
+        } else {
+            echo "Real-time attendance tracking for " . date('F j, Y', strtotime($today));
+        }
+        ?>
       </p>
     </div>
 
@@ -200,7 +307,7 @@ $records = $stmt->get_result();
                 <td class="px-6 py-3 "><?= $r['time_out'] ? date('g:i A', strtotime($r['time_out'])) : '--' ?></td>
                 <td class="px-6 py-3 font-semibold <?php 
                   $status = $r['status'];
-                  $color = ($status==='Present') ? 'text-green-600' : (($status==='Time In Only')?'text-blue-600':(($status==='Absent')?'text-red-600':'text-gray-600'));
+                  $color = ($status==='Present') ? 'text-green-600' : (($status==='Absent')?'text-red-600':'text-gray-600');
                   echo $color; ?>
                 ">
                   <?= htmlspecialchars($r['status'] ?: '-') ?>
@@ -214,5 +321,48 @@ $records = $stmt->get_result();
       </table>
     </div>
   </div>
+
+  <script>
+    // Date validation and dynamic min/max updates
+    document.addEventListener('DOMContentLoaded', function() {
+        const startDate = document.getElementById('startDate');
+        const endDate = document.getElementById('endDate');
+        const today = '<?= $today ?>';
+        
+        // Update end date minimum when start date changes
+        startDate.addEventListener('change', function() {
+            if (this.value) {
+                endDate.min = this.value;
+                // If end date is before start date, clear it
+                if (endDate.value && endDate.value < this.value) {
+                    endDate.value = '';
+                }
+            } else {
+                endDate.min = '';
+            }
+        });
+        
+        // Update start date maximum when end date changes
+        endDate.addEventListener('change', function() {
+            if (this.value) {
+                startDate.max = this.value;
+                // If start date is after end date, clear it
+                if (startDate.value && startDate.value > this.value) {
+                    startDate.value = '';
+                }
+            } else {
+                startDate.max = today;
+            }
+        });
+        
+        // Initialize min/max based on current values
+        if (startDate.value) {
+            endDate.min = startDate.value;
+        }
+        if (endDate.value) {
+            startDate.max = endDate.value;
+        }
+    });
+  </script>
 </body>
 </html>

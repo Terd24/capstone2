@@ -218,8 +218,8 @@ $records = $stmt->get_result();
                       $otMin = max(0, intval((strtotime($timeOut) - strtotime($shiftOut)) / 60));
                     }
                   }
-                  $status = (!empty($timeIn) && !empty($timeOut)) ? 'Present' : ((!empty($timeIn)) ? 'Time In Only' : '—');
-                  $statusColor = ($status==='Present') ? 'text-green-600' : (($status==='Time In Only') ? 'text-blue-600' : 'text-gray-600');
+                  $status = (!empty($timeIn)) ? 'Present' : '—';
+                  $statusColor = ($status==='Present') ? 'text-green-600' : 'text-gray-600';
                 ?>
                 <td class="px-6 py-3 font-medium"><?= htmlspecialchars(trim(($r['first_name'] ?? '').' '.($r['last_name'] ?? ''))) ?></td>
                 <td class="px-6 py-3 text-gray-800"><?= date('F j, Y', strtotime($r['date'])) ?></td>
