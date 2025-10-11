@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 include("../StudentLogin/db_conn.php");
 
@@ -1101,9 +1101,7 @@ function initRegistrarInlineValidation() {
         'payment_mode','address',
         'father_first_name','father_last_name','father_occupation','father_contact',
         'mother_first_name','mother_last_name','mother_occupation','mother_contact',
-        'guardian_first_name','guardian_last_name','guardian_occupation','guardian_contact',
-        'last_school','last_school_year',
-        'rfid_uid'
+        'guardian_first_name','guardian_last_name','guardian_occupation','guardian_contact','last_school','last_school_year'
     ];
 
     const findField = (name) => form.querySelector(`[name="${name}"]`);
@@ -1190,7 +1188,7 @@ function initRegistrarInlineValidation() {
             { n:'religion', re:/^[A-Za-z\s]+$/, msg:'Religion must contain letters only.' },
             { n:'school_year', re:/^[0-9\-]+$/, msg:'School year must be like 2024-2025.' },
             { n:'address', re:/^.{20,500}$/, msg:'Complete address must be 20-500 characters long.' },
-            { n:'rfid_uid', re:/^[0-9]{10}$/, msg:'RFID must be exactly 10 digits.' }
+            { n:'rfid_uid', re:/^[0-9]{10}$/, msg:'RFID must be exactly 10 digits.', optional: true }
         ];
         patterns.forEach(p => { const el = findField(p.n); if (el && el.value && !p.re.test(el.value.trim())) { setError(el, p.msg); ok = false; } });
 
@@ -1524,20 +1522,8 @@ function printQRCode() {
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1 style="color: #0B2C62;">🏫 Cornerstone College Inc.</h1>
-                <h2>Student RFID QR Code</h2>
-            </div>
-            
             <div class="qr-container">
                 <img src="${canvas.toDataURL()}" alt="QR Code">
-            </div>
-            
-            <div class="info">
-                <p><strong>Student:</strong> ${studentName || 'New Student'}</p>
-                <p><strong>RFID Number:</strong> ${rfid}</p>
-                <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-                <p>✅ Compatible with RFID and QR scanners</p>
             </div>
         </body>
         </html>
@@ -1549,3 +1535,4 @@ function printQRCode() {
 </script>
 </body>
 </html>
+

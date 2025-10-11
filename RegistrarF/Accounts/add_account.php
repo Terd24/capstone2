@@ -122,6 +122,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         $raw_password = $_POST['password'] ?? '';
         $password = password_hash($raw_password, PASSWORD_DEFAULT);
         $rfid_uid = trim($_POST['rfid_uid'] ?? '');
+        // Treat empty RFID as NULL for database insert
+        $rfid_uid_db = ($rfid_uid === '') ? null : $rfid_uid;
         $username = trim($_POST['username'] ?? '');
         $parent_username = trim($_POST['parent_username'] ?? '');
         $parent_password = $_POST['parent_password'] ?? '';
@@ -182,15 +184,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
             $check_rfid->close();
         }
 
-        // Validate required fields (middle_name is optional)
+        // Validate required fields (middle_name and rfid_uid are optional)
         if (empty($lrn) || empty($last_name) || empty($first_name) || empty($dob) || 
             empty($birthplace) || empty($gender) || empty($religion) || empty($academic_track) || 
             empty($grade_level) || empty($semester) || empty($school_year) || empty($enrollment_status) || 
             empty($payment_mode) || empty($father_first_name) || empty($father_last_name) || 
-            empty($mother_first_name) || empty($mother_last_name) || empty($guardian_first_name) || empty($guardian_last_name) ||
-            empty($rfid_uid)) {
+            empty($mother_first_name) || empty($mother_last_name) || empty($guardian_first_name) || empty($guardian_last_name)) {
             
-            $error_msg = "All required fields must be filled. (Middle name, Student ID, username, and password are optional as they are auto-generated)";
+            $error_msg = "All required fields must be filled. (Middle name, RFID, Student ID, username, and password are optional as they are auto-generated)";
             $form_data = $_POST;
             $show_modal = true;
             $_SESSION['error_msg'] = $error_msg;
@@ -348,11 +349,13 @@ $validation_errors = [];
             $validation_errors[] = "Student ID must be exactly 11 digits.";
         }
 
-        // Validate RFID: numbers only, exactly 10 digits
-        if (!preg_match('/^[0-9]+$/', $rfid_uid)) {
-            $validation_errors[] = "RFID must contain digits only.";
-        } elseif (strlen($rfid_uid) !== 10) {
-            $validation_errors[] = "RFID must be exactly 10 digits.";
+        // Validate RFID only when provided: numbers only, exactly 10 digits
+        if (!empty($rfid_uid)) {
+            if (!preg_match('/^[0-9]+$/', $rfid_uid)) {
+                $validation_errors[] = "RFID must contain digits only.";
+            } elseif (strlen($rfid_uid) !== 10) {
+                $validation_errors[] = "RFID must be exactly 10 digits.";
+            }
         }
 
 // Validate username (lastname + last6(id) + 'muzon' @ student.cci.edu.ph)
@@ -407,7 +410,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 $mother_name, $mother_occupation, $mother_contact,
                 $guardian_name, $guardian_occupation, $guardian_contact,
                 $last_school, $last_school_year,
-                $id_number, $password, $rfid_uid, $username
+                $id_number, $password, $rfid_uid_db, $username
             );
 
             $student_ok = $stmt->execute();
@@ -1253,8 +1256,8 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                             <p class="text-xs text-gray-500 mt-1">Format: <span class="font-medium">lastname + birthdate</span> (e.g., studentjanuary152003)</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">RFID Number *</label>
-                            <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" required value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
+                            <label class="block text-sm font-semibold mb-1">RFID Number</label>
+                            <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
                             <?php if (!empty($error_rfid)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
                             <?php endif; ?>
@@ -1265,11 +1268,51 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 <!-- Submit Buttons -->
                 <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
                     <button type="button" onclick="closeModal()" class="px-5 py-2 border border-[#0B2C62] text-[#0B2C62] rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Cancel</button>
-                    <button type="submit" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">Create Student & Parent Accounts</button>
+                    <button type="button" onclick="showConfirmationModal()" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">Review & Create Account</button>
                 </div>
             </form>
         </div>
 
+    </div>
+</div>
+
+<!-- Student Confirmation Modal -->
+<div id="confirmationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[9999]" onclick="closeConfirmationModal()">
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border-2 border-gray-200" onclick="event.stopPropagation()">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-[#0B2C62] to-[#153e86] text-white px-6 py-5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold">Confirm Student Creation</h3>
+            </div>
+            <button onclick="closeConfirmationModal()" class="text-white hover:text-gray-200 p-2 rounded-lg hover:bg-white/10 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Content -->
+        <div class="p-6 max-h-[calc(90vh-160px)] overflow-y-auto bg-gray-50">
+            <div id="confirmationContent">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="bg-white px-6 py-4 border-t border-gray-200 flex justify-end gap-4">
+            <button onclick="closeConfirmationModal()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">Cancel</button>
+            <button onclick="confirmAndCreateStudent()" class="px-6 py-2 bg-[#0B2C62] text-white rounded-lg hover:bg-[#153e86] transition flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Confirm & Create Student
+            </button>
+        </div>
     </div>
 </div>
 
@@ -1666,7 +1709,293 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Date validation and dynamic day updating initialized');
 });
 
+// Confirmation Modal Functions
+function showConfirmationModal() {
+    // Trigger the inline validation first
+    const form = document.querySelector('#unifiedForm form');
+    
+    // Create a temporary submit event to trigger validation
+    const submitEvent = new Event('submit', { cancelable: true });
+    const isValid = form.dispatchEvent(submitEvent);
+    
+    // If validation failed, don't show confirmation modal
+    if (!isValid) {
+        return;
+    }
+    
+    // Also check HTML5 validity
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Collect form data
+    const formData = new FormData(form);
+    const data = {};
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    // Handle checkboxes for credentials
+    const credentials = [];
+    const credentialCheckboxes = form.querySelectorAll('input[name="credentials[]"]');
+    credentialCheckboxes.forEach(cb => {
+        if (cb.checked) credentials.push(cb.value);
+    });
+    data.credentials = credentials;
+    
+    // Format date of birth
+    let dobFormatted = 'Not specified';
+    if (data.dob_month && data.dob_day && data.dob_year) {
+        const months = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        dobFormatted = `${months[parseInt(data.dob_month)]} ${data.dob_day}, ${data.dob_year}`;
+    }
+    
+    // Generate confirmation content
+    const content = `
+        <!-- Student Information -->
+        <div class="mb-6">
+            <div class="flex items-center gap-3 mb-4 p-3 bg-[#0B2C62]/5 rounded-lg">
+                <div class="w-8 h-8 bg-[#0B2C62] rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <h4 class="text-lg font-bold text-[#0B2C62]">Student Information</h4>
+            </div>
+            <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200 space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Student ID:</span> 
+                        <span class="text-[#0B2C62] font-medium text-lg">${data.id_number || 'Auto-generated'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">LRN:</span> 
+                        <span class="text-[#0B2C62] font-medium text-lg">${data.lrn || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Full Name:</span> 
+                        <span class="text-[#0B2C62] font-medium text-lg">${data.first_name} ${data.middle_name || ''} ${data.last_name}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Date of Birth:</span> 
+                        <span class="text-gray-900 font-medium">${dobFormatted}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Birthplace:</span> 
+                        <span class="text-gray-900 font-medium">${data.birthplace || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Gender:</span> 
+                        <span class="text-gray-900 font-medium">${data.gender || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Religion:</span> 
+                        <span class="text-gray-900 font-medium">${data.religion || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Academic Track:</span> 
+                        <span class="text-gray-900 font-medium">${data.academic_track || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Grade Level:</span> 
+                        <span class="text-gray-900 font-medium">${data.grade_level || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Semester:</span> 
+                        <span class="text-gray-900 font-medium">${data.semester || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">School Year:</span> 
+                        <span class="text-gray-900 font-medium">${data.school_year || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Enrollment Status:</span> 
+                        <span class="text-gray-900 font-medium">${data.enrollment_status || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Payment Mode:</span> 
+                        <span class="text-gray-900 font-medium">${data.payment_mode || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">RFID Number:</span> 
+                        <span class="text-gray-900 font-medium">${data.rfid_uid || 'Not provided (Optional)'}</span>
+                    </div>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <span class="font-semibold text-gray-800 block">Complete Address:</span> 
+                    <span class="text-gray-900 font-medium">${data.address || 'Not specified'}</span>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <span class="font-semibold text-gray-800 block">Credentials Submitted:</span> 
+                    <span class="text-gray-900 font-medium">${data.credentials.length > 0 ? data.credentials.join(', ') : 'None selected'}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Family Information -->
+        <div class="mb-6">
+            <div class="flex items-center gap-3 mb-4 p-3 bg-[#0B2C62]/5 rounded-lg">
+                <div class="w-8 h-8 bg-[#0B2C62] rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                    </svg>
+                </div>
+                <h4 class="text-lg font-bold text-[#0B2C62]">Family Information</h4>
+            </div>
+            <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200 space-y-4">
+                <!-- Father's Information -->
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <h5 class="font-semibold text-gray-800 mb-3">Father's Information</h5>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Name:</span> 
+                            <span class="text-gray-900 font-medium">${data.father_first_name || ''} ${data.father_middle_name || ''} ${data.father_last_name || ''}</span>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Occupation:</span> 
+                            <span class="text-gray-900 font-medium">${data.father_occupation || 'Not specified'}</span>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Contact:</span> 
+                            <span class="text-gray-900 font-medium">${data.father_contact || 'Not specified'}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mother's Information -->
+                <div class="border-l-4 border-pink-500 pl-4">
+                    <h5 class="font-semibold text-gray-800 mb-3">Mother's Information</h5>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Name:</span> 
+                            <span class="text-gray-900 font-medium">${data.mother_first_name || ''} ${data.mother_middle_name || ''} ${data.mother_last_name || ''}</span>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Occupation:</span> 
+                            <span class="text-gray-900 font-medium">${data.mother_occupation || 'Not specified'}</span>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Contact:</span> 
+                            <span class="text-gray-900 font-medium">${data.mother_contact || 'Not specified'}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Guardian's Information -->
+                <div class="border-l-4 border-green-500 pl-4">
+                    <h5 class="font-semibold text-gray-800 mb-3">Guardian's Information</h5>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Name:</span> 
+                            <span class="text-gray-900 font-medium">${data.guardian_first_name || ''} ${data.guardian_middle_name || ''} ${data.guardian_last_name || ''}</span>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Occupation:</span> 
+                            <span class="text-gray-900 font-medium">${data.guardian_occupation || 'Not specified'}</span>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg">
+                            <span class="font-semibold text-gray-800 block">Contact:</span> 
+                            <span class="text-gray-900 font-medium">${data.guardian_contact || 'Not specified'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Educational Background -->
+        <div class="mb-6">
+            <div class="flex items-center gap-3 mb-4 p-3 bg-[#0B2C62]/5 rounded-lg">
+                <div class="w-8 h-8 bg-[#0B2C62] rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                </div>
+                <h4 class="text-lg font-bold text-[#0B2C62]">Educational Background</h4>
+            </div>
+            <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200 space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Last School Attended:</span> 
+                        <span class="text-gray-900 font-medium">${data.last_school || 'Not specified'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Last School Year:</span> 
+                        <span class="text-gray-900 font-medium">${data.last_school_year || 'Not specified'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Parent Account -->
+        <div class="mb-6">
+            <div class="flex items-center gap-3 mb-4 p-3 bg-[#0B2C62]/5 rounded-lg">
+                <div class="w-8 h-8 bg-[#0B2C62] rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </div>
+                <h4 class="text-lg font-bold text-[#0B2C62]">Parent Account</h4>
+            </div>
+            <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200 space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Username:</span> 
+                        <span class="text-[#0B2C62] font-medium">${data.parent_username || 'Auto-generated'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Password:</span> 
+                        <span class="text-gray-900 font-medium">${data.parent_password ? '•'.repeat(data.parent_password.length) + ' (' + data.parent_password.length + ' chars)' : 'Auto-generated'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Student Account -->
+        <div class="mb-6">
+            <div class="flex items-center gap-3 mb-4 p-3 bg-[#0B2C62]/5 rounded-lg">
+                <div class="w-8 h-8 bg-[#0B2C62] rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <h4 class="text-lg font-bold text-[#0B2C62]">Student Account</h4>
+            </div>
+            <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200 space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Username:</span> 
+                        <span class="text-[#0B2C62] font-medium">${data.username || 'Auto-generated'}</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <span class="font-semibold text-gray-800 block">Password:</span> 
+                        <span class="text-gray-900 font-medium">${data.password ? '•'.repeat(data.password.length) + ' (' + data.password.length + ' chars)' : 'Auto-generated'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('confirmationContent').innerHTML = content;
+    document.getElementById('confirmationModal').classList.remove('hidden');
+    document.getElementById('confirmationModal').classList.add('flex');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeConfirmationModal() {
+    document.getElementById('confirmationModal').classList.add('hidden');
+    document.getElementById('confirmationModal').classList.remove('flex');
+    document.body.style.overflow = '';
+}
+
+function confirmAndCreateStudent() {
+    // Submit the original form
+    const form = document.querySelector('#unifiedForm form');
+    form.submit();
+}
+
 </script>
 <?php
 if ($_SERVER["REQUEST_METHOD"] != "POST") {
 }
+
