@@ -358,7 +358,8 @@ if (!$student_data) {
 
 // Parse combined parent names into separate fields for display
 function parseFullName($fullName) {
-    $parts = array_filter(array_map('trim', explode(' ', $fullName ?? '')));
+    // Re-index array to avoid "Undefined array key" warnings
+    $parts = array_values(array_filter(array_map('trim', explode(' ', $fullName ?? ''))));
     $result = ['first' => '', 'middle' => '', 'last' => ''];
     
     if (count($parts) === 1) {
@@ -376,23 +377,29 @@ function parseFullName($fullName) {
     return $result;
 }
 
-// Parse father's name
-$father_parsed = parseFullName($student_data['father_name'] ?? '');
-$student_data['father_first_name'] = $father_parsed['first'];
-$student_data['father_middle_name'] = $father_parsed['middle'];
-$student_data['father_last_name'] = $father_parsed['last'];
+// Parse father's name (only if not already split in database)
+if (empty($student_data['father_first_name']) && !empty($student_data['father_name'])) {
+    $father_parsed = parseFullName($student_data['father_name']);
+    $student_data['father_first_name'] = $father_parsed['first'];
+    $student_data['father_middle_name'] = $father_parsed['middle'];
+    $student_data['father_last_name'] = $father_parsed['last'];
+}
 
-// Parse mother's name
-$mother_parsed = parseFullName($student_data['mother_name'] ?? '');
-$student_data['mother_first_name'] = $mother_parsed['first'];
-$student_data['mother_middle_name'] = $mother_parsed['middle'];
-$student_data['mother_last_name'] = $mother_parsed['last'];
+// Parse mother's name (only if not already split in database)
+if (empty($student_data['mother_first_name']) && !empty($student_data['mother_name'])) {
+    $mother_parsed = parseFullName($student_data['mother_name']);
+    $student_data['mother_first_name'] = $mother_parsed['first'];
+    $student_data['mother_middle_name'] = $mother_parsed['middle'];
+    $student_data['mother_last_name'] = $mother_parsed['last'];
+}
 
-// Parse guardian's name
-$guardian_parsed = parseFullName($student_data['guardian_name'] ?? '');
-$student_data['guardian_first_name'] = $guardian_parsed['first'];
-$student_data['guardian_middle_name'] = $guardian_parsed['middle'];
-$student_data['guardian_last_name'] = $guardian_parsed['last'];
+// Parse guardian's name (only if not already split in database)
+if (empty($student_data['guardian_first_name']) && !empty($student_data['guardian_name'])) {
+    $guardian_parsed = parseFullName($student_data['guardian_name']);
+    $student_data['guardian_first_name'] = $guardian_parsed['first'];
+    $student_data['guardian_middle_name'] = $guardian_parsed['middle'];
+    $student_data['guardian_last_name'] = $guardian_parsed['last'];
+}
 
 // Normalize gender value for display (handles 'M'/'F' or 'Male'/'Female', any case/spacing)
 $genderVal = '';
@@ -812,8 +819,8 @@ input[type=number] { -moz-appearance: textfield; }
                     
                     <div class="grid grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Username</label>
-                            <input type="text" name="parent_username" value="<?= htmlspecialchars($parent_username) ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
+                            <label class="block text-sm font-semibold mb-1">Parent Username <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="parent_username" autocomplete="off" value="<?= htmlspecialchars($parent_username) ?>" pattern="^[a-z]+[0-9]{6}muzon@parent\.cci\.edu\.ph$" title="Auto-generated: lastname000000muzon@parent.cci.edu.ph" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] student-field" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password</label>
@@ -842,8 +849,8 @@ input[type=number] { -moz-appearance: textfield; }
 
                         <!-- Username -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Username</label>
-                            <input type="text" name="username" value="<?= htmlspecialchars($student_data['username'] ?? '') ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
+                            <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="username" autocomplete="off" value="<?= htmlspecialchars($student_data['username'] ?? '') ?>" pattern="^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$" title="Auto-generated: lastname000000muzon@student.cci.edu.ph" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] student-field" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                         </div>
 
                         <!-- Password -->
@@ -994,7 +1001,7 @@ function toggleEdit() {
         
         // Make fields editable
         fields.forEach(field => {
-            // Skip username fields - they should always remain readonly
+            // Skip username fields - they should always remain readonly (auto-generated)
             if (field.name === 'username' || field.name === 'parent_username') {
                 return;
             }
@@ -1064,6 +1071,96 @@ function populateLastSchoolYears(yearsBack = 5) {
     }
 }
 
+// Setup auto-generated Student Username (EXACT COPY from add_account.php)
+function setupAutoUsername() {
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const idField = document.querySelector('input[name="id_number"]');
+    const usernameField = document.querySelector('input[name="username"]');
+    
+    if (!lastNameField || !idField || !usernameField) return;
+
+    const lettersOnly = (s) => (s || '').toLowerCase().replace(/[^a-z]/g, '');
+    const last6 = (s) => {
+        const digits = (s || '').replace(/\D/g, '');
+        return digits.slice(-6).padStart(6, '0');
+    };
+
+    const updateUsername = () => {
+        const lastName = lettersOnly(lastNameField.value);
+        const idNumber = idField.value;
+        const tail = last6(idNumber);
+        
+        if (lastName && tail.length === 6) {
+            const username = `${lastName}${tail}muzon@student.cci.edu.ph`;
+            usernameField.value = username;
+            usernameField.readOnly = true;
+            usernameField.style.backgroundColor = '#f3f4f6';
+            usernameField.style.cursor = 'not-allowed';
+        }
+    };
+
+    // Initial fill and listeners
+    updateUsername();
+    lastNameField.addEventListener('input', updateUsername);
+    idField.addEventListener('input', updateUsername);
+    
+    // Poll every 500ms to check if Student ID gets auto-filled
+    const pollForStudentId = setInterval(() => {
+        if (idField.value && idField.value.length === 11) {
+            updateUsername();
+            clearInterval(pollForStudentId);
+        }
+    }, 500);
+    
+    // Stop polling after 10 seconds
+    setTimeout(() => clearInterval(pollForStudentId), 10000);
+}
+
+// Setup auto-generated Parent Username (SAME LOGIC as student username)
+function setupAutoParentUsername() {
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const idField = document.querySelector('input[name="id_number"]');
+    const parentUsernameField = document.querySelector('input[name="parent_username"]');
+    
+    if (!lastNameField || !idField || !parentUsernameField) return;
+
+    const lettersOnly = (s) => (s || '').toLowerCase().replace(/[^a-z]/g, '');
+    const last6 = (s) => {
+        const digits = (s || '').replace(/\D/g, '');
+        return digits.slice(-6).padStart(6, '0');
+    };
+
+    const updateParentUsername = () => {
+        const lastName = lettersOnly(lastNameField.value);
+        const idNumber = idField.value;
+        const tail = last6(idNumber);
+        
+        if (lastName && tail.length === 6) {
+            const parentUsername = `${lastName}${tail}muzon@parent.cci.edu.ph`;
+            parentUsernameField.value = parentUsername;
+            parentUsernameField.readOnly = true;
+            parentUsernameField.style.backgroundColor = '#f3f4f6';
+            parentUsernameField.style.cursor = 'not-allowed';
+        }
+    };
+
+    // Initial fill and listeners
+    updateParentUsername();
+    lastNameField.addEventListener('input', updateParentUsername);
+    idField.addEventListener('input', updateParentUsername);
+    
+    // Poll every 500ms to check if Student ID gets auto-filled
+    const pollForStudentId = setInterval(() => {
+        if (idField.value && idField.value.length === 11) {
+            updateParentUsername();
+            clearInterval(pollForStudentId);
+        }
+    }, 500);
+    
+    // Stop polling after 10 seconds
+    setTimeout(() => clearInterval(pollForStudentId), 10000);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     updateGradeLevels();
     
@@ -1112,6 +1209,21 @@ document.addEventListener('DOMContentLoaded', function() {
     if (academicTrack) {
         academicTrack.addEventListener('change', updateGradeLevels);
     }
+    
+    // Setup auto-generated usernames (with delays to ensure fields are ready)
+    setTimeout(() => {
+        setupAutoUsername();
+        setupAutoParentUsername();
+    }, 100);
+    setTimeout(() => {
+        setupAutoUsername();
+        setupAutoParentUsername();
+    }, 500);
+    setTimeout(() => {
+        setupAutoUsername();
+        setupAutoParentUsername();
+    }, 1000);
+    
     // Force-initialize gender select if not pre-selected
     const genderEl = document.querySelector('select[name="gender"]');
     if (genderEl && !genderEl.value && genderEl.dataset.initial) {

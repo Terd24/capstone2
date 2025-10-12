@@ -206,6 +206,34 @@ window.viewStudent = async function(studentId) {
         
         inner.innerHTML = html;
         
+        // Extract and execute only the script content (using eval in global scope)
+        const scripts = inner.querySelectorAll('script');
+        scripts.forEach((script) => {
+            if (!script.src && script.textContent.trim()) {
+                try {
+                    // Use indirect eval to execute in global scope
+                    (0, eval)(script.textContent);
+                } catch (e) {
+                    console.warn('Error executing script:', e);
+                }
+            }
+        });
+        
+        // Trigger username setup with multiple attempts
+        const triggerSetup = () => {
+            if (typeof setupAutoUsername === 'function') {
+                setupAutoUsername();
+            }
+            if (typeof setupAutoParentUsername === 'function') {
+                setupAutoParentUsername();
+            }
+        };
+        
+        // Try multiple times with delays
+        setTimeout(triggerSetup, 100);
+        setTimeout(triggerSetup, 300);
+        setTimeout(triggerSetup, 500);
+        
         // Wire up handlers
         if (typeof setupStudentModalHandlers === 'function') {
             setupStudentModalHandlers(studentId);
