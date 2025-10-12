@@ -103,19 +103,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     $credentials = isset($_POST['credentials']) ? implode(",", $_POST['credentials']) : '';
     $payment_mode = $_POST['payment_mode'] ?? '';
     $address = $_POST['address'] ?? '';
-    $father_name = $_POST['father_name'] ?? '';
+    
+    // Father's Information - separate fields
+    $father_first_name = trim($_POST['father_first_name'] ?? '');
+    $father_last_name = trim($_POST['father_last_name'] ?? '');
+    $father_middle_name = trim($_POST['father_middle_name'] ?? '');
+    $father_name = trim($father_first_name . ' ' . $father_middle_name . ' ' . $father_last_name);
     $father_occupation = $_POST['father_occupation'] ?? '';
     $father_contact = $_POST['father_contact'] ?? '';
-    $mother_name = $_POST['mother_name'] ?? '';
+    
+    // Mother's Information - separate fields
+    $mother_first_name = trim($_POST['mother_first_name'] ?? '');
+    $mother_last_name = trim($_POST['mother_last_name'] ?? '');
+    $mother_middle_name = trim($_POST['mother_middle_name'] ?? '');
+    $mother_name = trim($mother_first_name . ' ' . $mother_middle_name . ' ' . $mother_last_name);
     $mother_occupation = $_POST['mother_occupation'] ?? '';
     $mother_contact = $_POST['mother_contact'] ?? '';
-    $guardian_name = $_POST['guardian_name'] ?? '';
+    
+    // Guardian's Information - separate fields
+    $guardian_first_name = trim($_POST['guardian_first_name'] ?? '');
+    $guardian_last_name = trim($_POST['guardian_last_name'] ?? '');
+    $guardian_middle_name = trim($_POST['guardian_middle_name'] ?? '');
+    $guardian_name = trim($guardian_first_name . ' ' . $guardian_middle_name . ' ' . $guardian_last_name);
     $guardian_occupation = $_POST['guardian_occupation'] ?? '';
     $guardian_contact = $_POST['guardian_contact'] ?? '';
     $last_school = $_POST['last_school'] ?? '';
     $last_school_year = $_POST['last_school_year'] ?? '';
     $id_number = $_POST['id_number'] ?? '';
-    $rfid_uid = $_POST['rfid_uid'] ?? '';
+    $rfid_uid = trim($_POST['rfid_uid'] ?? '');
+    // Convert empty RFID to NULL to avoid duplicate key errors
+    $rfid_uid = ($rfid_uid === '') ? null : $rfid_uid;
     $password = $_POST['password'] ?? '';
     $parent_password = $_POST['parent_password'] ?? '';
 
@@ -129,11 +146,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     if (empty(trim($birthplace))) $validation_errors[] = "Birthplace is required.";
     if (empty(trim($religion))) $validation_errors[] = "Religion is required.";
     if (empty(trim($address))) $validation_errors[] = "Complete address is required.";
-    if (empty(trim($father_name))) $validation_errors[] = "Father's name is required.";
+    if (empty(trim($father_first_name))) $validation_errors[] = "Father's first name is required.";
+    if (empty(trim($father_last_name))) $validation_errors[] = "Father's last name is required.";
     if (empty(trim($father_occupation))) $validation_errors[] = "Father's occupation is required.";
-    if (empty(trim($mother_name))) $validation_errors[] = "Mother's name is required.";
+    if (empty(trim($mother_first_name))) $validation_errors[] = "Mother's first name is required.";
+    if (empty(trim($mother_last_name))) $validation_errors[] = "Mother's last name is required.";
     if (empty(trim($mother_occupation))) $validation_errors[] = "Mother's occupation is required.";
-    if (empty(trim($guardian_name))) $validation_errors[] = "Guardian's name is required.";
+    if (empty(trim($guardian_first_name))) $validation_errors[] = "Guardian's first name is required.";
+    if (empty(trim($guardian_last_name))) $validation_errors[] = "Guardian's last name is required.";
     if (empty(trim($guardian_occupation))) $validation_errors[] = "Guardian's occupation is required.";
     if (empty(trim($last_school))) $validation_errors[] = "Last school name is required.";
     if (empty(trim($last_school_year))) $validation_errors[] = "Last school year is required.";
@@ -168,6 +188,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     }
     if (!empty($guardian_occupation) && !preg_match('/^[A-Za-z\s]+$/', $guardian_occupation)) {
         $validation_errors[] = "Guardian's occupation must contain letters only.";
+    }
+    
+    // Validate parent name fields (letters and spaces only)
+    if (!empty($father_first_name) && !preg_match('/^[A-Za-z\s]+$/', $father_first_name)) {
+        $validation_errors[] = "Father's first name must contain letters only.";
+    }
+    if (!empty($father_last_name) && !preg_match('/^[A-Za-z\s]+$/', $father_last_name)) {
+        $validation_errors[] = "Father's last name must contain letters only.";
+    }
+    if (!empty($father_middle_name) && !preg_match('/^[A-Za-z\s]*$/', $father_middle_name)) {
+        $validation_errors[] = "Father's middle name must contain letters only.";
+    }
+    
+    if (!empty($mother_first_name) && !preg_match('/^[A-Za-z\s]+$/', $mother_first_name)) {
+        $validation_errors[] = "Mother's first name must contain letters only.";
+    }
+    if (!empty($mother_last_name) && !preg_match('/^[A-Za-z\s]+$/', $mother_last_name)) {
+        $validation_errors[] = "Mother's last name must contain letters only.";
+    }
+    if (!empty($mother_middle_name) && !preg_match('/^[A-Za-z\s]*$/', $mother_middle_name)) {
+        $validation_errors[] = "Mother's middle name must contain letters only.";
+    }
+    
+    if (!empty($guardian_first_name) && !preg_match('/^[A-Za-z\s]+$/', $guardian_first_name)) {
+        $validation_errors[] = "Guardian's first name must contain letters only.";
+    }
+    if (!empty($guardian_last_name) && !preg_match('/^[A-Za-z\s]+$/', $guardian_last_name)) {
+        $validation_errors[] = "Guardian's last name must contain letters only.";
+    }
+    if (!empty($guardian_middle_name) && !preg_match('/^[A-Za-z\s]*$/', $guardian_middle_name)) {
+        $validation_errors[] = "Guardian's middle name must contain letters only.";
     }
     
     // If validation fails, redirect back with error message
@@ -304,6 +355,45 @@ if (!$student_data) {
     header("Location: /onecci/RegistrarF/AccountList.php?type=student");
     exit;
 }
+
+// Parse combined parent names into separate fields for display
+function parseFullName($fullName) {
+    $parts = array_filter(array_map('trim', explode(' ', $fullName ?? '')));
+    $result = ['first' => '', 'middle' => '', 'last' => ''];
+    
+    if (count($parts) === 1) {
+        $result['first'] = $parts[0];
+    } elseif (count($parts) === 2) {
+        $result['first'] = $parts[0];
+        $result['last'] = $parts[1];
+    } elseif (count($parts) >= 3) {
+        $result['first'] = $parts[0];
+        $result['last'] = array_pop($parts);
+        array_shift($parts); // Remove first name
+        $result['middle'] = implode(' ', $parts);
+    }
+    
+    return $result;
+}
+
+// Parse father's name
+$father_parsed = parseFullName($student_data['father_name'] ?? '');
+$student_data['father_first_name'] = $father_parsed['first'];
+$student_data['father_middle_name'] = $father_parsed['middle'];
+$student_data['father_last_name'] = $father_parsed['last'];
+
+// Parse mother's name
+$mother_parsed = parseFullName($student_data['mother_name'] ?? '');
+$student_data['mother_first_name'] = $mother_parsed['first'];
+$student_data['mother_middle_name'] = $mother_parsed['middle'];
+$student_data['mother_last_name'] = $mother_parsed['last'];
+
+// Parse guardian's name
+$guardian_parsed = parseFullName($student_data['guardian_name'] ?? '');
+$student_data['guardian_first_name'] = $guardian_parsed['first'];
+$student_data['guardian_middle_name'] = $guardian_parsed['middle'];
+$student_data['guardian_last_name'] = $guardian_parsed['last'];
+
 // Normalize gender value for display (handles 'M'/'F' or 'Male'/'Female', any case/spacing)
 $genderVal = '';
 if ($student_data) {
@@ -589,12 +679,23 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Father's Information -->
                         <div class="col-span-3 mt-6">
                             <h4 class="font-semibold text-gray-700 mb-3">Father's Information *</h4>
-                            <div class="grid grid-cols-3 gap-6">
+                            <div class="grid grid-cols-3 gap-6 mb-2">
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Name *</label>
-                                    <input type="text" name="father_name" value="<?= htmlspecialchars($student_data['father_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
-                                    <small class="text-red-500 text-xs error-message hidden">Father's name is required</small>
+                                    <label class="block text-sm font-semibold mb-1">First Name *</label>
+                                    <input type="text" name="father_first_name" value="<?= htmlspecialchars($student_data['father_first_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Father's first name is required</small>
                                 </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Last Name *</label>
+                                    <input type="text" name="father_last_name" value="<?= htmlspecialchars($student_data['father_last_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Father's last name is required</small>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                                    <input type="text" name="father_middle_name" value="<?= htmlspecialchars($student_data['father_middle_name'] ?? '') ?>" readonly pattern="[A-Za-z\s]*" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-6">
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Occupation *</label>
                                     <input type="text" name="father_occupation" value="<?= htmlspecialchars($student_data['father_occupation'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
@@ -610,12 +711,23 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Mother's Information -->
                         <div class="col-span-3 mt-6">
                             <h4 class="font-semibold text-gray-700 mb-3">Mother's Information *</h4>
-                            <div class="grid grid-cols-3 gap-6">
+                            <div class="grid grid-cols-3 gap-6 mb-2">
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Name *</label>
-                                    <input type="text" name="mother_name" value="<?= htmlspecialchars($student_data['mother_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
-                                    <small class="text-red-500 text-xs error-message hidden">Mother's name is required</small>
+                                    <label class="block text-sm font-semibold mb-1">First Name *</label>
+                                    <input type="text" name="mother_first_name" value="<?= htmlspecialchars($student_data['mother_first_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Mother's first name is required</small>
                                 </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Last Name *</label>
+                                    <input type="text" name="mother_last_name" value="<?= htmlspecialchars($student_data['mother_last_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Mother's last name is required</small>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                                    <input type="text" name="mother_middle_name" value="<?= htmlspecialchars($student_data['mother_middle_name'] ?? '') ?>" readonly pattern="[A-Za-z\s]*" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-6">
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Occupation *</label>
                                     <input type="text" name="mother_occupation" value="<?= htmlspecialchars($student_data['mother_occupation'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
@@ -631,12 +743,23 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Guardian's Information -->
                         <div class="col-span-3 mt-6">
                             <h4 class="font-semibold text-gray-700 mb-3">Guardian's Information *</h4>
-                            <div class="grid grid-cols-3 gap-6">
+                            <div class="grid grid-cols-3 gap-6 mb-2">
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Name *</label>
-                                    <input type="text" name="guardian_name" value="<?= htmlspecialchars($student_data['guardian_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
-                                    <small class="text-red-500 text-xs error-message hidden">Guardian's name is required</small>
+                                    <label class="block text-sm font-semibold mb-1">First Name *</label>
+                                    <input type="text" name="guardian_first_name" value="<?= htmlspecialchars($student_data['guardian_first_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Guardian's first name is required</small>
                                 </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Last Name *</label>
+                                    <input type="text" name="guardian_last_name" value="<?= htmlspecialchars($student_data['guardian_last_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Guardian's last name is required</small>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                                    <input type="text" name="guardian_middle_name" value="<?= htmlspecialchars($student_data['guardian_middle_name'] ?? '') ?>" readonly pattern="[A-Za-z\s]*" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-6">
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Occupation *</label>
                                     <input type="text" name="guardian_occupation" value="<?= htmlspecialchars($student_data['guardian_occupation'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
@@ -732,8 +855,8 @@ input[type=number] { -moz-appearance: textfield; }
 
                         <!-- RFID Number -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">RFID Number</label>
-                            <input type="number" name="rfid_uid" value="<?= htmlspecialchars($student_data['rfid_uid'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <label class="block text-sm font-semibold mb-1">RFID Number <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($student_data['rfid_uid'] ?? '') ?>" readonly pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="10" inputmode="numeric">
                         </div>
                     </div>
                 </div>
@@ -1173,11 +1296,14 @@ document.getElementById('studentForm').addEventListener('submit', function(e) {
     const religion = document.querySelector('input[name="religion"]')?.value.trim() || '';
     const address = document.querySelector('textarea[name="address"]')?.value.trim() || '';
     const schoolYear = document.querySelector('input[name="school_year"]')?.value.trim() || '';
-    const fatherName = document.querySelector('input[name="father_name"]')?.value.trim() || '';
+    const fatherFirstName = document.querySelector('input[name="father_first_name"]')?.value.trim() || '';
+    const fatherLastName = document.querySelector('input[name="father_last_name"]')?.value.trim() || '';
     const fatherOccupation = document.querySelector('input[name="father_occupation"]')?.value.trim() || '';
-    const motherName = document.querySelector('input[name="mother_name"]')?.value.trim() || '';
+    const motherFirstName = document.querySelector('input[name="mother_first_name"]')?.value.trim() || '';
+    const motherLastName = document.querySelector('input[name="mother_last_name"]')?.value.trim() || '';
     const motherOccupation = document.querySelector('input[name="mother_occupation"]')?.value.trim() || '';
-    const guardianName = document.querySelector('input[name="guardian_name"]')?.value.trim() || '';
+    const guardianFirstName = document.querySelector('input[name="guardian_first_name"]')?.value.trim() || '';
+    const guardianLastName = document.querySelector('input[name="guardian_last_name"]')?.value.trim() || '';
     const guardianOccupation = document.querySelector('input[name="guardian_occupation"]')?.value.trim() || '';
     const lastSchool = document.querySelector('input[name="last_school"]')?.value.trim() || '';
     const lastSchoolYear = document.querySelector('input[name="last_school_year"]')?.value.trim() || '';
@@ -1189,11 +1315,14 @@ document.getElementById('studentForm').addEventListener('submit', function(e) {
     if (!birthplace) errors.push("Birthplace is required");
     if (!religion) errors.push("Religion is required");
     if (!address) errors.push("Complete address is required");
-    if (!fatherName) errors.push("Father's name is required");
+    if (!fatherFirstName) errors.push("Father's first name is required");
+    if (!fatherLastName) errors.push("Father's last name is required");
     if (!fatherOccupation) errors.push("Father's occupation is required");
-    if (!motherName) errors.push("Mother's name is required");
+    if (!motherFirstName) errors.push("Mother's first name is required");
+    if (!motherLastName) errors.push("Mother's last name is required");
     if (!motherOccupation) errors.push("Mother's occupation is required");
-    if (!guardianName) errors.push("Guardian's name is required");
+    if (!guardianFirstName) errors.push("Guardian's first name is required");
+    if (!guardianLastName) errors.push("Guardian's last name is required");
     if (!guardianOccupation) errors.push("Guardian's occupation is required");
     if (!lastSchool) errors.push("Last school name is required");
     if (!lastSchoolYear) errors.push("Last school year is required");
