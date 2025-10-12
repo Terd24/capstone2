@@ -55,12 +55,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 // Generate next Employee ID for display
 $next_employee_id = generateNextEmployeeId($conn);
 
-// Handle success message
-$success_msg = $_SESSION['success_msg'] ?? '';
-if ($success_msg) {
-    unset($_SESSION['success_msg']);
-}
-
 // Handle error message
 $error_msg = $_SESSION['error_msg'] ?? '';
 $show_modal = $_SESSION['show_modal'] ?? false;
@@ -254,6 +248,11 @@ input[type=number] { -moz-appearance: textfield; }
             <h2 class="text-lg font-semibold text-white">Employee Information</h2>
             <div class="flex flex-col items-end gap-1">
                 <div class="flex gap-3">
+                    <!-- Edit mode buttons (hidden by default) -->
+                    <button id="saveChangesBtn" onclick="saveEmployeeChanges()" class="hidden px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">Save Changes</button>
+                    <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Cancel</button>
+                    
+                    <!-- View mode buttons -->
                     <button id="editEmployeeBtn" onclick="toggleEditMode()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
                     <button id="deleteEmployeeBtn" onclick="showDeleteEmployeeConfirmation(getCurrentEmployeeId())" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete Employee</button>
                     <button onclick="closeViewModal()" class="text-2xl font-bold text-white hover:text-gray-300">&times;</button>
@@ -370,10 +369,12 @@ input[type=number] { -moz-appearance: textfield; }
                         <div>
                             <label class="block text-sm font-semibold mb-1">Email *</label>
                             <input type="email" name="email" autocomplete="off" required value="<?= htmlspecialchars($form_data['email'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <p class="field-error-message text-red-600 text-sm mt-1 font-medium hidden"></p>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Phone *</label>
                             <input type="text" name="phone" required value="<?= htmlspecialchars($form_data['phone'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] phone-input" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
+                            <p class="field-error-message text-red-600 text-sm mt-1 font-medium hidden"></p>
                         </div>
                         
 
@@ -451,19 +452,7 @@ input[type=number] { -moz-appearance: textfield; }
     </div>
 </div>
 
-<!-- Success Notification -->
-<?php if (!empty($success_msg)): ?>
-<div id="notif" class="fixed top-4 right-4 bg-green-400 text-white px-4 py-2 rounded shadow-lg z-50 transform translate-x-full opacity-0 transition-all duration-300">
-    <?= htmlspecialchars($success_msg) ?>
-</div>
-<?php endif; ?>
-
-<!-- Error Notification -->
-<?php if (!empty($error_msg)): ?>
-<div id="error-notif" class="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50 transform translate-x-full opacity-0 transition-all duration-300">
-    <?= htmlspecialchars($error_msg) ?>
-</div>
-<?php endif; ?>
+<!-- Notifications removed - using toast notifications instead -->
 
 <!-- Edit Account Modal -->
 <div id="editAccountModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -583,6 +572,7 @@ function highlightFieldError(element, message) {
         element.parentElement.appendChild(errorMsg);
     }
     errorMsg.textContent = message;
+    errorMsg.classList.remove('hidden');
     
     // Focus on first error field
     if (!document.querySelector('.border-red-500')) {
@@ -600,9 +590,12 @@ function clearFieldErrors(form) {
         field.classList.add('border-gray-300', 'focus:ring-[#0B2C62]');
     });
     
-    // Remove error messages
+    // Hide error messages
     const errorMessages = form.querySelectorAll('.field-error-message');
-    errorMessages.forEach(msg => msg.remove());
+    errorMessages.forEach(msg => {
+        msg.classList.add('hidden');
+        msg.textContent = '';
+    });
 }
 
 function clearSingleFieldError(element) {
@@ -612,10 +605,11 @@ function clearSingleFieldError(element) {
     element.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
     element.classList.add('border-gray-300', 'focus:ring-[#0B2C62]');
     
-    // Remove error message
+    // Hide error message
     const errorMsg = element.parentElement.querySelector('.field-error-message');
     if (errorMsg) {
-        errorMsg.remove();
+        errorMsg.classList.add('hidden');
+        errorMsg.textContent = '';
     }
 }
 
@@ -800,12 +794,12 @@ function viewEmployee(employeeId) {
             if (data.success) {
                 showEmployeeDetailsModal(data.employee);
             } else {
-                alert('Error loading employee details: ' + data.message);
+                showToast('Error loading employee details: ' + data.message, 'error');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error loading employee details');
+            showToast('Error loading employee details', 'error');
         });
 }
 
@@ -839,41 +833,57 @@ function showEmployeeDetailsModal(employee) {
                     <div class="grid grid-cols-3 gap-6">
                         <!-- Row: ID Number and Full Name -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">ID Number <span class="text-gray-500 text-xs">(Cannot be changed)</span></label>
-                            <input type="text" value="${employee.id_number}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed employee-field-readonly" style="background-color:#f3f4f6;">
-                        </div>
-                        <div>
                             <label class="block text-sm font-semibold mb-1">First Name</label>
                             <input type="text" id="first_name_${employee.id_number}" value="${employee.first_name}" readonly pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field name-input">
+                            <p id="first_name_error_${employee.id_number}" class="hidden text-sm text-red-600 mt-1">First name is required</p>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last Name</label>
                             <input type="text" id="last_name_${employee.id_number}" value="${employee.last_name}" readonly pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field name-input">
+                            <p id="last_name_error_${employee.id_number}" class="hidden text-sm text-red-600 mt-1">Last name is required</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <input type="text" id="middle_name_${employee.id_number}" value="${employee.middle_name || ''}" readonly pattern="[A-Za-z\s]*" maxlength="20" title="Letters only, maximum 20 characters" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field name-input">
+                        </div>
+                                                <div>
+                            <label class="block text-sm font-semibold mb-1">Employee ID<span class="text-gray-500 text-xs">(Cannot be changed)</span></label>
+                            <input type="text" value="${employee.id_number}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed employee-field-readonly" style="background-color:#f3f4f6;">
                         </div>
                         
                         <!-- Row: Position, Department, Email -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Position</label>
                             <input type="text" id="position_${employee.id_number}" value="${employee.position}" readonly pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field name-input">
+                            <p id="position_error_${employee.id_number}" class="hidden text-sm text-red-600 mt-1">Position is required</p>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Department</label>
                             <input type="text" id="department_${employee.id_number}" value="${employee.department}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <p id="department_error_${employee.id_number}" class="hidden text-sm text-red-600 mt-1">Department is required</p>
+                        </div>
+
+                         <div>
+                            <label class="block text-sm font-semibold mb-1">Hire Date <span class="text-gray-500 text-xs">(Cannot be changed)</span></label>
+                            <input type="date" id="hire_date_${employee.id_number}" value="${employee.hire_date}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed employee-field-readonly" style="background-color:#f3f4f6;">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Email</label>
                             <input type="email" id="email_${employee.id_number}" value="${employee.email || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
                         </div>
-                        
-                        <!-- Row: Phone, Hire Date -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Phone</label>
                             <input type="tel" id="phone_${employee.id_number}" value="${employee.phone || ''}" readonly pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits" inputmode="numeric" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field phone-input">
                         </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Hire Date</label>
-                            <input type="date" id="hire_date_${employee.id_number}" value="${employee.hire_date}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                        
+                        <!-- Complete Address (full width) -->
+                        <div class="col-span-3">
+                            <label class="block text-sm font-semibold mb-1">Complete Address</label>
+                            <textarea id="address_${employee.id_number}" rows="3" readonly minlength="20" maxlength="500" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">${employee.address || ''}</textarea>
+                            <p id="address_error_${employee.id_number}" class="hidden text-sm text-red-600 mt-1"></p>
+                            <p class="text-xs text-gray-500 mt-1">Minimum 20 characters. Include street, barangay, city/municipality, and province.</p>
                         </div>
+                        
                         ${employee.account_role === 'teacher' ? `
                         <div>
                             <label class="block text-sm font-semibold mb-1">RFID</label>
@@ -914,7 +924,7 @@ function showEmployeeDetailsModal(employee) {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password</label>
-                            <input type="password" id="password_${employee.id_number}" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <input type="password" id="password_${employee.id_number}" placeholder="Enter new password" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] employee-field">
                             <small class="text-gray-500">Leave blank to keep current password</small>
                         </div>
                     </div>
@@ -1005,92 +1015,164 @@ function closeViewModal() {
 let isEditMode = false;
 function toggleEditMode() {
     const editBtn = document.getElementById('editEmployeeBtn');
+    const deleteBtn = document.getElementById('deleteEmployeeBtn');
+    const saveBtn = document.getElementById('saveChangesBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
     const fields = document.querySelectorAll('.employee-field');
     
-    isEditMode = !isEditMode;
+    isEditMode = true;
     
-    if (isEditMode) {
-        editBtn.textContent = 'Cancel';
-        editBtn.className = 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition';
-        
-        // Show save changes button
-        const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
-        if (saveBtn) saveBtn.classList.remove('hidden');
-        
-        // Enable fields for editing (except readonly fields like ID Number)
-        fields.forEach(field => {
-            // Skip fields that should never be editable
-            if (field.classList.contains('employee-field-readonly')) {
-                return;
-            }
-            
-            if (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type)) {
-                field.readOnly = false;
-                field.classList.remove('bg-gray-50');
-                field.classList.add('bg-white');
-                field.classList.add('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
-            } else if (['radio', 'checkbox'].includes(field.type) || field.tagName === 'SELECT') {
-                field.disabled = false;
-                field.classList.remove('bg-gray-50');
-                field.classList.add('bg-white');
-            }
-        });
-        
-        // Setup input restrictions after enabling fields
-        setTimeout(() => {
-            setupInputRestrictions();
-        }, 100);
-    } else {
-        // Cancel editing - reset to read-only mode
-        editBtn.textContent = 'Edit';
-        editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
-        
-        // Hide save changes button
-        const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
-        if (saveBtn) saveBtn.classList.add('hidden');
-        
-        // Disable fields and restore read-only appearance
-        fields.forEach(field => {
-            if (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type)) {
-                field.readOnly = true;
-                field.classList.add('bg-gray-50');
-                field.classList.remove('bg-white');
-                field.classList.remove('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
-            } else if (['radio', 'checkbox'].includes(field.type) || field.tagName === 'SELECT') {
-                field.disabled = true;
-                field.classList.add('bg-gray-50');
-                field.classList.remove('bg-white');
-            }
-        });
-        
-        // Reload the modal to restore original values
-        if (currentEmployeeId) {
-            const employee = employees.find(emp => emp.id_number === currentEmployeeId);
-            if (employee) {
-                showEmployeeDetailsModal(employee);
-            }
+    // Hide Edit and Delete buttons
+    if (editBtn) editBtn.classList.add('hidden');
+    if (deleteBtn) deleteBtn.classList.add('hidden');
+    
+    // Show Save and Cancel buttons
+    if (saveBtn) saveBtn.classList.remove('hidden');
+    if (cancelBtn) cancelBtn.classList.remove('hidden');
+    
+    // Enable fields for editing (except readonly fields like ID Number)
+    fields.forEach(field => {
+        // Skip fields that should never be editable
+        if (field.classList.contains('employee-field-readonly')) {
+            return;
         }
+        
+        if (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type)) {
+            field.readOnly = false;
+            field.classList.remove('bg-gray-50');
+            field.classList.add('bg-white');
+            field.classList.add('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
+        } else if (['radio', 'checkbox'].includes(field.type) || field.tagName === 'SELECT') {
+            field.disabled = false;
+            field.classList.remove('bg-gray-50');
+            field.classList.add('bg-white');
+        }
+    });
+    
+    // Setup input restrictions after enabling fields
+    setTimeout(() => {
+        setupInputRestrictions();
+    }, 100);
+}
+
+function cancelEdit() {
+    const editBtn = document.getElementById('editEmployeeBtn');
+    const deleteBtn = document.getElementById('deleteEmployeeBtn');
+    const saveBtn = document.getElementById('saveChangesBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    
+    isEditMode = false;
+    
+    // Show Edit and Delete buttons
+    if (editBtn) editBtn.classList.remove('hidden');
+    if (deleteBtn) deleteBtn.classList.remove('hidden');
+    
+    // Hide Save and Cancel buttons
+    if (saveBtn) saveBtn.classList.add('hidden');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    
+    // Reload the modal to restore original values
+    if (currentEmployeeId) {
+        // Fetch fresh employee data from server
+        fetch(`view_employee.php?id=${currentEmployeeId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showEmployeeDetailsModal(data.employee);
+                }
+            })
+            .catch(error => {
+                console.error('Error reloading employee data:', error);
+            });
     }
 }
 
 function saveEmployeeChanges() {
     if (!currentEmployeeId) {
-        alert('No employee selected');
+        showToast('No employee selected', 'error');
         return;
     }
     
     // Collect employee data from the form fields
     const firstName = document.getElementById(`first_name_${currentEmployeeId}`)?.value;
+    const middleName = document.getElementById(`middle_name_${currentEmployeeId}`)?.value;
     const lastName = document.getElementById(`last_name_${currentEmployeeId}`)?.value;
     const position = document.getElementById(`position_${currentEmployeeId}`)?.value;
     const department = document.getElementById(`department_${currentEmployeeId}`)?.value;
     const email = document.getElementById(`email_${currentEmployeeId}`)?.value;
     const phone = document.getElementById(`phone_${currentEmployeeId}`)?.value;
+    const address = document.getElementById(`address_${currentEmployeeId}`)?.value;
     const hireDate = document.getElementById(`hire_date_${currentEmployeeId}`)?.value;
     
+    // Clear all previous errors
+    const fields = [
+        { id: `first_name_${currentEmployeeId}`, errorId: `first_name_error_${currentEmployeeId}`, value: firstName },
+        { id: `last_name_${currentEmployeeId}`, errorId: `last_name_error_${currentEmployeeId}`, value: lastName },
+        { id: `position_${currentEmployeeId}`, errorId: `position_error_${currentEmployeeId}`, value: position },
+        { id: `department_${currentEmployeeId}`, errorId: `department_error_${currentEmployeeId}`, value: department }
+    ];
+    
+    let hasErrors = false;
+    
+    // Clear all red borders and error messages
+    fields.forEach(field => {
+        const element = document.getElementById(field.id);
+        const errorElement = document.getElementById(field.errorId);
+        if (element) {
+            element.classList.remove('border-red-500');
+            element.classList.add('border-gray-300');
+        }
+        if (errorElement) errorElement.classList.add('hidden');
+    });
+    
+    // Clear address error
+    const addressField = document.getElementById(`address_${currentEmployeeId}`);
+    const addressError = document.getElementById(`address_error_${currentEmployeeId}`);
+    if (addressError) addressError.classList.add('hidden');
+    if (addressField) {
+        addressField.classList.remove('border-red-500');
+        addressField.classList.add('border-gray-300');
+    }
+    
     // Validate required fields
-    if (!firstName || !lastName || !position || !department || !hireDate) {
-        alert('Please fill in all required fields');
+    fields.forEach(field => {
+        if (!field.value || field.value.trim() === '') {
+            const element = document.getElementById(field.id);
+            const errorElement = document.getElementById(field.errorId);
+            if (element) {
+                element.classList.remove('border-gray-300');
+                element.classList.add('border-red-500');
+            }
+            if (errorElement) errorElement.classList.remove('hidden');
+            hasErrors = true;
+        }
+    });
+    
+    // Validate address
+    let addressErrorMsg = '';
+    if (!address || address.trim().length < 20) {
+        addressErrorMsg = 'Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.';
+        hasErrors = true;
+    } else if (address.trim().length > 500) {
+        addressErrorMsg = 'Complete address must not exceed 500 characters.';
+        hasErrors = true;
+    } else if (!/[,\s]/.test(address)) {
+        addressErrorMsg = 'Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.';
+        hasErrors = true;
+    }
+    
+    if (addressErrorMsg) {
+        if (addressError) {
+            addressError.textContent = addressErrorMsg;
+            addressError.classList.remove('hidden');
+        }
+        if (addressField) {
+            addressField.classList.remove('border-gray-300');
+            addressField.classList.add('border-red-500');
+        }
+    }
+    
+    if (hasErrors) {
         return;
     }
     
@@ -1098,11 +1180,13 @@ function saveEmployeeChanges() {
     const formData = new FormData();
     formData.append('employee_id', currentEmployeeId);
     formData.append('first_name', firstName);
+    formData.append('middle_name', middleName || '');
     formData.append('last_name', lastName);
     formData.append('position', position);
     formData.append('department', department);
     formData.append('email', email || '');
     formData.append('phone', phone || '');
+    formData.append('address', address);
     formData.append('hire_date', hireDate);
     
     fetch('edit_employee.php', {
@@ -1117,16 +1201,39 @@ function saveEmployeeChanges() {
     })
     .then(data => {
         if (data.success) {
-            alert('Employee updated successfully!');
-            toggleEditMode(); // Exit edit mode
-            location.reload(); // Refresh to show updated data
+            // Show success notification
+            showToast('Employee updated successfully!', 'success');
+            
+            // Exit edit mode and refresh the modal data without closing
+            isEditMode = false;
+            
+            // Show Edit and Delete buttons
+            const editBtn = document.getElementById('editEmployeeBtn');
+            const deleteBtn = document.getElementById('deleteEmployeeBtn');
+            if (editBtn) editBtn.classList.remove('hidden');
+            if (deleteBtn) deleteBtn.classList.remove('hidden');
+            
+            // Hide Save and Cancel buttons
+            const saveBtn = document.getElementById('saveChangesBtn');
+            const cancelBtn = document.getElementById('cancelEditBtn');
+            if (saveBtn) saveBtn.classList.add('hidden');
+            if (cancelBtn) cancelBtn.classList.add('hidden');
+            
+            // Reload employee data in the modal without closing it
+            fetch(`view_employee.php?id=${currentEmployeeId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showEmployeeDetailsModal(data.employee);
+                    }
+                });
         } else {
-            alert('Error: ' + data.message);
+            showToast('Error: ' + data.message, 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error updating employee: ' + error.message);
+        showToast('Error updating employee: ' + error.message, 'error');
     });
 }
 
@@ -1202,7 +1309,7 @@ function editAccountDetails(employeeId) {
             if (data.success && data.employee.username) {
                 showEditAccountModal(data.employee);
             } else {
-                alert('Error loading account details');
+                showToast('Error loading account details', 'error');
             }
         });
 }
@@ -1219,14 +1326,14 @@ function resetPassword(employeeId) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Password reset successfully');
-                    closeViewModal();
+                    showToast('Password reset successfully', 'success');
+                    setTimeout(() => closeViewModal(), 1500);
                 } else {
-                    alert('Error: ' + data.message);
+                    showToast('Error: ' + data.message, 'error');
                 }
             });
         } else {
-            alert('Password must be at least 6 characters long');
+            showToast('Password must be at least 6 characters long', 'error');
         }
     }
 }
@@ -1364,12 +1471,12 @@ function updateAccount(event) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Account updated successfully');
+            showToast('Account updated successfully', 'success');
             closeEditAccountModal();
             closeViewModal();
-            location.reload();
+            setTimeout(() => location.reload(), 1500);
         } else {
-            alert('Error: ' + data.message);
+            showToast('Error: ' + data.message, 'error');
         }
     });
 }
@@ -1396,10 +1503,10 @@ function createNewAccount(event) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Account created successfully');
+            showToast('Account created successfully', 'success');
             closeCreateAccountModal();
             closeViewModal();
-            location.reload();
+            setTimeout(() => location.reload(), 1500);
         } else {
             // Inline handle for duplicate username
             if (data.message && data.message.toLowerCase().includes('username already taken')) {
@@ -1411,9 +1518,9 @@ function createNewAccount(event) {
                     uErr.textContent = 'Username already in use';
                     uErr.classList.remove('hidden');
                 }
-                return; // keep modal open, no alert
+                return; // keep modal open, no toast
             }
-            alert('Error: ' + data.message);
+            showToast('Error: ' + data.message, 'error');
         }
     });
 }
@@ -1426,12 +1533,12 @@ function editEmployee(employeeId) {
             if (data.success) {
                 showEditEmployeeModal(data.employee);
             } else {
-                alert('Error loading employee details: ' + data.message);
+                showToast('Error loading employee details: ' + data.message, 'error');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error loading employee details');
+            showToast('Error loading employee details', 'error');
         });
 }
 
@@ -1474,8 +1581,8 @@ function showEditEmployeeModal(employee) {
                 <input type="text" name="phone" value="${employee.phone || ''}" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Hire Date</label>
-                <input type="date" name="hire_date" value="${employee.hire_date}" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Hire Date <span class="text-gray-500 text-xs">(Cannot be changed)</span></label>
+                <input type="date" name="hire_date" value="${employee.hire_date}" readonly class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 cursor-not-allowed" style="background-color:#f3f4f6;">
             </div>
         </div>
     `;
@@ -1500,16 +1607,25 @@ document.getElementById('editEmployeeForm').addEventListener('submit', function(
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Employee updated successfully!');
+            // Show success notification
+            showToast('Employee updated successfully!', 'success');
+            
             closeEditModal();
-            location.reload(); // Refresh to show updated data
+            // Reload employee data in the view modal without closing it
+            fetch(`view_employee.php?id=${currentEmployeeId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showEmployeeDetailsModal(data.employee);
+                    }
+                });
         } else {
-            alert('Error: ' + data.message);
+            showToast('Error: ' + data.message, 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error updating employee');
+        showToast('Error updating employee', 'error');
     });
 });
 
@@ -1629,8 +1745,8 @@ function confirmAddEmployee() {
 
     // Validate with inline messages
     let hasErrors = false;
-    const need = (selector, msg) => { const el = form.querySelector(selector); if (!el || !el.value.trim()) { highlightFieldError(el, msg); hasErrors = true; } };
-    const invalid = (selector, testFn, msg) => { const el = form.querySelector(selector); if (!testFn(el?.value?.trim() || '')) { highlightFieldError(el, msg); hasErrors = true; } };
+    const need = (selector, msg) => { const el = form.querySelector(selector); if (!el || !el.value.trim()) { highlightFieldError(el, msg); hasErrors = true; return false; } return true; };
+    const invalid = (selector, testFn, msg) => { const el = form.querySelector(selector); const val = el?.value?.trim() || ''; if (val && !testFn(val)) { highlightFieldError(el, msg); hasErrors = true; } };
 
     // Employee ID is auto-generated, no need to validate
     need('input[name="first_name"]', 'First name is required');
@@ -1638,14 +1754,16 @@ function confirmAddEmployee() {
     need('input[name="position"]', 'Position is required');
     need('select[name="department"]', 'Department is required');
     need('input[name="hire_date"]', 'Hire date is required');
-    need('input[name="email"]', 'Email is required');
-    invalid('input[name="email"]', v => /^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(v), 'Please enter a valid email address');
-    need('input[name="phone"]', 'Phone is required');
-    invalid('input[name="phone"]', v => /^\d{11}$/.test(v), 'Phone must be exactly 11 digits');
+    if (need('input[name="email"]', 'Email is required')) {
+        invalid('input[name="email"]', v => /^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(v), 'Please enter a valid email address');
+    }
+    if (need('input[name="phone"]', 'Phone is required')) {
+        invalid('input[name="phone"]', v => /^\d{11}$/.test(v), 'Phone must be exactly 11 digits');
+    }
     need('textarea[name="address"]', 'Address is required');
     invalid('textarea[name="address"]', v => v.length >= 20, 'Address must be at least 20 characters long');
     invalid('textarea[name="address"]', v => v.length <= 500, 'Address must not exceed 500 characters');
-    invalid('textarea[name="address"]', v => /[,\s]/.test(v), 'Complete address must include street, barangay, city/municipality, and province.');
+    invalid('textarea[name="address"]', v => /[,\s]/.test(v), 'Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.');
 
     if (createAccount) {
         // Username and password are auto-generated, no need to validate

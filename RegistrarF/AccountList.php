@@ -1282,7 +1282,7 @@ function initRegistrarInlineValidation() {
                 // Check if address contains multiple components (at least 2 commas or multiple words)
                 const components = address.split(/[,\s]+/).filter(part => part.length > 0);
                 if (components.length < 4) {
-                    setError(addressEl, 'Complete address must include street, barangay, city/municipality, and province.');
+                    setError(addressEl, 'Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.');
                     ok = false;
                 }
             }

@@ -15,11 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $employee_id = $_POST['employee_id'] ?? '';
 $first_name = $_POST['first_name'] ?? '';
+$middle_name = $_POST['middle_name'] ?? '';
 $last_name = $_POST['last_name'] ?? '';
 $position = $_POST['position'] ?? '';
 $department = $_POST['department'] ?? '';
 $email = $_POST['email'] ?? '';
 $phone = $_POST['phone'] ?? '';
+$address = $_POST['address'] ?? '';
 $hire_date = $_POST['hire_date'] ?? '';
 
 if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($position) || empty($department) || empty($hire_date)) {
@@ -27,19 +29,39 @@ if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($pos
     exit;
 }
 
-// Update employee
-$stmt = $conn->prepare("UPDATE employees SET first_name = ?, last_name = ?, position = ?, department = ?, email = ?, phone = ?, hire_date = ? WHERE id_number = ?");
-
-if (!$stmt) {
-    echo json_encode(['success' => false, 'message' => 'Prepare failed: ' . $conn->error]);
+// Validate address
+if (strlen($address) < 20) {
+    echo json_encode(['success' => false, 'message' => 'Complete address must be at least 20 characters long.']);
+    exit;
+} elseif (strlen($address) > 500) {
+    echo json_encode(['success' => false, 'message' => 'Complete address must not exceed 500 characters.']);
+    exit;
+} elseif (!preg_match('/.*[,\s].*/i', $address)) {
+    echo json_encode(['success' => false, 'message' => 'Complete address must include multiple components separated by commas or spaces.']);
     exit;
 }
 
-$stmt->bind_param("ssssssss", $first_name, $last_name, $position, $department, $email, $phone, $hire_date, $employee_id);
+// Update employee
+$sql = "UPDATE employees SET first_name = ?, middle_name = ?, last_name = ?, position = ?, department = ?, email = ?, phone = ?, address = ?, hire_date = ? WHERE id_number = ?";
+$stmt = $conn->prepare($sql);
+
+if (!$stmt) {
+    error_log("SQL Error: " . $conn->error);
+    error_log("SQL Query: " . $sql);
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $conn->error]);
+    exit;
+}
+
+$stmt->bind_param("ssssssssss", $first_name, $middle_name, $last_name, $position, $department, $email, $phone, $address, $hire_date, $employee_id);
 
 if ($stmt->execute()) {
-    if ($stmt->affected_rows > 0) {
-        $_SESSION['success_msg'] = 'Employee information updated successfully!';
+    // Check if employee exists (affected_rows can be 0 if no changes were made)
+    $check_stmt = $conn->prepare("SELECT id_number FROM employees WHERE id_number = ?");
+    $check_stmt->bind_param("s", $employee_id);
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+    
+    if ($check_result->num_rows > 0) {
         echo json_encode(['success' => true, 'message' => 'Employee updated successfully', 'reload' => true]);
     } else {
         echo json_encode(['success' => false, 'message' => 'No employee found with ID: ' . $employee_id]);
