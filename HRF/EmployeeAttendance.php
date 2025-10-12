@@ -26,10 +26,10 @@ if ($check_columns && $check_columns->num_rows > 0) {
     }
 }
 
-// Filters
-$search_name = trim($_GET['search_name'] ?? '');
-$start_date  = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
-$end_date    = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
+// Filters - Use POST instead of GET for security
+$search_name = trim($_POST['search_name'] ?? '');
+$start_date  = isset($_POST['start_date']) ? trim($_POST['start_date']) : '';
+$end_date    = isset($_POST['end_date']) ? trim($_POST['end_date']) : '';
 
 // Build teacher attendance query (teacher_attendance used for teachers)
 $sql = "SELECT ta.*, e.first_name, e.last_name, e.id_number
@@ -92,7 +92,7 @@ $records = $stmt->get_result();
   <div class="container mx-auto px-6 py-4">
     <div class="bg-white rounded-2xl shadow-lg p-5 mb-4">
       <h2 class="text-xl font-bold text-gray-800 mb-4">Filter</h2>
-      <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         <div>
           <label class="text-sm font-medium text-gray-700 mb-2 block">Search Employee</label>
           <input type="text" name="search_name" value="<?= htmlspecialchars($search_name) ?>" placeholder="Enter employee name..."
@@ -241,7 +241,53 @@ $records = $stmt->get_result();
           <?php endif; ?>
         </tbody>
       </table>
+      
+      <!-- Pagination Controls -->
+      <div id="paginationBar" class="p-4 flex items-center justify-center gap-2 text-sm border-t border-gray-200">
+        <button id="prevPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 transition">Prev</button>
+        <span id="pageInfo" class="px-2 text-gray-600">Page 1 of 1</span>
+        <button id="nextPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 transition">Next</button>
+      </div>
     </div>
   </div>
+
+<script>
+// Pagination for attendance table
+const tableBody = document.querySelector('tbody');
+const prevBtn = document.getElementById('prevPage');
+const nextBtn = document.getElementById('nextPage');
+const pageInfo = document.getElementById('pageInfo');
+const pageSize = 10;
+let currentPage = 1;
+let allRows = Array.from(tableBody.querySelectorAll('tr'));
+
+function renderPage() {
+    // Calculate pagination
+    const total = allRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageRows = allRows.slice(start, end);
+    
+    // Hide all rows first
+    allRows.forEach(row => row.style.display = 'none');
+    
+    // Show only current page rows
+    pageRows.forEach(row => row.style.display = '');
+    
+    // Update pagination controls
+    if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = (currentPage <= 1);
+    if (nextBtn) nextBtn.disabled = (currentPage >= totalPages);
+}
+
+// Event listeners
+if (prevBtn) prevBtn.addEventListener('click', () => { currentPage--; renderPage(); });
+if (nextBtn) nextBtn.addEventListener('click', () => { currentPage++; renderPage(); });
+
+// Initial render
+renderPage();
+</script>
 </body>
 </html>

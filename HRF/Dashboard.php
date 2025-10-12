@@ -84,13 +84,13 @@ $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_reason TEXT
 // Fetch only active employees (not soft-deleted)
 $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, position, department, 
                        (SELECT username FROM employee_accounts WHERE employee_accounts.employee_id = employees.id_number) as username 
-                       FROM employees WHERE deleted_at IS NULL ORDER BY first_name ASC");
+                       FROM employees WHERE deleted_at IS NULL ORDER BY id_number ASC");
 
 // Get total active employee count
 $count_result = $conn->query("SELECT COUNT(*) as total_employees FROM employees WHERE deleted_at IS NULL");
 $total_employees = $count_result->fetch_assoc()['total_employees'];
 
-$columns = ['ID Number', 'Full Name', 'Position', 'Department', 'Account Status', 'Actions'];
+$columns = ['ID Number', 'Full Name', 'Position', 'Department', 'Account Status'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -189,8 +189,7 @@ input[type=number] { -moz-appearance: textfield; }
     <!-- Controls Section -->
     <div class="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-[#0B2C62]/10">
         <div class="flex items-center gap-3">
-            <label class="font-medium text-[#0B2C62] text-sm">Show entries:</label>
-            <input type="number" id="showEntries" min="1" value="10" class="w-20 border border-[#0B2C62]/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"/>
+            <!-- Pagination will be shown here after table -->
         </div>
         
         <div class="flex items-center gap-3">
@@ -229,21 +228,6 @@ input[type=number] { -moz-appearance: textfield; }
                             <td class="px-4 py-3"><?= htmlspecialchars($row['position']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($row['department']) ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= $row['username'] ? '<span class="px-2 py-1 bg-green-500 text-white rounded text-xs">Has Account</span>' : '<span class="px-2 py-1 bg-gray-500 text-white rounded text-xs">No Account</span>' ?></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" onclick="event.stopPropagation()">
-                                <button onclick="viewEmployee('<?= $row['id_number'] ?>')" class="text-blue-600 hover:text-blue-900 mr-2 p-2 rounded" title="View Employee">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                    </svg>
-                                </button>
-                                <?php if (!$row['username']): ?>
-                                <button onclick="createAccountForEmployee('<?= $row['id_number'] ?>')" class="text-green-600 hover:text-green-900 p-2 rounded" title="Create Account">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                    </svg>
-                                </button>
-                                <?php endif; ?>
-                            </td>
                         </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
@@ -253,6 +237,13 @@ input[type=number] { -moz-appearance: textfield; }
                 <?php endif; ?>
             </tbody>
         </table>
+    </div>
+    
+    <!-- Pagination Controls -->
+    <div id="paginationBar" class="mt-4 flex items-center justify-center gap-2 text-sm">
+        <button id="prevPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 transition">Prev</button>
+        <span id="pageInfo" class="px-2 text-gray-600">Page 1 of 1</span>
+        <button id="nextPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 transition">Next</button>
     </div>
 </div>
 
@@ -389,7 +380,8 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Complete Address -->
                         <div class="col-span-3">
                             <label class="block text-sm font-semibold mb-1">Complete Address *</label>
-                            <textarea name="address" rows="3" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
+                            <textarea name="address" rows="3" autocomplete="off" required minlength="20" maxlength="500" placeholder="Enter complete address (e.g., Block 8, Lot 15, Subdivision Name, Barangay, City, Province)" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" title="Please enter a complete address with at least 20 characters including street, barangay, city/municipality, and province."><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Minimum 20 characters. Include street, barangay, city/municipality, and province.</p>
                         </div>
                     </div>
                 </div>
@@ -847,22 +839,22 @@ function showEmployeeDetailsModal(employee) {
                     <div class="grid grid-cols-3 gap-6">
                         <!-- Row: ID Number and Full Name -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">ID Number</label>
-                            <input type="text" value="${employee.id_number}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <label class="block text-sm font-semibold mb-1">ID Number <span class="text-gray-500 text-xs">(Cannot be changed)</span></label>
+                            <input type="text" value="${employee.id_number}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed employee-field-readonly" style="background-color:#f3f4f6;">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">First Name</label>
-                            <input type="text" id="first_name_${employee.id_number}" value="${employee.first_name}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <input type="text" id="first_name_${employee.id_number}" value="${employee.first_name}" readonly pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field name-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last Name</label>
-                            <input type="text" id="last_name_${employee.id_number}" value="${employee.last_name}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <input type="text" id="last_name_${employee.id_number}" value="${employee.last_name}" readonly pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field name-input">
                         </div>
                         
                         <!-- Row: Position, Department, Email -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Position</label>
-                            <input type="text" id="position_${employee.id_number}" value="${employee.position}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <input type="text" id="position_${employee.id_number}" value="${employee.position}" readonly pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field name-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Department</label>
@@ -876,7 +868,7 @@ function showEmployeeDetailsModal(employee) {
                         <!-- Row: Phone, Hire Date -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Phone</label>
-                            <input type="text" id="phone_${employee.id_number}" value="${employee.phone || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <input type="tel" id="phone_${employee.id_number}" value="${employee.phone || ''}" readonly pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits" inputmode="numeric" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field phone-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Hire Date</label>
@@ -907,8 +899,8 @@ function showEmployeeDetailsModal(employee) {
                     <p class="text-xs text-gray-500 mb-4 text-right">Removes login access only. The employee record will remain.</p>
                     <div class="grid grid-cols-3 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Username</label>
-                            <input type="text" id="username_${employee.id_number}" value="${employee.username}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 text-xs">(Auto-updates with last name)</span></label>
+                            <input type="text" id="username_${employee.id_number}" value="${employee.username}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed employee-field-readonly" style="background-color:#f3f4f6;">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Role</label>
@@ -950,6 +942,36 @@ function showEmployeeDetailsModal(employee) {
         </div>
     `;
     document.getElementById('viewEmployeeModal').classList.remove('hidden');
+    
+    // Setup input restrictions for dynamically created fields
+    setTimeout(() => {
+        setupInputRestrictions();
+        setupUsernameAutoUpdate(employee.id_number);
+    }, 100);
+}
+
+// Auto-update username when last name changes in edit mode
+function setupUsernameAutoUpdate(employeeId) {
+    const lastNameField = document.getElementById(`last_name_${employeeId}`);
+    const usernameField = document.getElementById(`username_${employeeId}`);
+    
+    if (!lastNameField || !usernameField) return;
+    
+    // Store original username to extract the ID part
+    const originalUsername = usernameField.value;
+    
+    // Extract the 3-digit ID from username (e.g., smith001muzon@employee.cci.edu.ph -> 001)
+    const match = originalUsername.match(/(\d{3})muzon@employee\.cci\.edu\.ph$/);
+    const idNumber = match ? match[1] : '000';
+    
+    // Update username when last name changes
+    lastNameField.addEventListener('input', function() {
+        const lastName = this.value.trim().toLowerCase();
+        if (lastName) {
+            const newUsername = lastName + idNumber + 'muzon@employee.cci.edu.ph';
+            usernameField.value = newUsername;
+        }
+    });
 }
 
 // Close view modal
@@ -995,8 +1017,13 @@ function toggleEditMode() {
         const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
         if (saveBtn) saveBtn.classList.remove('hidden');
         
-        // Enable fields for editing
+        // Enable fields for editing (except readonly fields like ID Number)
         fields.forEach(field => {
+            // Skip fields that should never be editable
+            if (field.classList.contains('employee-field-readonly')) {
+                return;
+            }
+            
             if (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type)) {
                 field.readOnly = false;
                 field.classList.remove('bg-gray-50');
@@ -1008,6 +1035,11 @@ function toggleEditMode() {
                 field.classList.add('bg-white');
             }
         });
+        
+        // Setup input restrictions after enabling fields
+        setTimeout(() => {
+            setupInputRestrictions();
+        }, 100);
     } else {
         // Cancel editing - reset to read-only mode
         editBtn.textContent = 'Edit';
@@ -1411,7 +1443,7 @@ function showEditEmployeeModal(employee) {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">ID Number</label>
-                <input type="text" name="id_number" value="${employee.id_number}" readonly class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100">
+                <input type="text" name="id_number" value="${employee.id_number}" readonly class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 cursor-not-allowed" style="background-color:#f3f4f6;">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
@@ -1498,25 +1530,56 @@ if (notificationElement) {
     }, 4000);
 }
 
-// Search and pagination functionality
+// Search and pagination functionality (10 per page)
 const searchInput = document.getElementById('searchInput');
-const showEntriesInput = document.getElementById('showEntries');
-let tableRows = Array.from(document.querySelectorAll('#employeeTable tr'));
+const tableBody = document.getElementById('employeeTable');
+const prevBtn = document.getElementById('prevPage');
+const nextBtn = document.getElementById('nextPage');
+const pageInfo = document.getElementById('pageInfo');
+const pageSize = 10;
+let currentPage = 1;
+let allRows = Array.from(tableBody.querySelectorAll('tr'));
 
-function updateEntries() {
-    const value = parseInt(showEntriesInput.value) || tableRows.length;
-    let shown = 0;
-    tableRows.forEach(row => row.style.display = '');
-    const query = searchInput.value.toLowerCase().trim();
-    tableRows.forEach(row => { if (!row.textContent.toLowerCase().includes(query)) row.style.display='none'; });
-    shown = 0;
-    tableRows.forEach(row => {
-        if(row.style.display !== 'none'){ if(shown<value) row.style.display=''; else row.style.display='none'; shown++; }
+function renderPage() {
+    // Filter rows based on search
+    const searchTerm = searchInput.value.toLowerCase();
+    const filteredRows = allRows.filter(row => {
+        const text = row.textContent.toLowerCase();
+        return text.includes(searchTerm);
+    });
+    
+    // Calculate pagination
+    const total = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageRows = filteredRows.slice(start, end);
+    
+    // Hide all rows first
+    allRows.forEach(row => row.style.display = 'none');
+    
+    // Show only current page rows
+    pageRows.forEach(row => row.style.display = '');
+    
+    // Update pagination controls
+    if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = (currentPage <= 1);
+    if (nextBtn) nextBtn.disabled = (currentPage >= totalPages);
+}
+
+// Event listeners
+if (searchInput) {
+    searchInput.addEventListener('input', () => {
+        currentPage = 1;
+        renderPage();
     });
 }
-showEntriesInput.addEventListener('input', updateEntries);
-searchInput.addEventListener('input', updateEntries);
-updateEntries();
+if (prevBtn) prevBtn.addEventListener('click', () => { currentPage--; renderPage(); });
+if (nextBtn) nextBtn.addEventListener('click', () => { currentPage++; renderPage(); });
+
+// Initial render
+renderPage();
 
 // Menu dropdown functionality
 document.getElementById('menuBtn').addEventListener('click', function() {
@@ -1580,6 +1643,9 @@ function confirmAddEmployee() {
     need('input[name="phone"]', 'Phone is required');
     invalid('input[name="phone"]', v => /^\d{11}$/.test(v), 'Phone must be exactly 11 digits');
     need('textarea[name="address"]', 'Address is required');
+    invalid('textarea[name="address"]', v => v.length >= 20, 'Address must be at least 20 characters long');
+    invalid('textarea[name="address"]', v => v.length <= 500, 'Address must not exceed 500 characters');
+    invalid('textarea[name="address"]', v => /[,\s]/.test(v), 'Complete address must include street, barangay, city/municipality, and province.');
 
     if (createAccount) {
         // Username and password are auto-generated, no need to validate
@@ -1718,22 +1784,45 @@ function proceedWithCreation() {
     }
 
     // Additional input validation
-    document.addEventListener('DOMContentLoaded', function() {
+    // Function to setup input restrictions
+    function setupInputRestrictions() {
       // Restrict name inputs to letters only and max 20 characters
       const nameInputs = document.querySelectorAll('.name-input');
       nameInputs.forEach(input => {
-        input.addEventListener('input', function() {
-          this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 20);
-        });
+        // Remove old listener if exists
+        input.removeEventListener('input', restrictToLetters);
+        input.addEventListener('input', restrictToLetters);
+      });
+
+      // Restrict phone inputs to digits only and max 11 digits
+      const phoneInputs = document.querySelectorAll('.phone-input');
+      phoneInputs.forEach(input => {
+        input.removeEventListener('input', restrictToDigits);
+        input.addEventListener('input', restrictToDigits);
       });
 
       // Employee ID validation - numbers only, max 11 digits
       const empIdInput = document.querySelector('.employee-id-input');
       if (empIdInput) {
-        empIdInput.addEventListener('input', function() {
-          this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
-        });
+        empIdInput.removeEventListener('input', restrictToDigits11);
+        empIdInput.addEventListener('input', restrictToDigits11);
       }
+    }
+
+    function restrictToLetters(e) {
+      this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 20);
+    }
+
+    function restrictToDigits(e) {
+      this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+    }
+
+    function restrictToDigits11(e) {
+      this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      setupInputRestrictions();
     });
     
     // ===== PREVENT BACK BUTTON AFTER LOGOUT =====

@@ -6,38 +6,7 @@ if (session_status() == PHP_SESSION_NONE) {
 }
 include '../StudentLogin/db_conn.php';
 
-// Function to generate next Employee ID
-function generateNextEmployeeId($conn) {
-    $currentYear = date('Y');
-    $prefix = 'CCI' . $currentYear . '-';
-    
-    // Get the highest existing employee ID for current year
-    $query = "SELECT id_number FROM employees WHERE id_number LIKE ? ORDER BY id_number DESC LIMIT 1";
-    $stmt = $conn->prepare($query);
-    $searchPattern = $prefix . '%';
-    $stmt->bind_param("s", $searchPattern);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        $lastId = $row['id_number'];
-        // Extract the numeric part after the dash
-        $parts = explode('-', $lastId);
-        if (count($parts) == 2) {
-            $numericPart = intval($parts[1]);
-            $nextNumber = $numericPart + 1;
-        } else {
-            $nextNumber = 1;
-        }
-    } else {
-        // First employee for this year
-        $nextNumber = 1;
-    }
-    
-    // Format as CCI2025-001, CCI2025-002, etc.
-    return $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-}
+// Note: generateNextEmployeeId() function is defined in Dashboard.php
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Auto-generate Employee ID
@@ -58,6 +27,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $role = $_POST['role'] ?? '';
+
+    // Validate complete address (same as registrar)
+    $validation_errors = [];
+    if (strlen($address) < 20) {
+        $validation_errors[] = "Complete address must be at least 20 characters long.";
+    } elseif (strlen($address) > 500) {
+        $validation_errors[] = "Complete address must not exceed 500 characters.";
+    } elseif (!preg_match('/.*[,\s].*/i', $address)) {
+        $validation_errors[] = "Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.";
+    }
+    
+    if (!empty($validation_errors)) {
+        $_SESSION['error_msg'] = implode(' ', $validation_errors);
+        $_SESSION['show_modal'] = true;
+        $_SESSION['form_data'] = $_POST;
+        header("Location: Dashboard.php");
+        exit;
+    }
 
     try {
         // Start transaction
@@ -220,6 +207,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $success_message .= " with system account";
         }
         $_SESSION['success_msg'] = $success_message;
+        
+        // Redirect to prevent form resubmission on refresh (Post/Redirect/Get pattern)
+        header("Location: Dashboard.php");
+        exit;
 
     } catch (Exception $e) {
         $conn->rollback();
@@ -228,9 +219,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $_SESSION['form_data'] = $_POST;
         error_log("Employee creation error: " . $e->getMessage());
         error_log("POST data: " . print_r($_POST, true));
+        
+        // Redirect to prevent form resubmission on refresh
+        header("Location: Dashboard.php");
+        exit;
     }
-
-    // Don't redirect when included - let Dashboard.php handle the display
-    return;
 }
 ?>

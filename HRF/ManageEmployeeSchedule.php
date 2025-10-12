@@ -24,6 +24,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             exit;
         }
         
+        // Check if teacher already has a schedule (check both assignment and schedule name)
+        $check_stmt = $conn->prepare("SELECT COUNT(*) as count FROM employee_schedules WHERE employee_id = ?");
+        $check_stmt->bind_param("s", $teacher_id);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        $check_row = $check_result->fetch_assoc();
+        
+        // Also check if a schedule with this teacher's name already exists
+        $check_name_stmt = $conn->prepare("SELECT COUNT(*) as count FROM employee_work_schedules WHERE schedule_name = ?");
+        $check_name_stmt->bind_param("s", $section_name);
+        $check_name_stmt->execute();
+        $check_name_result = $check_name_stmt->get_result();
+        $check_name_row = $check_name_result->fetch_assoc();
+        
+        if ($check_row['count'] > 0 || $check_name_row['count'] > 0) {
+            $response = ['success' => false, 'message' => 'This teacher already has a schedule. Please edit the existing schedule or delete it first.'];
+            header('Content-Type: application/json');
+            echo json_encode($response);
+            exit;
+        }
+        
         if ($schedule_type == 'same') {
             // Same time for all days
             $start_time = $_POST['start_time'];
@@ -45,9 +66,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             if ($stmt->execute()) {
                 // Auto-assign teacher to this schedule
                 $new_schedule_id = $conn->insert_id;
-                $rem = $conn->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
-                $rem->bind_param("s", $teacher_id);
-                $rem->execute();
                 $ins = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
                 $ins->bind_param("sii", $teacher_id, $new_schedule_id, $actorId);
                 $ins->execute();
@@ -99,9 +117,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                 $update_stmt->execute();
                 
                 // Auto-assign teacher to this schedule
-                $rem = $conn->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
-                $rem->bind_param("s", $teacher_id);
-                $rem->execute();
                 $ins = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
                 $ins->bind_param("sii", $teacher_id, $schedule_id, $actorId);
                 $ins->execute();
@@ -264,13 +279,14 @@ $schedules_query = "SELECT cs.*, COUNT(es.id) as employee_count
                    ORDER BY cs.schedule_name";
 $schedules_result = $conn->query($schedules_query);
 
-// Fetch available teachers for dropdown (active employees with teacher accounts)
-// Uses unified employee_accounts with role = 'teacher'
-$teachers_sql = "SELECT e.id_number, CONCAT(e.first_name, ' ', e.last_name) AS full_name
+$teachers_sql = "SELECT e.id_number, 
+                        CONCAT(e.first_name, ' ', e.last_name) AS full_name,
+                        CASE WHEN es.id IS NOT NULL THEN 1 ELSE 0 END as has_schedule
                  FROM employees e
                  INNER JOIN employee_accounts a ON a.employee_id = e.id_number AND a.role = 'teacher'
-                 WHERE e.deleted_at IS NULL OR e.deleted_at IS NULL
-                 ORDER BY full_name";
+                 LEFT JOIN employee_schedules es ON es.employee_id = e.id_number
+                 WHERE e.deleted_at IS NULL
+                 ORDER BY has_schedule ASC, full_name ASC";
 $teachers_result = $conn->query($teachers_sql);
 ?>
 
@@ -443,6 +459,13 @@ $teachers_result = $conn->query($teachers_sql);
         </div>
         <!-- No results message for search -->
         <div id="classNoResults" class="hidden col-span-full text-center py-8 text-gray-500">No schedules found</div>
+        
+        <!-- Pagination Controls -->
+        <div id="paginationBar" class="mt-4 flex items-center justify-center gap-2 text-sm">
+            <button id="prevPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 transition">Prev</button>
+            <span id="pageInfo" class="px-2 text-gray-600">Page 1 of 1</span>
+            <button id="nextPage" class="px-3 py-1 border rounded-lg text-[#0B2C62] hover:bg-[#0B2C62] hover:text-white disabled:opacity-40 transition">Next</button>
+        </div>
     </div>
 </div>
 
@@ -506,8 +529,24 @@ $teachers_result = $conn->query($teachers_sql);
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
                     <option value="">-- Select Teacher --</option>
                     <?php if ($teachers_result && $teachers_result->num_rows > 0): ?>
-                        <?php while ($t = $teachers_result->fetch_assoc()): ?>
-                            <option value="<?= htmlspecialchars($t['id_number']) ?>" data-name="<?= htmlspecialchars($t['full_name']) ?>">
+                        <?php 
+                        $last_status = null;
+                        while ($t = $teachers_result->fetch_assoc()): 
+                            $has_schedule = $t['has_schedule'];
+                            
+                            // Add section header when status changes
+                            if ($last_status !== $has_schedule) {
+                                if ($has_schedule == 0) {
+                                    echo '<option disabled style="background-color: #f3f4f6; font-weight: 600; color: #1f2937;">Available Teachers</option>';
+                                } else {
+                                    echo '<option disabled style="background-color: #f3f4f6; font-weight: 600; color: #1f2937;">Already Has Schedule</option>';
+                                }
+                                $last_status = $has_schedule;
+                            }
+                        ?>
+                            <option value="<?= htmlspecialchars($t['id_number']) ?>" 
+                                    data-name="<?= htmlspecialchars($t['full_name']) ?>"
+                                    <?= $has_schedule ? 'disabled style="color: #6b7280;"' : '' ?>>
                                 <?= htmlspecialchars($t['full_name']) ?>
                             </option>
                         <?php endwhile; ?>
@@ -640,6 +679,10 @@ $teachers_result = $conn->query($teachers_sql);
                     <p id="diffDaysError" class="hidden text-sm text-red-600">Please enable at least one day and provide start and end times.</p>
                 </div>
             </div>
+            
+            <!-- Error Message Display -->
+            <div id="formError" class="hidden p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm"></div>
+            
             <div class="flex gap-3 pt-4">
                 <button type="button" onclick="hideCreateScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
                 <button type="submit" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Create Schedule</button>
@@ -1503,34 +1546,71 @@ function openClassScheduleDetails(id){
 function closeClassScheduleDetails(){ const m=document.getElementById('classScheduleDetailsModal'); if(m) m.classList.add('hidden'); }
 function formatTime(t){ try{ const d = new Date(`1970-01-01T${t}`); return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); } catch(e){ return t; } }
 
-// Search filter for student schedules
+// Pagination and Search for schedules
 (function(){
   const classSearchEl = document.getElementById('classScheduleSearch');
-  if(!classSearchEl) return;
   const icon = document.getElementById('classSearchIcon');
   const clearBtn = document.getElementById('classSearchClear');
   const noRes = document.getElementById('classNoResults');
-  const applyFilter = () => {
+  const prevBtn = document.getElementById('prevPage');
+  const nextBtn = document.getElementById('nextPage');
+  const pageInfo = document.getElementById('pageInfo');
+  const pageSize = 6;
+  let currentPage = 1;
+  
+  if(!classSearchEl) return;
+  
+  const allCards = Array.from(document.querySelectorAll('.class-schedule-card'));
+  
+  const renderPage = () => {
     const q = classSearchEl.value.trim().toLowerCase();
+    
+    // Update search UI
     if(icon) icon.classList.toggle('hidden', q.length>0);
     if(clearBtn) clearBtn.classList.toggle('hidden', q.length===0);
     if(q.length>0){ classSearchEl.classList.remove('pl-10'); classSearchEl.classList.add('pl-3'); }
     else { classSearchEl.classList.add('pl-10'); classSearchEl.classList.remove('pl-3'); }
-    const cards = document.querySelectorAll('.class-schedule-card');
-    let visible=0;
-    cards.forEach(card=>{
+    
+    // Filter cards based on search
+    const filteredCards = allCards.filter(card => {
       const name = (card.querySelector('.class-schedule-name')?.textContent || '').toLowerCase();
       const days = (card.querySelector('.class-schedule-days')?.textContent || '').toLowerCase();
-      const match = q.length===0 || name.includes(q) || days.includes(q);
-      card.style.display = match ? '' : 'none';
-      if(match) visible++;
+      return q.length===0 || name.includes(q) || days.includes(q);
     });
-    if(noRes) noRes.classList.toggle('hidden', visible>0);
+    
+    // Calculate pagination
+    const total = filteredCards.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageCards = filteredCards.slice(start, end);
+    
+    // Hide all cards first
+    allCards.forEach(card => card.style.display = 'none');
+    
+    // Show only current page cards
+    pageCards.forEach(card => card.style.display = '');
+    
+    // Update pagination controls
+    if(pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    if(prevBtn) prevBtn.disabled = (currentPage <= 1);
+    if(nextBtn) nextBtn.disabled = (currentPage >= totalPages);
+    
+    // Show/hide no results message
+    if(noRes) noRes.classList.toggle('hidden', total > 0);
   };
-  classSearchEl.addEventListener('input', applyFilter);
-  classSearchEl.addEventListener('focus', applyFilter);
-  classSearchEl.addEventListener('blur', applyFilter);
-  if(clearBtn){ clearBtn.addEventListener('click', ()=>{ classSearchEl.value=''; classSearchEl.focus(); applyFilter(); }); }
+  
+  // Event listeners
+  classSearchEl.addEventListener('input', () => { currentPage = 1; renderPage(); });
+  classSearchEl.addEventListener('focus', renderPage);
+  classSearchEl.addEventListener('blur', renderPage);
+  if(clearBtn){ clearBtn.addEventListener('click', ()=>{ classSearchEl.value=''; classSearchEl.focus(); renderPage(); }); }
+  if(prevBtn) prevBtn.addEventListener('click', () => { currentPage--; renderPage(); });
+  if(nextBtn) nextBtn.addEventListener('click', () => { currentPage++; renderPage(); });
+  
+  // Initial render
+  renderPage();
 })();
 </script>
 
