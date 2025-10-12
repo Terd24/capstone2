@@ -71,17 +71,60 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Validations
-        if (!preg_match('/^[0-9]+$/', $id_number) || strlen($id_number) > 11) {
-            throw new Exception("Employee ID must contain only numbers and be maximum 11 digits.");
+        $validation_errors = [];
+        
+        // Employee ID validation
+        if (empty($id_number) || trim($id_number) === '') {
+            $validation_errors[] = "Employee ID is required.";
+        } elseif (!preg_match('/^[0-9]+$/', $id_number)) {
+            $validation_errors[] = "Employee ID must contain only numbers.";
+        } elseif (strlen($id_number) > 11) {
+            $validation_errors[] = "Employee ID must be maximum 11 digits.";
         }
-        if (empty($email)) {
-            throw new Exception("Email is required.");
+        
+        // Name validations
+        if (empty($first_name) || trim($first_name) === '') {
+            $validation_errors[] = "First name is required.";
         }
-        if (empty($phone) || !preg_match('/^[0-9]{11}$/', $phone)) {
-            throw new Exception("Phone must be exactly 11 digits (numbers only).");
+        if (empty($last_name) || trim($last_name) === '') {
+            $validation_errors[] = "Last name is required.";
         }
-        if (empty($address)) {
-            throw new Exception("Complete Address is required.");
+        if (empty($position) || trim($position) === '') {
+            $validation_errors[] = "Position is required.";
+        }
+        if (empty($department) || trim($department) === '') {
+            $validation_errors[] = "Department is required.";
+        }
+        
+        // Email validation
+        if (empty($email) || trim($email) === '') {
+            $validation_errors[] = "Email is required.";
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $validation_errors[] = "Please enter a valid email address.";
+        }
+        
+        // Phone validation
+        if (empty($phone) || trim($phone) === '') {
+            $validation_errors[] = "Phone number is required.";
+        } elseif (!preg_match('/^[0-9]+$/', $phone)) {
+            $validation_errors[] = "Phone must contain digits only.";
+        } elseif (strlen($phone) !== 11) {
+            $validation_errors[] = "Phone must be exactly 11 digits.";
+        }
+        
+        // Address validation
+        if (empty($address) || trim($address) === '') {
+            $validation_errors[] = "Complete address is required.";
+        }
+        
+        // Hire date validation
+        if (empty($hire_date)) {
+            $validation_errors[] = "Hire date is required.";
+        }
+        
+        // If there are validation errors, throw exception with all errors
+        if (!empty($validation_errors)) {
+            throw new Exception(implode('<br>', $validation_errors));
         }
         // RFID validation - only required for teachers
         if ($role === 'teacher') {
@@ -151,7 +194,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     } catch (Exception $e) {
         $conn->rollback();
-        $_SESSION['error_msg'] = "Error: " . $e->getMessage();
+        $_SESSION['error_msg'] = $e->getMessage();
+        $_SESSION['show_modal'] = true;
+        $_SESSION['form_data'] = $_POST;
         error_log("Employee creation error: " . $e->getMessage());
         error_log("POST data: " . print_r($_POST, true));
     }

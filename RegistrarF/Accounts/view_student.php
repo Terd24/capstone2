@@ -524,15 +524,15 @@ input[type=number] { -moz-appearance: textfield; }
                         </div>
 
                         <!-- Row: Full Name -->
+                                                 <div>
+                            <label class="block text-sm font-semibold mb-1">First Name *</label>
+                            <input type="text" name="first_name" value="<?= htmlspecialchars($student_data['first_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                            <small class="text-red-500 text-xs error-message hidden">First Name is required</small>
+                        </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last Name *</label>
                             <input type="text" name="last_name" value="<?= htmlspecialchars($student_data['last_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
                             <small class="text-red-500 text-xs error-message hidden">Last Name is required</small>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">First Name *</label>
-                            <input type="text" name="first_name" value="<?= htmlspecialchars($student_data['first_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
-                            <small class="text-red-500 text-xs error-message hidden">First Name is required</small>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>

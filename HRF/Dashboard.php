@@ -27,8 +27,17 @@ if ($success_msg) {
 
 // Handle error message
 $error_msg = $_SESSION['error_msg'] ?? '';
+$show_modal = $_SESSION['show_modal'] ?? false;
+$form_data = $_SESSION['form_data'] ?? [];
+
 if ($error_msg) {
     unset($_SESSION['error_msg']);
+}
+if (isset($_SESSION['show_modal'])) {
+    unset($_SESSION['show_modal']);
+}
+if (isset($_SESSION['form_data'])) {
+    unset($_SESSION['form_data']);
 }
 
 // Ensure soft delete columns exist
@@ -267,8 +276,15 @@ input[type=number] { -moz-appearance: textfield; }
             <button onclick="closeModal()" class="text-2xl font-bold text-white hover:text-gray-300">&times;</button>
         </div>
 
+        <!-- Error Messages -->
+        <?php if (!empty($error_msg)): ?>
+            <div class="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <?= $error_msg ?>
+            </div>
+        <?php endif; ?>
+
         <!-- Form -->
-        <form method="POST" autocomplete="off" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+        <form method="POST" action="" autocomplete="off" novalidate class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
             
             <!-- Personal Information Section -->
             <div class="col-span-3 mb-6">
@@ -283,61 +299,61 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Row 1: ID Number, First Name, Middle Name -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Employee ID *</label>
-                            <input type="text" name="id_number" autocomplete="off" required maxlength="11" pattern="[0-9]{1,11}" title="Numbers only, maximum 11 digits" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] employee-id-input">
+                            <input type="text" name="id_number" autocomplete="off" required maxlength="11" pattern="[0-9]{1,11}" title="Numbers only, maximum 11 digits" value="<?= htmlspecialchars($form_data['id_number'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] employee-id-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">First Name *</label>
-                            <input type="text" name="first_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
+                            <input type="text" name="first_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
-                            <input type="text" name="middle_name" autocomplete="off" pattern="[A-Za-z\s]*" maxlength="20" title="Letters only, maximum 20 characters" placeholder="Optional" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
+                            <input type="text" name="middle_name" autocomplete="off" pattern="[A-Za-z\s]*" maxlength="20" title="Letters only, maximum 20 characters" placeholder="Optional" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
                         
                         <!-- Row 2: Last Name, Position, Department -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Last Name *</label>
-                            <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
+                            <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
 
                         <div>
                             <label class="block text-sm font-semibold mb-1">Position *</label>
-                            <input type="text" name="position" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
+                            <input type="text" name="position" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required value="<?= htmlspecialchars($form_data['position'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Department *</label>
                             <select name="department" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 <option value="">-- Select Department --</option>
-                                <option value="Academic Affairs">Academic Affairs</option>
-                                <option value="Student Affairs">Student Affairs</option>
-                                <option value="Finance">Finance</option>
-                                <option value="Human Resources">Human Resources</option>
-                                <option value="IT Department">IT Department</option>
-                                <option value="Maintenance">Maintenance</option>
-                                <option value="Security">Security</option>
+                                <option value="Academic Affairs" <?= ($form_data['department'] ?? '') === 'Academic Affairs' ? 'selected' : '' ?>>Academic Affairs</option>
+                                <option value="Student Affairs" <?= ($form_data['department'] ?? '') === 'Student Affairs' ? 'selected' : '' ?>>Student Affairs</option>
+                                <option value="Finance" <?= ($form_data['department'] ?? '') === 'Finance' ? 'selected' : '' ?>>Finance</option>
+                                <option value="Human Resources" <?= ($form_data['department'] ?? '') === 'Human Resources' ? 'selected' : '' ?>>Human Resources</option>
+                                <option value="IT Department" <?= ($form_data['department'] ?? '') === 'IT Department' ? 'selected' : '' ?>>IT Department</option>
+                                <option value="Maintenance" <?= ($form_data['department'] ?? '') === 'Maintenance' ? 'selected' : '' ?>>Maintenance</option>
+                                <option value="Security" <?= ($form_data['department'] ?? '') === 'Security' ? 'selected' : '' ?>>Security</option>
                             </select>
                         </div>
                         
                         <!-- Row 3: Hire Date, Email, Phone -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Hire Date *</label>
-                            <input type="date" name="hire_date" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="date" name="hire_date" required value="<?= htmlspecialchars($form_data['hire_date'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
 
                         <div>
                             <label class="block text-sm font-semibold mb-1">Email *</label>
-                            <input type="email" name="email" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="email" name="email" autocomplete="off" required value="<?= htmlspecialchars($form_data['email'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Phone *</label>
-                            <input type="text" name="phone" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] phone-input" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
+                            <input type="text" name="phone" required value="<?= htmlspecialchars($form_data['phone'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] phone-input" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
                         </div>
                         
 
                         <!-- Complete Address -->
                         <div class="col-span-3">
                             <label class="block text-sm font-semibold mb-1">Complete Address *</label>
-                            <textarea name="address" rows="3" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"></textarea>
+                            <textarea name="address" rows="3" autocomplete="off" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]"><?= htmlspecialchars($form_data['address'] ?? '') ?></textarea>
                         </div>
                     </div>
                 </div>
@@ -507,6 +523,13 @@ input[type=number] { -moz-appearance: textfield; }
 </style>
 
 <script>
+// Show modal if there's an error
+<?php if ($show_modal): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('addEmployeeModal').classList.remove('hidden');
+});
+<?php endif; ?>
+
 // Modal functions
 function openModal() {
     document.getElementById('addEmployeeModal').classList.remove('hidden');
@@ -514,6 +537,44 @@ function openModal() {
 
 function closeModal() {
     document.getElementById('addEmployeeModal').classList.add('hidden');
+}
+
+// Validation helper functions
+function highlightFieldError(element, message) {
+    if (!element) return;
+    
+    // Add red border and background
+    element.classList.remove('border-gray-300', 'focus:ring-[#0B2C62]');
+    element.classList.add('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+    
+    // Create or update error message
+    let errorMsg = element.parentElement.querySelector('.field-error-message');
+    if (!errorMsg) {
+        errorMsg = document.createElement('p');
+        errorMsg.className = 'field-error-message text-red-500 text-sm mt-1 font-medium';
+        element.parentElement.appendChild(errorMsg);
+    }
+    errorMsg.textContent = message;
+    
+    // Focus on first error field
+    if (!document.querySelector('.border-red-500')) {
+        element.focus();
+    }
+}
+
+function clearFieldErrors(form) {
+    if (!form) return;
+    
+    // Remove red borders and backgrounds
+    const errorFields = form.querySelectorAll('.border-red-500');
+    errorFields.forEach(field => {
+        field.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+        field.classList.add('border-gray-300', 'focus:ring-[#0B2C62]');
+    });
+    
+    // Remove error messages
+    const errorMessages = form.querySelectorAll('.field-error-message');
+    errorMessages.forEach(msg => msg.remove());
 }
 
 // Show/hide account fields and RFID when needed
@@ -1379,6 +1440,7 @@ function confirmAddEmployee() {
     need('input[name="first_name"]', 'First name is required');
     need('input[name="last_name"]', 'Last name is required');
     need('input[name="position"]', 'Position is required');
+    need('select[name="department"]', 'Department is required');
     need('input[name="hire_date"]', 'Hire date is required');
     need('input[name="email"]', 'Email is required');
     invalid('input[name="email"]', v => /^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(v), 'Please enter a valid email address');
