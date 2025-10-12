@@ -11,13 +11,33 @@ if (!isset($_SESSION['registrar_id'])) {
 date_default_timezone_set('Asia/Manila');
 $today = date('Y-m-d');
 
-// Filters
-$search_name = trim($_GET['search_name'] ?? '');
-// Keep inputs empty by default; we will still filter to today if both are empty
-$start_date  = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
-$end_date    = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
-$filter_section = trim($_GET['filter_section'] ?? '');
-$filter_status = trim($_GET['filter_status'] ?? '');
+// Handle POST submission - store in session and redirect to clean URL
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['attendance_filters'] = [
+        'search_name' => trim($_POST['search_name'] ?? ''),
+        'start_date' => trim($_POST['start_date'] ?? ''),
+        'end_date' => trim($_POST['end_date'] ?? ''),
+        'filter_section' => trim($_POST['filter_section'] ?? ''),
+        'filter_status' => trim($_POST['filter_status'] ?? '')
+    ];
+    header("Location: AttendanceRecords.php");
+    exit;
+}
+
+// Get filters from session or use defaults
+$filters = $_SESSION['attendance_filters'] ?? [];
+$search_name = $filters['search_name'] ?? '';
+$start_date = $filters['start_date'] ?? '';
+$end_date = $filters['end_date'] ?? '';
+$filter_section = $filters['filter_section'] ?? '';
+$filter_status = $filters['filter_status'] ?? '';
+
+// Clear session filters if explicitly requested
+if (isset($_GET['clear'])) {
+    unset($_SESSION['attendance_filters']);
+    header("Location: AttendanceRecords.php");
+    exit;
+}
 
 // Validate date restrictions
 if ($start_date !== '') {
@@ -152,7 +172,7 @@ if ($status_result) {
   <div class="container mx-auto px-6 py-4">
     <div class="bg-white rounded-2xl shadow-lg p-5 mb-4">
       <h2 class="text-xl font-bold text-gray-800 mb-4">Filter</h2>
-      <form method="get" class="space-y-4">
+      <form method="post" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-8 gap-4 items-end">
           <div class="md:col-span-2">
             <label class="text-sm font-medium text-gray-700 mb-2 block">Start Date</label>
@@ -160,11 +180,11 @@ if ($status_result) {
           </div>
           <div class="md:col-span-2">
             <label class="text-sm font-medium text-gray-700 mb-2 block">End Date</label>
-            <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" max="<?= $today ?>" placeholder="End date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="endDate">
+            <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" min="2025-01-01" max="<?= $today ?>" placeholder="End date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent" id="endDate">
           </div>
           <div class="md:col-span-4 flex gap-2">
             <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium whitespace-nowrap">Generate Report</button>
-            <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-10 py-2 rounded-lg font-medium whitespace-nowrap">Clear</a>
+            <a href="AttendanceRecords.php?clear=1" class="bg-gray-500 hover:bg-gray-600 text-white px-10 py-2 rounded-lg font-medium whitespace-nowrap">Clear</a>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-8 gap-4 items-end">

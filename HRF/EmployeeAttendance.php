@@ -11,6 +11,32 @@ if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSIO
 date_default_timezone_set('Asia/Manila');
 $today = date('Y-m-d');
 
+// Handle POST submission - store in session and redirect to clean URL
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['employee_attendance_filters'] = [
+        'search_name' => trim($_POST['search_name'] ?? ''),
+        'start_date' => trim($_POST['start_date'] ?? ''),
+        'end_date' => trim($_POST['end_date'] ?? ''),
+        'filter_section' => trim($_POST['filter_section'] ?? '')
+    ];
+    header("Location: EmployeeAttendance.php");
+    exit;
+}
+
+// Get filters from session or use defaults
+$filters = $_SESSION['employee_attendance_filters'] ?? [];
+$search_name = $filters['search_name'] ?? '';
+$start_date = $filters['start_date'] ?? '';
+$end_date = $filters['end_date'] ?? '';
+$filter_section = $filters['filter_section'] ?? '';
+
+// Clear session filters if explicitly requested
+if (isset($_GET['clear'])) {
+    unset($_SESSION['employee_attendance_filters']);
+    header("Location: EmployeeAttendance.php");
+    exit;
+}
+
 // Check which column exists in teacher_attendance table
 $teacher_id_column = 'teacher_id'; // default
 $check_columns = $conn->query("SHOW COLUMNS FROM teacher_attendance LIKE '%id'");
@@ -26,10 +52,27 @@ if ($check_columns && $check_columns->num_rows > 0) {
     }
 }
 
-// Filters - Use POST instead of GET for security
-$search_name = trim($_POST['search_name'] ?? '');
-$start_date  = isset($_POST['start_date']) ? trim($_POST['start_date']) : '';
-$end_date    = isset($_POST['end_date']) ? trim($_POST['end_date']) : '';
+// Validate date restrictions
+if ($start_date !== '') {
+    // Start date must be from 2025-01-01 onwards and not in the future
+    if ($start_date < '2025-01-01') {
+        $start_date = '2025-01-01';
+    }
+    if ($start_date > $today) {
+        $start_date = $today;
+    }
+}
+
+if ($end_date !== '') {
+    // End date cannot be in the future
+    if ($end_date > $today) {
+        $end_date = $today;
+    }
+    // End date should not be before start date if both are provided
+    if ($start_date !== '' && $end_date < $start_date) {
+        $end_date = $start_date;
+    }
+}
 
 // Build teacher attendance query (teacher_attendance used for teachers)
 $sql = "SELECT ta.*, e.first_name, e.last_name, e.id_number
@@ -100,15 +143,15 @@ $records = $stmt->get_result();
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700 mb-2 block">Start Date</label>
-          <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+          <input type="date" name="start_date" value="<?= htmlspecialchars($start_date) ?>" min="2025-01-01" max="<?= $today ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700 mb-2 block">End Date</label>
-          <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+          <input type="date" name="end_date" value="<?= htmlspecialchars($end_date) ?>" min="2025-01-01" max="<?= $today ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
         </div>
         <div class="flex gap-2">
           <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium">Generate Report</button>
-          <a href="EmployeeAttendance.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Clear</a>
+          <a href="EmployeeAttendance.php?clear=1" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Clear</a>
         </div>
       </form>
       <p class="mt-4 text-gray-600">

@@ -439,7 +439,8 @@ input[type=number] { -moz-appearance: textfield; }
             <h2 class="text-lg font-semibold text-white">Student Information</h2>
             <div class="flex gap-3 items-center">
                 <!-- Save on header (hidden until Edit is pressed) -->
-                <button type="submit" id="saveBtn" form="studentForm" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition hidden">Save Changes</button>
+                <button type="button" id="saveBtn" onclick="showSaveConfirmation()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition hidden">Save Changes</button>
+                <button type="button" id="cancelBtn" onclick="window.location.reload()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition hidden">Cancel</button>
                 <button type="button" id="editBtn" onclick="toggleEdit()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
                 <form method="post" action="<?= $_SERVER['PHP_SELF'] ?>?id=<?= htmlspecialchars($student_id) ?>" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this student account? This action cannot be undone.')">
                     <input type="hidden" name="delete_student" value="1">
@@ -1589,6 +1590,58 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// Simple confirmation dialog
+function showSaveConfirmation() {
+    const c = document.createElement('div');
+    c.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[2147483647]';
+    c.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <h3 class="text-lg font-semibold mb-2">Confirm Changes</h3>
+            <p class="text-gray-600 mb-6">Are you sure you want to save these changes to the student information?</p>
+            <div class="flex justify-end gap-2">
+                <button id="cCancel" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded">Cancel</button>
+                <button id="cSave" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirm & Save</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(c);
+    c.querySelector('#cCancel').onclick = () => c.remove();
+    c.querySelector('#cSave').onclick = () => {
+        c.remove();
+        document.getElementById('studentForm').submit();
+    };
+}
+
+function toggleEdit() {
+    const editBtn = document.getElementById('editBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const fields = document.querySelectorAll('.student-field');
+    
+    // Hide Edit and Delete
+    if (editBtn) editBtn.classList.add('hidden');
+    if (deleteBtn) deleteBtn.classList.add('hidden');
+    
+    // Show Save and Cancel
+    if (saveBtn) saveBtn.classList.remove('hidden');
+    if (cancelBtn) cancelBtn.classList.remove('hidden');
+    
+    // Make fields editable
+    fields.forEach(field => {
+        if (field.name === 'username' || field.name === 'parent_username' || field.name === 'id_number') {
+            return;
+        }
+        if (['text', 'tel', 'number', 'date'].includes(field.type) || field.tagName === 'TEXTAREA') {
+            field.readOnly = false;
+            field.classList.remove('bg-gray-50');
+            field.classList.add('bg-white');
+        } else if (['radio', 'checkbox'].includes(field.type) || field.tagName === 'SELECT') {
+            field.disabled = false;
+        }
+    });
+}
 </script>
 <?php if (!$embed): ?>
 </body>

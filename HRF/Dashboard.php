@@ -1177,6 +1177,32 @@ function saveEmployeeChanges() {
     }
     
     // Prepare form data
+    // Show confirmation dialog before saving
+    showEmployeeSaveConfirmation(firstName, middleName, lastName, position, department, email, phone, address, hireDate);
+}
+
+function showEmployeeSaveConfirmation(firstName, middleName, lastName, position, department, email, phone, address, hireDate) {
+    const c = document.createElement('div');
+    c.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[2147483647]';
+    c.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <h3 class="text-lg font-semibold mb-2">Confirm Changes</h3>
+            <p class="text-gray-600 mb-6">Are you sure you want to save these changes to the employee information?</p>
+            <div class="flex justify-end gap-2">
+                <button id="cCancel" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded">Cancel</button>
+                <button id="cSave" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirm & Save</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(c);
+    c.querySelector('#cCancel').onclick = () => c.remove();
+    c.querySelector('#cSave').onclick = () => {
+        c.remove();
+        performEmployeeSave(firstName, middleName, lastName, position, department, email, phone, address, hireDate);
+    };
+}
+
+function performEmployeeSave(firstName, middleName, lastName, position, department, email, phone, address, hireDate) {
     const formData = new FormData();
     formData.append('employee_id', currentEmployeeId);
     formData.append('first_name', firstName);
