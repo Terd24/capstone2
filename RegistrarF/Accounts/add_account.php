@@ -1234,26 +1234,26 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                         <span class="tracking-wide">PERSONAL ACCOUNT</span>
                     </h3>
                     <!-- Row 1: Username (full width) -->
-                    <div class="grid grid-cols-1 gap-6 mb-6">
+                    <div class="grid grid-cols-2 gap-6 mb-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
                             <input type="text" name="username" autocomplete="off" value="<?= htmlspecialchars($form_data['username'] ?? '') ?>" pattern="^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$" title="Auto-generated: lastname000000muzon@student.cci.edu.ph" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                         </div>
+                                                <div>
+                            <label class="block text-sm font-semibold mb-1">Password <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
+                            <input type="text" name="password" autocomplete="new-password" value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;" title="Auto-generated when date of birth is entered: surnamemonthddyyyy">
+                            <p class="text-xs text-gray-500 mt-1">Format: <span class="font-medium">lastname + birthdate</span> (e.g., studentjanuary152003)</p>
+                        </div>
                     </div>
                     
                     <!-- Row 2: Student ID, Password, RFID Number -->
-                    <div class="grid grid-cols-3 gap-6">
+                    <div class="grid grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Student ID <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
                             <input type="text" name="id_number" autocomplete="off" value="<?= htmlspecialchars($old_id ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Auto-generated Student ID" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46] digits-only" data-maxlen="11" inputmode="numeric" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                             <?php if (!empty($error_id)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_id) ?></p>
                             <?php endif; ?>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Password <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
-                            <input type="text" name="password" autocomplete="new-password" value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;" title="Auto-generated when date of birth is entered: surnamemonthddyyyy">
-                            <p class="text-xs text-gray-500 mt-1">Format: <span class="font-medium">lastname + birthdate</span> (e.g., studentjanuary152003)</p>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">RFID Number <span class="text-gray-500 text-xs">(Optional)</span></label>
@@ -1998,4 +1998,3 @@ function confirmAndCreateStudent() {
 <?php
 if ($_SERVER["REQUEST_METHOD"] != "POST") {
 }
-

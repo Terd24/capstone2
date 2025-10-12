@@ -623,7 +623,7 @@ input[type=number] { -moz-appearance: textfield; }
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Birthplace *</label>
-                            <input type="text" name="birthplace" value="<?= htmlspecialchars($student_data['birthplace'] ?? '') ?>" readonly required pattern="[A-Za-z\s,.-]+" title="Please enter a valid location" oninput="this.value = this.value.replace(/[^A-Za-z\s,.-]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <input type="text" name="birthplace" value="<?= htmlspecialchars($student_data['birthplace'] ?? '') ?>" readonly required pattern="[A-Za-z\s,.\-]+" title="Please enter a valid location" oninput="this.value = this.value.replace(/[^A-Za-z\s,.\-]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
                             <small class="text-red-500 text-xs error-message hidden">Birthplace is required</small>
                         </div>
                         <div>
@@ -710,7 +710,7 @@ input[type=number] { -moz-appearance: textfield; }
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Contact</label>
-                                    <input type="tel" name="father_contact" value="<?= htmlspecialchars($student_data['father_contact'] ?? '') ?>" readonly pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="11" inputmode="numeric">
+                                    <input type="tel" name="father_contact" value="<?= htmlspecialchars($student_data['father_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-white student-field digits-only" data-maxlen="11" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -742,7 +742,7 @@ input[type=number] { -moz-appearance: textfield; }
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Contact</label>
-                                    <input type="tel" name="mother_contact" value="<?= htmlspecialchars($student_data['mother_contact'] ?? '') ?>" readonly pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="11" inputmode="numeric">
+                                    <input type="tel" name="mother_contact" value="<?= htmlspecialchars($student_data['mother_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-white student-field digits-only" data-maxlen="11" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -774,7 +774,7 @@ input[type=number] { -moz-appearance: textfield; }
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Contact</label>
-                                    <input type="tel" name="guardian_contact" value="<?= htmlspecialchars($student_data['guardian_contact'] ?? '') ?>" readonly pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="11" inputmode="numeric">
+                                    <input type="tel" name="guardian_contact" value="<?= htmlspecialchars($student_data['guardian_contact'] ?? '') ?>" pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-white student-field digits-only" data-maxlen="11" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -840,13 +840,7 @@ input[type=number] { -moz-appearance: textfield; }
                         </svg>
                         PERSONAL ACCOUNT
                     </h3>
-                    <div class="grid grid-cols-3 gap-6">
-                        <!-- Student ID -->
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Student ID</label>
-                            <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
-                        </div>
-
+                    <div class="grid grid-cols-2 gap-6">
                         <!-- Username -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
@@ -859,10 +853,16 @@ input[type=number] { -moz-appearance: textfield; }
                             <input type="text" name="password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
                             <small class="text-gray-500">Leave blank to keep current password</small>
                         </div>
+                     </div>
 
+                    <div class="grid grid-cols-2 gap-6">
+                                                <div>
+                            <label class="block text-sm font-semibold mb-1">Student ID</label>
+                            <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
+                        </div>
                         <!-- RFID Number -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">RFID Number <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <label class="block text-sm font-semibold mb-1">RFID Number</label>
                             <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($student_data['rfid_uid'] ?? '') ?>" readonly pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="10" inputmode="numeric">
                         </div>
                     </div>
@@ -1006,7 +1006,7 @@ function toggleEdit() {
                 return;
             }
             
-            if (field.type === 'text' || field.type === 'number' || field.type === 'date' || field.tagName === 'TEXTAREA') {
+            if (field.type === 'text' || field.type === 'tel' || field.type === 'number' || field.type === 'date' || field.tagName === 'TEXTAREA') {
                 field.readOnly = false;
                 field.classList.remove('bg-gray-50');
                 field.classList.add('bg-white');
@@ -1386,8 +1386,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Form validation before submit
+// Clear custom validity when user types
+document.querySelectorAll('#studentForm input, #studentForm textarea, #studentForm select').forEach(field => {
+    field.addEventListener('input', function() {
+        this.setCustomValidity('');
+    });
+});
+
 document.getElementById('studentForm').addEventListener('submit', function(e) {
     const form = this;
+    
+    // Clear all custom validities first
+    form.querySelectorAll('input, textarea, select').forEach(field => {
+        field.setCustomValidity('');
+    });
+    
+    // Enable all disabled fields before submission (disabled fields don't submit)
+    const disabledFields = form.querySelectorAll('[disabled]');
+    disabledFields.forEach(field => {
+        field.disabled = false;
+    });
     
     // Check HTML5 validity - this will show native browser validation messages
     if (!form.checkValidity()) {
@@ -1418,7 +1436,7 @@ document.getElementById('studentForm').addEventListener('submit', function(e) {
     const guardianLastName = document.querySelector('input[name="guardian_last_name"]')?.value.trim() || '';
     const guardianOccupation = document.querySelector('input[name="guardian_occupation"]')?.value.trim() || '';
     const lastSchool = document.querySelector('input[name="last_school"]')?.value.trim() || '';
-    const lastSchoolYear = document.querySelector('input[name="last_school_year"]')?.value.trim() || '';
+    const lastSchoolYear = document.querySelector('select[name="last_school_year"]')?.value.trim() || '';
     
     // Required field validation
     if (!lrn) errors.push("LRN is required");
@@ -1444,30 +1462,77 @@ document.getElementById('studentForm').addEventListener('submit', function(e) {
     if (lastName && !/^[A-Za-z\s]+$/.test(lastName)) errors.push("Last name must contain letters only");
     if (firstName && !/^[A-Za-z\s]+$/.test(firstName)) errors.push("First name must contain letters only");
     if (middleName && !/^[A-Za-z\s]*$/.test(middleName)) errors.push("Middle name must contain letters only");
-    if (birthplace && !/^[A-Za-z\s,.-]+$/.test(birthplace)) errors.push("Birthplace must contain valid location characters only");
+    if (birthplace && !/^[A-Za-z\s,.\-]+$/.test(birthplace)) errors.push("Birthplace must contain valid location characters only");
     if (religion && !/^[A-Za-z\s]+$/.test(religion)) errors.push("Religion must contain letters only");
     if (schoolYear && !/^[0-9\-]+$/.test(schoolYear)) errors.push("School year must be in format like 2024-2025");
     
     // Address validation
     if (address && address.length < 20) errors.push("Complete address must be at least 20 characters long");
     if (address && address.length > 500) errors.push("Complete address must not exceed 500 characters");
+    if (address && !/.*[,\s].*/i.test(address)) errors.push("Complete address must include street, barangay, city/municipality, and province.");
     
     // Occupation validation
     if (fatherOccupation && !/^[A-Za-z\s]+$/.test(fatherOccupation)) errors.push("Father's occupation must contain letters only");
     if (motherOccupation && !/^[A-Za-z\s]+$/.test(motherOccupation)) errors.push("Mother's occupation must contain letters only");
     if (guardianOccupation && !/^[A-Za-z\s]+$/.test(guardianOccupation)) errors.push("Guardian's occupation must contain letters only");
     
-    // If there are validation errors, prevent submission and show alert
+    // If there are validation errors, use HTML5 validation to show inline errors
     if (errors.length > 0) {
         e.preventDefault();
-        alert("Please fix the following errors:\n\n" + errors.join("\n"));
         
-        // Focus on first empty required field
-        const firstEmptyField = form.querySelector('[required]:invalid') || 
-                               form.querySelector('input[name="lrn"]');
-        if (firstEmptyField) {
-            firstEmptyField.focus();
-            firstEmptyField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Set custom validation messages on fields
+        if (!lrn) {
+            const field = form.querySelector('input[name="lrn"]');
+            if (field) {
+                field.setCustomValidity("Please fill out this field.");
+                field.reportValidity();
+                return false;
+            }
+        }
+        if (!lastName) {
+            const field = form.querySelector('input[name="last_name"]');
+            if (field) {
+                field.setCustomValidity("Please fill out this field.");
+                field.reportValidity();
+                return false;
+            }
+        }
+        if (!firstName) {
+            const field = form.querySelector('input[name="first_name"]');
+            if (field) {
+                field.setCustomValidity("Please fill out this field.");
+                field.reportValidity();
+                return false;
+            }
+        }
+        if (!address) {
+            const field = form.querySelector('textarea[name="address"]');
+            if (field) {
+                field.setCustomValidity("Please fill out this field.");
+                field.reportValidity();
+                return false;
+            }
+        }
+        if (address && address.length < 20) {
+            const field = form.querySelector('textarea[name="address"]');
+            if (field) {
+                field.setCustomValidity("Complete address must be at least 20 characters long.");
+                field.reportValidity();
+                return false;
+            }
+        }
+        if (address && !/.*[,\s].*/i.test(address)) {
+            const field = form.querySelector('textarea[name="address"]');
+            if (field) {
+                field.setCustomValidity("Complete address must include street, barangay, city/municipality, and province.");
+                field.reportValidity();
+                return false;
+            }
+        }
+        
+        // For other errors, show the first one
+        if (errors.length > 0) {
+            alert("Please fix the following errors:\n\n" + errors.join("\n"));
         }
         
         return false;

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 include("../StudentLogin/db_conn.php");
 
@@ -121,6 +121,12 @@ $total_accounts = count($rows);
 <script>
 // Test QR library loading
 document.addEventListener('DOMContentLoaded', function() {
+    // Clean URL - remove query parameters without refreshing
+    if (window.location.search) {
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+    
     console.log('QRious library loaded:', typeof QRious !== 'undefined');
     if (typeof QRious !== 'undefined') {
         console.log('QRious version available');
@@ -178,8 +184,8 @@ window.viewStudent = async function(studentId) {
     
     console.log('Modal elements found, opening...');
     
-    // Show loading state
-    inner.innerHTML = '<div class="p-8 text-center text-gray-600"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>Loading student information...</div>';
+    // Clear previous content
+    inner.innerHTML = '';
     
     // Show the modal
     overlay.classList.remove('hidden');
@@ -1144,10 +1150,21 @@ function testPasswordGeneration() {
 // Close Add Account modal (used by the × button inside the modal markup)
 function closeModal() {
     const modal = document.getElementById('addAccountModal');
+    const modalContent = document.getElementById('modalContent');
+    
+    // Instant close - no animation delay
+    if (modalContent) {
+        modalContent.classList.remove('scale-100');
+        modalContent.classList.add('scale-95');
+    }
+    
     if (modal) {
         modal.classList.add('hidden');
     }
     document.body.style.overflow = '';
+    
+    // Prevent any default behavior
+    return false;
 }
 
 // Inline validation for Add Account modal (HR-style red feedback)
