@@ -6,9 +6,42 @@ if (session_status() == PHP_SESSION_NONE) {
 }
 include '../StudentLogin/db_conn.php';
 
+// Function to generate next Employee ID
+function generateNextEmployeeId($conn) {
+    $currentYear = date('Y');
+    $prefix = 'CCI' . $currentYear . '-';
+    
+    // Get the highest existing employee ID for current year
+    $query = "SELECT id_number FROM employees WHERE id_number LIKE ? ORDER BY id_number DESC LIMIT 1";
+    $stmt = $conn->prepare($query);
+    $searchPattern = $prefix . '%';
+    $stmt->bind_param("s", $searchPattern);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $lastId = $row['id_number'];
+        // Extract the numeric part after the dash
+        $parts = explode('-', $lastId);
+        if (count($parts) == 2) {
+            $numericPart = intval($parts[1]);
+            $nextNumber = $numericPart + 1;
+        } else {
+            $nextNumber = 1;
+        }
+    } else {
+        // First employee for this year
+        $nextNumber = 1;
+    }
+    
+    // Format as CCI2025-001, CCI2025-002, etc.
+    return $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Employee information
-    $id_number = trim($_POST['id_number']);
+    // Auto-generate Employee ID
+    $id_number = generateNextEmployeeId($conn);
     $first_name = trim($_POST['first_name']);
     $middle_name = trim($_POST['middle_name'] ?? '');
     $last_name = trim($_POST['last_name']);
@@ -35,7 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($table_check->num_rows == 0) {
             $create_employees_table = "CREATE TABLE employees (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                id_number VARCHAR(11) UNIQUE NOT NULL,
+                id_number VARCHAR(20) UNIQUE NOT NULL,
                 first_name VARCHAR(50) NOT NULL,
                 middle_name VARCHAR(50),
                 last_name VARCHAR(50) NOT NULL,
@@ -68,19 +101,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($address_check->num_rows == 0) {
                 $conn->query("ALTER TABLE employees ADD COLUMN address TEXT NULL");
             }
+            
+            // Update id_number column to support new format (CCI2025-001)
+            $conn->query("ALTER TABLE employees MODIFY COLUMN id_number VARCHAR(20) UNIQUE NOT NULL");
         }
 
         // Validations
         $validation_errors = [];
         
-        // Employee ID validation
-        if (empty($id_number) || trim($id_number) === '') {
-            $validation_errors[] = "Employee ID is required.";
-        } elseif (!preg_match('/^[0-9]+$/', $id_number)) {
-            $validation_errors[] = "Employee ID must contain only numbers.";
-        } elseif (strlen($id_number) > 11) {
-            $validation_errors[] = "Employee ID must be maximum 11 digits.";
-        }
+        // Employee ID is auto-generated, no validation needed
         
         // Name validations
         if (empty($first_name) || trim($first_name) === '') {

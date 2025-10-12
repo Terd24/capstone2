@@ -14,10 +14,46 @@ header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 header("Expires: 0");
 
+// Function to generate next Employee ID
+function generateNextEmployeeId($conn) {
+    $currentYear = date('Y');
+    $prefix = 'CCI' . $currentYear . '-';
+    
+    // Get the highest existing employee ID for current year
+    $query = "SELECT id_number FROM employees WHERE id_number LIKE ? ORDER BY id_number DESC LIMIT 1";
+    $stmt = $conn->prepare($query);
+    $searchPattern = $prefix . '%';
+    $stmt->bind_param("s", $searchPattern);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $lastId = $row['id_number'];
+        // Extract the numeric part after the dash
+        $parts = explode('-', $lastId);
+        if (count($parts) == 2) {
+            $numericPart = intval($parts[1]);
+            $nextNumber = $numericPart + 1;
+        } else {
+            $nextNumber = 1;
+        }
+    } else {
+        // First employee for this year
+        $nextNumber = 1;
+    }
+    
+    // Format as CCI2025-001, CCI2025-002, etc.
+    return $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+}
+
 // Handle form submission (like registrar)
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     include("add_employee.php");
 }
+
+// Generate next Employee ID for display
+$next_employee_id = generateNextEmployeeId($conn);
 
 // Handle success message
 $success_msg = $_SESSION['success_msg'] ?? '';
@@ -296,24 +332,24 @@ input[type=number] { -moz-appearance: textfield; }
                         PERSONAL INFORMATION
                     </h3>
                     <div class="grid grid-cols-3 gap-6">
-                        <!-- Row 1: ID Number, First Name, Middle Name -->
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Employee ID *</label>
-                            <input type="text" name="id_number" autocomplete="off" required maxlength="11" pattern="[0-9]{1,11}" title="Numbers only, maximum 11 digits" value="<?= htmlspecialchars($form_data['id_number'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] employee-id-input">
-                        </div>
+                        
                         <div>
                             <label class="block text-sm font-semibold mb-1">First Name *</label>
                             <input type="text" name="first_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required value="<?= htmlspecialchars($form_data['first_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
                         </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
-                            <input type="text" name="middle_name" autocomplete="off" pattern="[A-Za-z\s]*" maxlength="20" title="Letters only, maximum 20 characters" placeholder="Optional" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
-                        </div>
-                        
-                        <!-- Row 2: Last Name, Position, Department -->
-                        <div>
+                                                 <div>
                             <label class="block text-sm font-semibold mb-1">Last Name *</label>
                             <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\s]+" maxlength="20" title="Letters only, maximum 20 characters" required value="<?= htmlspecialchars($form_data['last_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <input type="text" name="middle_name" autocomplete="off" pattern="[A-Za-z\s]*" maxlength="20" title="Letters only, maximum 20 characters" value="<?= htmlspecialchars($form_data['middle_name'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] name-input">
+                        </div>
+
+                                                <div>
+                            <label class="block text-sm font-semibold mb-1">Employee ID <span class="text-gray-500 text-xs">(Auto-generated)</span></label>
+                            <input type="text" name="id_number" autocomplete="off" value="<?= htmlspecialchars($form_data['id_number'] ?? $next_employee_id) ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] bg-gray-100 cursor-not-allowed" style="background-color:#f3f4f6;">
                         </div>
 
                         <div>
@@ -379,12 +415,12 @@ input[type=number] { -moz-appearance: textfield; }
                     <div id="accountFields" class="hidden">
                         <div class="grid grid-cols-3 gap-6 mb-4">
                             <div>
-                                <label class="block text-sm font-semibold mb-1">Username</label>
-                                <input type="text" name="username" autocomplete="off" pattern="^[A-Za-z0-9_]+$" title="Letters, numbers, underscores only" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                                <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 text-xs">(Auto-generated)</span></label>
+                                <input type="text" id="usernameField" name="username" autocomplete="off" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] bg-gray-100 cursor-not-allowed" style="background-color:#f3f4f6;">
                             </div>
                             <div>
-                                <label class="block text-sm font-semibold mb-1">Password</label>
-                                <input type="password" name="password" autocomplete="new-password" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                                <label class="block text-sm font-semibold mb-1">Password <span class="text-gray-500 text-xs">(Auto-generated)</span></label>
+                                <input type="text" id="passwordField" name="password" autocomplete="new-password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] bg-gray-100 cursor-not-allowed" style="background-color:#f3f4f6;">
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold mb-1">Role</label>
@@ -551,7 +587,7 @@ function highlightFieldError(element, message) {
     let errorMsg = element.parentElement.querySelector('.field-error-message');
     if (!errorMsg) {
         errorMsg = document.createElement('p');
-        errorMsg.className = 'field-error-message text-red-500 text-sm mt-1 font-medium';
+        errorMsg.className = 'field-error-message text-red-600 text-sm mt-1 font-medium';
         element.parentElement.appendChild(errorMsg);
     }
     errorMsg.textContent = message;
@@ -576,6 +612,103 @@ function clearFieldErrors(form) {
     const errorMessages = form.querySelectorAll('.field-error-message');
     errorMessages.forEach(msg => msg.remove());
 }
+
+function clearSingleFieldError(element) {
+    if (!element) return;
+    
+    // Remove red border and background
+    element.classList.remove('border-red-500', 'focus:ring-red-500', 'bg-red-50');
+    element.classList.add('border-gray-300', 'focus:ring-[#0B2C62]');
+    
+    // Remove error message
+    const errorMsg = element.parentElement.querySelector('.field-error-message');
+    if (errorMsg) {
+        errorMsg.remove();
+    }
+}
+
+// Add input event listeners to clear errors when user types
+function setupFieldValidationListeners() {
+    const form = document.querySelector('#addEmployeeModal form');
+    if (!form) return;
+    
+    // Get all input, select, and textarea elements
+    const fields = form.querySelectorAll('input, select, textarea');
+    
+    fields.forEach(field => {
+        // Clear error on input/change
+        field.addEventListener('input', function() {
+            if (this.classList.contains('border-red-500')) {
+                clearSingleFieldError(this);
+            }
+        });
+        
+        field.addEventListener('change', function() {
+            if (this.classList.contains('border-red-500')) {
+                clearSingleFieldError(this);
+            }
+        });
+    });
+}
+
+// Auto-generate username and password based on last name and employee ID
+function generateUsernameAndPassword() {
+    const form = document.querySelector('#addEmployeeModal form');
+    if (!form) return;
+    
+    const lastNameField = form.querySelector('input[name="last_name"]');
+    const employeeIdField = form.querySelector('input[name="id_number"]');
+    const usernameField = document.getElementById('usernameField');
+    const passwordField = document.getElementById('passwordField');
+    
+    if (!lastNameField || !employeeIdField || !usernameField || !passwordField) return;
+    
+    const lastName = lastNameField.value.trim().toLowerCase();
+    const employeeId = employeeIdField.value.trim();
+    
+    if (lastName && employeeId) {
+        // Extract the 3-digit number from employee ID (e.g., CCI2025-001 -> 001)
+        const parts = employeeId.split('-');
+        const idNumber = parts.length === 2 ? parts[1] : '000';
+        
+        // Get current year
+        const currentYear = new Date().getFullYear();
+        
+        // Format username: lastname001muzon@employee.cci.edu.ph
+        const username = lastName + idNumber + 'muzon@employee.cci.edu.ph';
+        usernameField.value = username;
+        
+        // Format password: lastname0012025
+        const password = lastName + idNumber + currentYear;
+        passwordField.value = password;
+    } else {
+        usernameField.value = '';
+        passwordField.value = '';
+    }
+}
+
+// Setup username and password auto-generation
+function setupUsernameAndPasswordGeneration() {
+    const form = document.querySelector('#addEmployeeModal form');
+    if (!form) return;
+    
+    const lastNameField = form.querySelector('input[name="last_name"]');
+    
+    if (lastNameField) {
+        // Generate username and password when last name changes
+        lastNameField.addEventListener('input', generateUsernameAndPassword);
+        lastNameField.addEventListener('blur', generateUsernameAndPassword);
+    }
+    
+    // Generate on page load if last name already has value
+    generateUsernameAndPassword();
+}
+
+// Initialize field validation listeners when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setupFieldValidationListeners();
+    setupUsernameAndPasswordGeneration();
+});
 
 // Show/hide account fields and RFID when needed
 const createAccountChk = document.getElementById('createAccount');
@@ -1436,7 +1569,7 @@ function confirmAddEmployee() {
     const need = (selector, msg) => { const el = form.querySelector(selector); if (!el || !el.value.trim()) { highlightFieldError(el, msg); hasErrors = true; } };
     const invalid = (selector, testFn, msg) => { const el = form.querySelector(selector); if (!testFn(el?.value?.trim() || '')) { highlightFieldError(el, msg); hasErrors = true; } };
 
-    need('input[name="id_number"]', 'Employee ID is required');
+    // Employee ID is auto-generated, no need to validate
     need('input[name="first_name"]', 'First name is required');
     need('input[name="last_name"]', 'Last name is required');
     need('input[name="position"]', 'Position is required');
@@ -1449,8 +1582,7 @@ function confirmAddEmployee() {
     need('textarea[name="address"]', 'Address is required');
 
     if (createAccount) {
-        need('input[name="username"]', 'Username is required when creating system account');
-        need('input[name="password"]', 'Password is required when creating system account');
+        // Username and password are auto-generated, no need to validate
         if (!role) { highlightFieldError(form.querySelector('#employeeRole'), 'Role is required'); hasErrors = true; }
         if (role === 'teacher') {
             const r = form.querySelector('#rfid_uid');
