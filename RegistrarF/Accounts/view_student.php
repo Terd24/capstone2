@@ -119,13 +119,71 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     $password = $_POST['password'] ?? '';
     $parent_password = $_POST['parent_password'] ?? '';
 
-    // Update student record
+    // SERVER-SIDE VALIDATION - Prevent empty required fields
+    $validation_errors = [];
+    
+    // Validate required fields
+    if (empty(trim($lrn))) $validation_errors[] = "LRN is required.";
+    if (empty(trim($last_name))) $validation_errors[] = "Last name is required.";
+    if (empty(trim($first_name))) $validation_errors[] = "First name is required.";
+    if (empty(trim($birthplace))) $validation_errors[] = "Birthplace is required.";
+    if (empty(trim($religion))) $validation_errors[] = "Religion is required.";
+    if (empty(trim($address))) $validation_errors[] = "Complete address is required.";
+    if (empty(trim($father_name))) $validation_errors[] = "Father's name is required.";
+    if (empty(trim($father_occupation))) $validation_errors[] = "Father's occupation is required.";
+    if (empty(trim($mother_name))) $validation_errors[] = "Mother's name is required.";
+    if (empty(trim($mother_occupation))) $validation_errors[] = "Mother's occupation is required.";
+    if (empty(trim($guardian_name))) $validation_errors[] = "Guardian's name is required.";
+    if (empty(trim($guardian_occupation))) $validation_errors[] = "Guardian's occupation is required.";
+    if (empty(trim($last_school))) $validation_errors[] = "Last school name is required.";
+    if (empty(trim($last_school_year))) $validation_errors[] = "Last school year is required.";
+    
+    // Validate data types
+    if (!empty($lrn) && !preg_match('/^[0-9]+$/', $lrn)) {
+        $validation_errors[] = "LRN must contain numbers only.";
+    }
+    if (!empty($last_name) && !preg_match('/^[A-Za-z\s]+$/', $last_name)) {
+        $validation_errors[] = "Last name must contain letters only.";
+    }
+    if (!empty($first_name) && !preg_match('/^[A-Za-z\s]+$/', $first_name)) {
+        $validation_errors[] = "First name must contain letters only.";
+    }
+    if (!empty($middle_name) && !preg_match('/^[A-Za-z\s]*$/', $middle_name)) {
+        $validation_errors[] = "Middle name must contain letters only.";
+    }
+    if (!empty($birthplace) && !preg_match('/^[A-Za-z\s,.-]+$/', $birthplace)) {
+        $validation_errors[] = "Birthplace must contain valid location characters only.";
+    }
+    if (!empty($religion) && !preg_match('/^[A-Za-z\s]+$/', $religion)) {
+        $validation_errors[] = "Religion must contain letters only.";
+    }
+    if (!empty($address) && strlen($address) < 20) {
+        $validation_errors[] = "Complete address must be at least 20 characters long.";
+    }
+    if (!empty($father_occupation) && !preg_match('/^[A-Za-z\s]+$/', $father_occupation)) {
+        $validation_errors[] = "Father's occupation must contain letters only.";
+    }
+    if (!empty($mother_occupation) && !preg_match('/^[A-Za-z\s]+$/', $mother_occupation)) {
+        $validation_errors[] = "Mother's occupation must contain letters only.";
+    }
+    if (!empty($guardian_occupation) && !preg_match('/^[A-Za-z\s]+$/', $guardian_occupation)) {
+        $validation_errors[] = "Guardian's occupation must contain letters only.";
+    }
+    
+    // If validation fails, redirect back with error message
+    if (!empty($validation_errors)) {
+        $_SESSION['error_msg'] = implode('<br>', $validation_errors);
+        header("Location: " . $_SERVER['PHP_SELF'] . "?id=" . urlencode($student_id));
+        exit;
+    }
+
+    // Update student record (username is excluded as it should remain readonly)
     if (!empty($password)) {
         // Update with new password
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         $update_sql = "UPDATE student_account SET 
             lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
-            last_name = ?, first_name = ?, middle_name = ?, username = ?,
+            last_name = ?, first_name = ?, middle_name = ?,
             school_year = ?, grade_level = ?, semester = ?,
             dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
             payment_mode = ?, address = ?,
@@ -137,9 +195,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             WHERE id_number = ?";
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bind_param(
-            "ssssssssssssssssssssssssssssssss",
+            "sssssssssssssssssssssssssssssss",
             $lrn, $academic_track, $enrollment_status, $school_type,
-            $last_name, $first_name, $middle_name, $username,
+            $last_name, $first_name, $middle_name,
             $school_year, $grade_level, $semester,
             $dob, $birthplace, $gender, $religion, $credentials,
             $payment_mode, $address,
@@ -153,7 +211,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         // Update without changing password
         $update_sql = "UPDATE student_account SET 
             lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
-            last_name = ?, first_name = ?, middle_name = ?, username = ?,
+            last_name = ?, first_name = ?, middle_name = ?,
             school_year = ?, grade_level = ?, semester = ?,
             dob = ?, birthplace = ?, gender = ?, religion = ?, credentials = ?, 
             payment_mode = ?, address = ?,
@@ -165,9 +223,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             WHERE id_number = ?";
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bind_param(
-            "sssssssssssssssssssssssssssssss",
+            "ssssssssssssssssssssssssssssss",
             $lrn, $academic_track, $enrollment_status, $school_type,
-            $last_name, $first_name, $middle_name, $username,
+            $last_name, $first_name, $middle_name,
             $school_year, $grade_level, $semester,
             $dob, $birthplace, $gender, $religion, $credentials,
             $payment_mode, $address,
@@ -311,8 +369,9 @@ input[type=number] { -moz-appearance: textfield; }
                     <div class="grid grid-cols-3 gap-6">
                         <!-- Row: LRN, Academic Track, Enrollment Status -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">LRN</label>
-                            <input type="number" name="lrn" value="<?= htmlspecialchars($student_data['lrn'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <label class="block text-sm font-semibold mb-1">LRN *</label>
+                            <input type="text" name="lrn" value="<?= htmlspecialchars($student_data['lrn'] ?? '') ?>" readonly required pattern="^[0-9]{12}$" maxlength="12" data-maxlen="12" inputmode="numeric" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 12)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" title="Please enter exactly 12 digits">
+                            <small class="text-red-500 text-xs error-message hidden">LRN is required</small>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Academic Track / Course</label>
@@ -351,32 +410,50 @@ input[type=number] { -moz-appearance: textfield; }
                             <label class="block text-sm font-semibold mb-1">Enrollment Status</label>
                             <div class="flex items-center gap-6 mt-1">
                                 <label class="flex items-center gap-2">
-                                    <input type="radio" name="enrollment_status" value="OLD" <?= ($student_data['enrollment_status'] ?? '') === 'OLD' ? 'checked' : '' ?> disabled class="student-field"> OLD
+                                    <input type="radio" name="enrollment_status" value="OLD" <?= (isset($student_data['enrollment_status']) && $student_data['enrollment_status'] === 'OLD') ? 'checked' : '' ?> disabled class="student-field" onchange="toggleNewOptions()"> OLD
                                 </label>
                                 <label class="flex items-center gap-2">
-                                    <input type="radio" name="enrollment_status" value="NEW" <?= ($student_data['enrollment_status'] ?? '') === 'NEW' ? 'checked' : '' ?> disabled class="student-field"> NEW
+                                    <input type="radio" name="enrollment_status" value="NEW" <?= (isset($student_data['enrollment_status']) && $student_data['enrollment_status'] === 'NEW') ? 'checked' : '' ?> disabled class="student-field" onchange="toggleNewOptions()"> NEW
+                                </label>
+                            </div>
+                            <div id="newOptions" class="flex items-center gap-6 mt-3 <?= (isset($student_data['enrollment_status']) && $student_data['enrollment_status'] === 'NEW') ? '' : 'hidden' ?> ml-4">
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="school_type" value="PUBLIC" <?= (isset($student_data['school_type']) && ($student_data['school_type'] === 'PUBLIC' || $student_data['school_type'] === 'Public')) ? 'checked' : '' ?> disabled class="student-field"> Public
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="school_type" value="PRIVATE" <?= (isset($student_data['school_type']) && ($student_data['school_type'] === 'PRIVATE' || $student_data['school_type'] === 'Private')) ? 'checked' : '' ?> disabled class="student-field"> Private
                                 </label>
                             </div>
                         </div>
 
                         <!-- Row: Full Name -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Last Name</label>
-                            <input type="text" name="last_name" value="<?= htmlspecialchars($student_data['last_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <label class="block text-sm font-semibold mb-1">Last Name *</label>
+                            <input type="text" name="last_name" value="<?= htmlspecialchars($student_data['last_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                            <small class="text-red-500 text-xs error-message hidden">Last Name is required</small>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">First Name</label>
-                            <input type="text" name="first_name" value="<?= htmlspecialchars($student_data['first_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <label class="block text-sm font-semibold mb-1">First Name *</label>
+                            <input type="text" name="first_name" value="<?= htmlspecialchars($student_data['first_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                            <small class="text-red-500 text-xs error-message hidden">First Name is required</small>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Middle Name <span class="text-gray-500 text-xs">(Optional)</span></label>
-                            <input type="text" name="middle_name" value="<?= htmlspecialchars($student_data['middle_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <input type="text" name="middle_name" value="<?= htmlspecialchars($student_data['middle_name'] ?? '') ?>" readonly pattern="[A-Za-z\s]*" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
                         </div>
 
                         <!-- Row: School Year, Grade Level, Semester -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">School Year</label>
-                            <input type="text" name="school_year" value="<?= htmlspecialchars($student_data['school_year'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <select id="schoolYearSelect" name="school_year" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                <option value="">Select Year</option>
+                                <?php
+                                $saved_sy = $student_data['school_year'] ?? '';
+                                if (!empty($saved_sy)) {
+                                    echo '<option value="' . htmlspecialchars($saved_sy) . '" selected>' . htmlspecialchars($saved_sy) . '</option>';
+                                }
+                                ?>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Grade Level</label>
@@ -448,22 +525,24 @@ input[type=number] { -moz-appearance: textfield; }
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Birthplace</label>
-                            <input type="text" name="birthplace" value="<?= htmlspecialchars($student_data['birthplace'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <label class="block text-sm font-semibold mb-1">Birthplace *</label>
+                            <input type="text" name="birthplace" value="<?= htmlspecialchars($student_data['birthplace'] ?? '') ?>" readonly required pattern="[A-Za-z\s,.-]+" title="Please enter a valid location" oninput="this.value = this.value.replace(/[^A-Za-z\s,.-]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <small class="text-red-500 text-xs error-message hidden">Birthplace is required</small>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Gender</label>
-                            <select name="gender" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field" data-initial="<?= htmlspecialchars($genderVal) ?>">
+                            <select name="gender" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
                                 <option value="">-- Select Gender --</option>
-                                <option value="M" <?= ($genderVal === 'M') ? 'selected' : '' ?>>Male</option>
-                                <option value="F" <?= ($genderVal === 'F') ? 'selected' : '' ?>>Female</option>
+                                <option value="M" <?= (isset($student_data['gender']) && (strtoupper($student_data['gender']) === 'M' || strtoupper($student_data['gender']) === 'MALE')) ? 'selected' : '' ?>>Male</option>
+                                <option value="F" <?= (isset($student_data['gender']) && (strtoupper($student_data['gender']) === 'F' || strtoupper($student_data['gender']) === 'FEMALE')) ? 'selected' : '' ?>>Female</option>
                             </select>
                         </div>
 
                         <!-- Row: Religion, Credentials, Payment Mode -->
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Religion</label>
-                            <input type="text" name="religion" value="<?= htmlspecialchars($student_data['religion'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <label class="block text-sm font-semibold mb-1">Religion *</label>
+                            <input type="text" name="religion" value="<?= htmlspecialchars($student_data['religion'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                            <small class="text-red-500 text-xs error-message hidden">Religion is required</small>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Credentials Submitted</label>
@@ -501,63 +580,71 @@ input[type=number] { -moz-appearance: textfield; }
 
                         <!-- Complete Address -->
                         <div class="col-span-3">
-                            <label class="block text-sm font-semibold mb-1">Complete Address</label>
-                            <textarea name="address" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field"><?= htmlspecialchars($student_data['address'] ?? '') ?></textarea>
+                            <label class="block text-sm font-semibold mb-1">Complete Address *</label>
+                            <textarea name="address" readonly required minlength="20" maxlength="500" placeholder="Enter complete address (e.g., Block 8, Lot 15, Subdivision Name, Barangay, City, Province)" title="Please enter a complete address with at least 20 characters including street, barangay, city/municipality, and province" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field"><?= htmlspecialchars($student_data['address'] ?? '') ?></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Minimum 20 characters. Include street, barangay, city/municipality, and province.</p>
+                            <small class="text-red-500 text-xs error-message hidden">Complete Address is required</small>
                         </div>
 
                         <!-- Father's Information -->
                         <div class="col-span-3 mt-6">
-                            <h4 class="font-semibold text-gray-700 mb-3">Father's Information</h4>
+                            <h4 class="font-semibold text-gray-700 mb-3">Father's Information *</h4>
                             <div class="grid grid-cols-3 gap-6">
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Name</label>
-                                    <input type="text" name="father_name" value="<?= htmlspecialchars($student_data['father_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">Name *</label>
+                                    <input type="text" name="father_name" value="<?= htmlspecialchars($student_data['father_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Father's name is required</small>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Occupation</label>
-                                    <input type="text" name="father_occupation" value="<?= htmlspecialchars($student_data['father_occupation'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">Occupation *</label>
+                                    <input type="text" name="father_occupation" value="<?= htmlspecialchars($student_data['father_occupation'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Father's occupation is required</small>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Contact</label>
-                                    <input type="tel" name="father_contact" value="<?= htmlspecialchars($student_data['father_contact'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <input type="tel" name="father_contact" value="<?= htmlspecialchars($student_data['father_contact'] ?? '') ?>" readonly pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="11" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
 
                         <!-- Mother's Information -->
                         <div class="col-span-3 mt-6">
-                            <h4 class="font-semibold text-gray-700 mb-3">Mother's Information</h4>
+                            <h4 class="font-semibold text-gray-700 mb-3">Mother's Information *</h4>
                             <div class="grid grid-cols-3 gap-6">
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Name</label>
-                                    <input type="text" name="mother_name" value="<?= htmlspecialchars($student_data['mother_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">Name *</label>
+                                    <input type="text" name="mother_name" value="<?= htmlspecialchars($student_data['mother_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Mother's name is required</small>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Occupation</label>
-                                    <input type="text" name="mother_occupation" value="<?= htmlspecialchars($student_data['mother_occupation'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">Occupation *</label>
+                                    <input type="text" name="mother_occupation" value="<?= htmlspecialchars($student_data['mother_occupation'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Mother's occupation is required</small>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Contact</label>
-                                    <input type="tel" name="mother_contact" value="<?= htmlspecialchars($student_data['mother_contact'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <input type="tel" name="mother_contact" value="<?= htmlspecialchars($student_data['mother_contact'] ?? '') ?>" readonly pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="11" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
 
                         <!-- Guardian's Information -->
                         <div class="col-span-3 mt-6">
-                            <h4 class="font-semibold text-gray-700 mb-3">Guardian's Information</h4>
+                            <h4 class="font-semibold text-gray-700 mb-3">Guardian's Information *</h4>
                             <div class="grid grid-cols-3 gap-6">
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Name</label>
-                                    <input type="text" name="guardian_name" value="<?= htmlspecialchars($student_data['guardian_name'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">Name *</label>
+                                    <input type="text" name="guardian_name" value="<?= htmlspecialchars($student_data['guardian_name'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Guardian's name is required</small>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">Occupation</label>
-                                    <input type="text" name="guardian_occupation" value="<?= htmlspecialchars($student_data['guardian_occupation'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">Occupation *</label>
+                                    <input type="text" name="guardian_occupation" value="<?= htmlspecialchars($student_data['guardian_occupation'] ?? '') ?>" readonly required pattern="[A-Za-z\s]+" title="Please enter letters only" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field letters-only">
+                                    <small class="text-red-500 text-xs error-message hidden">Guardian's occupation is required</small>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Contact</label>
-                                    <input type="tel" name="guardian_contact" value="<?= htmlspecialchars($student_data['guardian_contact'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <input type="tel" name="guardian_contact" value="<?= htmlspecialchars($student_data['guardian_contact'] ?? '') ?>" readonly pattern="^[0-9]{11}$" maxlength="11" title="Please enter 11 digits" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="11" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -567,12 +654,22 @@ input[type=number] { -moz-appearance: textfield; }
                             <h4 class="font-semibold text-gray-700 mb-3">Last School Attended</h4>
                             <div class="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">School Name</label>
-                                    <input type="text" name="last_school" value="<?= htmlspecialchars($student_data['last_school'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">School Name *</label>
+                                    <input type="text" name="last_school" value="<?= htmlspecialchars($student_data['last_school'] ?? '') ?>" readonly required class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <small class="text-red-500 text-xs error-message hidden">Last school name is required</small>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-semibold mb-1">School Year</label>
-                                    <input type="text" name="last_school_year" value="<?= htmlspecialchars($student_data['last_school_year'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                    <label class="block text-sm font-semibold mb-1">School Year *</label>
+                                    <select id="lastSchoolYearSelect" name="last_school_year" disabled required class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                                        <option value="">Select Year</option>
+                                        <?php
+                                        $saved_last_sy = $student_data['last_school_year'] ?? '';
+                                        if (!empty($saved_last_sy)) {
+                                            echo '<option value="' . htmlspecialchars($saved_last_sy) . '" selected>' . htmlspecialchars($saved_last_sy) . '</option>';
+                                        }
+                                        ?>
+                                    </select>
+                                    <small class="text-red-500 text-xs error-message hidden">Last school year is required</small>
                                 </div>
                             </div>
                         </div>
@@ -593,7 +690,7 @@ input[type=number] { -moz-appearance: textfield; }
                     <div class="grid grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username</label>
-                            <input type="text" name="parent_username" value="<?= htmlspecialchars($parent_username) ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <input type="text" name="parent_username" value="<?= htmlspecialchars($parent_username) ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password</label>
@@ -617,13 +714,13 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Student ID -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Student ID</label>
-                            <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
                         </div>
 
                         <!-- Username -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username</label>
-                            <input type="text" name="username" value="<?= htmlspecialchars($student_data['username'] ?? '') ?>" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
+                            <input type="text" name="username" value="<?= htmlspecialchars($student_data['username'] ?? '') ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
                         </div>
 
                         <!-- Password -->
@@ -727,6 +824,15 @@ function restoreOriginal() {
     });
 }
 
+// Toggle visibility of school type options based on enrollment status
+function toggleNewOptions() {
+    const newOptions = document.getElementById("newOptions");
+    const isNew = document.querySelector('input[name="enrollment_status"]:checked')?.value === "NEW";
+    if (newOptions) {
+        newOptions.classList.toggle("hidden", !isNew);
+    }
+}
+
 function toggleEdit() {
     const editBtn = document.getElementById('editBtn');
     const saveBtn = document.getElementById('saveBtn');
@@ -765,6 +871,11 @@ function toggleEdit() {
         
         // Make fields editable
         fields.forEach(field => {
+            // Skip username fields - they should always remain readonly
+            if (field.name === 'username' || field.name === 'parent_username') {
+                return;
+            }
+            
             if (field.type === 'text' || field.type === 'number' || field.type === 'date' || field.tagName === 'TEXTAREA') {
                 field.readOnly = false;
                 field.classList.remove('bg-gray-50');
@@ -780,8 +891,99 @@ function toggleEdit() {
 }
 
 // Initialize grade levels on page load and add event listener
+// Populate helper: last school year (N years back)
+function populateLastSchoolYears(yearsBack = 5) {
+    const lastSySelect = document.getElementById('lastSchoolYearSelect');
+    if (!lastSySelect) return;
+    
+    const savedLastSY = lastSySelect.querySelector('option[selected]')?.value || '';
+    
+    // Clear existing options except placeholder
+    const selectYearOption = lastSySelect.querySelector('option[value=""]');
+    lastSySelect.innerHTML = '';
+    if (selectYearOption) lastSySelect.appendChild(selectYearOption);
+    
+    const now = new Date();
+    const year = now.getFullYear();
+    
+    // Generate past years
+    for (let i = yearsBack; i >= 1; i--) {
+        const start = year - i;
+        const end = year - i + 1;
+        const label = `${start}-${end}`;
+        const opt = document.createElement('option');
+        opt.value = label;
+        opt.textContent = label;
+        if (savedLastSY && savedLastSY === label) {
+            opt.selected = true;
+        }
+        lastSySelect.appendChild(opt);
+    }
+    
+    // Add current academic year
+    const currentLabel = `${year}-${year+1}`;
+    const curOpt = document.createElement('option');
+    curOpt.value = currentLabel;
+    curOpt.textContent = currentLabel;
+    if (savedLastSY && savedLastSY === currentLabel) {
+        curOpt.selected = true;
+    }
+    lastSySelect.appendChild(curOpt);
+    
+    // If saved year is not in the list, add it
+    const allOptions = Array.from(lastSySelect.options).map(opt => opt.value);
+    if (savedLastSY && !allOptions.includes(savedLastSY)) {
+        const opt = document.createElement('option');
+        opt.value = savedLastSY;
+        opt.textContent = savedLastSY;
+        opt.selected = true;
+        lastSySelect.appendChild(opt);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     updateGradeLevels();
+    
+    // Populate School Year dropdown
+    const sySelect = document.getElementById('schoolYearSelect');
+    if (sySelect) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const prev = `${year-1}-${year}`;
+        const curr = `${year}-${year+1}`;
+        const next = `${year+1}-${year+2}`;
+        
+        const options = [prev, curr, next];
+        const savedSY = sySelect.querySelector('option[selected]')?.value || '';
+        
+        // Clear existing options except the saved one
+        const selectYearOption = sySelect.querySelector('option[value=""]');
+        const savedOption = sySelect.querySelector('option[selected]');
+        sySelect.innerHTML = '';
+        if (selectYearOption) sySelect.appendChild(selectYearOption);
+        
+        options.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val;
+            if (savedSY && savedSY === val) {
+                opt.selected = true;
+            }
+            sySelect.appendChild(opt);
+        });
+        
+        // If saved year is not in the list, add it
+        if (savedSY && !options.includes(savedSY)) {
+            const opt = document.createElement('option');
+            opt.value = savedSY;
+            opt.textContent = savedSY;
+            opt.selected = true;
+            sySelect.appendChild(opt);
+        }
+    }
+    
+    // Populate Last School Year dropdown
+    populateLastSchoolYears(5);
     
     const academicTrack = document.querySelector('select[name="academic_track"]');
     if (academicTrack) {
@@ -946,6 +1148,140 @@ document.addEventListener('DOMContentLoaded', function() {
         monthSelect.addEventListener('change', updateDaysInMonth);
         yearSelect.addEventListener('change', updateDaysInMonth);
     }
+});
+
+// Form validation before submit
+document.getElementById('studentForm').addEventListener('submit', function(e) {
+    const form = this;
+    
+    // Check HTML5 validity - this will show native browser validation messages
+    if (!form.checkValidity()) {
+        e.preventDefault();
+        form.reportValidity();
+        return false;
+    }
+    
+    // Additional custom validation
+    const errors = [];
+    
+    // Get all form fields
+    const lrn = document.querySelector('input[name="lrn"]')?.value.trim() || '';
+    const lastName = document.querySelector('input[name="last_name"]')?.value.trim() || '';
+    const firstName = document.querySelector('input[name="first_name"]')?.value.trim() || '';
+    const middleName = document.querySelector('input[name="middle_name"]')?.value.trim() || '';
+    const birthplace = document.querySelector('input[name="birthplace"]')?.value.trim() || '';
+    const religion = document.querySelector('input[name="religion"]')?.value.trim() || '';
+    const address = document.querySelector('textarea[name="address"]')?.value.trim() || '';
+    const schoolYear = document.querySelector('input[name="school_year"]')?.value.trim() || '';
+    const fatherName = document.querySelector('input[name="father_name"]')?.value.trim() || '';
+    const fatherOccupation = document.querySelector('input[name="father_occupation"]')?.value.trim() || '';
+    const motherName = document.querySelector('input[name="mother_name"]')?.value.trim() || '';
+    const motherOccupation = document.querySelector('input[name="mother_occupation"]')?.value.trim() || '';
+    const guardianName = document.querySelector('input[name="guardian_name"]')?.value.trim() || '';
+    const guardianOccupation = document.querySelector('input[name="guardian_occupation"]')?.value.trim() || '';
+    const lastSchool = document.querySelector('input[name="last_school"]')?.value.trim() || '';
+    const lastSchoolYear = document.querySelector('input[name="last_school_year"]')?.value.trim() || '';
+    
+    // Required field validation
+    if (!lrn) errors.push("LRN is required");
+    if (!lastName) errors.push("Last name is required");
+    if (!firstName) errors.push("First name is required");
+    if (!birthplace) errors.push("Birthplace is required");
+    if (!religion) errors.push("Religion is required");
+    if (!address) errors.push("Complete address is required");
+    if (!fatherName) errors.push("Father's name is required");
+    if (!fatherOccupation) errors.push("Father's occupation is required");
+    if (!motherName) errors.push("Mother's name is required");
+    if (!motherOccupation) errors.push("Mother's occupation is required");
+    if (!guardianName) errors.push("Guardian's name is required");
+    if (!guardianOccupation) errors.push("Guardian's occupation is required");
+    if (!lastSchool) errors.push("Last school name is required");
+    if (!lastSchoolYear) errors.push("Last school year is required");
+    
+    // Data type validations
+    if (lrn && !/^[0-9]+$/.test(lrn)) errors.push("LRN must contain numbers only");
+    if (lastName && !/^[A-Za-z\s]+$/.test(lastName)) errors.push("Last name must contain letters only");
+    if (firstName && !/^[A-Za-z\s]+$/.test(firstName)) errors.push("First name must contain letters only");
+    if (middleName && !/^[A-Za-z\s]*$/.test(middleName)) errors.push("Middle name must contain letters only");
+    if (birthplace && !/^[A-Za-z\s,.-]+$/.test(birthplace)) errors.push("Birthplace must contain valid location characters only");
+    if (religion && !/^[A-Za-z\s]+$/.test(religion)) errors.push("Religion must contain letters only");
+    if (schoolYear && !/^[0-9\-]+$/.test(schoolYear)) errors.push("School year must be in format like 2024-2025");
+    
+    // Address validation
+    if (address && address.length < 20) errors.push("Complete address must be at least 20 characters long");
+    if (address && address.length > 500) errors.push("Complete address must not exceed 500 characters");
+    
+    // Occupation validation
+    if (fatherOccupation && !/^[A-Za-z\s]+$/.test(fatherOccupation)) errors.push("Father's occupation must contain letters only");
+    if (motherOccupation && !/^[A-Za-z\s]+$/.test(motherOccupation)) errors.push("Mother's occupation must contain letters only");
+    if (guardianOccupation && !/^[A-Za-z\s]+$/.test(guardianOccupation)) errors.push("Guardian's occupation must contain letters only");
+    
+    // If there are validation errors, prevent submission and show alert
+    if (errors.length > 0) {
+        e.preventDefault();
+        alert("Please fix the following errors:\n\n" + errors.join("\n"));
+        
+        // Focus on first empty required field
+        const firstEmptyField = form.querySelector('[required]:invalid') || 
+                               form.querySelector('input[name="lrn"]');
+        if (firstEmptyField) {
+            firstEmptyField.focus();
+            firstEmptyField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        return false;
+    }
+    
+    return true;
+});
+
+// Enforce digits-only and max length on inputs with class 'digits-only'
+document.addEventListener('input', function(e){
+    const el = e.target;
+    if (el.classList && el.classList.contains('digits-only')) {
+        const max = parseInt(el.getAttribute('data-maxlen')) || 0;
+        // Strip non-digits
+        el.value = el.value.replace(/\D+/g, '');
+        // Enforce max length
+        if (max > 0 && el.value.length > max) {
+            el.value = el.value.slice(0, max);
+        }
+    }
+});
+
+// Prevent numbers and special characters in name fields
+function preventNumbersInNames(event) {
+    const char = String.fromCharCode(event.which || event.keyCode);
+    // Allow only letters, spaces, hyphens, apostrophes, and periods
+    const namePattern = /^[a-zA-Z\s\-'.]+$/;
+    if (!namePattern.test(char)) {
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Initialize input validation for letters-only fields
+document.addEventListener('DOMContentLoaded', function() {
+    // Apply validation to all fields with 'letters-only' class
+    const lettersOnlyFields = document.querySelectorAll('.letters-only');
+    
+    lettersOnlyFields.forEach(field => {
+        field.addEventListener('keypress', preventNumbersInNames);
+        field.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                // Clean pasted content
+                const value = this.value;
+                const cleanValue = value.replace(/[^a-zA-Z\s\-'.]/g, '');
+                if (value !== cleanValue) {
+                    this.value = cleanValue;
+                    this.style.border = '2px solid #ef4444';
+                    setTimeout(() => {
+                        this.style.border = '';
+                    }, 1000);
+                }
+            }, 10);
+        });
+    });
 });
 </script>
 <?php if (!$embed): ?>

@@ -164,7 +164,7 @@ if ($status_result) {
           </div>
           <div class="md:col-span-4 flex gap-2">
             <button type="submit" class="flex-1 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium whitespace-nowrap">Generate Report</button>
-            <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap">Clear</a>
+            <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-10 py-2 rounded-lg font-medium whitespace-nowrap">Clear</a>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-8 gap-4 items-end">
