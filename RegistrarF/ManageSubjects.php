@@ -53,7 +53,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS subject_offerings (
     <div class="container mx-auto px-6 py-4">
         <div class="flex justify-between items-center">
         <div class="flex items-center space-x-4">
-        <button onclick="window.location.href='registrardashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+        <button onclick="window.location.href='RegistrarDashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
           </svg>

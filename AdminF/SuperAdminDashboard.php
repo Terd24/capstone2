@@ -1489,6 +1489,61 @@ require_once 'includes/dashboard_data.php';
         }
 
         function showSaveConfirmation() {
+            if (!currentHREmployeeId) {
+                showToast('No HR employee selected', 'error');
+                return;
+            }
+            
+            // Collect employee data from the form fields
+            const firstName = document.getElementById(`first_name_${currentHREmployeeId}`)?.value;
+            const middleName = document.getElementById(`middle_name_${currentHREmployeeId}`)?.value;
+            const lastName = document.getElementById(`last_name_${currentHREmployeeId}`)?.value;
+            const position = document.getElementById(`position_${currentHREmployeeId}`)?.value;
+            const department = document.getElementById(`department_${currentHREmployeeId}`)?.value;
+            const email = document.getElementById(`email_${currentHREmployeeId}`)?.value;
+            const phone = document.getElementById(`phone_${currentHREmployeeId}`)?.value;
+            const hireDate = document.getElementById(`hire_date_${currentHREmployeeId}`)?.value;
+            const address = document.getElementById(`address_${currentHREmployeeId}`)?.value;
+            
+            // Remove any existing error messages
+            document.querySelectorAll('.field-error').forEach(el => el.remove());
+            
+            // Validate required fields and show red borders
+            let hasErrors = false;
+            const requiredFields = [
+                { id: `first_name_${currentHREmployeeId}`, value: firstName, label: 'First Name' },
+                { id: `last_name_${currentHREmployeeId}`, value: lastName, label: 'Last Name' },
+                { id: `position_${currentHREmployeeId}`, value: position, label: 'Position' },
+                { id: `department_${currentHREmployeeId}`, value: department, label: 'Department' },
+                { id: `email_${currentHREmployeeId}`, value: email, label: 'Email' },
+                { id: `phone_${currentHREmployeeId}`, value: phone, label: 'Phone' },
+                { id: `hire_date_${currentHREmployeeId}`, value: hireDate, label: 'Hire Date' },
+                { id: `address_${currentHREmployeeId}`, value: address, label: 'Complete Address' }
+            ];
+            
+            requiredFields.forEach(field => {
+                const element = document.getElementById(field.id);
+                if (!field.value || field.value.trim() === '') {
+                    hasErrors = true;
+                    element.classList.add('border-red-500', 'border-2');
+                    element.classList.remove('border-gray-300');
+                    
+                    // Add error message below field
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'field-error text-red-500 text-sm mt-1';
+                    errorMsg.textContent = `${field.label} is required`;
+                    element.parentNode.appendChild(errorMsg);
+                } else {
+                    element.classList.remove('border-red-500', 'border-2');
+                    element.classList.add('border-gray-300');
+                }
+            });
+            
+            if (hasErrors) {
+                return;
+            }
+            
+            // If validation passes, show confirmation dialog
             const c = document.createElement('div');
             c.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]';
             c.innerHTML = `
@@ -1510,11 +1565,6 @@ require_once 'includes/dashboard_data.php';
         }
 
         function saveHREmployeeChanges() {
-            if (!currentHREmployeeId) {
-                showToast('No HR employee selected', 'error');
-                return;
-            }
-            
             // Collect employee data from the form fields
             const firstName = document.getElementById(`first_name_${currentHREmployeeId}`)?.value;
             const middleName = document.getElementById(`middle_name_${currentHREmployeeId}`)?.value;
@@ -1525,12 +1575,6 @@ require_once 'includes/dashboard_data.php';
             const phone = document.getElementById(`phone_${currentHREmployeeId}`)?.value;
             const hireDate = document.getElementById(`hire_date_${currentHREmployeeId}`)?.value;
             const address = document.getElementById(`address_${currentHREmployeeId}`)?.value;
-            
-            // Validate required fields
-            if (!firstName || !lastName || !position || !department || !hireDate) {
-                alert('Please fill in all required fields');
-                return;
-            }
             
             // Prepare form data
             const formData = new FormData();
