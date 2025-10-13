@@ -164,9 +164,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['last_name'] = $row['last_name'];
             $_SESSION['grade_level'] = $row['grade_level'];
             $_SESSION['role'] = 'student';
+            
+            // Check if student must change password (first-time login)
+            $must_change = $row['must_change_password'] ?? 1; // Default to 1 if column doesn't exist
+            
             // Log student login
             log_login($conn, 'student', $row['id_number'], $row['username'], 'student');
-            echo json_encode(['status'=>'success','redirect'=>'studentDashboard.php']);
+            
+            // Redirect to password change if first-time login
+            if ($must_change == 1) {
+                $_SESSION['must_change_password'] = true;
+                echo json_encode(['status'=>'success','redirect'=>'change_password.php']);
+            } else {
+                echo json_encode(['status'=>'success','redirect'=>'studentDashboard.php']);
+            }
             exit;
         }
     }

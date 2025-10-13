@@ -7,6 +7,12 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'student') {
     exit;
 }
 
+// Check if student must change password (first-time login)
+if (isset($_SESSION['must_change_password']) && $_SESSION['must_change_password'] === true) {
+    header("Location: change_password.php");
+    exit;
+}
+
 // Check maintenance mode
 $maintenance_check = $conn->query("SELECT config_value FROM system_config WHERE config_key = 'maintenance_mode'");
 if ($maintenance_check && $maintenance_check->num_rows > 0) {

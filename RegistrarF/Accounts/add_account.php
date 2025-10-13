@@ -395,12 +395,13 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 mother_name, mother_occupation, mother_contact,
                 guardian_name, guardian_occupation, guardian_contact,
                 last_school, last_school_year,
-                id_number, password, rfid_uid, username
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+                id_number, password, rfid_uid, username, must_change_password
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
+            $must_change_pwd = 1; // Force password change on first login
             $stmt = $conn->prepare($sql);
             $stmt->bind_param(
-                "ssssssssssssssssssssssssssssssss",
+                "ssssssssssssssssssssssssssssssssi",
                 $lrn, $academic_track, $enrollment_status, $school_type,
                 $last_name, $first_name, $middle_name,
                 $school_year, $grade_level, $semester,
@@ -410,7 +411,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 $mother_name, $mother_occupation, $mother_contact,
                 $guardian_name, $guardian_occupation, $guardian_contact,
                 $last_school, $last_school_year,
-                $id_number, $password, $rfid_uid_db, $username
+                $id_number, $password, $rfid_uid_db, $username, $must_change_pwd
             );
 
             $student_ok = $stmt->execute();

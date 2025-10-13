@@ -1,11 +1,35 @@
 <?php
-// ⚙️ HOSTINGER DATABASE CONFIGURATION
-// Update these values with your Hostinger database credentials
-define('DB_HOST', 'localhost');           // Your Hostinger DB host
-define('DB_USER', 'u502476186_onecci_user');   // Your Hostinger DB username
-define('DB_PASS', 'OneCciMuzon2004');     // Your Hostinger DB password
-define('DB_NAME', 'u502476186_onecci_db');   // Your Hostinger DB name
+// Prevent multiple inclusions
+if (defined('DB_CONN_LOADED')) {
+    return;
+}
+define('DB_CONN_LOADED', true);
 
+// ⚙️ AUTO-DETECT ENVIRONMENT (Local vs Hostinger)
+// Automatically switches between localhost and Hostinger credentials
+
+// Check if running on localhost or live server
+$isLocalhost = (
+    $_SERVER['SERVER_NAME'] === 'localhost' || 
+    $_SERVER['SERVER_ADDR'] === '127.0.0.1' ||
+    $_SERVER['SERVER_ADDR'] === '::1'
+);
+
+if ($isLocalhost) {
+    // 🏠 LOCALHOST CONFIGURATION (XAMPP)
+    define('DB_HOST', 'localhost');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('DB_NAME', 'onecci_db');
+} else {
+    // 🌐 HOSTINGER CONFIGURATION (Live Server)
+    define('DB_HOST', 'localhost');
+    define('DB_USER', 'u502476186_onecci_user');
+    define('DB_PASS', 'OneCciMuzon2004');
+    define('DB_NAME', 'u502476186_onecci_db');
+}
+
+// Create connection
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
 if ($conn->connect_error) {
