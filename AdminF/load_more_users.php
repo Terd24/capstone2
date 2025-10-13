@@ -24,14 +24,15 @@ $response = ['items' => [], 'hasMore' => false];
 
 if ($type === 'employees') {
     // Get teachers who haven't logged in today
-    // Check both employee_accounts table and employees table for teacher identification
+    // First, get all teachers with accounts (role = 'teacher' in employee_accounts)
     $query = "
-        SELECT DISTINCT e.id_number, e.first_name, e.last_name, e.middle_name
+        SELECT DISTINCT e.id_number, e.first_name, e.last_name, e.middle_name, ea.role
         FROM employees e
-        LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id
+        INNER JOIN employee_accounts ea ON e.id_number = ea.employee_id
         LEFT JOIN login_activity la ON e.id_number = la.id_number AND DATE(la.login_time) = ?
-        WHERE la.id_number IS NULL 
-        AND (ea.role = 'teacher' OR e.role = 'teacher' OR e.position LIKE '%teacher%' OR e.position LIKE '%Teacher%')
+        WHERE ea.role = 'teacher'
+        AND la.id_number IS NULL
+        AND (e.deleted_at IS NULL OR e.deleted_at = '')
         ORDER BY e.last_name, e.first_name
         LIMIT ? OFFSET ?
     ";
@@ -50,10 +51,11 @@ if ($type === 'employees') {
         $count_query = "
             SELECT COUNT(DISTINCT e.id_number)
             FROM employees e
-            LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id
+            INNER JOIN employee_accounts ea ON e.id_number = ea.employee_id
             LEFT JOIN login_activity la ON e.id_number = la.id_number AND DATE(la.login_time) = ?
-            WHERE la.id_number IS NULL 
-            AND (ea.role = 'teacher' OR e.role = 'teacher' OR e.position LIKE '%teacher%' OR e.position LIKE '%Teacher%')
+            WHERE ea.role = 'teacher'
+            AND la.id_number IS NULL
+            AND (e.deleted_at IS NULL OR e.deleted_at = '')
         ";
         
         if ($count_stmt = $conn->prepare($count_query)) {

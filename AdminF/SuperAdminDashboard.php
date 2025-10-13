@@ -172,86 +172,120 @@ require_once 'includes/dashboard_data.php';
             <!-- Dashboard Section -->
             <div id="dashboard-section" class="section active">
                 <!-- System Status Overview -->
-                <div class="mb-6 bg-gradient-to-r from-[#0B2C62] to-[#153e86] text-white rounded-xl p-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <h2 class="text-xl font-bold">System Status</h2>
+                <div class="mb-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <h2 class="text-lg font-semibold">System Status Overview</h2>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="bg-white/10 rounded-lg p-4">
-                            <div class="text-blue-200 text-sm">System Status</div>
-                            <div class="text-xl font-semibold system-status-display"><?= $system_status ?></div>
+                        <div class="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                <div class="text-gray-300 text-xs font-medium">System Status</div>
+                            </div>
+                            <div class="text-lg font-bold system-status-display"><?= $system_status ?></div>
                         </div>
-                        <div class="bg-white/10 rounded-lg p-4">
-                            <div class="text-blue-200 text-sm">Data Usage</div>
-                            <div class="text-xl font-semibold">Monitoring</div>
+                        <div class="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                                </svg>
+                                <div class="text-gray-300 text-xs font-medium">Data Usage</div>
+                            </div>
+                            <div class="text-lg font-bold">Monitoring</div>
                         </div>
-                        <div class="bg-white/10 rounded-lg p-4">
-                            <div class="text-blue-200 text-sm">Server Performance</div>
-                            <div class="text-xl font-semibold">Optimal</div>
+                        <div class="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <div class="text-gray-300 text-xs font-medium">Performance</div>
+                            </div>
+                            <div class="text-lg font-bold">Optimal</div>
                         </div>
-                        <div class="bg-white/10 rounded-lg p-4">
-                            <div class="text-blue-200 text-sm">Security</div>
-                            <div class="text-xl font-semibold">🔒 Secured</div>
+                        <div class="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                                <div class="text-gray-300 text-xs font-medium">Security</div>
+                            </div>
+                            <div class="text-lg font-bold">Secured</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Key Metrics Dashboard -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <!-- Total Enrollment -->
-                    <div class="bg-white rounded-2xl shadow p-5 border border-[#0B2C62]/20">
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="w-10 h-10 rounded-lg bg-[#0B2C62]/10 text-[#0B2C62] flex items-center justify-center">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M12 7a3 3 0 110-6 3 3 0 010 6z"/>
+                    <div class="group bg-white rounded-xl shadow-md hover:shadow-xl border border-gray-100 p-6 transition-all duration-300 hover:-translate-y-1 cursor-pointer">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-500 mb-1">Total Enrollees</p>
+                                <p class="text-4xl font-bold text-gray-900"><?= number_format($total_students ?? 35) ?></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                                 </svg>
                             </div>
-                            <div>
-                                <div class="text-gray-500 text-sm">Total Enrollment</div>
-                                <div class="text-2xl font-bold text-gray-800"><?= number_format($total_students ?? 35) ?></div>
-                            </div>
+                        </div>
+                        <div class="flex items-center text-sm text-gray-500">
+                            <svg class="w-4 h-4 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                            <span>Active students</span>
                         </div>
                     </div>
 
-
                     <!-- Present Today -->
-                    <div class="bg-white rounded-2xl shadow p-5 border border-amber-100">
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    <div class="group bg-white rounded-xl shadow-md hover:shadow-xl border border-gray-100 p-6 transition-all duration-300 hover:-translate-y-1 cursor-pointer">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-500 mb-1">Present Today</p>
+                                <p class="text-4xl font-bold text-gray-900"><?= number_format(($student_present_today ?? 0) + ($employee_present_today ?? 0)) ?></p>
+                            </div>
+                            <div class="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                             </div>
-                            <div>
-                                <div class="text-gray-500 text-sm">Present Today</div>
-                                <div class="text-2xl font-bold text-gray-800"><?= number_format($student_present_today ?? 0) ?></div>
-                            </div>
                         </div>
-                        <div class="text-xs text-gray-600">
-                            <div class="flex justify-between"><span>Students:</span><span><?= $student_present_today ?? 0 ?>/<?= $total_students ?? 35 ?></span></div>
-                            <div class="flex justify-between"><span>Teachers:</span><span><?= $employee_present_today ?? 0 ?>/<?= $total_employees ?? 0 ?></span></div>
+                        <div class="flex items-center gap-4 text-xs">
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                                <span class="text-gray-600">Students: <span class="font-semibold text-gray-900"><?= $student_present_today ?? 0 ?></span></span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2 h-2 rounded-full bg-purple-500"></div>
+                                <span class="text-gray-600">Teachers: <span class="font-semibold text-gray-900"><?= $employee_present_today ?? 0 ?></span></span>
+                            </div>
                         </div>
                     </div>
 
                     <!-- System Health -->
-                    <div class="bg-white rounded-2xl shadow p-5 border border-purple-100">
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="w-10 h-10 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    <div class="group bg-white rounded-xl shadow-md hover:shadow-xl border border-gray-100 p-6 transition-all duration-300 hover:-translate-y-1 cursor-pointer">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-500 mb-1">System Health</p>
+                                <p class="text-4xl font-bold text-gray-900">Optimal</p>
+                            </div>
+                            <div class="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                                <svg class="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                                 </svg>
                             </div>
-                            <div>
-                                <div class="text-gray-500 text-sm">System Health</div>
-                                <div class="text-2xl font-bold text-green-600">🟢 Optimal</div>
-                            </div>
                         </div>
-                        <div class="text-xs text-gray-600">
-                            <div class="flex justify-between"><span>DB Size:</span><span><?= $db_size ?? 1.44 ?> MB</span></div>
-                            <div class="flex justify-between"><span>Records:</span><span><?= number_format($total_records ?? 44) ?></span></div>
+                        <div class="flex items-center gap-3 text-xs text-gray-600">
+                            <span>DB: <span class="font-semibold text-gray-900"><?= $db_size ?? 1.44 ?> MB</span></span>
+                            <span class="text-gray-300">•</span>
+                            <span>Records: <span class="font-semibold text-gray-900"><?= number_format($total_records ?? 44) ?></span></span>
                         </div>
                     </div>
                 </div>
@@ -259,9 +293,20 @@ require_once 'includes/dashboard_data.php';
                 <!-- Additional Dashboard Sections -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <!-- Enrollment by Grade Level -->
-                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Enrollment by Grade Level</h3>
-                        <div class="space-y-3 max-h-64 overflow-y-auto">
+                    <div class="bg-white rounded-xl shadow-md hover:shadow-lg border border-gray-100 p-6 transition-shadow">
+                        <div class="flex items-center justify-between mb-5">
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-900">Enrollment by Grade Level</h3>
+                                <p class="text-xs text-gray-500 mt-1">Student distribution across grades</p>
+                            </div>
+                            <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+                                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                </svg>
+                                <span class="text-sm font-semibold text-gray-900"><?= array_sum($grade_levels ?? []) ?></span>
+                            </div>
+                        </div>
+                        <div class="space-y-4 max-h-80 overflow-y-auto pr-2">
                             <?php
                             // Get enrollment by grade level
                             $grade_levels = [
@@ -282,45 +327,154 @@ require_once 'includes/dashboard_data.php';
                                 }
                             }
                             
+                            // Color palette for different grades
+                            $colors = [
+                                'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500',
+                                'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500',
+                                'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-violet-500'
+                            ];
+                            
+                            $maxCount = max(array_values($grade_levels));
+                            $colorIndex = 0;
+                            
                             foreach ($grade_levels as $grade => $count):
+                                $percentage = $maxCount > 0 ? ($count / $maxCount) * 100 : 0;
+                                $color = $colors[$colorIndex % count($colors)];
+                                $colorIndex++;
                             ?>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-600"><?= htmlspecialchars($grade) ?></span>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-sm font-medium text-gray-900"><?= $count ?></span>
-                                    <div class="w-8 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-[#0B2C62] rounded-full" style="width: <?= min(100, ($count / max(1, $total_students)) * 100) ?>%"></div>
+                            <div class="group">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 rounded-full <?= $color ?>"></div>
+                                        <span class="text-sm font-medium text-gray-700"><?= htmlspecialchars($grade) ?></span>
                                     </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs text-gray-500"><?= number_format(($count / max(1, array_sum($grade_levels))) * 100, 1) ?>%</span>
+                                        <span class="text-sm font-bold text-gray-900 min-w-[2rem] text-right"><?= $count ?></span>
+                                    </div>
+                                </div>
+                                <div class="relative h-3 bg-gray-100 rounded-full overflow-hidden">
+                                    <div class="absolute inset-0 <?= $color ?> rounded-full transition-all duration-500 group-hover:opacity-90" 
+                                         style="width: <?= $percentage ?>%"></div>
                                 </div>
                             </div>
                             <?php endforeach; ?>
+                        </div>
+                        
+                        <!-- Summary Stats -->
+                        <div class="mt-5 pt-5 border-t border-gray-100">
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="text-center">
+                                    <div class="text-xs text-gray-500 mb-1">Total Grades</div>
+                                    <div class="text-lg font-bold text-gray-900"><?= count($grade_levels) ?></div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-xs text-gray-500 mb-1">Avg per Grade</div>
+                                    <div class="text-lg font-bold text-gray-900"><?= count($grade_levels) > 0 ? round(array_sum($grade_levels) / count($grade_levels), 1) : 0 ?></div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-xs text-gray-500 mb-1">Largest Class</div>
+                                    <div class="text-lg font-bold text-gray-900"><?= max(array_values($grade_levels)) ?></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
 
                     <!-- System Performance -->
-                    <div class="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">System Performance</h3>
+                    <div class="bg-white rounded-xl shadow-md hover:shadow-lg border border-gray-100 p-6 transition-shadow">
+                        <div class="flex items-center justify-between mb-5">
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-900">System Performance</h3>
+                                <p class="text-xs text-gray-500 mt-1">Real-time system metrics</p>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                Healthy
+                            </span>
+                        </div>
+                        
                         <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-600">Database Size</span>
-                                <span class="text-lg font-bold text-gray-900"><?= number_format($db_size ?? 1.44, 2) ?> MB</span>
+                            <!-- Database Size -->
+                            <div class="group p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-700">Database Size</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-gray-900"><?= number_format($db_size ?? 1.44, 2) ?> MB</span>
+                                </div>
+                                <div class="ml-10">
+                                    <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-full bg-blue-500 rounded-full" style="width: <?= min(100, (($db_size ?? 1.44) / 10) * 100) ?>%"></div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-600">Total Tables</span>
-                                <span class="text-lg font-bold text-gray-900"><?= number_format($table_count ?? 37) ?></span>
+
+                            <!-- Total Tables -->
+                            <div class="group p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-700">Total Tables</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-gray-900"><?= number_format($table_count ?? 37) ?></span>
+                                </div>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-600">Total Records</span>
-                                <span class="text-lg font-bold text-gray-900"><?= number_format($total_records ?? 44) ?></span>
+
+                            <!-- Total Records -->
+                            <div class="group p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-700">Total Records</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-gray-900"><?= number_format($total_records ?? 44) ?></span>
+                                </div>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-600">Server Uptime</span>
-                                <span class="text-lg font-bold text-green-600"><?= $formatted_uptime ?? '02:39:04' ?></span>
+
+                            <!-- Server Uptime -->
+                            <div class="group p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-700">Server Uptime</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-green-600"><?= $formatted_uptime ?? '02:39:04' ?></span>
+                                </div>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-600">Active Connections</span>
-                                <span class="text-lg font-bold text-blue-600"><?= number_format($connections ?? 1) ?></span>
+
+                            <!-- Active Connections -->
+                            <div class="group p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-700">Active Connections</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-cyan-600"><?= number_format($connections ?? 1) ?></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -329,87 +483,218 @@ require_once 'includes/dashboard_data.php';
                 <!-- Login Activity Section -->
                 <div class="mb-6">
                     <!-- Today's Logins -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900">Today's Logins</h3>
-                            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">Refresh</button>
+                    <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                        <div class="bg-blue-600 px-6 py-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="bg-white/20 p-2 rounded-lg">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-white">Today's Logins</h3>
+                                        <p class="text-blue-100 text-sm">Recent system access activity</p>
+                                    </div>
+                                </div>
+                                <button onclick="location.reload()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    Refresh
+                                </button>
+                            </div>
                         </div>
                         
                         <!-- Login Table -->
                         <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead class="bg-[#1e3a8a] text-white">
+                            <table class="w-full text-sm" id="logins-table">
+                                <thead class="bg-gray-50 border-b border-gray-200">
                                     <tr>
-                                        <th class="px-3 py-2 text-left font-medium">User Type</th>
-                                        <th class="px-3 py-2 text-left font-medium">ID</th>
-                                        <th class="px-3 py-2 text-left font-medium">Name</th>
-                                        <th class="px-3 py-2 text-left font-medium">Role</th>
-                                        <th class="px-3 py-2 text-left font-medium">Login Time</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-700">User Type</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Login Time</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-200">
+                                <tbody class="divide-y divide-gray-100" id="logins-tbody">
                                     <?php if (!empty($today_logins)): ?>
-                                        <?php foreach (array_slice($today_logins, 0, 5) as $login): ?>
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['user_type']) ?></td>
-                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['id_number']) ?></td>
-                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['full_name'] ?: $login['username']) ?></td>
-                                            <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars($login['role']) ?></td>
-                                            <td class="px-3 py-2 text-gray-900"><?= date('M j, Y g:i A', strtotime($login['login_time'])) ?></td>
+                                        <?php foreach ($today_logins as $login): 
+                                            $userTypeColor = $login['user_type'] === 'employee' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700';
+                                            $roleColors = [
+                                                'superadmin' => 'bg-red-100 text-red-700',
+                                                'hr' => 'bg-orange-100 text-orange-700',
+                                                'teacher' => 'bg-green-100 text-green-700',
+                                                'registrar' => 'bg-indigo-100 text-indigo-700',
+                                                'cashier' => 'bg-yellow-100 text-yellow-700',
+                                                'guidance' => 'bg-pink-100 text-pink-700',
+                                                'attendance' => 'bg-teal-100 text-teal-700',
+                                                'student' => 'bg-blue-100 text-blue-700'
+                                            ];
+                                            $roleColor = $roleColors[$login['role']] ?? 'bg-gray-100 text-gray-700';
+                                        ?>
+                                        <tr class="hover:bg-blue-50 transition-colors login-row">
+                                            <td class="px-4 py-3">
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium <?= $userTypeColor ?>">
+                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <circle cx="10" cy="10" r="3"/>
+                                                    </svg>
+                                                    <?= ucfirst(htmlspecialchars($login['user_type'])) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 font-mono text-gray-600"><?= htmlspecialchars($login['id_number']) ?></td>
+                                            <td class="px-4 py-3 font-medium text-gray-900"><?= htmlspecialchars($login['full_name'] ?: $login['username']) ?></td>
+                                            <td class="px-4 py-3">
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <?= $roleColor ?>">
+                                                    <?= ucfirst(htmlspecialchars($login['role'])) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-gray-600">
+                                                <div class="flex items-center gap-2">
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    <?= date('M j, Y g:i A', strtotime($login['login_time'])) ?>
+                                                </div>
+                                            </td>
                                         </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>
-                                        <tr>
-                                            <td class="px-3 py-2 text-gray-900">employee</td>
-                                            <td class="px-3 py-2 text-gray-900">HR001</td>
-                                            <td class="px-3 py-2 text-gray-900">HR Administrator</td>
-                                            <td class="px-3 py-2 text-gray-900">hr</td>
-                                            <td class="px-3 py-2 text-gray-900">October 3, 2025 1:26 PM</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-3 py-2 text-gray-900">employee</td>
-                                            <td class="px-3 py-2 text-gray-900">SA001</td>
-                                            <td class="px-3 py-2 text-gray-900">Super Administrator</td>
-                                            <td class="px-3 py-2 text-gray-900">superadmin</td>
-                                            <td class="px-3 py-2 text-gray-900">October 3, 2025 1:24 PM</td>
+                                        <tr class="login-row">
+                                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                                <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                                </svg>
+                                                No logins recorded today
+                                            </td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination for Today's Logins -->
+                        <?php if (!empty($today_logins) && count($today_logins) > 10): ?>
+                        <div class="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
+                            <div class="text-sm text-gray-600">
+                                Showing <span id="logins-start" class="font-semibold text-gray-900">1</span> to <span id="logins-end" class="font-semibold text-gray-900">10</span> of <span id="logins-total" class="font-semibold text-gray-900"><?= count($today_logins) ?></span> logins
+                            </div>
+                            <div class="flex gap-2">
+                                <button id="logins-prev" onclick="changeLoginsPage(-1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                    Previous
+                                </button>
+                                <button id="logins-next" onclick="changeLoginsPage(1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    Next
+                                    <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <!-- Not Logged In Today Sections -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <!-- Not Logged In Today (Teachers) -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Not Logged In Today (Teachers)</h3>
-                        <div class="max-h-64 overflow-y-auto" id="employees-container">
-                            <ul class="space-y-2 text-sm text-gray-700" id="employees-list">
-                                <!-- Initial items will be loaded here -->
-                            </ul>
-                            <div id="employees-loading" class="text-center py-2 hidden">
-                                <span class="text-gray-500 text-sm">Loading more...</span>
+                    <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                        <div class="bg-orange-500 px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-white/20 p-2 rounded-lg">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
+                                    <p class="text-orange-100 text-sm">Teachers</p>
+                                </div>
                             </div>
-                            <div id="employees-no-more" class="text-center py-2 hidden">
-                                <span class="text-gray-400 text-sm">No more teachers</span>
+                        </div>
+                        <div class="p-6">
+                            <div class="min-h-[280px]">
+                                <ul class="space-y-2" id="employees-list">
+                                    <!-- Items will be loaded here -->
+                                </ul>
+                                <div id="employees-loading" class="text-center py-8">
+                                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-orange-200 border-t-orange-600"></div>
+                                    <p class="text-gray-500 text-sm mt-2">Loading teachers...</p>
+                                </div>
+                            </div>
+                            <!-- Pagination for Teachers -->
+                            <div id="employees-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
+                                <div class="text-sm text-gray-600">
+                                    Showing <span id="employees-start" class="font-semibold text-gray-900">1</span> to <span id="employees-end" class="font-semibold text-gray-900">10</span> of <span id="employees-total" class="font-semibold text-gray-900">0</span> teachers
+                                </div>
+                                <div class="flex gap-2">
+                                    <button id="employees-prev" onclick="changeEmployeesPage(-1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                        </svg>
+                                        Prev
+                                    </button>
+                                    <button id="employees-next" onclick="changeEmployeesPage(1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                        Next
+                                        <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Not Logged In Today (Students) -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Not Logged In Today (Students)</h3>
-                        <div class="max-h-64 overflow-y-auto" id="students-container">
-                            <ul class="space-y-2 text-sm text-gray-700" id="students-list">
-                                <!-- Initial items will be loaded here -->
-                            </ul>
-                            <div id="students-loading" class="text-center py-2 hidden">
-                                <span class="text-gray-500 text-sm">Loading more...</span>
+                    <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                        <div class="bg-blue-500 px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-white/20 p-2 rounded-lg">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                                        <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
+                                    <p class="text-blue-100 text-sm">Students</p>
+                                </div>
                             </div>
-                            <div id="students-no-more" class="text-center py-2 hidden">
-                                <span class="text-gray-400 text-sm">No more students</span>
+                        </div>
+                        <div class="p-6">
+                            <div class="min-h-[280px]">
+                                <ul class="space-y-2" id="students-list">
+                                    <!-- Items will be loaded here -->
+                                </ul>
+                                <div id="students-loading" class="text-center py-8">
+                                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"></div>
+                                    <p class="text-gray-500 text-sm mt-2">Loading students...</p>
+                                </div>
+                            </div>
+                            <!-- Pagination for Students -->
+                            <div id="students-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
+                                <div class="text-sm text-gray-600">
+                                    Showing <span id="students-start" class="font-semibold text-gray-900">1</span> to <span id="students-end" class="font-semibold text-gray-900">10</span> of <span id="students-total" class="font-semibold text-gray-900">0</span> students
+                                </div>
+                                <div class="flex gap-2">
+                                    <button id="students-prev" onclick="changeStudentsPage(-1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                        </svg>
+                                        Prev
+                                    </button>
+                                    <button id="students-next" onclick="changeStudentsPage(1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                        Next
+                                        <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1017,7 +1302,7 @@ require_once 'includes/dashboard_data.php';
                     <div class="bg-[#0B2C62] text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                         <h3 class="text-xl font-semibold">Employee Information</h3>
                         <div class="flex items-center gap-3">
-                            <button id="saveHRChangesBtn" onclick="saveHREmployeeChanges()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Save Changes</button>
+                            <button id="saveHRChangesBtn" onclick="showSaveConfirmation()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Save Changes</button>
                             <button id="editHREmployeeBtn" onclick="toggleHREditMode()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
                             <button id="deleteHREmployeeBtn" onclick="showDeleteHREmployeeConfirmation('${employee.id_number}')" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete Employee</button>
                             <button onclick="closeHRModal()" class="text-white hover:text-gray-200 p-1">
@@ -1206,9 +1491,30 @@ require_once 'includes/dashboard_data.php';
             }
         }
 
+        function showSaveConfirmation() {
+            const c = document.createElement('div');
+            c.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]';
+            c.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
+                    <h3 class="text-lg font-semibold mb-2">Confirm Changes</h3>
+                    <p class="text-gray-600 mb-6">Are you sure you want to save these changes to the HR employee information?</p>
+                    <div class="flex justify-end gap-2">
+                        <button id="cCancel" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded">Cancel</button>
+                        <button id="cSave" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirm & Save</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(c);
+            c.querySelector('#cCancel').onclick = () => c.remove();
+            c.querySelector('#cSave').onclick = () => {
+                c.remove();
+                saveHREmployeeChanges();
+            };
+        }
+
         function saveHREmployeeChanges() {
             if (!currentHREmployeeId) {
-                alert('No HR employee selected');
+                showToast('No HR employee selected', 'error');
                 return;
             }
             
@@ -1636,7 +1942,7 @@ require_once 'includes/dashboard_data.php';
             modal.innerHTML = `
                 <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border-2 border-gray-200">
                     <!-- Header -->
-                    <div class="bg-gradient-to-r from-[#0B2C62] to-[#153e86] text-white px-6 py-5 flex items-center justify-between">
+                    <div class="bg-[#0B2C62] text-white px-6 py-5 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1753,7 +2059,7 @@ require_once 'includes/dashboard_data.php';
                         <button onclick="closeConfirmationModal()" class="px-8 py-3 border-2 border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium text-lg">
                             Cancel
                         </button>
-                        <button onclick="proceedWithCreation()" class="px-8 py-3 bg-gradient-to-r from-[#0B2C62] to-[#153e86] hover:from-[#153e86] hover:to-[#1e40af] text-white rounded-lg transition-all duration-200 flex items-center gap-3 font-bold text-lg shadow-lg hover:shadow-xl">
+                        <button onclick="proceedWithCreation()" class="px-8 py-3 bg-[#0B2C62] hover:bg-[#153e86] text-white rounded-lg transition-all duration-200 flex items-center gap-3 font-bold text-lg shadow-lg hover:shadow-xl">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                             </svg>
@@ -2490,7 +2796,7 @@ function deletePermanently(recordId, recordType) {
             modal.innerHTML = `
                 <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border-2 border-gray-200">
                     <!-- Header -->
-                    <div class="bg-gradient-to-r from-[#0B2C62] to-[#153e86] text-white px-6 py-4 flex items-center justify-between rounded-t-xl">
+                    <div class="bg-[#0B2C62] text-white px-6 py-4 flex items-center justify-between rounded-t-xl">
                         <h3 class="text-lg font-bold">Create System Account</h3>
                         <button onclick="closeCreateAccountModal()" class="text-white hover:text-gray-200 p-1">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2549,125 +2855,7 @@ function deletePermanently(recordId, recordType) {
             }
         }
 
-        // Infinite Scroll for Not Logged In Today sections
-        class InfiniteScroll {
-            constructor(type, containerId, listId, loadingId, noMoreId) {
-                this.type = type;
-                this.container = document.getElementById(containerId);
-                this.list = document.getElementById(listId);
-                this.loading = document.getElementById(loadingId);
-                this.noMore = document.getElementById(noMoreId);
-                this.offset = 0;
-                this.isLoading = false;
-                this.hasMore = true;
-                
-                this.init();
-            }
-            
-            init() {
-                if (!this.container || !this.list) return;
-                
-                // Load initial data
-                this.loadMore();
-                
-                // Add scroll event listener
-                this.container.addEventListener('scroll', () => {
-                    if (this.shouldLoadMore()) {
-                        this.loadMore();
-                    }
-                });
-            }
-            
-            shouldLoadMore() {
-                if (this.isLoading || !this.hasMore) return false;
-                
-                const scrollTop = this.container.scrollTop;
-                const scrollHeight = this.container.scrollHeight;
-                const clientHeight = this.container.clientHeight;
-                
-                // Load more when user scrolls to within 50px of bottom
-                return scrollTop + clientHeight >= scrollHeight - 50;
-            }
-            
-            async loadMore() {
-                if (this.isLoading || !this.hasMore) return;
-                
-                this.isLoading = true;
-                this.showLoading();
-                
-                try {
-                    const response = await fetch(`load_more_users.php?type=${this.type}&offset=${this.offset}`);
-                    const data = await response.json();
-                    
-                    if (data.error) {
-                        console.error('Error loading more users:', data.error);
-                        return;
-                    }
-                    
-                    // Add new items to the list
-                    data.items.forEach(item => {
-                        const li = document.createElement('li');
-                        li.textContent = item;
-                        this.list.appendChild(li);
-                    });
-                    
-                    this.offset += data.items.length;
-                    this.hasMore = data.hasMore;
-                    
-                    if (!this.hasMore) {
-                        this.showNoMore();
-                    }
-                    
-                } catch (error) {
-                    console.error('Error loading more users:', error);
-                } finally {
-                    this.isLoading = false;
-                    this.hideLoading();
-                }
-            }
-            
-            showLoading() {
-                if (this.loading) {
-                    this.loading.classList.remove('hidden');
-                }
-            }
-            
-            hideLoading() {
-                if (this.loading) {
-                    this.loading.classList.add('hidden');
-                }
-            }
-            
-            showNoMore() {
-                if (this.noMore) {
-                    this.noMore.classList.remove('hidden');
-                }
-            }
-        }
-        
 
-        // Initialize infinite scroll when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            // Only initialize if we're on the dashboard section
-            if (document.getElementById('dashboard-section').classList.contains('active')) {
-                new InfiniteScroll('employees', 'employees-container', 'employees-list', 'employees-loading', 'employees-no-more');
-                new InfiniteScroll('students', 'students-container', 'students-list', 'students-loading', 'students-no-more');
-            }
-        });
-        
-        // Re-initialize when switching to dashboard section
-        const originalShowSection = window.showSection;
-        window.showSection = function(sectionName, event) {
-            originalShowSection(sectionName, event);
-            
-            if (sectionName === 'dashboard') {
-                // Small delay to ensure DOM is ready
-                setTimeout(() => {
-                    new InfiniteScroll('employees', 'employees-container', 'employees-list', 'employees-loading', 'employees-no-more');
-                    new InfiniteScroll('students', 'students-container', 'students-list', 'students-loading', 'students-no-more');
-                }, 100);
-            }
-        };
 
         // Export deleted account to file
         function exportToFile(accountId, accountType) {
@@ -2761,6 +2949,217 @@ function deletePermanently(recordId, recordType) {
             clearTimeout(window.__toastTimer);
             window.__toastTimer = setTimeout(()=>{ t.classList.add('hidden'); }, 3000);
         }
+        
+        // Pagination for Not Logged In Today sections
+        let employeesPage = 1;
+        let studentsPage = 1;
+        let employeesTotal = 0;
+        let studentsTotal = 0;
+        const itemsPerPage = 10;
+        
+        async function loadNotLoggedIn(type, page = 1) {
+            const list = document.getElementById(`${type}-list`);
+            const loading = document.getElementById(`${type}-loading`);
+            const pagination = document.getElementById(`${type}-pagination`);
+            
+            if (!list || !loading) {
+                console.error('Required elements not found:', {list, loading});
+                return;
+            }
+            
+            loading.classList.remove('hidden');
+            
+            try {
+                const offset = (page - 1) * itemsPerPage;
+                // Relative path - load_more_users.php is in the same directory
+                const url = `load_more_users.php?type=${type}&offset=${offset}&limit=${itemsPerPage}`;
+                console.log('Fetching:', url);
+                
+                const response = await fetch(url);
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Data received:', data);
+                
+                if (data.error) {
+                    console.error('Error loading users:', data.error);
+                    list.innerHTML = `<li class="text-center py-8"><p class="text-red-500 font-medium">Error: ${data.error}</p></li>`;
+                    return;
+                }
+                
+                // Clear list
+                list.innerHTML = '';
+                
+                // Add items
+                if (data.items.length === 0) {
+                    const emptyIcon = type === 'employees' 
+                        ? '<svg class="w-12 h-12 mx-auto mb-2 text-orange-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>'
+                        : '<svg class="w-12 h-12 mx-auto mb-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>';
+                    list.innerHTML = `<li class="text-center py-8">${emptyIcon}<p class="text-gray-500 font-medium">All ${type} have logged in today!</p><p class="text-gray-400 text-sm mt-1">Great attendance 🎉</p></li>`;
+                    pagination.classList.add('hidden');
+                } else {
+                    data.items.forEach(item => {
+                        const li = document.createElement('li');
+                        const iconColor = type === 'employees' ? 'text-orange-500' : 'text-blue-500';
+                        const bgColor = type === 'employees' ? 'hover:bg-orange-50' : 'hover:bg-blue-50';
+                        const borderColor = type === 'employees' ? 'border-orange-100' : 'border-blue-100';
+                        
+                        li.className = `flex items-center gap-3 p-3 rounded-lg border ${borderColor} ${bgColor} transition-all`;
+                        
+                        // Extract name from item (format: "• Name (ID)" or "• First, Last (ID)")
+                        // Remove bullet point and extract name before parentheses
+                        const cleanItem = item.replace(/•\s*/, '').trim();
+                        const nameMatch = cleanItem.match(/^([^(]+)/);
+                        const name = nameMatch ? nameMatch[1].trim() : '';
+                        
+                        // Split by comma or space to get name parts
+                        let nameParts;
+                        if (name.includes(',')) {
+                            // Format: "First, Last" - split by comma
+                            nameParts = name.split(',').map(p => p.trim()).filter(p => p.length > 0);
+                        } else {
+                            // Format: "First Last" - split by space
+                            nameParts = name.split(' ').filter(p => p.length > 0);
+                        }
+                        
+                        let initials = '?';
+                        if (nameParts.length >= 2) {
+                            // First letter of first name + first letter of last name
+                            initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+                        } else if (nameParts.length === 1 && nameParts[0].length >= 2) {
+                            // If only one name, take first two letters
+                            initials = nameParts[0].substring(0, 2).toUpperCase();
+                        }
+                        
+                        li.innerHTML = `
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full ${type === 'employees' ? 'bg-orange-500' : 'bg-blue-500'} flex items-center justify-center text-white font-bold text-sm shadow-md">
+                                    ${initials}
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900 truncate">${item.replace(/•\s*/, '')}</p>
+                                <p class="text-xs text-gray-500">Not logged in today</p>
+                            </div>
+                        `;
+                        list.appendChild(li);
+                    });
+                    
+                    // Update pagination
+                    const total = data.total || 0;
+                    if (type === 'employees') {
+                        employeesTotal = total;
+                    } else {
+                        studentsTotal = total;
+                    }
+                    
+                    updatePagination(type, page, total);
+                    
+                    if (total > itemsPerPage) {
+                        pagination.classList.remove('hidden');
+                    } else {
+                        pagination.classList.add('hidden');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error loading users:', error);
+                list.innerHTML = `<li class="text-center py-8"><p class="text-red-500 font-medium">Error loading data</p><p class="text-gray-500 text-sm mt-1">${error.message}</p></li>`;
+            } finally {
+                if (loading) {
+                    loading.classList.add('hidden');
+                }
+            }
+        }
+        
+        function updatePagination(type, page, total) {
+            const start = (page - 1) * itemsPerPage + 1;
+            const end = Math.min(page * itemsPerPage, total);
+            
+            document.getElementById(`${type}-start`).textContent = start;
+            document.getElementById(`${type}-end`).textContent = end;
+            document.getElementById(`${type}-total`).textContent = total;
+            
+            const prevBtn = document.getElementById(`${type}-prev`);
+            const nextBtn = document.getElementById(`${type}-next`);
+            
+            prevBtn.disabled = page === 1;
+            nextBtn.disabled = end >= total;
+        }
+        
+        function changeEmployeesPage(direction) {
+            employeesPage += direction;
+            if (employeesPage < 1) employeesPage = 1;
+            loadNotLoggedIn('employees', employeesPage);
+        }
+        
+        function changeStudentsPage(direction) {
+            studentsPage += direction;
+            if (studentsPage < 1) studentsPage = 1;
+            loadNotLoggedIn('students', studentsPage);
+        }
+        
+        // Pagination for Today's Logins
+        let loginsPage = 1;
+        const loginsPerPage = 10;
+        
+        function updateLoginsDisplay() {
+            const rows = document.querySelectorAll('.login-row');
+            const total = rows.length;
+            
+            if (total === 0) return;
+            
+            const start = (loginsPage - 1) * loginsPerPage;
+            const end = start + loginsPerPage;
+            
+            rows.forEach((row, index) => {
+                if (index >= start && index < end) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            // Update pagination info only if elements exist
+            const startEl = document.getElementById('logins-start');
+            const endEl = document.getElementById('logins-end');
+            const totalEl = document.getElementById('logins-total');
+            const prevBtn = document.getElementById('logins-prev');
+            const nextBtn = document.getElementById('logins-next');
+            
+            if (startEl) startEl.textContent = start + 1;
+            if (endEl) endEl.textContent = Math.min(end, total);
+            if (totalEl) totalEl.textContent = total;
+            
+            // Update button states
+            if (prevBtn) prevBtn.disabled = loginsPage === 1;
+            if (nextBtn) nextBtn.disabled = end >= total;
+        }
+        
+        function changeLoginsPage(direction) {
+            const rows = document.querySelectorAll('.login-row');
+            const totalPages = Math.ceil(rows.length / loginsPerPage);
+            
+            loginsPage += direction;
+            if (loginsPage < 1) loginsPage = 1;
+            if (loginsPage > totalPages) loginsPage = totalPages;
+            
+            updateLoginsDisplay();
+        }
+        
+        // Initialize pagination on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Today's Logins pagination only if pagination elements exist
+            const loginsTable = document.getElementById('logins-table');
+            const loginsPagination = document.getElementById('logins-start');
+            if (loginsTable && loginsPagination) {
+                updateLoginsDisplay();
+            }
+            
+            // Initialize Not Logged In sections
+            loadNotLoggedIn('employees', 1);
+            loadNotLoggedIn('students', 1);
+        });
     </script>
 </body>
 </html>

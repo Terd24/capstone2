@@ -55,13 +55,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 // Generate next Employee ID for display
 $next_employee_id = generateNextEmployeeId($conn);
 
-// Handle error message
+// Handle error and success messages
 $error_msg = $_SESSION['error_msg'] ?? '';
+$success_msg = $_SESSION['success_msg'] ?? '';
 $show_modal = $_SESSION['show_modal'] ?? false;
 $form_data = $_SESSION['form_data'] ?? [];
 
 if ($error_msg) {
     unset($_SESSION['error_msg']);
+}
+if ($success_msg) {
+    unset($_SESSION['success_msg']);
 }
 if (isset($_SESSION['show_modal'])) {
     unset($_SESSION['show_modal']);
@@ -548,6 +552,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 <?php endif; ?>
 
+// Show success toast if there's a success message
+<?php if ($success_msg): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    showToast('<?= addslashes($success_msg) ?>', 'success');
+});
+<?php endif; ?>
+
 // Modal functions
 function openModal() {
     document.getElementById('addEmployeeModal').classList.remove('hidden');
@@ -991,16 +1002,25 @@ function closeViewModal() {
     // Reset edit mode when closing
     isEditMode = false;
     currentEmployeeId = null;
+    
+    // Reset all button states to view mode
     const editBtn = document.getElementById('editEmployeeBtn');
+    const deleteBtn = document.getElementById('deleteEmployeeBtn');
+    const saveBtn = document.getElementById('saveChangesBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    
+    // Show Edit and Delete buttons
     if (editBtn) {
+        editBtn.classList.remove('hidden');
         editBtn.textContent = 'Edit';
         editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
     }
-    // Hide delete and save buttons
-    const deleteBtn = document.getElementById('deleteEmployeeBtn');
-    if (deleteBtn) deleteBtn.classList.add('hidden');
-    const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
+    if (deleteBtn) deleteBtn.classList.remove('hidden');
+    
+    // Hide Save and Cancel buttons
     if (saveBtn) saveBtn.classList.add('hidden');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    
     // Disable all fields
     document.querySelectorAll('.employee-field').forEach(field => {
         if (field.type === 'text' || field.type === 'email' || field.type === 'date' || field.tagName === 'SELECT') {
