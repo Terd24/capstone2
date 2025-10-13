@@ -6,10 +6,7 @@ if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin')
     die('⛔ Access Denied: Super Admin only');
 }
 
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
-    die('Database connection failed');
-}
+require_once '../StudentLogin/db_conn.php';
 
 // Create table if not exists
 $conn->query("CREATE TABLE IF NOT EXISTS system_config (

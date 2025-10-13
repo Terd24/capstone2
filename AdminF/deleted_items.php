@@ -8,10 +8,7 @@ if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin')
 }
 
 // Database connection
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
-    die('DB connection failed: ' . $conn->connect_error);
-}
+require_once '../StudentLogin/db_conn.php';
 
 // Get deleted students
 $deleted_students = [];

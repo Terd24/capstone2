@@ -15,11 +15,7 @@ if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin')
     exit;
 }
 
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
-    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
-    exit;
-}
+require_once '../StudentLogin/db_conn.php';
 
 // Create backups directory if it doesn't exist
 $backupDir = '../backups';

@@ -6,10 +6,7 @@ if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin')
     exit;
 }
 
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
-    die('DB connection failed: ' . $conn->connect_error);
-}
+require_once '../StudentLogin/db_conn.php';
 
 date_default_timezone_set('Asia/Manila');
 $today = date('Y-m-d');

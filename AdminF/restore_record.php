@@ -8,11 +8,7 @@ if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin')
     exit;
 }
 
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
-    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
-    exit;
-}
+require_once '../StudentLogin/db_conn.php';
 
 // Get JSON input
 $input = json_decode(file_get_contents('php://input'), true);

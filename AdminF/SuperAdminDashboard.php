@@ -13,10 +13,7 @@ header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 header("Expires: 0");
 
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
-    die('DB connection failed: ' . $conn->connect_error);
-}
+require_once '../StudentLogin/db_conn.php';
 
 // Function to generate next Employee ID (same as HR Dashboard)
 function generateNextEmployeeId($conn) {
