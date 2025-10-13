@@ -33,6 +33,16 @@ try {
     // Start transaction
     $conn->begin_transaction();
 
+    // First check if employee exists
+    $check_stmt = $conn->prepare("SELECT id_number FROM employees WHERE id_number = ?");
+    $check_stmt->bind_param("s", $employee_id);
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+    
+    if ($check_result->num_rows === 0) {
+        throw new Exception('No employee found with ID: ' . $employee_id);
+    }
+
     // Update employee
     $stmt = $conn->prepare("UPDATE employees SET first_name = ?, middle_name = ?, last_name = ?, position = ?, department = ?, email = ?, phone = ?, hire_date = ?, address = ? WHERE id_number = ?");
 
@@ -44,10 +54,6 @@ try {
 
     if (!$stmt->execute()) {
         throw new Exception('Error updating employee: ' . $stmt->error);
-    }
-
-    if ($stmt->affected_rows === 0) {
-        throw new Exception('No HR employee found with ID: ' . $employee_id);
     }
 
     // Commit transaction

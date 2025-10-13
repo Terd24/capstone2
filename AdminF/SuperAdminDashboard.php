@@ -18,17 +18,41 @@ if ($conn->connect_error) {
     die('DB connection failed: ' . $conn->connect_error);
 }
 
-// Handle success message
-$success_msg = $_SESSION['success_msg'] ?? '';
-if ($success_msg) {
-    unset($_SESSION['success_msg']);
+// Function to generate next Employee ID (same as HR Dashboard)
+function generateNextEmployeeId($conn) {
+    $currentYear = date('Y');
+    $prefix = 'CCI' . $currentYear . '-';
+    
+    // Get the highest existing employee ID for current year
+    $query = "SELECT id_number FROM employees WHERE id_number LIKE ? ORDER BY id_number DESC LIMIT 1";
+    $stmt = $conn->prepare($query);
+    $searchPattern = $prefix . '%';
+    $stmt->bind_param("s", $searchPattern);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $lastId = $row['id_number'];
+        // Extract the numeric part after the dash
+        $parts = explode('-', $lastId);
+        if (count($parts) == 2) {
+            $numericPart = intval($parts[1]);
+            $nextNumber = $numericPart + 1;
+        } else {
+            $nextNumber = 1;
+        }
+    } else {
+        $nextNumber = 1;
+    }
+    
+    // Format as CCI2025-001, CCI2025-002, etc. (3 digits)
+    return $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 }
 
-// Handle error message
-$error_msg = $_SESSION['error_msg'] ?? '';
-if ($error_msg) {
-    unset($_SESSION['error_msg']);
-}
+// Clear any session messages (we use toast notifications now)
+unset($_SESSION['success_msg']);
+unset($_SESSION['error_msg']);
 
 // Check maintenance mode status
 $maintenance_result = $conn->query("SELECT config_value FROM system_config WHERE config_key = 'maintenance_mode'");
@@ -913,6 +937,11 @@ require_once 'includes/dashboard_data.php';
         }
 
         function showSection(sectionName, clickEvent = null) {
+            // Prevent default link behavior to avoid hash in URL
+            if (clickEvent) {
+                clickEvent.preventDefault();
+            }
+            
             // Hide all sections
             document.querySelectorAll('.section').forEach(section => {
                 section.classList.remove('active');
@@ -937,6 +966,11 @@ require_once 'includes/dashboard_data.php';
                 if (navItem) {
                     navItem.classList.add('active');
                 }
+            }
+            
+            // Remove hash from URL without page reload
+            if (window.location.hash) {
+                history.replaceState(null, null, window.location.pathname);
             }
             
             // Update page title
@@ -983,6 +1017,7 @@ require_once 'includes/dashboard_data.php';
                     <div class="bg-[#0B2C62] text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                         <h3 class="text-xl font-semibold">Employee Information</h3>
                         <div class="flex items-center gap-3">
+                            <button id="saveHRChangesBtn" onclick="saveHREmployeeChanges()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Save Changes</button>
                             <button id="editHREmployeeBtn" onclick="toggleHREditMode()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
                             <button id="deleteHREmployeeBtn" onclick="showDeleteHREmployeeConfirmation('${employee.id_number}')" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete Employee</button>
                             <button onclick="closeHRModal()" class="text-white hover:text-gray-200 p-1">
@@ -1006,12 +1041,12 @@ require_once 'includes/dashboard_data.php';
                                 <div class="grid grid-cols-3 gap-6">
                                     <!-- Row: ID Number, First Name, Middle Name -->
                                     <div>
-                                        <label class="block text-sm font-semibold mb-1">ID Number</label>
-                                        <input type="text" value="${employee.id_number}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field">
-                                    </div>
-                                    <div>
                                         <label class="block text-sm font-semibold mb-1">First Name</label>
                                         <input type="text" id="first_name_${employee.id_number}" value="${employee.first_name}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field">
+                                    </div>
+                                                                        <div>
+                                        <label class="block text-sm font-semibold mb-1">Last Name</label>
+                                        <input type="text" id="last_name_${employee.id_number}" value="${employee.last_name}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-semibold mb-1">Middle Name</label>
@@ -1019,9 +1054,9 @@ require_once 'includes/dashboard_data.php';
                                     </div>
                                     
                                     <!-- Row: Last Name, Position, Department -->
-                                    <div>
-                                        <label class="block text-sm font-semibold mb-1">Last Name</label>
-                                        <input type="text" id="last_name_${employee.id_number}" value="${employee.last_name}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field">
+                                                                        <div>
+                                        <label class="block text-sm font-semibold mb-1">Employee ID</label>
+                                        <input type="text" value="${employee.id_number}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field employee-id-readonly cursor-not-allowed">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-semibold mb-1">Position</label>
@@ -1043,7 +1078,7 @@ require_once 'includes/dashboard_data.php';
                                     </div>
                                     <div>
                                         <label class="block text-sm font-semibold mb-1">Hire Date</label>
-                                        <input type="date" id="hire_date_${employee.id_number}" value="${employee.hire_date || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field">
+                                        <input type="date" id="hire_date_${employee.id_number}" value="${employee.hire_date || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field hire-date-readonly cursor-not-allowed">
                                     </div>
                                 </div>
                                 
@@ -1068,7 +1103,7 @@ require_once 'includes/dashboard_data.php';
                                     <div class="grid grid-cols-2 gap-6">
                                         <div>
                                             <label class="block text-sm font-semibold mb-1">Username</label>
-                                            <input type="text" value="${employee.username}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50">
+                                            <input type="text" value="${employee.username}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 username-field-readonly cursor-not-allowed">
                                         </div>
                                         <div>
                                             <label class="block text-sm font-semibold mb-1">Password</label>
@@ -1090,12 +1125,7 @@ require_once 'includes/dashboard_data.php';
                             </div>
                         </div>
                         
-                        <!-- Save Changes Button (hidden by default) -->
-                        <div class="flex justify-end">
-                            <button id="saveChangesBtn_${employee.id_number}" onclick="saveHREmployeeChanges()" class="hidden px-6 py-2 bg-[#0B2C62] text-white rounded-lg hover:bg-[#0B2C62]/90 transition">
-                                Save Changes
-                            </button>
-                        </div>
+
                     </div>
                 </div>
             `;
@@ -1125,17 +1155,29 @@ require_once 'includes/dashboard_data.php';
                 editBtn.textContent = 'Cancel';
                 editBtn.className = 'px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition';
                 
-                // Show save changes button
-                const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
+                // Show save button and hide delete button
+                const saveBtn = document.getElementById('saveHRChangesBtn');
+                const deleteBtn = document.getElementById('deleteHREmployeeBtn');
                 if (saveBtn) saveBtn.classList.remove('hidden');
+                if (deleteBtn) deleteBtn.classList.add('hidden');
                 
-                // Enable fields for editing
+                // Enable fields for editing (except Employee ID, Username, and Hire Date which should always be readonly)
                 fields.forEach(field => {
-                    if (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type)) {
+                    // Skip Employee ID field - it should NEVER be editable
+                    const isEmployeeIdField = field.classList.contains('employee-id-readonly');
+                    // Skip Username field - it should NEVER be editable
+                    const isUsernameField = field.classList.contains('username-field-readonly');
+                    // Skip Hire Date field - it should NEVER be editable
+                    const isHireDateField = field.classList.contains('hire-date-readonly');
+                    
+                    if (!isEmployeeIdField && !isUsernameField && !isHireDateField && (['TEXTAREA'].includes(field.tagName) || ['text', 'email', 'date', 'tel'].includes(field.type))) {
                         field.readOnly = false;
                         field.classList.remove('bg-gray-50');
+                        field.classList.remove('cursor-not-allowed');
                         field.classList.add('bg-white');
                         field.classList.add('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
+                        // Clear any previous error styling
+                        field.classList.remove('border-red-500');
                     }
                 });
             } else {
@@ -1143,9 +1185,11 @@ require_once 'includes/dashboard_data.php';
                 editBtn.textContent = 'Edit';
                 editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
                 
-                // Hide save changes button
-                const saveBtn = document.querySelector('[id^="saveChangesBtn_"]');
+                // Hide save button and show delete button
+                const saveBtn = document.getElementById('saveHRChangesBtn');
+                const deleteBtn = document.getElementById('deleteHREmployeeBtn');
                 if (saveBtn) saveBtn.classList.add('hidden');
+                if (deleteBtn) deleteBtn.classList.remove('hidden');
                 
                 // Disable fields and restore read-only appearance
                 fields.forEach(field => {
@@ -1210,16 +1254,34 @@ require_once 'includes/dashboard_data.php';
             })
             .then(data => {
                 if (data.success) {
-                    alert('HR Employee updated successfully!');
+                    showToast('HR Employee updated successfully!', 'success');
                     toggleHREditMode(); // Exit edit mode
-                    location.reload(); // Refresh to show updated data
+                    
+                    // Refresh the modal data without closing it
+                    fetch(`view_hr_employee.php?id=${currentHREmployeeId}`)
+                        .then(response => response.json())
+                        .then(refreshData => {
+                            if (refreshData.success) {
+                                // Update all field values with fresh data
+                                const emp = refreshData.employee;
+                                document.getElementById(`first_name_${currentHREmployeeId}`).value = emp.first_name || '';
+                                document.getElementById(`middle_name_${currentHREmployeeId}`).value = emp.middle_name || '';
+                                document.getElementById(`last_name_${currentHREmployeeId}`).value = emp.last_name || '';
+                                document.getElementById(`position_${currentHREmployeeId}`).value = emp.position || '';
+                                document.getElementById(`department_${currentHREmployeeId}`).value = emp.department || '';
+                                document.getElementById(`email_${currentHREmployeeId}`).value = emp.email || '';
+                                document.getElementById(`phone_${currentHREmployeeId}`).value = emp.phone || '';
+                                document.getElementById(`hire_date_${currentHREmployeeId}`).value = emp.hire_date || '';
+                                document.getElementById(`address_${currentHREmployeeId}`).value = emp.address || '';
+                            }
+                        });
                 } else {
-                    alert('Error: ' + data.message);
+                    showToast('Error: ' + data.message, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('An error occurred while updating the HR employee');
+                showToast('An error occurred while updating the HR employee', 'error');
             });
         }
 
@@ -1273,20 +1335,20 @@ require_once 'includes/dashboard_data.php';
                                 
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee ID *</label>
-                                        <input type="text" name="id_number" autocomplete="off" required maxlength="11" pattern="[0-9]+" title="Numbers only, maximum 11 digits" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
-                                    </div>
-                                    <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
                                         <input type="text" name="first_name" autocomplete="off" pattern="[A-Za-z\\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm name-input" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 20)">
+                                    </div>
+                                                                        <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+                                        <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm name-input" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 20)">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Middle Name <span class="text-gray-500">(Optional)</span></label>
                                         <input type="text" name="middle_name" autocomplete="off" pattern="[A-Za-z\\s]*" maxlength="20" title="Letters only, maximum 20 characters" placeholder="Optional" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm name-input" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 20)">
                                     </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
-                                        <input type="text" name="last_name" autocomplete="off" pattern="[A-Za-z\\s]+" maxlength="20" title="Letters only, maximum 20 characters" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm name-input" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 20)">
+                                                                        <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee ID *</label>
+                                        <input type="text" name="id_number" id="auto_employee_id" autocomplete="off" required readonly class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-600" value="Loading...">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Position *</label>
@@ -1312,7 +1374,8 @@ require_once 'includes/dashboard_data.php';
                                 
                                 <div class="mt-6">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Complete Address *</label>
-                                    <textarea name="address" rows="3" autocomplete="off" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm"></textarea>
+                                    <textarea name="address" rows="3" autocomplete="off" required minlength="20" maxlength="500" placeholder="Enter complete address (e.g., Block 8, Lot 15, Subdivision Name, Barangay, City, Province)" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm" title="Please enter a complete address with at least 20 characters including street, barangay, city/municipality, and province."></textarea>
+                                    <p class="text-xs text-gray-500 mt-1">Minimum 20 characters. Include street, barangay, city/municipality, and province.</p>
                                 </div>
                             </div>
                             
@@ -1335,11 +1398,11 @@ require_once 'includes/dashboard_data.php';
                                 <div id="accountFields" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Username *</label>
-                                        <input type="text" name="username" autocomplete="off" pattern="^[A-Za-z0-9_]+$" title="Letters, numbers, underscores only" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm">
+                                        <input type="text" id="usernameField" name="username" autocomplete="off" readonly class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-600">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Password *</label>
-                                        <input type="password" name="password" autocomplete="new-password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm">
+                                        <input type="text" id="passwordField" name="password" autocomplete="new-password" readonly class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-600">
                                     </div>
                                 </div>
                             </div>
@@ -1360,6 +1423,65 @@ require_once 'includes/dashboard_data.php';
             
             document.body.appendChild(modal);
             window.currentAddHRModal = modal;
+            
+            // Fetch next employee ID
+            fetch('get_next_employee_id.php')
+                .then(response => response.json())
+                .then(data => {
+                    const employeeIdField = document.getElementById('auto_employee_id');
+                    if (employeeIdField && data.next_id) {
+                        employeeIdField.value = data.next_id;
+                        // Trigger username/password generation after employee ID is loaded
+                        generateUsernameAndPassword();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching employee ID:', error);
+                    const employeeIdField = document.getElementById('auto_employee_id');
+                    if (employeeIdField) {
+                        employeeIdField.value = 'Error loading ID';
+                    }
+                });
+            
+            // Auto-generate username and password based on last name and employee ID
+            function generateUsernameAndPassword() {
+                const lastNameField = modal.querySelector('input[name="last_name"]');
+                const employeeIdField = document.getElementById('auto_employee_id');
+                const usernameField = document.getElementById('usernameField');
+                const passwordField = document.getElementById('passwordField');
+                
+                if (!lastNameField || !employeeIdField || !usernameField || !passwordField) return;
+                
+                const lastName = lastNameField.value.trim().toLowerCase();
+                const employeeId = employeeIdField.value.trim();
+                
+                if (lastName && employeeId) {
+                    // Extract the 3-digit number from employee ID (e.g., CCI2025-006 -> 006)
+                    const parts = employeeId.split('-');
+                    const idNumber = parts.length === 2 ? parts[1] : '000';
+                    
+                    // Get current year
+                    const currentYear = new Date().getFullYear();
+                    
+                    // Format username: lastname006muzon@employee.cci.edu.ph
+                    const username = lastName + idNumber + 'muzon@employee.cci.edu.ph';
+                    usernameField.value = username;
+                    
+                    // Format password: lastname0062025
+                    const password = lastName + idNumber + currentYear;
+                    passwordField.value = password;
+                } else {
+                    usernameField.value = '';
+                    passwordField.value = '';
+                }
+            }
+            
+            // Setup auto-generation on last name change
+            const lastNameField = modal.querySelector('input[name="last_name"]');
+            if (lastNameField) {
+                lastNameField.addEventListener('input', generateUsernameAndPassword);
+                lastNameField.addEventListener('blur', generateUsernameAndPassword);
+            }
             
             // Handle checkbox toggle
             document.getElementById('createAccount').addEventListener('change', function() {
@@ -1437,6 +1559,15 @@ require_once 'includes/dashboard_data.php';
             }
             if (!address) {
                 highlightFieldError(form.querySelector('textarea[name="address"]'), 'Address is required');
+                hasErrors = true;
+            } else if (address.length < 20) {
+                highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must be at least 20 characters long');
+                hasErrors = true;
+            } else if (address.length > 500) {
+                highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must not exceed 500 characters');
+                hasErrors = true;
+            } else if (!/.*[,\s].*/i.test(address)) {
+                highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.');
                 hasErrors = true;
             }
             if (!hireDate) {
@@ -2585,29 +2716,7 @@ function deletePermanently(recordId, recordType) {
         }
     </script>
 
-    <!-- Success Notification -->
-    <?php if (!empty($success_msg)): ?>
-    <div id="success-notif" class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transform translate-x-full opacity-0 transition-all duration-300">
-        <div class="flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <?= htmlspecialchars($success_msg) ?>
-        </div>
-    </div>
-    <script>
-        // Show success notification
-        const successNotif = document.getElementById('success-notif');
-        if (successNotif) {
-            setTimeout(() => {
-                successNotif.classList.remove('translate-x-full', 'opacity-0');
-            }, 100);
-            setTimeout(() => {
-                successNotif.classList.add('translate-x-full', 'opacity-0');
-            }, 4000);
-        }
-    </script>
-    <?php endif; ?>
+
 
     <!-- Error Notification -->
     <?php if (!empty($error_msg)): ?>
@@ -2633,5 +2742,25 @@ function deletePermanently(recordId, recordType) {
     </script>
     <script src="assets/js/deleted-items-fix.js"></script>
     <?php endif; ?>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 right-5 z-[9999] hidden">
+        <div id="toastInner" class="px-4 py-3 rounded shadow-lg text-white"></div>
+    </div>
+    <style>
+        .toast-success { background-color: #10b981; }
+        .toast-error { background-color: #ef4444; }
+    </style>
+    <script>
+        function showToast(message, type='success'){
+            const t = document.getElementById('toast');
+            const ti = document.getElementById('toastInner');
+            ti.className = 'px-4 py-3 rounded shadow-lg text-white ' + (type==='success'?'toast-success':'toast-error');
+            ti.textContent = message;
+            t.classList.remove('hidden');
+            clearTimeout(window.__toastTimer);
+            window.__toastTimer = setTimeout(()=>{ t.classList.add('hidden'); }, 3000);
+        }
+    </script>
 </body>
 </html>

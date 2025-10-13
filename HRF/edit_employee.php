@@ -29,6 +29,25 @@ if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($pos
     exit;
 }
 
+// Prevent HR staff from editing HR department employees (only Super Admin can)
+if ($_SESSION['role'] === 'hr' && $department === 'Human Resources') {
+    echo json_encode(['success' => false, 'message' => 'HR staff cannot edit HR department employees. Only Super Admin can manage HR accounts.']);
+    exit;
+}
+
+// Also check if the existing employee is from HR department
+$check_dept = $conn->prepare("SELECT department FROM employees WHERE id_number = ?");
+$check_dept->bind_param("s", $employee_id);
+$check_dept->execute();
+$dept_result = $check_dept->get_result();
+if ($dept_result && $dept_result->num_rows > 0) {
+    $existing_dept = $dept_result->fetch_assoc()['department'];
+    if ($_SESSION['role'] === 'hr' && $existing_dept === 'Human Resources') {
+        echo json_encode(['success' => false, 'message' => 'HR staff cannot edit HR department employees. Only Super Admin can manage HR accounts.']);
+        exit;
+    }
+}
+
 // Validate address
 if (strlen($address) < 20) {
     echo json_encode(['success' => false, 'message' => 'Complete address must be at least 20 characters long.']);

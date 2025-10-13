@@ -40,7 +40,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($table_check->num_rows == 0) {
             $create_employees_table = "CREATE TABLE employees (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                id_number VARCHAR(11) UNIQUE NOT NULL,
+                id_number VARCHAR(20) UNIQUE NOT NULL,
                 first_name VARCHAR(50) NOT NULL,
                 middle_name VARCHAR(50),
                 last_name VARCHAR(50) NOT NULL,
@@ -55,6 +55,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             )";
             $conn->query($create_employees_table);
         } else {
+            // Update id_number column to support longer IDs (CCI2025-0001 format)
+            $id_column = $conn->query("SHOW COLUMNS FROM employees LIKE 'id_number'")->fetch_assoc();
+            if ($id_column && strpos($id_column['Type'], 'varchar(11)') !== false) {
+                $conn->query("ALTER TABLE employees MODIFY COLUMN id_number VARCHAR(20) UNIQUE NOT NULL");
+            }
+            
             // Add missing columns if needed
             $column_check = $conn->query("SHOW COLUMNS FROM employees LIKE 'hire_date'");
             if ($column_check->num_rows == 0) {
@@ -71,8 +77,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Validations
-        if (!preg_match('/^[0-9A-Za-z]+$/', $id_number) || strlen($id_number) > 11) {
-            throw new Exception("Employee ID must contain only letters and numbers and be maximum 11 characters.");
+        if (!preg_match('/^[0-9A-Za-z\-]+$/', $id_number) || strlen($id_number) > 20) {
+            throw new Exception("Employee ID must contain only letters, numbers, and dashes and be maximum 20 characters.");
         }
         if (empty($email)) {
             throw new Exception("Email is required.");

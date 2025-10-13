@@ -75,13 +75,14 @@ $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at TIMESTAM
 $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) NULL");
 $conn->query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_reason TEXT NULL");
 
-// Fetch only active employees (not soft-deleted)
+// Fetch only active employees (not soft-deleted) excluding HR department
+// HR staff cannot see or edit HR employees - only Super Admin can manage HR accounts
 $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, position, department, 
                        (SELECT username FROM employee_accounts WHERE employee_accounts.employee_id = employees.id_number) as username 
-                       FROM employees WHERE deleted_at IS NULL ORDER BY id_number ASC");
+                       FROM employees WHERE deleted_at IS NULL AND department != 'Human Resources' ORDER BY id_number ASC");
 
-// Get total active employee count
-$count_result = $conn->query("SELECT COUNT(*) as total_employees FROM employees WHERE deleted_at IS NULL");
+// Get total active employee count (excluding HR department)
+$count_result = $conn->query("SELECT COUNT(*) as total_employees FROM employees WHERE deleted_at IS NULL AND department != 'Human Resources'");
 $total_employees = $count_result->fetch_assoc()['total_employees'];
 
 $columns = ['ID Number', 'Full Name', 'Position', 'Department', 'Account Status'];
