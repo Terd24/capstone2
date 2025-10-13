@@ -7,6 +7,6 @@ session_unset();
 session_destroy();
 
 // Redirect to parent login page
-header("Location: ParentLogin.html");
+header("Location: ParentLogin.php");
 exit();
 ?>

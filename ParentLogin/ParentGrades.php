@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
-    header("Location: ParentLogin.html");
+    header("Location: ParentLogin.php");
     exit();
 }
 
