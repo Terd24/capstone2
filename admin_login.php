@@ -1,11 +1,6 @@
 <?php
 session_start();
-$conn = new mysqli("localhost", "root", "", "onecci_db");
-
-// Check database connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once 'StudentLogin/db_conn.php';
 
 $error_msg = '';
 $success_msg = '';

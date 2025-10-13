@@ -1,6 +1,6 @@
 <?php
 session_start();
-include '../StudentLogin/db_conn.php';
+require_once '../StudentLogin/db_conn.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = $_POST['parent_id'] ?? '';
