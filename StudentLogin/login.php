@@ -205,9 +205,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['first_name'] = $row['first_name'];
             $_SESSION['last_name'] = $row['last_name'];
             $_SESSION['role'] = $role;
+            
+            // Check if employee must change password (first-time login)
+            $must_change = $row['must_change_password'] ?? 0;
 
             // Log employee/superadmin login
             log_login($conn, 'employee', $row['id_number'], $row['username'], $role);
+            
+            // If must change password, redirect to employee password change page
+            if ($must_change == 1) {
+                $_SESSION['must_change_password'] = true;
+                echo json_encode(['status'=>'success','redirect'=>'../EmployeePortal/change_password.php']);
+                exit;
+            }
 
             // Role routing
             switch($role) {

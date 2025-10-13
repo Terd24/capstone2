@@ -65,8 +65,19 @@ try {
 
     // Create account
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-    $stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssss", $employee_id, $username, $hashed_password, $role);
+    
+    // Check if must_change_password column exists
+    $check_column = $conn->query("SHOW COLUMNS FROM employee_accounts LIKE 'must_change_password'");
+    $has_password_column = ($check_column && $check_column->num_rows > 0);
+    
+    if ($has_password_column) {
+        $must_change_pwd = 1; // Force password change on first login
+        $stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role, must_change_password) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssi", $employee_id, $username, $hashed_password, $role, $must_change_pwd);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("ssss", $employee_id, $username, $hashed_password, $role);
+    }
 
     if ($stmt->execute()) {
         $_SESSION['success_msg'] = 'System account created successfully for Employee ID: ' . $employee_id;

@@ -10,6 +10,12 @@ if (!isset($_SESSION['registrar_id'])) {
     exit;
 }
 
+// Check if employee must change password (first-time login)
+if (isset($_SESSION['must_change_password']) && $_SESSION['must_change_password'] === true) {
+    header("Location: ../EmployeePortal/change_password.php");
+    exit;
+}
+
 // Prevent browser caching (so back button after logout doesn't show dashboard)
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
