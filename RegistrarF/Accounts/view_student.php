@@ -1,5 +1,11 @@
 <?php
 session_start();
+
+// Prevent caching
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 include(__DIR__ . "/../../StudentLogin/db_conn.php");
 
 // Require registrar login
@@ -149,12 +155,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     if (empty(trim($father_first_name))) $validation_errors[] = "Father's first name is required.";
     if (empty(trim($father_last_name))) $validation_errors[] = "Father's last name is required.";
     if (empty(trim($father_occupation))) $validation_errors[] = "Father's occupation is required.";
+    if (empty(trim($father_contact))) $validation_errors[] = "Father's contact is required.";
     if (empty(trim($mother_first_name))) $validation_errors[] = "Mother's first name is required.";
     if (empty(trim($mother_last_name))) $validation_errors[] = "Mother's last name is required.";
     if (empty(trim($mother_occupation))) $validation_errors[] = "Mother's occupation is required.";
+    if (empty(trim($mother_contact))) $validation_errors[] = "Mother's contact is required.";
     if (empty(trim($guardian_first_name))) $validation_errors[] = "Guardian's first name is required.";
     if (empty(trim($guardian_last_name))) $validation_errors[] = "Guardian's last name is required.";
     if (empty(trim($guardian_occupation))) $validation_errors[] = "Guardian's occupation is required.";
+    if (empty(trim($guardian_contact))) $validation_errors[] = "Guardian's contact is required.";
     if (empty(trim($last_school))) $validation_errors[] = "Last school name is required.";
     if (empty(trim($last_school_year))) $validation_errors[] = "Last school year is required.";
     
@@ -221,6 +230,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         $validation_errors[] = "Guardian's middle name must contain letters only.";
     }
     
+    // Validate contact numbers (must be exactly 11 digits)
+    if (!empty($father_contact) && !preg_match('/^[0-9]{11}$/', $father_contact)) {
+        $validation_errors[] = "Father's contact must be exactly 11 digits.";
+    }
+    if (!empty($mother_contact) && !preg_match('/^[0-9]{11}$/', $mother_contact)) {
+        $validation_errors[] = "Mother's contact must be exactly 11 digits.";
+    }
+    if (!empty($guardian_contact) && !preg_match('/^[0-9]{11}$/', $guardian_contact)) {
+        $validation_errors[] = "Guardian's contact must be exactly 11 digits.";
+    }
+    
     // If validation fails, redirect back with error message
     if (!empty($validation_errors)) {
         $_SESSION['error_msg'] = implode('<br>', $validation_errors);
@@ -228,9 +248,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         exit;
     }
 
+    // Ensure must_change_password column exists
+    $conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS must_change_password TINYINT(1) DEFAULT 0");
+
     // Update student record (username is excluded as it should remain readonly)
     if (!empty($password)) {
-        // Update with new password
+        // Update with new password and set must_change_password flag
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         $update_sql = "UPDATE student_account SET 
             lrn = ?, academic_track = ?, enrollment_status = ?, school_type = ?,
@@ -242,7 +265,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             mother_name = ?, mother_occupation = ?, mother_contact = ?,
             guardian_name = ?, guardian_occupation = ?, guardian_contact = ?,
             last_school = ?, last_school_year = ?,
-            rfid_uid = ?, password = ?
+            rfid_uid = ?, password = ?, must_change_password = 1
             WHERE id_number = ?";
         $update_stmt = $conn->prepare($update_sql);
         $update_stmt->bind_param(
@@ -336,8 +359,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         }
         // Update parent password if provided
         if (!empty($parent_password)) {
+            // Ensure must_change_password column exists in parent_account table
+            $conn->query("ALTER TABLE parent_account ADD COLUMN IF NOT EXISTS must_change_password TINYINT(1) DEFAULT 0");
+            
             $parent_hashed = password_hash($parent_password, PASSWORD_DEFAULT);
-            $up_parent = $conn->prepare("UPDATE parent_account SET password = ? WHERE child_id = ?");
+            $up_parent = $conn->prepare("UPDATE parent_account SET password = ?, must_change_password = 1 WHERE child_id = ?");
             $up_parent->bind_param("ss", $parent_hashed, $student_id);
             $up_parent->execute();
             $up_parent->close();
@@ -423,6 +449,43 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin
 input[type=number] { -moz-appearance: textfield; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Password fields - always disabled and not editable */
+#studentPasswordField, #parentPasswordField {
+    pointer-events: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    cursor: not-allowed !important;
+    background-color: #f9fafb !important;
+}
+
+/* Inline validation error styles (HR-style) */
+.field-error {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2 !important;
+    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.12) !important;
+}
+.error-text {
+    color: #dc2626;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+/* Reset Password Button styles (both student and parent) */
+#resetPasswordBtn:not([disabled]), #resetParentPasswordBtn:not([disabled]) {
+    background-color: #eab308 !important;
+    cursor: pointer !important;
+}
+#resetPasswordBtn:not([disabled]):hover, #resetParentPasswordBtn:not([disabled]):hover {
+    background-color: #ca8a04 !important;
+}
+#resetPasswordBtn[disabled], #resetParentPasswordBtn[disabled] {
+    background-color: #9ca3af !important;
+    cursor: not-allowed !important;
+}
 </style>
 </head>
 <body class="bg-gradient-to-br from-[#f3f6fb] to-[#e6ecf7] font-sans min-h-screen text-gray-900">
@@ -825,8 +888,13 @@ input[type=number] { -moz-appearance: textfield; }
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password</label>
-                            <input type="text" name="parent_password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                            <small class="text-gray-500">Leave blank to keep current password</small>
+                            <div class="flex gap-2">
+                                <input type="text" name="parent_password" id="parentPasswordField" placeholder="Click Reset Password button to generate" readonly disabled class="flex-1 border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed" style="pointer-events: none;">
+                                <button type="button" id="resetParentPasswordBtn" onclick="resetParentPassword()" disabled class="px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed">
+                                    Reset Password
+                                </button>
+                            </div>
+                            <small class="text-gray-500">Leave blank to keep current password. Click "Reset Password" to generate a new temporary password.</small>
                         </div>
                     </div>
                 </div>
@@ -851,8 +919,13 @@ input[type=number] { -moz-appearance: textfield; }
                         <!-- Password -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password</label>
-                            <input type="text" name="password" placeholder="Enter new password" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field">
-                            <small class="text-gray-500">Leave blank to keep current password</small>
+                            <div class="flex gap-2">
+                                <input type="text" name="password" id="studentPasswordField" placeholder="Click Reset Password button to generate" readonly disabled class="flex-1 border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed" style="pointer-events: none;">
+                                <button type="button" id="resetPasswordBtn" onclick="resetStudentPassword()" disabled class="px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed">
+                                    Reset Password
+                                </button>
+                            </div>
+                            <small class="text-gray-500">Leave blank to keep current password. Click "Reset Password" to generate a new temporary password.</small>
                         </div>
                      </div>
 
@@ -879,6 +952,105 @@ input[type=number] { -moz-appearance: textfield; }
 </div>
 
 <script>
+// Close password modal
+function closePasswordModal() {
+    document.getElementById('passwordResetModal').classList.add('hidden');
+}
+
+// Reset student password function
+function resetStudentPassword() {
+    const passwordField = document.getElementById('studentPasswordField');
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const dobMonthField = document.querySelector('select[name="dob_month"]');
+    const dobDayField = document.querySelector('select[name="dob_day"]');
+    const dobYearField = document.querySelector('select[name="dob_year"]');
+    
+    if (!passwordField || !lastNameField || !dobMonthField || !dobDayField || !dobYearField) {
+        alert('Error: Required fields not found. Please ensure last name and date of birth are filled.');
+        return;
+    }
+    
+    // Get values
+    const lastName = (lastNameField.value || '').toLowerCase().replace(/[^a-z]/g, '');
+    const month = dobMonthField.value;
+    const day = dobDayField.value;
+    const year = dobYearField.value;
+    
+    // Validate all fields are filled
+    if (!lastName || !month || !day || !year) {
+        alert('Error: Last name and complete date of birth are required to generate password.');
+        return;
+    }
+    
+    // Format: lastname + monthname + daydigits + yeardigits (e.g., dsasadoctober182004)
+    const monthNames = ['', 'january', 'february', 'march', 'april', 'may', 'june', 
+                        'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthName = monthNames[parseInt(month)] || '';
+    const dayFormatted = String(day).padStart(2, '0');
+    const yearFormatted = String(year);
+    
+    const newPassword = lastName + monthName + dayFormatted + yearFormatted;
+    
+    // Enable field and set value (keep it enabled so it submits with the form)
+    passwordField.disabled = false;
+    passwordField.removeAttribute('disabled');
+    passwordField.value = newPassword;
+    // Keep readonly and pointer-events:none for visual purposes, but NOT disabled
+    passwordField.readOnly = true;
+    passwordField.style.pointerEvents = 'none';
+    
+    // Show custom modal instead of alert
+    document.getElementById('generatedPassword').textContent = newPassword;
+    document.getElementById('passwordResetModal').classList.remove('hidden');
+}
+
+// Reset parent password function (same logic as student)
+function resetParentPassword() {
+    const passwordField = document.getElementById('parentPasswordField');
+    const lastNameField = document.querySelector('input[name="last_name"]');
+    const dobMonthField = document.querySelector('select[name="dob_month"]');
+    const dobDayField = document.querySelector('select[name="dob_day"]');
+    const dobYearField = document.querySelector('select[name="dob_year"]');
+    
+    if (!passwordField || !lastNameField || !dobMonthField || !dobDayField || !dobYearField) {
+        alert('Error: Required fields not found. Please ensure last name and date of birth are filled.');
+        return;
+    }
+    
+    // Get values
+    const lastName = (lastNameField.value || '').toLowerCase().replace(/[^a-z]/g, '');
+    const month = dobMonthField.value;
+    const day = dobDayField.value;
+    const year = dobYearField.value;
+    
+    // Validate all fields are filled
+    if (!lastName || !month || !day || !year) {
+        alert('Error: Last name and complete date of birth are required to generate password.');
+        return;
+    }
+    
+    // Format: lastname + monthname + daydigits + yeardigits (e.g., lanceoctober162004)
+    const monthNames = ['', 'january', 'february', 'march', 'april', 'may', 'june', 
+                        'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthName = monthNames[parseInt(month)] || '';
+    const dayFormatted = String(day).padStart(2, '0');
+    const yearFormatted = String(year);
+    
+    const newPassword = lastName + monthName + dayFormatted + yearFormatted;
+    
+    // Enable field and set value (keep it enabled so it submits with the form)
+    passwordField.disabled = false;
+    passwordField.removeAttribute('disabled');
+    passwordField.value = newPassword;
+    // Keep readonly and pointer-events:none for visual purposes, but NOT disabled
+    passwordField.readOnly = true;
+    passwordField.style.pointerEvents = 'none';
+    
+    // Show custom modal instead of alert
+    document.getElementById('generatedPassword').textContent = newPassword;
+    document.getElementById('passwordResetModal').classList.remove('hidden');
+}
+
 // Grade level options mapping
 const gradeOptions = {
     "Elementary": ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
@@ -934,7 +1106,7 @@ function captureOriginal() {
     const fields = document.querySelectorAll('.student-field');
     fields.forEach(f => {
         if (f.dataset.origCaptured === '1') return;
-        if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+        if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date','tel'].includes(f.type)) {
             f.dataset.originalValue = f.value;
         } else if (f.type === 'radio' || f.type === 'checkbox') {
             f.dataset.originalChecked = f.checked ? '1' : '0';
@@ -947,7 +1119,7 @@ function captureOriginal() {
 function restoreOriginal() {
     const fields = document.querySelectorAll('.student-field');
     fields.forEach(f => {
-        if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+        if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date','tel'].includes(f.type)) {
             if (f.dataset.originalValue !== undefined) f.value = f.dataset.originalValue;
         } else if (f.type === 'radio' || f.type === 'checkbox') {
             if (f.dataset.originalChecked !== undefined) f.checked = (f.dataset.originalChecked === '1');
@@ -968,6 +1140,7 @@ function toggleEdit() {
     const editBtn = document.getElementById('editBtn');
     const saveBtn = document.getElementById('saveBtn');
     const delBtn = document.getElementById('deleteBtn');
+    const resetPasswordBtn = document.getElementById('resetPasswordBtn');
     const fields = document.querySelectorAll('.student-field');
     
     const isEditing = editBtn.textContent === 'Cancel';
@@ -981,9 +1154,50 @@ function toggleEdit() {
         saveBtn.classList.add('hidden');
         if (delBtn) delBtn.classList.remove('hidden');
         
+        // Disable reset password buttons
+        const passwordField = document.getElementById('studentPasswordField');
+        const parentPasswordField = document.getElementById('parentPasswordField');
+        const resetParentPasswordBtn = document.getElementById('resetParentPasswordBtn');
+        
+        if (resetPasswordBtn) {
+            resetPasswordBtn.disabled = true;
+            resetPasswordBtn.setAttribute('disabled', 'disabled');
+            resetPasswordBtn.className = 'px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed';
+            console.log('Reset button disabled');
+        }
+        
+        if (resetParentPasswordBtn) {
+            resetParentPasswordBtn.disabled = true;
+            resetParentPasswordBtn.setAttribute('disabled', 'disabled');
+            resetParentPasswordBtn.className = 'px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed';
+        }
+        
+        // Keep password fields ALWAYS disabled
+        if (passwordField) {
+            passwordField.readOnly = true;
+            passwordField.disabled = true;
+            passwordField.setAttribute('readonly', 'readonly');
+            passwordField.setAttribute('disabled', 'disabled');
+            passwordField.style.pointerEvents = 'none';
+            passwordField.classList.add('bg-gray-50');
+            passwordField.classList.remove('bg-white');
+            passwordField.value = ''; // Clear password field on cancel
+        }
+        
+        if (parentPasswordField) {
+            parentPasswordField.readOnly = true;
+            parentPasswordField.disabled = true;
+            parentPasswordField.setAttribute('readonly', 'readonly');
+            parentPasswordField.setAttribute('disabled', 'disabled');
+            parentPasswordField.style.pointerEvents = 'none';
+            parentPasswordField.classList.add('bg-gray-50');
+            parentPasswordField.classList.remove('bg-white');
+            parentPasswordField.value = ''; // Clear password field on cancel
+        }
+        
         // Make fields readonly
         fields.forEach(field => {
-            if (field.type === 'text' || field.type === 'number' || field.type === 'date' || field.tagName === 'TEXTAREA') {
+            if (field.type === 'text' || field.type === 'tel' || field.type === 'number' || field.type === 'date' || field.tagName === 'TEXTAREA') {
                 field.readOnly = true;
                 field.classList.add('bg-gray-50');
                 field.classList.remove('bg-white');
@@ -999,6 +1213,55 @@ function toggleEdit() {
         captureOriginal();
         saveBtn.classList.remove('hidden');
         if (delBtn) delBtn.classList.add('hidden');
+        
+        // Enable reset password buttons
+        const passwordField = document.getElementById('studentPasswordField');
+        const parentPasswordField = document.getElementById('parentPasswordField');
+        const resetParentPasswordBtn = document.getElementById('resetParentPasswordBtn');
+        
+        if (resetPasswordBtn) {
+            console.log('Enabling reset button...');
+            resetPasswordBtn.disabled = false;
+            resetPasswordBtn.removeAttribute('disabled');
+            resetPasswordBtn.className = 'px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors cursor-pointer';
+            resetPasswordBtn.style.backgroundColor = '#eab308';
+            resetPasswordBtn.style.cursor = 'pointer';
+            console.log('Reset button enabled - disabled:', resetPasswordBtn.disabled);
+            console.log('Reset button classes:', resetPasswordBtn.className);
+        } else {
+            console.error('Reset button not found!');
+        }
+        
+        if (resetParentPasswordBtn) {
+            resetParentPasswordBtn.disabled = false;
+            resetParentPasswordBtn.removeAttribute('disabled');
+            resetParentPasswordBtn.className = 'px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors cursor-pointer';
+            resetParentPasswordBtn.style.backgroundColor = '#eab308';
+            resetParentPasswordBtn.style.cursor = 'pointer';
+        }
+        
+        // Keep password fields ALWAYS disabled and readonly (only Reset button should fill them)
+        if (passwordField) {
+            passwordField.readOnly = true;
+            passwordField.disabled = true;
+            passwordField.setAttribute('readonly', 'readonly');
+            passwordField.setAttribute('disabled', 'disabled');
+            passwordField.style.pointerEvents = 'none';
+            // Keep gray background to show it's not editable
+            passwordField.classList.add('bg-gray-50');
+            passwordField.classList.remove('bg-white');
+        }
+        
+        if (parentPasswordField) {
+            parentPasswordField.readOnly = true;
+            parentPasswordField.disabled = true;
+            parentPasswordField.setAttribute('readonly', 'readonly');
+            parentPasswordField.setAttribute('disabled', 'disabled');
+            parentPasswordField.style.pointerEvents = 'none';
+            // Keep gray background to show it's not editable
+            parentPasswordField.classList.add('bg-gray-50');
+            parentPasswordField.classList.remove('bg-white');
+        }
         
         // Make fields editable
         fields.forEach(field => {
@@ -1591,8 +1854,166 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Inline validation helpers (HR-style)
+function setFieldError(field, message) {
+    if (!field) return;
+    
+    // Add error class to field
+    field.classList.add('field-error');
+    field.classList.remove('border-gray-300');
+    field.classList.add('border-red-500');
+    
+    // Find or create error message element
+    const container = field.closest('div');
+    if (!container) return;
+    
+    // Remove existing error message
+    const existingError = container.querySelector('.error-text');
+    if (existingError) existingError.remove();
+    
+    // Create new error message
+    const errorMsg = document.createElement('small');
+    errorMsg.className = 'error-text text-red-600 text-xs mt-1 block';
+    errorMsg.textContent = message;
+    
+    // Insert after the field
+    if (field.nextSibling) {
+        container.insertBefore(errorMsg, field.nextSibling);
+    } else {
+        container.appendChild(errorMsg);
+    }
+}
+
+function clearFieldError(field) {
+    if (!field) return;
+    
+    // Remove error class
+    field.classList.remove('field-error', 'border-red-500');
+    field.classList.add('border-gray-300');
+    
+    // Remove error message
+    const container = field.closest('div');
+    if (container) {
+        const errorMsg = container.querySelector('.error-text');
+        if (errorMsg) errorMsg.remove();
+    }
+}
+
+// Validate required fields before saving
+function validateStudentForm() {
+    const form = document.getElementById('studentForm');
+    const requiredFields = [
+        { name: 'lrn', label: 'LRN is required' },
+        { name: 'last_name', label: 'Last Name is required' },
+        { name: 'first_name', label: 'First Name is required' },
+        { name: 'birthplace', label: 'Birthplace is required' },
+        { name: 'religion', label: 'Religion is required' },
+        { name: 'address', label: 'Complete Address is required' },
+        { name: 'father_first_name', label: "Father's First Name is required" },
+        { name: 'father_last_name', label: "Father's Last Name is required" },
+        { name: 'father_occupation', label: "Father's Occupation is required" },
+        { name: 'father_contact', label: "Father's Contact is required" },
+        { name: 'mother_first_name', label: "Mother's First Name is required" },
+        { name: 'mother_last_name', label: "Mother's Last Name is required" },
+        { name: 'mother_occupation', label: "Mother's Occupation is required" },
+        { name: 'mother_contact', label: "Mother's Contact is required" },
+        { name: 'guardian_first_name', label: "Guardian's First Name is required" },
+        { name: 'guardian_last_name', label: "Guardian's Last Name is required" },
+        { name: 'guardian_occupation', label: "Guardian's Occupation is required" },
+        { name: 'guardian_contact', label: "Guardian's Contact is required" },
+        { name: 'last_school', label: 'Last School is required' },
+        { name: 'last_school_year', label: 'Last School Year is required' }
+    ];
+    
+    let isValid = true;
+    let firstErrorField = null;
+    
+    // Clear all previous errors
+    form.querySelectorAll('.field-error').forEach(field => clearFieldError(field));
+    form.querySelectorAll('.error-text').forEach(msg => msg.remove());
+    
+    // Validate each required field
+    requiredFields.forEach(field => {
+        const input = form.querySelector(`[name="${field.name}"]`);
+        if (input) {
+            const value = input.value.trim();
+            if (!value) {
+                setFieldError(input, field.label);
+                isValid = false;
+                if (!firstErrorField) firstErrorField = input;
+            }
+        }
+    });
+    
+    // Validate contact number format (must be exactly 11 digits)
+    const contactFields = [
+        { name: 'father_contact', label: "Father's Contact" },
+        { name: 'mother_contact', label: "Mother's Contact" },
+        { name: 'guardian_contact', label: "Guardian's Contact" }
+    ];
+    
+    contactFields.forEach(field => {
+        const input = form.querySelector(`[name="${field.name}"]`);
+        if (input && input.value.trim()) {
+            const value = input.value.trim();
+            if (!/^[0-9]{11}$/.test(value)) {
+                setFieldError(input, `${field.label} must be exactly 11 digits`);
+                isValid = false;
+                if (!firstErrorField) firstErrorField = input;
+            }
+        }
+    });
+    
+    // Validate complete address (minimum 20 characters and must have multiple components)
+    const addressField = form.querySelector('[name="address"]');
+    if (addressField && addressField.value.trim()) {
+        const address = addressField.value.trim();
+        
+        // Check minimum length
+        if (address.length < 20) {
+            setFieldError(addressField, 'Complete address must be at least 20 characters long');
+            isValid = false;
+            if (!firstErrorField) firstErrorField = addressField;
+        } else {
+            // Check if address has multiple components (street, barangay, city, province)
+            const components = address.split(/[,\s]+/).filter(part => part.length > 0);
+            if (components.length < 4) {
+                setFieldError(addressField, 'Complete address must include street, barangay, city/municipality, and province');
+                isValid = false;
+                if (!firstErrorField) firstErrorField = addressField;
+            }
+        }
+    }
+    
+    // Check gender selection
+    const genderSelected = form.querySelector('input[name="gender"]:checked');
+    if (!genderSelected) {
+        const genderContainer = form.querySelector('input[name="gender"]')?.closest('div');
+        if (genderContainer) {
+            const errorMsg = document.createElement('small');
+            errorMsg.className = 'error-text text-red-600 text-xs mt-1 block';
+            errorMsg.textContent = 'Gender is required';
+            genderContainer.appendChild(errorMsg);
+            isValid = false;
+        }
+    }
+    
+    // Scroll to first error
+    if (!isValid && firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstErrorField.focus();
+    }
+    
+    return isValid;
+}
+
 // Simple confirmation dialog
 function showSaveConfirmation() {
+    // Validate form first
+    if (!validateStudentForm()) {
+        return;
+    }
+    
     const c = document.createElement('div');
     c.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[2147483647]';
     c.innerHTML = `
@@ -1612,6 +2033,26 @@ function showSaveConfirmation() {
         document.getElementById('studentForm').submit();
     };
 }
+
+// Add event listeners to clear errors when user types
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('studentForm');
+    if (form) {
+        // Clear error when user types in any field
+        form.addEventListener('input', function(e) {
+            if (e.target.classList.contains('field-error')) {
+                clearFieldError(e.target);
+            }
+        });
+        
+        // Clear error when user changes select/radio
+        form.addEventListener('change', function(e) {
+            if (e.target.classList.contains('field-error')) {
+                clearFieldError(e.target);
+            }
+        });
+    }
+});
 
 function toggleEdit() {
     const editBtn = document.getElementById('editBtn');
@@ -1643,6 +2084,53 @@ function toggleEdit() {
     });
 }
 </script>
+
+<!-- Custom Password Reset Modal -->
+<div id="passwordResetModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index: 2147483647;">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 transform transition-all">
+        <!-- Icon and Title -->
+        <div class="flex items-center gap-3 mb-6">
+            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-800">Password Reset</h3>
+        </div>
+        
+        <!-- Password Display -->
+        <div class="mb-6">
+            <p class="text-sm font-medium text-gray-600 mb-2">Temporary Password:</p>
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
+                <p class="font-mono text-xl font-bold text-blue-700 text-center" id="generatedPassword"></p>
+            </div>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+            <div class="flex gap-2">
+                <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="text-sm text-gray-700">
+                    <p class="font-semibold mb-1">Important:</p>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>Click <strong>Save</strong> to apply this password reset</li>
+                        <li>Student must change this password on next login</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Button -->
+        <div class="flex justify-end">
+            <button onclick="closePasswordModal()" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg">
+                Got it!
+            </button>
+        </div>
+    </div>
+</div>
+
 <?php if (!$embed): ?>
 </body>
 </html>

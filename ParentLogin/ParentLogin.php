@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // Lookup parent by username
-    $stmt = $conn->prepare("SELECT parent_id, username, password, child_id FROM parent_account WHERE username = ?");
+    $stmt = $conn->prepare("SELECT parent_id, username, password, child_id, must_change_password FROM parent_account WHERE username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Verify password
         if (password_verify($password, $row['password'])) {
             $child_id = $row['child_id'];
+            $must_change_password = $row['must_change_password'] ?? 0;
 
             // Fetch child's name from student_account
             $child_stmt = $conn->prepare("SELECT CONCAT(first_name, ' ', last_name) AS full_name FROM student_account WHERE id_number = ?");
@@ -53,7 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['child_name'] = $child_name;
             $_SESSION['role'] = 'parent';
 
-            echo json_encode(['status' => 'success', 'redirect' => 'ParentDashboard.php']);
+            // Check if parent must change password
+            if ($must_change_password == 1) {
+                echo json_encode(['status' => 'success', 'redirect' => 'change_password.php']);
+            } else {
+                echo json_encode(['status' => 'success', 'redirect' => 'ParentDashboard.php']);
+            }
             exit;
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Incorrect password.']);

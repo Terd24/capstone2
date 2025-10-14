@@ -528,7 +528,7 @@ function setupStudentModalHandlers(studentId) {
         const fields = root.querySelectorAll('.student-field');
         fields.forEach(f => {
             if (f.dataset.origCaptured === '1') return;
-            if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+            if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','tel','number','date'].includes(f.type)) {
                 f.dataset.originalValue = f.value;
             } else if (f.type === 'radio' || f.type === 'checkbox') {
                 f.dataset.originalChecked = f.checked ? '1' : '0';
@@ -539,7 +539,7 @@ function setupStudentModalHandlers(studentId) {
     function restoreOriginalLocal() {
         const fields = root.querySelectorAll('.student-field');
         fields.forEach(f => {
-            if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','number','date'].includes(f.type)) {
+            if (f.tagName === 'SELECT' || f.tagName === 'TEXTAREA' || ['text','tel','number','date'].includes(f.type)) {
                 if (f.dataset.originalValue !== undefined) f.value = f.dataset.originalValue;
             } else if (f.type === 'radio' || f.type === 'checkbox') {
                 if (f.dataset.originalChecked !== undefined) f.checked = (f.dataset.originalChecked === '1');
@@ -552,6 +552,10 @@ function setupStudentModalHandlers(studentId) {
         if (!editBtn || !saveBtn) return;
         const fields = root.querySelectorAll('.student-field');
         const delBtn = root.querySelector('#deleteBtn');
+        const resetPasswordBtn = root.querySelector('#resetPasswordBtn');
+        const resetParentPasswordBtn = root.querySelector('#resetParentPasswordBtn');
+        const passwordField = root.querySelector('#studentPasswordField');
+        const parentPasswordField = root.querySelector('#parentPasswordField');
         const isCancel = editBtn.textContent.trim() === 'Cancel';
         if (isCancel) {
             editBtn.textContent = 'Edit';
@@ -560,8 +564,31 @@ function setupStudentModalHandlers(studentId) {
             // Revert any unsaved changes
             restoreOriginalLocal();
             if (delBtn) delBtn.classList.remove('hidden');
+            
+            // Disable reset password buttons
+            if (resetPasswordBtn) {
+                resetPasswordBtn.disabled = true;
+                resetPasswordBtn.className = 'px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed';
+            }
+            if (resetParentPasswordBtn) {
+                resetParentPasswordBtn.disabled = true;
+                resetParentPasswordBtn.className = 'px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed';
+            }
+            
+            // Keep password fields disabled
+            if (passwordField) {
+                passwordField.readOnly = true;
+                passwordField.disabled = true;
+                passwordField.value = '';
+            }
+            if (parentPasswordField) {
+                parentPasswordField.readOnly = true;
+                parentPasswordField.disabled = true;
+                parentPasswordField.value = '';
+            }
+            
             fields.forEach(field => {
-                if (['TEXTAREA'].includes(field.tagName) || ['text','number','date'].includes(field.type)) {
+                if (['TEXTAREA'].includes(field.tagName) || ['text','tel','number','date'].includes(field.type)) {
                     field.readOnly = true; field.classList.add('bg-gray-50'); field.classList.remove('bg-white');
                 } else if (['radio','checkbox'].includes(field.type) || field.tagName === 'SELECT') {
                     field.disabled = true;
@@ -574,8 +601,36 @@ function setupStudentModalHandlers(studentId) {
             // Snapshot current values once when entering edit mode
             captureOriginalLocal();
             if (delBtn) delBtn.classList.add('hidden');
+            
+            // Enable reset password buttons
+            if (resetPasswordBtn) {
+                resetPasswordBtn.disabled = false;
+                resetPasswordBtn.className = 'px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors cursor-pointer';
+                console.log('Student reset button enabled in AccountList');
+            }
+            if (resetParentPasswordBtn) {
+                resetParentPasswordBtn.disabled = false;
+                resetParentPasswordBtn.className = 'px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors cursor-pointer';
+                console.log('Parent reset button enabled in AccountList');
+            }
+            
+            // Keep password fields disabled (only reset buttons can fill them)
+            if (passwordField) {
+                passwordField.readOnly = true;
+                passwordField.disabled = true;
+            }
+            if (parentPasswordField) {
+                parentPasswordField.readOnly = true;
+                parentPasswordField.disabled = true;
+            }
+            
             fields.forEach(field => {
-                if (['TEXTAREA'].includes(field.tagName) || ['text','number','date'].includes(field.type)) {
+                // Skip password fields - they should always stay disabled
+                if (field.name === 'password' || field.name === 'parent_password' || field.name === 'username' || field.name === 'parent_username') {
+                    return;
+                }
+                
+                if (['TEXTAREA'].includes(field.tagName) || ['text','tel','number','date'].includes(field.type)) {
                     field.readOnly = false; field.classList.remove('bg-gray-50'); field.classList.add('bg-white');
                 } else if (['radio','checkbox'].includes(field.type) || field.tagName === 'SELECT') {
                     field.disabled = false;
@@ -1293,15 +1348,31 @@ function initRegistrarInlineValidation() {
 
     // Bind once per open
     if (!form.__validatorBound) {
-        form.addEventListener('submit', function(e){ if (!validate()) { e.preventDefault(); const firstErr = form.querySelector('.field-error'); if (firstErr) firstErr.scrollIntoView({behavior:'smooth', block:'center'}); }});
+        form.addEventListener('submit', function(e){ 
+            if (!validate()) { 
+                e.preventDefault(); 
+                const firstErr = form.querySelector('.field-error'); 
+                if (firstErr) firstErr.scrollIntoView({behavior:'smooth', block:'center'}); 
+            }
+        });
         form.addEventListener('input', (e) => clearError(e.target));
         form.addEventListener('change', (e) => clearError(e.target));
         form.__validatorBound = true;
     }
 
-    // If server rendered error box, show inline highlights too
+    // Don't run validation automatically - only on submit
+    // If server rendered error box, show inline highlights too (but only if there are actual server errors)
     const hasServerErrors = !!document.querySelector('#addAccountModal .bg-red-100');
-    if (hasServerErrors) setTimeout(validate, 0);
+    if (hasServerErrors) {
+        // Only show errors for fields that have server-side errors, not all fields
+        setTimeout(() => {
+            const errorBox = document.querySelector('#addAccountModal .bg-red-100');
+            if (errorBox) {
+                // Server errors exist, but don't validate all fields - user needs to submit first
+                console.log('Server errors detected, but waiting for user to submit');
+            }
+        }, 0);
+    }
 }
 
 // Enforce Kinder + Kinder 2 grade levels for Pre-Elementary/Kinder
@@ -1354,6 +1425,27 @@ function openAddAccountModal() {
     if (typeof openModal === 'function') {
         openModal();
     }
+    
+    // Clear any existing error messages from previous submissions
+    setTimeout(() => {
+        const modal = document.getElementById('addAccountModal');
+        if (modal) {
+            // Remove server-side error boxes
+            const errorBoxes = modal.querySelectorAll('.bg-red-100, .bg-red-50');
+            errorBoxes.forEach(box => box.remove());
+            
+            // Clear inline field errors
+            const fieldErrors = modal.querySelectorAll('.field-error');
+            fieldErrors.forEach(field => {
+                field.classList.remove('field-error');
+            });
+            
+            // Remove error text messages
+            const errorTexts = modal.querySelectorAll('.error-text');
+            errorTexts.forEach(text => text.remove());
+        }
+    }, 10);
+    
     // Populate years after modal exists
     setTimeout(setupSchoolYearOptions, 50);
     setTimeout(setupSchoolYearOptions, 200);
