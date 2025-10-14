@@ -75,75 +75,89 @@ require_once 'includes/dashboard_data.php';
 </head>
 <body class="min-h-screen bg-gray-50 flex">
     <!-- Sidebar -->
-    <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#0B2C62] to-[#153e86] text-white transform -translate-x-full transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0">
-        <div class="flex items-center justify-between h-16 px-6 border-b border-white/10">
-            <div class="flex items-center gap-3">
-                <img src="../images/LogoCCI.png" class="h-8 w-8 rounded-full bg-white p-1" alt="Logo">
-                <div class="leading-tight">
-                    <div class="font-bold text-sm">Cornerstone College</div>
-                    <div class="text-xs text-blue-200">Super Admin</div>
+    <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#0B2C62] to-[#153e86] text-white transform -translate-x-full transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto flex flex-col">
+        <!-- Header with Logo -->
+        <div class="flex items-center gap-3 h-16 px-6 border-b border-white/10 flex-shrink-0">
+            <img src="../images/LogoCCI.png" class="h-8 w-8 rounded-full bg-white p-1" alt="Logo">
+            <div class="leading-tight">
+                <div class="font-bold text-sm">Cornerstone College</div>
+                <div class="text-xs text-blue-200">Super Admin</div>
+            </div>
+        </div>
+        
+        <!-- User Profile Section -->
+        <div class="border-b border-white/10 p-4 flex-shrink-0">
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-sm font-semibold"><?= substr($_SESSION['superadmin_name'] ?? 'IT', 0, 2) ?></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['superadmin_name'] ?? 'IT Personnel') ?></div>
+                    <div class="text-xs text-blue-200">Super Administrator</div>
                 </div>
             </div>
         </div>
         
-        <nav class="mt-8 px-4">
-            <div class="space-y-2">
+        <!-- Navigation - Flex grow to fill space -->
+        <nav class="flex-1 px-4 py-6">
+            <div class="space-y-1">
                 <!-- Dashboard -->
-                <a href="#dashboard" onclick="showSection('dashboard', event)" class="nav-item active flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                <a href="#dashboard" onclick="showSection('dashboard', event)" class="nav-item active flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
                     </svg>
                     <span>Dashboard</span>
                 </a>
                 
-                <!-- Management Tools -->
-                <div class="pt-4">
-                    <div class="text-xs font-semibold text-blue-200 uppercase tracking-wider px-4 mb-2">Management</div>
-                    <a href="#hr-accounts" onclick="showSection('hr-accounts', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                        </svg>
-                        <span>HR Accounts</span>
-                    </a>
-                    <a href="#system-maintenance" onclick="showSection('system-maintenance', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                        <span>System Maintenance</span>
-                    </a>
-                    <a href="#deleted-items" onclick="showSection('deleted-items', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                        <span>Deleted Items</span>
-                    </a>
-                    
-                    <!-- User Info & Logout -->
-                    <div class="mt-6 pt-4 border-t border-white/10">
-                        <div class="flex items-center gap-3 mb-3 px-4">
-                            <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                                <span class="text-sm font-semibold"><?= substr($_SESSION['superadmin_name'] ?? 'IT', 0, 2) ?></span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['superadmin_name'] ?? 'IT Personnel') ?></div>
-                                <div class="text-xs text-blue-200">Super Administrator</div>
-                            </div>
-                        </div>
-                        <a href="../StudentLogin/logout.php" class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 rounded-lg transition mx-4">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                            </svg>
-                            Logout
-                        </a>
-                    </div>
+                <!-- Management Section -->
+                <div class="pt-6 pb-2">
+                    <div class="text-xs font-semibold text-blue-200 uppercase tracking-wider px-4">Management</div>
                 </div>
+                
+                <a href="#hr-accounts" onclick="showSection('hr-accounts', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    <span>HR Accounts</span>
+                </a>
+                
+                <a href="#system-maintenance" onclick="showSection('system-maintenance', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span>System Maintenance</span>
+                </a>
+                
+                <a href="#deleted-items" onclick="showSection('deleted-items', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    <span>Deleted Items</span>
+                </a>
+                
+                <a href="#view-archives" onclick="showSection('view-archives', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                    </svg>
+                    <span>View Archives</span>
+                </a>
             </div>
         </nav>
+        
+        <!-- Logout Button - Fixed at bottom -->
+        <div class="border-t border-white/10 p-4 flex-shrink-0">
+            <a href="../StudentLogin/logout.php" class="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm bg-white/10 hover:bg-white/20 rounded-lg transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                <span>Logout</span>
+            </a>
+        </div>
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 lg:ml-0">
+    <div class="flex-1 lg:ml-64">
         <!-- Top Header -->
         <header class="bg-white shadow-sm border-b border-gray-200">
             <div class="flex items-center justify-between px-6 py-4">
@@ -1020,7 +1034,7 @@ require_once 'includes/dashboard_data.php';
                             </div>
                             <div>
                                 <div class="text-white/80 text-sm font-medium">Deleted Students</div>
-                                <div class="text-4xl font-bold text-white"><?= count($deleted_students) ?></div>
+                                <div class="text-4xl font-bold text-white" id="deleted-students-count"><?= count($deleted_students) ?></div>
                             </div>
                         </div>
                     </div>
@@ -1035,7 +1049,7 @@ require_once 'includes/dashboard_data.php';
                             </div>
                             <div>
                                 <div class="text-white/80 text-sm font-medium">Deleted Employees</div>
-                                <div class="text-4xl font-bold text-white"><?= count($deleted_employees) ?></div>
+                                <div class="text-4xl font-bold text-white" id="deleted-employees-count"><?= count($deleted_employees) ?></div>
                             </div>
                         </div>
                     </div>
@@ -1046,7 +1060,7 @@ require_once 'includes/dashboard_data.php';
                     <div class="px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                            <h3 class="text-lg font-bold text-gray-900">Deleted Students (<?= count($deleted_students) ?>)</h3>
+                            <h3 class="text-lg font-bold text-gray-900">Deleted Students (<span id="deleted-students-table-count"><?= count($deleted_students) ?></span>)</h3>
                         </div>
                     </div>
                     
@@ -1063,7 +1077,7 @@ require_once 'includes/dashboard_data.php';
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <?php if (count($deleted_students) > 0): ?>
                                     <?php foreach ($deleted_students as $student): ?>
-                                    <tr class="hover:bg-gray-50" data-student-id="<?= htmlspecialchars($student['id_number']) ?>">
+                                    <tr class="hover:bg-gray-50" data-student-id="<?= $student['id'] ?>" data-student-id-number="<?= htmlspecialchars($student['id_number']) ?>">
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
@@ -1092,13 +1106,19 @@ require_once 'includes/dashboard_data.php';
                                                 <?php endif; ?>
                                             </div>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <td class="px-6 py-4 text-sm font-medium">
                                             <div class="flex gap-2">
-                                                <button onclick="restoreStudent('<?= htmlspecialchars($student['id_number']) ?>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                <button onclick="restoreStudent(<?= $student['id'] ?>)" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                    </svg>
                                                     Restore
                                                 </button>
-                                                <button onclick="exportToFile('<?= htmlspecialchars($student['id_number']) ?>', 'student')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                    Export to File
+                                                <button onclick="archiveStudent(<?= $student['id'] ?>)" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                                    </svg>
+                                                    Archive
                                                 </button>
                                             </div>
                                         </td>
@@ -1139,7 +1159,7 @@ require_once 'includes/dashboard_data.php';
                     <div class="px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                            <h3 class="text-lg font-bold text-gray-900">Deleted Employees (<?= count($deleted_employees) ?>)</h3>
+                            <h3 class="text-lg font-bold text-gray-900">Deleted Employees (<span id="deleted-employees-table-count"><?= count($deleted_employees) ?></span>)</h3>
                         </div>
                     </div>
                     
@@ -1156,7 +1176,7 @@ require_once 'includes/dashboard_data.php';
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <?php if (count($deleted_employees) > 0): ?>
                                     <?php foreach ($deleted_employees as $employee): ?>
-                                    <tr class="hover:bg-gray-50" data-employee-id="<?= htmlspecialchars($employee['id_number']) ?>">
+                                    <tr class="hover:bg-gray-50" data-employee-id="<?= $employee['id'] ?>" data-employee-id-number="<?= htmlspecialchars($employee['id_number']) ?>">
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -1185,13 +1205,19 @@ require_once 'includes/dashboard_data.php';
                                                 <?php endif; ?>
                                             </div>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <td class="px-6 py-4 text-sm font-medium">
                                             <div class="flex gap-2">
-                                                <button onclick="restoreEmployee('<?= htmlspecialchars($employee['id_number']) ?>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                                                <button onclick="restoreEmployee(<?= $employee['id'] ?>)" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                    </svg>
                                                     Restore
                                                 </button>
-                                                <button onclick="exportToFile('<?= htmlspecialchars($employee['id_number']) ?>', 'employee')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition-colors">
-                                                    Export to File
+                                                <button onclick="archiveEmployee(<?= $employee['id'] ?>)" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                                    </svg>
+                                                    Archive
                                                 </button>
                                             </div>
                                         </td>
@@ -1221,6 +1247,115 @@ require_once 'includes/dashboard_data.php';
                                 Previous
                             </button>
                             <button id="employees-next" onclick="changeEmployeesPage(1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View Archives Section -->
+            <div id="view-archives-section" class="section hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">📦 Archived Records</h2>
+                    <p class="text-gray-600">View permanently archived student and employee records</p>
+                </div>
+
+                <!-- Archive Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl shadow-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-purple-100 text-sm font-medium">Archived Students</p>
+                                <p class="text-4xl font-bold text-white" id="archived-students-count">-</p>
+                            </div>
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <button onclick="loadArchives('students')" class="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                            View Students
+                        </button>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-indigo-100 text-sm font-medium">Archived Employees</p>
+                                <p class="text-4xl font-bold text-white" id="archived-employees-count">-</p>
+                            </div>
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <button onclick="loadArchives('employees')" class="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                            View Employees
+                        </button>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-gray-700 to-gray-800 text-white rounded-2xl shadow-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-gray-300 text-sm font-medium">Total Archived</p>
+                                <p class="text-4xl font-bold text-white" id="total-archived-count">-</p>
+                            </div>
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-gray-300 text-sm">
+                            Permanent storage
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Archive Viewer -->
+                <div id="archive-viewer" class="bg-white rounded-2xl shadow-lg hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900" id="archive-title">Archived Records</h3>
+                            <p class="text-sm text-gray-500" id="archive-subtitle">Viewing archived records</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="text" id="archive-search" placeholder="Search..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <button onclick="searchArchives()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+                                Search
+                            </button>
+                            <button onclick="closeArchiveViewer()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead class="bg-gray-50">
+                                <tr id="archive-table-header">
+                                    <!-- Dynamic headers -->
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="archive-table-body">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                        <div class="text-sm text-gray-700">
+                            Showing <span id="archive-start">0</span> to <span id="archive-end">0</span> of <span id="archive-total">0</span> records
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="changeArchivePage(-1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" id="archive-prev">
+                                Previous
+                            </button>
+                            <button onclick="changeArchivePage(1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" id="archive-next">
                                 Next
                             </button>
                         </div>
@@ -2869,7 +3004,7 @@ function restoreStudent(studentId) {
                         title: 'Student Restored',
                         message: data.message,
                         details: [
-                            `Student ID: ${studentId}`,
+                            `Student ID: ${data.student_id || studentId}`,
                             'Record is now active',
                             'Visible in Registrar system'
                         ],
@@ -2914,18 +3049,10 @@ function restoreStudent(studentId) {
                                     const remainingRows = tbody.querySelectorAll('tr[data-student-id]');
                                     if (remainingRows.length === 0) {
                                         tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500"><svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg><p>No deleted students found</p></td></tr>';
-                                        
-                                        // Automatically scroll to show Deleted Employees section
-                                        setTimeout(() => {
-                                            const deletedEmployeesSection = document.getElementById('deleted-employees-section');
-                                            if (deletedEmployeesSection) {
-                                                deletedEmployeesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                            }
-                                        }, 400);
-                                    } else {
-                                        // Update pagination after removing item
-                                        updateStudentsPagination();
                                     }
+                                    
+                                    // Update pagination after removing item
+                                    updateStudentsPagination();
                                 }, 300);
                             }
                         }
@@ -2979,12 +3106,15 @@ function restoreEmployee(employeeId) {
                         title: 'Employee Restored',
                         message: data.message,
                         details: [
-                            `Employee ID: ${employeeId}`,
+                            `Employee ID: ${data.employee_id || employeeId}`,
                             'Record is now active',
                             'Visible in HR system'
                         ],
                         type: 'success',
                         onClose: () => {
+                            // Save current scroll position before making changes
+                            const scrollPosition = window.scrollY || window.pageYOffset;
+                            
                             // Remove the restored employee from the list smoothly (no page reload)
                             const employeeRow = document.querySelector(`tr[data-employee-id="${employeeId}"]`);
                             if (employeeRow) {
@@ -3030,6 +3160,9 @@ function restoreEmployee(employeeId) {
                                             updateEmployeesPagination();
                                         }
                                     }
+                                    
+                                    // Restore scroll position to prevent unwanted scrolling
+                                    window.scrollTo(0, scrollPosition);
                                 }, 300);
                             }
                         }
@@ -3053,6 +3186,141 @@ function restoreEmployee(employeeId) {
         }
     });
 }
+
+// Archive Functions
+function archiveStudent(studentId) {
+    showConfirmationModal({
+        title: 'Archive Student Record',
+        message: 'Are you sure you want to archive this student record?',
+        details: [
+            'Student will be moved to permanent archive',
+            'Record will be removed from deleted items',
+            'This action preserves the data permanently',
+            'Cannot be restored once archived'
+        ],
+        confirmText: 'Archive',
+        cancelText: 'Cancel',
+        type: 'warning',
+        onConfirm: () => {
+            fetch('archive_record.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'archive',
+                    record_type: 'student',
+                    record_id: studentId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotificationModal({
+                        title: 'Student Archived',
+                        message: data.message,
+                        details: [
+                            `Student ID: ${data.student_id}`,
+                            'Moved to permanent archive',
+                            'Data preserved for records'
+                        ],
+                        type: 'success',
+                        onClose: () => {
+                            // Remove the archived student from the list
+                            const row = document.querySelector(`tr[data-student-id="${studentId}"]`);
+                            if (row) {
+                                row.remove();
+                            }
+                            // Update the counts
+                            updateDeletedCounts();
+                            loadArchiveCounts();
+                        }
+                    });
+                } else {
+                    showNotificationModal({
+                        title: 'Archive Failed',
+                        message: data.message,
+                        type: 'error'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotificationModal({
+                    title: 'Error',
+                    message: 'An error occurred while archiving the record',
+                    type: 'error'
+                });
+            });
+        }
+    });
+}
+
+function archiveEmployee(employeeId) {
+    showConfirmationModal({
+        title: 'Archive Employee Record',
+        message: 'Are you sure you want to archive this employee record?',
+        details: [
+            'Employee will be moved to permanent archive',
+            'Record will be removed from deleted items',
+            'This action preserves the data permanently',
+            'Cannot be restored once archived'
+        ],
+        confirmText: 'Archive',
+        cancelText: 'Cancel',
+        type: 'warning',
+        onConfirm: () => {
+            fetch('archive_record.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'archive',
+                    record_type: 'employee',
+                    record_id: employeeId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotificationModal({
+                        title: 'Employee Archived',
+                        message: data.message,
+                        details: [
+                            `Employee ID: ${data.employee_id}`,
+                            'Moved to permanent archive',
+                            'Data preserved for records'
+                        ],
+                        type: 'success',
+                        onClose: () => {
+                            // Remove the archived employee from the list
+                            const row = document.querySelector(`tr[data-employee-id="${employeeId}"]`);
+                            if (row) {
+                                row.remove();
+                            }
+                            // Update the counts
+                            updateDeletedCounts();
+                            loadArchiveCounts();
+                        }
+                    });
+                } else {
+                    showNotificationModal({
+                        title: 'Archive Failed',
+                        message: data.message,
+                        type: 'error'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotificationModal({
+                    title: 'Error',
+                    message: 'An error occurred while archiving the record',
+                    type: 'error'
+                });
+            });
+        }
+    });
+}
+
+
 
 function deletePermanently(recordId, recordType) {
     const reason = prompt('Please provide a reason for permanent deletion:');
@@ -3374,28 +3642,46 @@ function deletePermanently(recordId, recordType) {
         let studentsPage = 1;
         let employeesTotal = 0;
         let studentsTotal = 0;
-        const itemsPerPage = 10;
+        const notLoggedInItemsPerPage = 10;
         
         async function loadNotLoggedIn(type, page = 1) {
+            console.log(`Loading ${type}, page ${page}`);
             const list = document.getElementById(`${type}-list`);
             const loading = document.getElementById(`${type}-loading`);
             const pagination = document.getElementById(`${type}-pagination`);
             
-            if (!list || !loading) {
-                console.error('Required elements not found:', {list, loading});
+            console.log('Elements found:', {list: !!list, loading: !!loading, pagination: !!pagination});
+            
+            if (!list) {
+                console.error(`List element not found: ${type}-list`);
+                return;
+            }
+            
+            if (!loading) {
+                console.error(`Loading element not found: ${type}-loading`);
                 return;
             }
             
             loading.classList.remove('hidden');
             
             try {
-                const offset = (page - 1) * itemsPerPage;
+                const offset = (page - 1) * notLoggedInItemsPerPage;
                 // Relative path - load_more_users.php is in the same directory
-                const url = `load_more_users.php?type=${type}&offset=${offset}&limit=${itemsPerPage}`;
+                const url = `load_more_users.php?type=${type}&offset=${offset}&limit=${notLoggedInItemsPerPage}`;
                 console.log('Fetching:', url);
                 
-                const response = await fetch(url);
+                // Add timeout to prevent infinite loading
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
                 console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 
                 const data = await response.json();
                 console.log('Data received:', data);
@@ -3474,7 +3760,7 @@ function deletePermanently(recordId, recordType) {
                     
                     updatePagination(type, page, total);
                     
-                    if (total > itemsPerPage) {
+                    if (total > notLoggedInItemsPerPage) {
                         pagination.classList.remove('hidden');
                     } else {
                         pagination.classList.add('hidden');
@@ -3483,8 +3769,19 @@ function deletePermanently(recordId, recordType) {
                 
             } catch (error) {
                 console.error('Error loading users:', error);
-                list.innerHTML = `<li class="text-center py-8"><p class="text-red-500 font-medium">Error loading data</p><p class="text-gray-500 text-sm mt-1">${error.message}</p></li>`;
+                const errorMessage = error.name === 'AbortError' ? 'Request timed out' : error.message;
+                list.innerHTML = `<li class="text-center py-8">
+                    <svg class="w-12 h-12 text-red-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <p class="text-red-500 font-medium">Error loading data</p>
+                    <p class="text-gray-500 text-sm mt-1">${errorMessage}</p>
+                    <button onclick="loadNotLoggedIn('${type}', ${page})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                        Retry
+                    </button>
+                </li>`;
             } finally {
+                console.log('Finally block - hiding loading spinner');
                 if (loading) {
                     loading.classList.add('hidden');
                 }
@@ -3492,8 +3789,8 @@ function deletePermanently(recordId, recordType) {
         }
         
         function updatePagination(type, page, total) {
-            const start = (page - 1) * itemsPerPage + 1;
-            const end = Math.min(page * itemsPerPage, total);
+            const start = (page - 1) * notLoggedInItemsPerPage + 1;
+            const end = Math.min(page * notLoggedInItemsPerPage, total);
             
             document.getElementById(`${type}-start`).textContent = start;
             document.getElementById(`${type}-end`).textContent = end;
@@ -3578,7 +3875,221 @@ function deletePermanently(recordId, recordType) {
             // Initialize Not Logged In sections
             loadNotLoggedIn('employees', 1);
             loadNotLoggedIn('students', 1);
+            
+            // Load archive counts on page load
+            loadArchiveCounts();
         });
+
+        // Archive Management Functions
+        let currentArchiveType = '';
+        let currentArchivePage = 1;
+        let currentArchiveSearch = '';
+        const archiveItemsPerPage = 20;
+
+        async function loadArchiveCounts() {
+            try {
+                // Get students count
+                const studentsResponse = await fetch('get_archived_records.php?type=students&limit=1&offset=0');
+                const studentsData = await studentsResponse.json();
+                document.getElementById('archived-students-count').textContent = studentsData.total || 0;
+
+                // Get employees count
+                const employeesResponse = await fetch('get_archived_records.php?type=employees&limit=1&offset=0');
+                const employeesData = await employeesResponse.json();
+                document.getElementById('archived-employees-count').textContent = employeesData.total || 0;
+
+                // Calculate total
+                const total = (studentsData.total || 0) + (employeesData.total || 0);
+                document.getElementById('total-archived-count').textContent = total;
+            } catch (error) {
+                console.error('Error loading archive counts:', error);
+            }
+        }
+
+        async function updateDeletedCounts() {
+            try {
+                // Count deleted students in the table
+                const studentRows = document.querySelectorAll('tr[data-student-id]');
+                const studentCount = studentRows.length;
+                
+                // Update deleted students count in card
+                const deletedStudentsCount = document.getElementById('deleted-students-count');
+                if (deletedStudentsCount) {
+                    deletedStudentsCount.textContent = studentCount;
+                }
+                
+                // Update deleted students count in table header
+                const deletedStudentsTableCount = document.getElementById('deleted-students-table-count');
+                if (deletedStudentsTableCount) {
+                    deletedStudentsTableCount.textContent = studentCount;
+                }
+                
+                // Count deleted employees in the table
+                const employeeRows = document.querySelectorAll('tr[data-employee-id]');
+                const employeeCount = employeeRows.length;
+                
+                // Update deleted employees count in card
+                const deletedEmployeesCount = document.getElementById('deleted-employees-count');
+                if (deletedEmployeesCount) {
+                    deletedEmployeesCount.textContent = employeeCount;
+                }
+                
+                // Update deleted employees count in table header
+                const deletedEmployeesTableCount = document.getElementById('deleted-employees-table-count');
+                if (deletedEmployeesTableCount) {
+                    deletedEmployeesTableCount.textContent = employeeCount;
+                }
+            } catch (error) {
+                console.error('Error updating deleted counts:', error);
+            }
+        }
+
+        async function loadArchives(type) {
+            currentArchiveType = type;
+            currentArchivePage = 1;
+            currentArchiveSearch = '';
+            document.getElementById('archive-search').value = '';
+            
+            const viewer = document.getElementById('archive-viewer');
+            viewer.classList.remove('hidden');
+            
+            // Update title
+            const title = type === 'students' ? 'Archived Students' : 'Archived Employees';
+            document.getElementById('archive-title').textContent = title;
+            document.getElementById('archive-subtitle').textContent = `Viewing ${type} in permanent archive`;
+            
+            // Set up table headers
+            const headerRow = document.getElementById('archive-table-header');
+            if (type === 'students') {
+                headerRow.innerHTML = `
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Info</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade/Section</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Archived Info</th>
+                `;
+            } else {
+                headerRow.innerHTML = `
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee Info</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Archived Info</th>
+                `;
+            }
+            
+            await fetchArchiveData();
+        }
+
+        async function fetchArchiveData() {
+            const tbody = document.getElementById('archive-table-body');
+            tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">Loading...</td></tr>';
+            
+            try {
+                const offset = (currentArchivePage - 1) * archiveItemsPerPage;
+                const url = `get_archived_records.php?type=${currentArchiveType}&offset=${offset}&limit=${archiveItemsPerPage}&search=${encodeURIComponent(currentArchiveSearch)}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500">${data.message || 'Error loading data'}</td></tr>`;
+                    return;
+                }
+                
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">No archived records found</td></tr>';
+                    return;
+                }
+                
+                // Render data
+                tbody.innerHTML = '';
+                data.data.forEach(record => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50';
+                    
+                    if (currentArchiveType === 'students') {
+                        const initials = (record.first_name[0] + record.last_name[0]).toUpperCase();
+                        row.innerHTML = `
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                        <span class="text-purple-600 font-medium text-sm">${initials}</span>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">${record.first_name} ${record.last_name}</div>
+                                        <div class="text-sm text-gray-500">ID: ${record.id_number || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900">${record.grade_level || 'N/A'}</div>
+                                <div class="text-sm text-gray-500">${record.section || 'N/A'}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900">${new Date(record.archived_at).toLocaleString()}</div>
+                                <div class="text-sm text-gray-500">By: ${record.archived_by}</div>
+                                ${record.deletion_reason ? `<div class="text-xs text-gray-500 mt-1">${record.deletion_reason}</div>` : ''}
+                            </td>
+                        `;
+                    } else {
+                        const initials = (record.first_name[0] + record.last_name[0]).toUpperCase();
+                        row.innerHTML = `
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                                        <span class="text-indigo-600 font-medium text-sm">${initials}</span>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">${record.first_name} ${record.last_name}</div>
+                                        <div class="text-sm text-gray-500">ID: ${record.id_number || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900">${record.position || 'N/A'}</div>
+                                <div class="text-sm text-gray-500">${record.department || 'N/A'}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900">${new Date(record.archived_at).toLocaleString()}</div>
+                                <div class="text-sm text-gray-500">By: ${record.archived_by}</div>
+                                ${record.deletion_reason ? `<div class="text-xs text-gray-500 mt-1">${record.deletion_reason}</div>` : ''}
+                            </td>
+                        `;
+                    }
+                    
+                    tbody.appendChild(row);
+                });
+                
+                // Update pagination
+                const start = offset + 1;
+                const end = Math.min(offset + archiveItemsPerPage, data.total);
+                document.getElementById('archive-start').textContent = start;
+                document.getElementById('archive-end').textContent = end;
+                document.getElementById('archive-total').textContent = data.total;
+                
+                document.getElementById('archive-prev').disabled = currentArchivePage === 1;
+                document.getElementById('archive-next').disabled = end >= data.total;
+                
+            } catch (error) {
+                console.error('Error fetching archive data:', error);
+                tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Error loading data: ${error.message}</td></tr>`;
+            }
+        }
+
+        function searchArchives() {
+            currentArchiveSearch = document.getElementById('archive-search').value;
+            currentArchivePage = 1;
+            fetchArchiveData();
+        }
+
+        function changeArchivePage(direction) {
+            currentArchivePage += direction;
+            if (currentArchivePage < 1) currentArchivePage = 1;
+            fetchArchiveData();
+        }
+
+        function closeArchiveViewer() {
+            document.getElementById('archive-viewer').classList.add('hidden');
+        }
+
+
     </script>
 </body>
 </html>

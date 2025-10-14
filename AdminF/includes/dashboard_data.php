@@ -257,7 +257,7 @@ $deleted_employees = [];
 // Get deleted students
 if (table_exists($conn, 'student_account')) {
     try {
-        $stmt = $conn->prepare("SELECT id_number, first_name, last_name, middle_name, grade_level, academic_track, deleted_at, deleted_by, deleted_reason FROM student_account WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 100");
+        $stmt = $conn->prepare("SELECT id, id_number, first_name, last_name, middle_name, grade_level, academic_track, deleted_at, deleted_by, deleted_reason FROM student_account WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 100");
         if ($stmt) {
             $stmt->execute();
             $res = $stmt->get_result();
@@ -275,7 +275,7 @@ if (table_exists($conn, 'student_account')) {
 // Get deleted employees
 if (table_exists($conn, 'employees')) {
     try {
-        $stmt = $conn->prepare("SELECT id_number, first_name, last_name, middle_name, position, department, deleted_at, deleted_by, deleted_reason FROM employees WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 100");
+        $stmt = $conn->prepare("SELECT id, id_number, first_name, last_name, middle_name, position, department, deleted_at, deleted_by, deleted_reason FROM employees WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 100");
         if ($stmt) {
             $stmt->execute();
             $res = $stmt->get_result();

@@ -8,8 +8,9 @@ if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin')
     exit;
 }
 
-$conn = new mysqli('localhost', 'root', '', 'onecci_db');
-if ($conn->connect_error) {
+require_once '../StudentLogin/db_conn.php';
+
+if (!$conn) {
     http_response_code(500);
     echo json_encode(['error' => 'Database connection failed']);
     exit;
@@ -17,10 +18,10 @@ if ($conn->connect_error) {
 
 $type = $_GET['type'] ?? '';
 $offset = (int)($_GET['offset'] ?? 0);
-$limit = 20; // Load 20 more items at a time
+$limit = (int)($_GET['limit'] ?? 10);
 
 $today = date('Y-m-d');
-$response = ['items' => [], 'hasMore' => false];
+$response = ['items' => [], 'hasMore' => false, 'total' => 0];
 
 if ($type === 'employees') {
     // Get teachers who haven't logged in today
@@ -63,6 +64,7 @@ if ($type === 'employees') {
             $count_stmt->execute();
             $count_result = $count_stmt->get_result();
             $total = $count_result->fetch_row()[0];
+            $response['total'] = (int)$total;
             $response['hasMore'] = ($offset + $limit) < $total;
             $count_stmt->close();
         }
@@ -104,6 +106,7 @@ if ($type === 'employees') {
             $count_stmt->execute();
             $count_result = $count_stmt->get_result();
             $total = $count_result->fetch_row()[0];
+            $response['total'] = (int)$total;
             $response['hasMore'] = ($offset + $limit) < $total;
             $count_stmt->close();
         }
@@ -112,7 +115,8 @@ if ($type === 'employees') {
     }
 }
 
-$conn->close();
+// Don't close connection if using shared db_conn.php
+// $conn->close();
 
 header('Content-Type: application/json');
 echo json_encode($response);

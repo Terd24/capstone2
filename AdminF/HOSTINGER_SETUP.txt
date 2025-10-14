@@ -1,0 +1,75 @@
+========================================
+ARCHIVE SYSTEM - HOSTINGER SETUP GUIDE
+========================================
+
+STEP 1: Upload Files
+--------------------
+Make sure these files are uploaded to your Hostinger:
+✓ AdminF/setup_archive_system.php
+✓ AdminF/archive_record.php
+✓ AdminF/restore_record.php
+✓ AdminF/get_archived_records.php
+✓ AdminF/SuperAdminDashboard.php
+
+STEP 2: Run Setup Script (ONE TIME ONLY)
+-----------------------------------------
+1. Open your browser
+2. Go to: https://yourdomain.com/AdminF/setup_archive_system.php
+3. Login as Super Admin
+4. The script will create 3 tables:
+   - archived_students
+   - archived_employees
+   - archive_log
+
+STEP 3: Verify Setup
+--------------------
+Check in phpMyAdmin that these 3 tables exist:
+✓ archived_students (should have columns: archive_id, original_id, lrn, first_name, last_name, father_name, mother_name, guardian_name, etc.)
+✓ archived_employees (should have columns: archive_id, original_id, id_number, first_name, last_name, position, etc.)
+✓ archive_log (should have columns: log_id, record_type, record_id, action, performed_by, etc.)
+
+STEP 4: Test Archive System
+----------------------------
+1. Go to Super Admin Dashboard
+2. Navigate to "Deleted Items"
+3. Try to restore a deleted record (should work)
+4. Try to archive a deleted record (should work)
+5. Navigate to "View Archives"
+6. Check if archived records appear
+
+STEP 5: Delete Setup File (Optional)
+-------------------------------------
+After successful setup, you can delete:
+- AdminF/setup_archive_system.php (no longer needed)
+
+========================================
+ESSENTIAL FILES FOR ARCHIVE SYSTEM
+========================================
+
+Core Files (DO NOT DELETE):
+- archive_record.php - Archives deleted records
+- restore_record.php - Restores deleted records
+- get_archived_records.php - Fetches archived data
+- SuperAdminDashboard.php - Main dashboard
+
+Database Tables (DO NOT DELETE):
+- archived_students - Stores archived student records
+- archived_employees - Stores archived employee records
+- archive_log - Tracks all archive actions
+
+========================================
+TROUBLESHOOTING
+========================================
+
+If archive fails:
+1. Check database connection in db_conn.php
+2. Verify tables exist in phpMyAdmin
+3. Check PHP error logs
+4. Ensure Super Admin is logged in
+
+If counts don't update:
+1. Clear browser cache
+2. Check JavaScript console for errors
+3. Verify get_archived_records.php is accessible
+
+========================================
