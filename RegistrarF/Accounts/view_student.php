@@ -2087,45 +2087,24 @@ function toggleEdit() {
 
 <!-- Custom Password Reset Modal -->
 <div id="passwordResetModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index: 2147483647;">
-    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 transform transition-all">
-        <!-- Icon and Title -->
-        <div class="flex items-center gap-3 mb-6">
-            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+        <div class="flex flex-col items-center text-center">
+            <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
             </div>
-            <h3 class="text-2xl font-bold text-gray-800">Password Reset</h3>
-        </div>
-        
-        <!-- Password Display -->
-        <div class="mb-6">
-            <p class="text-sm font-medium text-gray-600 mb-2">Temporary Password:</p>
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
-                <p class="font-mono text-xl font-bold text-blue-700 text-center" id="generatedPassword"></p>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Temporary Password Generated</h3>
+            <p class="text-gray-600 mb-4">The new temporary password has been generated:</p>
+            <div class="bg-gray-100 border border-gray-300 rounded-lg px-4 py-3 mb-4 w-full">
+                <p class="text-lg font-mono font-semibold text-gray-900 break-all" id="generatedPassword"></p>
             </div>
-        </div>
-        
-        <!-- Instructions -->
-        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-            <div class="flex gap-2">
-                <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <div class="text-sm text-gray-700">
-                    <p class="font-semibold mb-1">Important:</p>
-                    <ul class="list-disc list-inside space-y-1">
-                        <li>Click <strong>Save</strong> to apply this password reset</li>
-                        <li>Student must change this password on next login</li>
-                    </ul>
-                </div>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p class="text-sm text-blue-800"><strong>⚠️ Important:</strong> Please save this password and click <strong>"Save Changes"</strong> button to apply the password reset.</p>
             </div>
-        </div>
-        
-        <!-- Button -->
-        <div class="flex justify-end">
-            <button onclick="closePasswordModal()" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg">
-                Got it!
+            <p class="text-xs text-amber-600 mb-6">The student will be required to change this password on first login.</p>
+            <button onclick="closePasswordModal()" class="w-full py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium">
+                OK, I've Saved It
             </button>
         </div>
     </div>

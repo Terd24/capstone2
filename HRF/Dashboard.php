@@ -110,6 +110,19 @@ input[type=number] { -moz-appearance: textfield; }
 .no-scrollbar::-webkit-scrollbar { 
     display: none;  /* Safari and Chrome */
 }
+
+/* Reset Password Button styles */
+button[id^="resetPasswordBtn_"]:not([disabled]) {
+    background-color: #eab308 !important;
+    cursor: pointer !important;
+}
+button[id^="resetPasswordBtn_"]:not([disabled]):hover {
+    background-color: #ca8a04 !important;
+}
+button[id^="resetPasswordBtn_"][disabled] {
+    background-color: #9ca3af !important;
+    cursor: not-allowed !important;
+}
 </style>
 </head>
 <body class="bg-gradient-to-br from-[#f3f6fb] to-[#e6ecf7] font-sans min-h-screen text-gray-900">
@@ -919,25 +932,32 @@ function showEmployeeDetailsModal(employee) {
                         </button>
                     </h3>
                     <p class="text-xs text-gray-500 mb-4 text-right">Removes login access only. The employee record will remain.</p>
-                    <div class="grid grid-cols-3 gap-6">
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 text-xs">(Auto-updates with last name)</span></label>
-                            <input type="text" id="username_${employee.id_number}" value="${employee.username}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed employee-field-readonly" style="background-color:#f3f4f6;">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Role</label>
-                            <select id="role_${employee.id_number}" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
-                                <option value="registrar" ${employee.account_role === 'registrar' ? 'selected' : ''}>Registrar</option>
-                                <option value="cashier" ${employee.account_role === 'cashier' ? 'selected' : ''}>Cashier</option>
-                                <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
-                                <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
-                                <option value="teacher" ${employee.account_role === 'teacher' ? 'selected' : ''}>Teacher</option>
-                            </select>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 text-xs">(Auto-updates with last name)</span></label>
+                                <input type="text" id="username_${employee.id_number}" value="${employee.username}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-100 cursor-not-allowed employee-field-readonly" style="background-color:#f3f4f6;">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1">Role</label>
+                                <select id="role_${employee.id_number}" disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                                    <option value="registrar" ${employee.account_role === 'registrar' ? 'selected' : ''}>Registrar</option>
+                                    <option value="cashier" ${employee.account_role === 'cashier' ? 'selected' : ''}>Cashier</option>
+                                    <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
+                                    <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
+                                    <option value="teacher" ${employee.account_role === 'teacher' ? 'selected' : ''}>Teacher</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Password</label>
-                            <input type="password" id="password_${employee.id_number}" placeholder="Enter new password" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] employee-field">
-                            <small class="text-gray-500">Leave blank to keep current password</small>
+                            <div class="flex gap-2">
+                                <input type="text" id="password_${employee.id_number}" placeholder="Click Reset Password button to generate" readonly disabled class="flex-1 border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 cursor-not-allowed" style="pointer-events: none;">
+                                <button type="button" id="resetPasswordBtn_${employee.id_number}" onclick="resetEmployeePassword('${employee.id_number}', '${employee.last_name}')" disabled class="px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed whitespace-nowrap">
+                                    Reset Password
+                                </button>
+                            </div>
+                            <small class="text-gray-500">Leave blank to keep current password. Click "Reset Password" to generate a new temporary password.</small>
                         </div>
                     </div>
                 </div>
@@ -1040,6 +1060,8 @@ function toggleEditMode() {
     const saveBtn = document.getElementById('saveChangesBtn');
     const cancelBtn = document.getElementById('cancelEditBtn');
     const fields = document.querySelectorAll('.employee-field');
+    const resetPasswordBtn = document.querySelector('[id^="resetPasswordBtn_"]');
+    const passwordField = document.querySelector('[id^="password_"]');
     
     isEditMode = true;
     
@@ -1051,10 +1073,35 @@ function toggleEditMode() {
     if (saveBtn) saveBtn.classList.remove('hidden');
     if (cancelBtn) cancelBtn.classList.remove('hidden');
     
-    // Enable fields for editing (except readonly fields like ID Number)
+    // Enable reset password button
+    if (resetPasswordBtn) {
+        resetPasswordBtn.disabled = false;
+        resetPasswordBtn.removeAttribute('disabled');
+        resetPasswordBtn.className = 'px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap';
+        resetPasswordBtn.style.backgroundColor = '#eab308';
+        resetPasswordBtn.style.cursor = 'pointer';
+    }
+    
+    // Keep password field ALWAYS disabled and readonly (only Reset button should fill it)
+    if (passwordField) {
+        passwordField.readOnly = true;
+        passwordField.disabled = true;
+        passwordField.setAttribute('readonly', 'readonly');
+        passwordField.setAttribute('disabled', 'disabled');
+        passwordField.style.pointerEvents = 'none';
+        passwordField.classList.add('bg-gray-50');
+        passwordField.classList.remove('bg-white');
+    }
+    
+    // Enable fields for editing (except readonly fields like ID Number and password)
     fields.forEach(field => {
         // Skip fields that should never be editable
         if (field.classList.contains('employee-field-readonly')) {
+            return;
+        }
+        
+        // Skip password field - it's controlled by reset button only
+        if (field.id && field.id.includes('password_')) {
             return;
         }
         
@@ -1081,6 +1128,8 @@ function cancelEdit() {
     const deleteBtn = document.getElementById('deleteEmployeeBtn');
     const saveBtn = document.getElementById('saveChangesBtn');
     const cancelBtn = document.getElementById('cancelEditBtn');
+    const resetPasswordBtn = document.querySelector('[id^="resetPasswordBtn_"]');
+    const passwordField = document.querySelector('[id^="password_"]');
     
     isEditMode = false;
     
@@ -1091,6 +1140,20 @@ function cancelEdit() {
     // Hide Save and Cancel buttons
     if (saveBtn) saveBtn.classList.add('hidden');
     if (cancelBtn) cancelBtn.classList.add('hidden');
+    
+    // Disable reset password button and clear password field
+    if (resetPasswordBtn) {
+        resetPasswordBtn.disabled = true;
+        resetPasswordBtn.setAttribute('disabled', 'disabled');
+        resetPasswordBtn.className = 'px-4 py-2 bg-gray-400 text-white rounded-lg font-medium transition-colors cursor-not-allowed whitespace-nowrap';
+    }
+    
+    // Clear password field when canceling
+    if (passwordField) {
+        passwordField.value = '';
+        passwordField.disabled = true;
+        passwordField.setAttribute('disabled', 'disabled');
+    }
     
     // Reload the modal to restore original values
     if (currentEmployeeId) {
@@ -1105,6 +1168,80 @@ function cancelEdit() {
             .catch(error => {
                 console.error('Error reloading employee data:', error);
             });
+    }
+}
+
+// Reset employee password function
+function resetEmployeePassword(employeeId, lastName) {
+    const passwordField = document.getElementById(`password_${employeeId}`);
+    
+    if (!passwordField || !lastName || !employeeId) {
+        alert('Error: Required fields not found. Please ensure last name and employee ID are available.');
+        return;
+    }
+    
+    // Get values
+    const lastNameClean = lastName.toLowerCase().replace(/[^a-z]/g, '');
+    
+    // Extract the 3-digit number from employee ID (e.g., CCI2025-006 -> 006)
+    const parts = employeeId.split('-');
+    const idNumber = parts.length === 2 ? parts[1] : '000';
+    
+    // Get current year
+    const currentYear = new Date().getFullYear();
+    
+    // Format: lastname + idNumber + currentYear (e.g., smith0062025)
+    const newPassword = lastNameClean + idNumber + currentYear;
+    
+    // Enable field and set value (keep it enabled so it submits with the form)
+    passwordField.disabled = false;
+    passwordField.removeAttribute('disabled');
+    passwordField.value = newPassword;
+    // Keep readonly and pointer-events:none for visual purposes, but NOT disabled
+    passwordField.readOnly = true;
+    passwordField.style.pointerEvents = 'none';
+    
+    // Show custom modal
+    showPasswordResetModal(newPassword);
+}
+
+// Show password reset modal
+function showPasswordResetModal(password) {
+    const modal = document.createElement('div');
+    modal.id = 'passwordResetModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+    modal.style.zIndex = '10100';
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Temporary Password Generated</h3>
+                <p class="text-gray-600 mb-4">The new temporary password has been generated:</p>
+                <div class="bg-gray-100 border border-gray-300 rounded-lg px-4 py-3 mb-4 w-full">
+                    <p class="text-lg font-mono font-semibold text-gray-900 break-all">${password}</p>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p class="text-sm text-blue-800"><strong>⚠️ Important:</strong> Please save this password and click <strong>"Save Changes"</strong> button to apply the password reset.</p>
+                </div>
+                <p class="text-xs text-amber-600 mb-6">The employee will be required to change this password on first login.</p>
+                <button onclick="closePasswordResetModal()" class="w-full py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium">
+                    OK, I've Saved It
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// Close password reset modal
+function closePasswordResetModal() {
+    const modal = document.getElementById('passwordResetModal');
+    if (modal) {
+        modal.remove();
     }
 }
 
@@ -1224,6 +1361,8 @@ function showEmployeeSaveConfirmation(firstName, middleName, lastName, position,
 }
 
 function performEmployeeSave(firstName, middleName, lastName, position, department, email, phone, address, hireDate) {
+    const password = document.getElementById(`password_${currentEmployeeId}`)?.value;
+    
     const formData = new FormData();
     formData.append('employee_id', currentEmployeeId);
     formData.append('first_name', firstName);
@@ -1235,6 +1374,9 @@ function performEmployeeSave(firstName, middleName, lastName, position, departme
     formData.append('phone', phone || '');
     formData.append('address', address);
     formData.append('hire_date', hireDate);
+    if (password) {
+        formData.append('password', password);
+    }
     
     fetch('edit_employee.php', {
         method: 'POST',
