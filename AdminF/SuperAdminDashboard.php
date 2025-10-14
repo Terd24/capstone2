@@ -1063,7 +1063,7 @@ require_once 'includes/dashboard_data.php';
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <?php if (count($deleted_students) > 0): ?>
                                     <?php foreach ($deleted_students as $student): ?>
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="hover:bg-gray-50" data-student-id="<?= htmlspecialchars($student['id_number']) ?>">
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
@@ -1117,10 +1117,25 @@ require_once 'includes/dashboard_data.php';
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Pagination for Deleted Students -->
+                    <div id="students-pagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                        <div class="text-sm text-gray-700">
+                            Showing <span id="students-start">1</span> to <span id="students-end">5</span> of <span id="students-total"><?= count($deleted_students) ?></span> students
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="students-prev" onclick="changeStudentsPage(-1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Previous
+                            </button>
+                            <button id="students-next" onclick="changeStudentsPage(1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Deleted Employees Table -->
-                <div class="bg-white rounded-2xl shadow-lg">
+                <div class="bg-white rounded-2xl shadow-lg" id="deleted-employees-section">
                     <div class="px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
@@ -1141,7 +1156,7 @@ require_once 'includes/dashboard_data.php';
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <?php if (count($deleted_employees) > 0): ?>
                                     <?php foreach ($deleted_employees as $employee): ?>
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="hover:bg-gray-50" data-employee-id="<?= htmlspecialchars($employee['id_number']) ?>">
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -1194,6 +1209,21 @@ require_once 'includes/dashboard_data.php';
                                 <?php endif; ?>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Pagination for Deleted Employees -->
+                    <div id="employees-pagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                        <div class="text-sm text-gray-700">
+                            Showing <span id="employees-start">1</span> to <span id="employees-end">5</span> of <span id="employees-total"><?= count($deleted_employees) ?></span> employees
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="employees-prev" onclick="changeEmployeesPage(-1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Previous
+                            </button>
+                            <button id="employees-next" onclick="changeEmployeesPage(1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1254,9 +1284,15 @@ require_once 'includes/dashboard_data.php';
                 item.classList.remove('active');
             });
             
-            // Add active class to clicked nav item
+            // Add active class to clicked nav item or find by href
             if (clickEvent && clickEvent.target) {
                 const navItem = clickEvent.target.closest('.nav-item');
+                if (navItem) {
+                    navItem.classList.add('active');
+                }
+            } else {
+                // If no click event, find the nav item by href
+                const navItem = document.querySelector(`a[href="#${sectionName}"]`);
                 if (navItem) {
                     navItem.classList.add('active');
                 }
@@ -2434,7 +2470,7 @@ require_once 'includes/dashboard_data.php';
             window.currentConfirmAction = onConfirm;
         }
         
-        function showNotificationModal({title, message, details = [], type = 'info'}) {
+        function showNotificationModal({title, message, details = [], type = 'info', onClose = null}) {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             
@@ -2475,6 +2511,7 @@ require_once 'includes/dashboard_data.php';
             
             document.body.appendChild(modal);
             window.currentNotificationModal = modal;
+            window.currentNotificationOnClose = onClose;
         }
         
         function confirmAction() {
@@ -2496,6 +2533,12 @@ require_once 'includes/dashboard_data.php';
             if (window.currentNotificationModal) {
                 document.body.removeChild(window.currentNotificationModal);
                 window.currentNotificationModal = null;
+                
+                // Execute onClose callback if provided
+                if (window.currentNotificationOnClose) {
+                    window.currentNotificationOnClose();
+                    window.currentNotificationOnClose = null;
+                }
             }
         }
 
@@ -2830,9 +2873,63 @@ function restoreStudent(studentId) {
                             'Record is now active',
                             'Visible in Registrar system'
                         ],
-                        type: 'success'
+                        type: 'success',
+                        onClose: () => {
+                            // Remove the restored student from the list smoothly (no page reload)
+                            const studentRow = document.querySelector(`tr[data-student-id="${studentId}"]`);
+                            if (studentRow) {
+                                // Fade out and slide the row
+                                studentRow.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                                studentRow.style.opacity = '0';
+                                studentRow.style.transform = 'translateX(-20px)';
+                                
+                                setTimeout(() => {
+                                    studentRow.remove();
+                                    
+                                    // Update the deleted students count in the card
+                                    const deletedStudentsCard = document.querySelector('.bg-red-500.text-white.rounded-2xl');
+                                    if (deletedStudentsCard) {
+                                        const countElement = deletedStudentsCard.querySelector('.text-4xl.font-bold.text-white');
+                                        if (countElement) {
+                                            const currentCount = parseInt(countElement.textContent);
+                                            const newCount = Math.max(0, currentCount - 1);
+                                            countElement.textContent = newCount;
+                                        }
+                                    }
+                                    
+                                    // Update the table header count
+                                    const tableHeaders = document.querySelectorAll('h3.text-lg.font-bold.text-gray-900');
+                                    tableHeaders.forEach(header => {
+                                        if (header.textContent.includes('Deleted Students')) {
+                                            const match = header.textContent.match(/\((\d+)\)/);
+                                            if (match) {
+                                                const newCount = Math.max(0, parseInt(match[1]) - 1);
+                                                header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
+                                            }
+                                        }
+                                    });
+                                    
+                                    // Check if table is empty and show "no deleted students" message
+                                    const tbody = document.querySelector('tbody');
+                                    const remainingRows = tbody.querySelectorAll('tr[data-student-id]');
+                                    if (remainingRows.length === 0) {
+                                        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500"><svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg><p>No deleted students found</p></td></tr>';
+                                        
+                                        // Automatically scroll to show Deleted Employees section
+                                        setTimeout(() => {
+                                            const deletedEmployeesSection = document.getElementById('deleted-employees-section');
+                                            if (deletedEmployeesSection) {
+                                                deletedEmployeesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }
+                                        }, 400);
+                                    } else {
+                                        // Update pagination after removing item
+                                        updateStudentsPagination();
+                                    }
+                                }, 300);
+                            }
+                        }
                     });
-                    setTimeout(() => location.reload(), 2000);
                 } else {
                     showNotificationModal({
                         title: 'Restore Failed',
@@ -2886,9 +2983,57 @@ function restoreEmployee(employeeId) {
                             'Record is now active',
                             'Visible in HR system'
                         ],
-                        type: 'success'
+                        type: 'success',
+                        onClose: () => {
+                            // Remove the restored employee from the list smoothly (no page reload)
+                            const employeeRow = document.querySelector(`tr[data-employee-id="${employeeId}"]`);
+                            if (employeeRow) {
+                                // Fade out and slide the row
+                                employeeRow.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                                employeeRow.style.opacity = '0';
+                                employeeRow.style.transform = 'translateX(-20px)';
+                                
+                                setTimeout(() => {
+                                    employeeRow.remove();
+                                    
+                                    // Update the deleted employees count in the card
+                                    const deletedEmployeesCard = document.querySelector('.bg-orange-500.text-white.rounded-2xl');
+                                    if (deletedEmployeesCard) {
+                                        const countElement = deletedEmployeesCard.querySelector('.text-4xl.font-bold.text-white');
+                                        if (countElement) {
+                                            const currentCount = parseInt(countElement.textContent);
+                                            const newCount = Math.max(0, currentCount - 1);
+                                            countElement.textContent = newCount;
+                                        }
+                                    }
+                                    
+                                    // Update the table header count
+                                    const tableHeaders = document.querySelectorAll('h3.text-lg.font-bold.text-gray-900');
+                                    tableHeaders.forEach(header => {
+                                        if (header.textContent.includes('Deleted Employees')) {
+                                            const match = header.textContent.match(/\((\d+)\)/);
+                                            if (match) {
+                                                const newCount = Math.max(0, parseInt(match[1]) - 1);
+                                                header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
+                                            }
+                                        }
+                                    });
+                                    
+                                    // Check if table is empty and show "no deleted employees" message
+                                    const employeeTbody = employeeRow.closest('tbody');
+                                    if (employeeTbody) {
+                                        const remainingRows = employeeTbody.querySelectorAll('tr[data-employee-id]');
+                                        if (remainingRows.length === 0) {
+                                            employeeTbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500"><svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg><p>No deleted employees found</p></td></tr>';
+                                        } else {
+                                            // Update pagination after removing item
+                                            updateEmployeesPagination();
+                                        }
+                                    }
+                                }, 300);
+                            }
+                        }
                     });
-                    setTimeout(() => location.reload(), 2000);
                 } else {
                     showNotificationModal({
                         title: 'Restore Failed',
@@ -2954,11 +3099,113 @@ function deletePermanently(recordId, recordType) {
                 toggle.checked = isMaintenanceMode;
             }
             
-            const hash = window.location.hash;
-            if (hash === '#hr-accounts') {
-                showSection('hr-accounts');
+            // Check if we should show deleted items section (after restore)
+            const activeSection = sessionStorage.getItem('activeSection');
+            if (activeSection === 'deleted-items') {
+                sessionStorage.removeItem('activeSection'); // Clear the flag
+                showSection('deleted-items');
+            } else {
+                const hash = window.location.hash;
+                if (hash === '#hr-accounts') {
+                    showSection('hr-accounts');
+                }
             }
+            
+            // Initialize pagination for deleted items
+            initDeletedItemsPagination();
         });
+
+        // Pagination for Deleted Students and Employees
+        let studentsCurrentPage = 1;
+        let employeesCurrentPage = 1;
+        const itemsPerPage = 5;
+
+        function initDeletedItemsPagination() {
+            updateStudentsPagination();
+            updateEmployeesPagination();
+        }
+
+        function updateStudentsPagination() {
+            const rows = document.querySelectorAll('tr[data-student-id]');
+            const totalItems = rows.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            
+            // Hide all rows first
+            rows.forEach(row => row.style.display = 'none');
+            
+            // Show only current page rows
+            const start = (studentsCurrentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            for (let i = start; i < end && i < totalItems; i++) {
+                rows[i].style.display = '';
+            }
+            
+            // Update pagination info
+            document.getElementById('students-start').textContent = totalItems > 0 ? start + 1 : 0;
+            document.getElementById('students-end').textContent = Math.min(end, totalItems);
+            document.getElementById('students-total').textContent = totalItems;
+            
+            // Update button states
+            document.getElementById('students-prev').disabled = studentsCurrentPage === 1;
+            document.getElementById('students-next').disabled = studentsCurrentPage >= totalPages || totalItems === 0;
+            
+            // Hide pagination if no items
+            const pagination = document.getElementById('students-pagination');
+            if (pagination) {
+                pagination.style.display = totalItems === 0 ? 'none' : 'flex';
+            }
+        }
+
+        function updateEmployeesPagination() {
+            const rows = document.querySelectorAll('tr[data-employee-id]');
+            const totalItems = rows.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            
+            // Hide all rows first
+            rows.forEach(row => row.style.display = 'none');
+            
+            // Show only current page rows
+            const start = (employeesCurrentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            for (let i = start; i < end && i < totalItems; i++) {
+                rows[i].style.display = '';
+            }
+            
+            // Update pagination info
+            document.getElementById('employees-start').textContent = totalItems > 0 ? start + 1 : 0;
+            document.getElementById('employees-end').textContent = Math.min(end, totalItems);
+            document.getElementById('employees-total').textContent = totalItems;
+            
+            // Update button states
+            document.getElementById('employees-prev').disabled = employeesCurrentPage === 1;
+            document.getElementById('employees-next').disabled = employeesCurrentPage >= totalPages || totalItems === 0;
+            
+            // Hide pagination if no items
+            const pagination = document.getElementById('employees-pagination');
+            if (pagination) {
+                pagination.style.display = totalItems === 0 ? 'none' : 'flex';
+            }
+        }
+
+        function changeStudentsPage(direction) {
+            const rows = document.querySelectorAll('tr[data-student-id]');
+            const totalPages = Math.ceil(rows.length / itemsPerPage);
+            
+            studentsCurrentPage += direction;
+            studentsCurrentPage = Math.max(1, Math.min(studentsCurrentPage, totalPages));
+            
+            updateStudentsPagination();
+        }
+
+        function changeEmployeesPage(direction) {
+            const rows = document.querySelectorAll('tr[data-employee-id]');
+            const totalPages = Math.ceil(rows.length / itemsPerPage);
+            
+            employeesCurrentPage += direction;
+            employeesCurrentPage = Math.max(1, Math.min(employeesCurrentPage, totalPages));
+            
+            updateEmployeesPagination();
+        }
 
         function createAccountForEmployee(employeeId) {
             // Show a modal to create account for existing employee
