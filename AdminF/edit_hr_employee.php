@@ -23,6 +23,7 @@ $email = $_POST['email'] ?? '';
 $phone = $_POST['phone'] ?? '';
 $hire_date = $_POST['hire_date'] ?? '';
 $address = $_POST['address'] ?? '';
+$password = $_POST['password'] ?? '';
 
 if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($position) || empty($department) || empty($hire_date)) {
     echo json_encode(['success' => false, 'message' => 'Required fields are missing']);
@@ -54,6 +55,21 @@ try {
 
     if (!$stmt->execute()) {
         throw new Exception('Error updating employee: ' . $stmt->error);
+    }
+
+    // Update password if provided
+    if (!empty($password)) {
+        // Ensure must_change_password column exists in employee_accounts table
+        $conn->query("ALTER TABLE employee_accounts ADD COLUMN IF NOT EXISTS must_change_password TINYINT(1) DEFAULT 0");
+        
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $update_password = $conn->prepare("UPDATE employee_accounts SET password = ?, must_change_password = 1 WHERE employee_id = ?");
+        $update_password->bind_param("ss", $hashed_password, $employee_id);
+        
+        if (!$update_password->execute()) {
+            throw new Exception('Error updating password: ' . $update_password->error);
+        }
+        $update_password->close();
     }
 
     // Commit transaction

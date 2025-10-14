@@ -51,10 +51,13 @@ try {
         $result = $stmt->get_result();
 
         if ($result->num_rows > 0) {
+            // Ensure must_change_password column exists
+            $conn->query("ALTER TABLE employee_accounts ADD COLUMN IF NOT EXISTS must_change_password TINYINT(1) DEFAULT 0");
+            
             // Update existing account
             if (!empty($password)) {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("UPDATE employee_accounts SET username = ?, password = ?, role = ? WHERE employee_id = ?");
+                $stmt = $conn->prepare("UPDATE employee_accounts SET username = ?, password = ?, role = ?, must_change_password = 1 WHERE employee_id = ?");
                 $stmt->bind_param("ssss", $username, $hashed_password, $role, $employee_id);
             } else {
                 $stmt = $conn->prepare("UPDATE employee_accounts SET username = ?, role = ? WHERE employee_id = ?");
@@ -62,6 +65,9 @@ try {
             }
             $stmt->execute();
         } else {
+            // Ensure must_change_password column exists
+            $conn->query("ALTER TABLE employee_accounts ADD COLUMN IF NOT EXISTS must_change_password TINYINT(1) DEFAULT 0");
+            
             // Create new account
             if (empty($password)) {
                 echo json_encode(['success' => false, 'message' => 'Password is required for new accounts']);
@@ -70,7 +76,7 @@ try {
             }
             
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
+            $stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role, must_change_password) VALUES (?, ?, ?, ?, 1)");
             $stmt->bind_param("ssss", $employee_id, $username, $hashed_password, $role);
             $stmt->execute();
         }
