@@ -1275,7 +1275,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                                 <span class="font-medium">For student use:</span> Attendance tracking, cashier transactions, and other school modules
                             </p>
                             <p class="text-xs text-blue-600 mt-1 font-medium">
-                                📝 Note: For Kinder students, parents can request documents through their parent account
+                                📝 Note: For Kinder and Elementary students, parents can request documents through their parent account
                             </p>
                             <?php if (!empty($error_rfid)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
@@ -1406,14 +1406,18 @@ function togglePersonalAccountSection(selectedGroup, selectedCourse) {
     const personalAccountSection = document.getElementById('personalAccountSection');
     if (!personalAccountSection) return;
     
-    // Hide Personal Account section if Pre-Elementary (Kinder) is selected
-    // Kinder students are too young to have login accounts
-    const isKinder = selectedGroup === 'Pre-Elementary' || selectedCourse === 'Kinder' || 
-                     (selectedCourse && selectedCourse.toLowerCase().includes('kinder'));
+    // Hide Personal Account section for young students (Kinder and Elementary)
+    // These students are too young to have personal login accounts
+    const isYoungStudent = selectedGroup === 'Pre-Elementary' || 
+                           selectedGroup === 'Elementary' ||
+                           selectedCourse === 'Kinder' || 
+                           selectedCourse === 'Elementary' ||
+                           (selectedCourse && selectedCourse.toLowerCase().includes('kinder')) ||
+                           (selectedCourse && selectedCourse.toLowerCase().includes('elementary'));
     
-    if (isKinder) {
+    if (isYoungStudent) {
         personalAccountSection.style.display = 'none';
-        // Clear username and password fields for Kinder students
+        // Clear username and password fields for young students
         const usernameField = document.querySelector('input[name="username"]');
         const passwordField = document.querySelector('input[name="password"]');
         if (usernameField) usernameField.value = '';
