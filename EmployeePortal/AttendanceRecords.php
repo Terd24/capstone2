@@ -42,9 +42,49 @@ if ($check_columns && $check_columns->num_rows > 0) {
     }
 }
 
-// Filters
-$start_date  = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
-$end_date    = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
+// Handle POST submission - store in session and redirect to clean URL
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['teacher_attendance_filters'] = [
+        'start_date' => trim($_POST['start_date'] ?? ''),
+        'end_date' => trim($_POST['end_date'] ?? '')
+    ];
+    header("Location: AttendanceRecords.php");
+    exit;
+}
+
+// Get filters from session or use defaults
+$filters = $_SESSION['teacher_attendance_filters'] ?? [];
+$start_date = $filters['start_date'] ?? '';
+$end_date = $filters['end_date'] ?? '';
+
+// Clear session filters if explicitly requested
+if (isset($_GET['clear'])) {
+    unset($_SESSION['teacher_attendance_filters']);
+    header("Location: AttendanceRecords.php");
+    exit;
+}
+
+// Validate date restrictions
+if ($start_date !== '') {
+    // Start date must be from 2025-01-01 onwards and not in the future
+    if ($start_date < '2025-01-01') {
+        $start_date = '2025-01-01';
+    }
+    if ($start_date > $today) {
+        $start_date = $today;
+    }
+}
+
+if ($end_date !== '') {
+    // End date cannot be in the future
+    if ($end_date > $today) {
+        $end_date = $today;
+    }
+    // End date should not be before start date if both are provided
+    if ($start_date !== '' && $end_date < $start_date) {
+        $end_date = $start_date;
+    }
+}
 
 // Build attendance query for this employee only (teacher_attendance table)
 $sql = "SELECT * FROM teacher_attendance WHERE $employee_id_column = ?";
@@ -67,6 +107,7 @@ $stmt = $conn->prepare($sql);
 $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $records = $stmt->get_result();
+$total_records = $records->num_rows; // Store count before iterating
 
 // Fetch schedule info for calculations
 $shiftType = '—';
@@ -167,20 +208,31 @@ if ($ws) {
     <!-- Filters & Records -->
     <div id="attendance" class="bg-white rounded-2xl shadow-lg p-6">
       <h3 class="text-lg font-bold text-gray-800 mb-4">Attendance Records</h3>
-      <form method="get" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4">
-        <div>
+      <form method="post" id="filterForm" class="grid grid-cols-1 md:grid-cols-8 gap-4 items-end mb-4">
+        <div class="md:col-span-2">
           <label class="text-sm font-medium text-gray-700 mb-2 block">Start Date</label>
-          <input type="date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+          <input type="date" name="start_date" id="start_date" value="<?php echo htmlspecialchars($start_date); ?>" min="2025-01-01" max="<?= $today ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
         </div>
-        <div>
+        <div class="md:col-span-2">
           <label class="text-sm font-medium text-gray-700 mb-2 block">End Date</label>
-          <input type="date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
+          <input type="date" name="end_date" id="end_date" value="<?php echo htmlspecialchars($end_date); ?>" min="2025-01-01" max="<?= $today ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
         </div>
-        <div class="flex gap-2 md:col-span-3">
-          <button type="submit" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium">Generate Report</button>
-          <a href="AttendanceRecords.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Clear</a>
+        <div class="md:col-span-4 flex gap-2">
+          <button type="submit" class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-medium text-sm whitespace-nowrap">Generate Report</button>
+          <a href="AttendanceRecords.php?clear=1" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium text-sm whitespace-nowrap">Clear</a>
         </div>
       </form>
+      <div class="pt-4 mt-4 border-t border-gray-200">
+        <p class="text-gray-600 mb-6">
+          <?php 
+          if ($start_date !== '' && $end_date !== '') {
+              echo "Attendance records from " . date('F j, Y', strtotime($start_date)) . " to " . date('F j, Y', strtotime($end_date));
+          } else {
+              echo "Attendance records for " . date('F j, Y', strtotime($today));
+          }
+          ?>
+        </p>
+      </div>
 
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
@@ -276,6 +328,45 @@ if ($ws) {
         empDropdown.classList.add('hidden');
       }
     });
+  }
+
+  // Date validation and dynamic min/max updates
+  const startDate = document.getElementById('start_date');
+  const endDate = document.getElementById('end_date');
+  const today = '<?= $today ?>';
+  
+  // Update end date minimum when start date changes
+  startDate.addEventListener('change', function() {
+      if (this.value) {
+          endDate.min = this.value;
+          // If end date is before start date, clear it
+          if (endDate.value && endDate.value < this.value) {
+              endDate.value = '';
+          }
+      } else {
+          endDate.min = '2025-01-01';
+      }
+  });
+  
+  // Update start date maximum when end date changes
+  endDate.addEventListener('change', function() {
+      if (this.value) {
+          startDate.max = this.value;
+          // If start date is after end date, clear it
+          if (startDate.value && startDate.value > this.value) {
+              startDate.value = '';
+          }
+      } else {
+          startDate.max = today;
+      }
+  });
+  
+  // Initialize min/max based on current values
+  if (startDate.value) {
+      endDate.min = startDate.value;
+  }
+  if (endDate.value) {
+      startDate.max = endDate.value;
   }
 </script>
 </html>

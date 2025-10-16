@@ -24,9 +24,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $phone = trim($_POST['phone'] ?? '');
     $address = trim($_POST['address'] ?? '');
     $hire_date = $_POST['hire_date'];
-    $create_account = isset($_POST['create_account']);
+    $create_account = true; // Always create account (mandatory)
     
-    // Account information (if creating account)
+    // Account information (always required)
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $role = 'hr'; // Always HR for Super Admin
@@ -83,11 +83,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (empty($email)) {
             throw new Exception("Email is required.");
         }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new Exception("Please enter a valid email address.");
+        }
+        
+        // Validate email domain - only allow trusted providers
+        $allowedDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'protonmail.com', 'aol.com', 'zoho.com', 'mail.com', 'yandex.com', 'gmx.com', 'tutanota.com'];
+        $emailDomain = strtolower(substr(strrchr($email, "@"), 1));
+        if (!in_array($emailDomain, $allowedDomains)) {
+            throw new Exception("Please use a valid email provider (Gmail, Yahoo, Outlook, etc.)");
+        }
         if (empty($phone) || !preg_match('/^[0-9]{11}$/', $phone)) {
             throw new Exception("Phone must be exactly 11 digits (numbers only).");
         }
         if (empty($address)) {
             throw new Exception("Complete Address is required.");
+        }
+        if (strlen($address) < 20) {
+            throw new Exception("Complete address must be at least 20 characters long.");
+        }
+        if (strlen($address) > 500) {
+            throw new Exception("Complete address must not exceed 500 characters.");
+        }
+        // Validate address has at least 4 components separated by commas
+        $addressParts = array_filter(array_map('trim', explode(',', $address)), function($part) {
+            return strlen($part) > 0;
+        });
+        if (count($addressParts) < 4) {
+            throw new Exception("Complete address must include at least 4 components separated by commas (e.g., Street, Barangay, City, Province)");
+        }
+        
+        // Account fields validation (now mandatory)
+        if (empty($username) || trim($username) === '') {
+            throw new Exception("Username is required for system account.");
+        }
+        if (empty($password)) {
+            throw new Exception("Password is required for system account.");
         }
 
         // Check if employee ID already exists
@@ -105,8 +136,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             throw new Exception("Failed to add employee: " . $stmt->error);
         }
 
-        // Optionally create a system account (HR accounts are allowed for Super Admin)
-        if ($create_account && $username && $password) {
+        // Always create a system account (mandatory for HR employees)
+        if ($username && $password) {
             // Ensure employee_accounts table exists
             $account_table_check = $conn->query("SHOW TABLES LIKE 'employee_accounts'");
             if ($account_table_check->num_rows == 0) {
@@ -149,10 +180,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Commit transaction
         $conn->commit();
 
-        $success_message = "HR Employee added successfully";
-        if ($create_account) {
-            $success_message .= " with system account";
-        }
+        $success_message = "HR Employee added successfully with system account";
         $_SESSION['success_msg'] = $success_message;
 
     } catch (Exception $e) {

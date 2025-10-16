@@ -2001,7 +2001,19 @@ require_once 'includes/dashboard_data.php';
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Position *</label>
-                                        <input type="text" name="position" autocomplete="off" pattern="[A-Za-z\\s]+" maxlength="50" title="Letters only, maximum 50 characters" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm name-input" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '').slice(0, 50)">
+                                        <select name="position" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm">
+                                            <option value="">Select HR Position</option>
+                                            <option value="HR Manager">HR Manager</option>
+                                            <option value="HR Assistant Manager">HR Assistant Manager</option>
+                                            <option value="HR Supervisor">HR Supervisor</option>
+                                            <option value="HR Officer">HR Officer</option>
+                                            <option value="HR Staff">HR Staff</option>
+                                            <option value="HR Assistant">HR Assistant</option>
+                                            <option value="Recruitment Specialist">Recruitment Specialist</option>
+                                            <option value="Training Coordinator">Training Coordinator</option>
+                                            <option value="Payroll Officer">Payroll Officer</option>
+                                            <option value="Benefits Administrator">Benefits Administrator</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Department *</label>
@@ -2009,7 +2021,7 @@ require_once 'includes/dashboard_data.php';
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Hire Date *</label>
-                                        <input type="date" name="hire_date" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm">
+                                        <input type="date" name="hire_date" max="<?= date('Y-m-d') ?>" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
@@ -2017,7 +2029,7 @@ require_once 'includes/dashboard_data.php';
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
-                                        <input type="text" name="phone" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
+                                        <input type="tel" name="phone" id="phoneField" required placeholder="+63 9XX-XXX-XXXX" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)" oninput="formatPhilippinePhone(this)">
                                     </div>
                                 </div>
                                 
@@ -2037,12 +2049,7 @@ require_once 'includes/dashboard_data.php';
                                     <h4 class="text-lg font-semibold text-gray-900">SYSTEM ACCOUNT</h4>
                                 </div>
                                 
-                                <div class="mb-4">
-                                    <label class="flex items-center">
-                                        <input type="checkbox" id="createAccount" name="create_account" class="mr-2 rounded border-gray-300 text-[#0B2C62] focus:ring-[#0B2C62]">
-                                        <span class="text-sm text-gray-700">Create system account for this employee</span>
-                                    </label>
-                                </div>
+                                <input type="hidden" id="createAccount" name="create_account" value="1">
                                 
                                 <div id="accountFields" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
@@ -2051,7 +2058,15 @@ require_once 'includes/dashboard_data.php';
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Password *</label>
-                                        <input type="text" id="passwordField" name="password" autocomplete="new-password" readonly class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-600">
+                                        <div class="relative">
+                                            <input type="password" id="passwordField" name="password" autocomplete="new-password" readonly class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-600">
+                                            <button type="button" onclick="togglePasswordVisibility('passwordField', 'eyeIcon')" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none">
+                                                <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2132,30 +2147,80 @@ require_once 'includes/dashboard_data.php';
                 lastNameField.addEventListener('blur', generateUsernameAndPassword);
             }
             
-            // Handle checkbox toggle
-            document.getElementById('createAccount').addEventListener('change', function() {
-                const accountFields = document.getElementById('accountFields');
-                const usernameField = document.querySelector('input[name="username"]');
-                const passwordField = document.querySelector('input[name="password"]');
-                
-                if (this.checked) {
-                    accountFields.style.display = 'grid';
-                    usernameField.required = true;
-                    passwordField.required = true;
-                } else {
-                    accountFields.style.display = 'none';
-                    usernameField.required = false;
-                    passwordField.required = false;
-                }
-            });
-            
-            // Initially hide account fields since checkbox is unchecked by default
+            // Account fields are always visible and required (automatic account creation)
             const accountFields = document.getElementById('accountFields');
             const usernameField = document.querySelector('input[name="username"]');
             const passwordField = document.querySelector('input[name="password"]');
-            accountFields.style.display = 'none';
-            usernameField.required = false;
-            passwordField.required = false;
+            accountFields.style.display = 'grid';
+            usernameField.required = true;
+            passwordField.required = true;
+        }
+
+        function formatPhilippinePhone(input) {
+            // Remove all non-numeric characters except +
+            let value = input.value.replace(/[^\d+]/g, '');
+            
+            // Remove + if it's not at the start
+            if (value.indexOf('+') > 0) {
+                value = value.replace(/\+/g, '');
+            }
+            
+            // If starts with 0, convert to +63
+            if (value.startsWith('0')) {
+                value = '+63' + value.slice(1);
+            }
+            
+            // If doesn't start with +63, add it
+            if (!value.startsWith('+63') && !value.startsWith('+')) {
+                value = '+63' + value;
+            }
+            
+            // Ensure it starts with +63
+            if (value.startsWith('+') && !value.startsWith('+63')) {
+                value = '+63' + value.slice(1);
+            }
+            
+            // Remove +63 prefix for processing
+            let digits = value.replace('+63', '');
+            
+            // Limit to 10 digits (after +63)
+            digits = digits.slice(0, 10);
+            
+            // Format as +63 9XX-XXX-XXXX
+            let formatted = '+63';
+            if (digits.length > 0) {
+                formatted += ' ' + digits.slice(0, 3);
+            }
+            if (digits.length > 3) {
+                formatted += '-' + digits.slice(3, 6);
+            }
+            if (digits.length > 6) {
+                formatted += '-' + digits.slice(6, 10);
+            }
+            
+            input.value = formatted;
+        }
+
+        function togglePasswordVisibility(fieldId, iconId) {
+            const passwordField = document.getElementById(fieldId);
+            const eyeIcon = document.getElementById(iconId);
+            
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                // Change to eye-slash icon (simple diagonal line)
+                eyeIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                `;
+            } else {
+                passwordField.type = 'password';
+                // Change back to eye icon
+                eyeIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                `;
+            }
         }
 
         function confirmAddEmployee() {
@@ -2169,13 +2234,13 @@ require_once 'includes/dashboard_data.php';
             const firstName = form.querySelector('input[name="first_name"]').value.trim();
             const middleName = form.querySelector('input[name="middle_name"]').value.trim();
             const lastName = form.querySelector('input[name="last_name"]').value.trim();
-            const position = form.querySelector('input[name="position"]').value.trim();
+            const position = form.querySelector('select[name="position"]').value.trim();
             const department = form.querySelector('input[name="department"]').value.trim();
             const email = form.querySelector('input[name="email"]').value.trim();
             const phone = form.querySelector('input[name="phone"]').value.trim();
             const address = form.querySelector('textarea[name="address"]').value.trim();
             const hireDate = form.querySelector('input[name="hire_date"]').value;
-            const createAccount = form.querySelector('input[name="create_account"]').checked;
+            const createAccount = true; // Always create account (mandatory)
             const username = form.querySelector('input[name="username"]').value.trim();
             const password = form.querySelector('input[name="password"]').value;
             
@@ -2195,7 +2260,7 @@ require_once 'includes/dashboard_data.php';
                 hasErrors = true;
             }
             if (!position) {
-                highlightFieldError(form.querySelector('input[name="position"]'), 'Position is required');
+                highlightFieldError(form.querySelector('select[name="position"]'), 'Position is required');
                 hasErrors = true;
             }
             if (!email) {
@@ -2215,37 +2280,79 @@ require_once 'includes/dashboard_data.php';
             } else if (address.length > 500) {
                 highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must not exceed 500 characters');
                 hasErrors = true;
-            } else if (!/.*[,\s].*/i.test(address)) {
-                highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.');
-                hasErrors = true;
+            } else {
+                // Count commas to ensure multiple address components
+                const commaCount = (address.match(/,/g) || []).length;
+                if (commaCount < 3) {
+                    highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must include at least 4 components separated by commas (e.g., Street, Barangay, City, Province)');
+                    hasErrors = true;
+                }
+                // Check if address has meaningful content (not just commas)
+                const addressParts = address.split(',').map(part => part.trim()).filter(part => part.length > 0);
+                if (addressParts.length < 4) {
+                    highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must include street, barangay, city/municipality, and province');
+                    hasErrors = true;
+                }
             }
             if (!hireDate) {
                 highlightFieldError(form.querySelector('input[name="hire_date"]'), 'Hire date is required');
                 hasErrors = true;
             }
+            // Validate hire date is not in the future
+            if (hireDate) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const selectedDate = new Date(hireDate + 'T00:00:00');
+                if (selectedDate > today) {
+                    highlightFieldError(form.querySelector('input[name="hire_date"]'), 'Hire date cannot be in the future');
+                    hasErrors = true;
+                }
+            }
             
-            // Email validation
-            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                highlightFieldError(form.querySelector('input[name="email"]'), 'Please enter a valid email address');
+            // Email validation - only allow trusted email providers
+            if (email) {
+                const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                const allowedDomains = [
+                    'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 
+                    'icloud.com', 'protonmail.com', 'aol.com', 'zoho.com',
+                    'mail.com', 'yandex.com', 'gmx.com', 'tutanota.com'
+                ];
+                
+                if (!emailPattern.test(email)) {
+                    highlightFieldError(form.querySelector('input[name="email"]'), 'Please enter a valid email address');
+                    hasErrors = true;
+                } else {
+                    const domain = email.split('@')[1].toLowerCase();
+                    if (!allowedDomains.includes(domain)) {
+                        highlightFieldError(form.querySelector('input[name="email"]'), 'Please use a valid email provider (Gmail, Yahoo, Outlook, etc.)');
+                        hasErrors = true;
+                    }
+                }
+            }
+            
+            // Phone validation (accept formatted: +63 9XX-XXX-XXXX)
+            const phoneDigits = phone.replace(/\D/g, '');
+            if (phone && !phone.startsWith('+63')) {
+                highlightFieldError(form.querySelector('input[name="phone"]'), 'Phone must start with +63');
+                hasErrors = true;
+            }
+            if (phoneDigits && phoneDigits.length !== 12) { // 63 + 10 digits
+                highlightFieldError(form.querySelector('input[name="phone"]'), 'Phone must be in format +63 9XX-XXX-XXXX');
+                hasErrors = true;
+            }
+            if (phoneDigits && !phoneDigits.startsWith('639')) {
+                highlightFieldError(form.querySelector('input[name="phone"]'), 'Philippine mobile numbers start with 9 after +63');
                 hasErrors = true;
             }
             
-            // Phone validation
-            if (phone && !/^[0-9]{11}$/.test(phone)) {
-                highlightFieldError(form.querySelector('input[name="phone"]'), 'Phone must be exactly 11 digits');
+            // Account validation (now mandatory)
+            if (!username) {
+                highlightFieldError(form.querySelector('input[name="username"]'), 'Username is required for system account');
                 hasErrors = true;
             }
-            
-            // Account validation if creating account
-            if (createAccount) {
-                if (!username) {
-                    highlightFieldError(form.querySelector('input[name="username"]'), 'Username is required when creating system account');
-                    hasErrors = true;
-                }
-                if (!password) {
-                    highlightFieldError(form.querySelector('input[name="password"]'), 'Password is required when creating system account');
-                    hasErrors = true;
-                }
+            if (!password) {
+                highlightFieldError(form.querySelector('input[name="password"]'), 'Password is required for system account');
+                hasErrors = true;
             }
             
             if (hasErrors) {
@@ -2361,38 +2468,19 @@ require_once 'includes/dashboard_data.php';
                                 </div>
                                 <h4 class="text-lg font-bold text-[#0B2C62]">System Account</h4>
                             </div>
-                            <div class="bg-white rounded-lg p-5 shadow-sm border-2 border-gray-300 space-y-4">
-                                ${data.createAccount ? `
-                                    <div class="flex items-center gap-3 mb-4">
-                                        <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                        </svg>
-                                        <span class="font-semibold text-gray-900">System account will be created</span>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <span class="font-semibold text-gray-700 block">Username:</span> 
-                                            <span class="text-gray-900 font-medium">${data.username}</span>
-                                        </div>
-                                        <div>
-                                            <span class="font-semibold text-gray-700 block">Password:</span> 
-                                            <span class="text-gray-900 font-medium">${'•'.repeat(data.password.length)} (${data.password.length} chars)</span>
-                                        </div>
-                                        <div>
-                                            <span class="font-semibold text-gray-700 block">Role:</span> 
-                                            <span class="text-gray-900 font-medium">HR</span>
-                                        </div>
-                                    </div>
-                                    <p class="text-gray-700 text-sm pt-2 border-t border-gray-200">This employee will have login access to the HR system.</p>
-                                ` : `
-                                    <div class="flex items-center gap-3 mb-4">
-                                        <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                        </svg>
-                                        <span class="font-semibold text-gray-900">Employee record only</span>
-                                    </div>
-                                    <p class="text-gray-700 text-sm">No system account will be created. Employee will NOT have login access.</p>
-                                `}
+                            <div class="bg-white rounded-lg p-5 shadow-sm border border-gray-200 space-y-3">
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <span class="font-semibold text-gray-800 block">Username:</span>
+                                    <span class="text-gray-900 font-medium">${data.username || 'Not generated'}</span>
+                                </div>
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <span class="font-semibold text-gray-800 block">Password:</span>
+                                    <span class="text-gray-900 font-medium">${data.password ? '•'.repeat(data.password.length) + ' (' + data.password.length + ' chars)' : 'Not generated'}</span>
+                                </div>
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <span class="font-semibold text-gray-800 block">Role:</span>
+                                    <span class="text-gray-900 font-medium">HR</span>
+                                </div>
                             </div>
                         </div>
                     </div>

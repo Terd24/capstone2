@@ -34,8 +34,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $validation_errors[] = "Complete address must be at least 20 characters long.";
     } elseif (strlen($address) > 500) {
         $validation_errors[] = "Complete address must not exceed 500 characters.";
-    } elseif (!preg_match('/.*[,\s].*/i', $address)) {
-        $validation_errors[] = "Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.";
+    } else {
+        // Validate address has at least 4 components separated by commas
+        $addressParts = array_filter(array_map('trim', explode(',', $address)), function($part) {
+            return strlen($part) > 0;
+        });
+        if (count($addressParts) < 4) {
+            $validation_errors[] = "Complete address must include at least 4 components separated by commas (e.g., Street, Barangay, City, Province)";
+        }
     }
     
     if (!empty($validation_errors)) {
@@ -117,6 +123,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $validation_errors[] = "Email is required.";
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $validation_errors[] = "Please enter a valid email address.";
+        } else {
+            // Validate email domain - only allow trusted providers
+            $allowedDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'protonmail.com', 'aol.com', 'zoho.com', 'mail.com', 'yandex.com', 'gmx.com', 'tutanota.com'];
+            $emailDomain = strtolower(substr(strrchr($email, "@"), 1));
+            if (!in_array($emailDomain, $allowedDomains)) {
+                $validation_errors[] = "Please use a valid email provider (Gmail, Yahoo, Outlook, etc.)";
+            }
         }
         
         // Phone validation

@@ -29,6 +29,9 @@ if ($isLocalhost) {
     define('DB_NAME', 'u502476186_onecci_db');
 }
 
+// Set timezone to Philippine Time (applies to all PHP date/time functions)
+date_default_timezone_set('Asia/Manila');
+
 // Create connection
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
@@ -39,4 +42,7 @@ if ($conn->connect_error) {
 }
 
 $conn->set_charset("utf8mb4");
+
+// Set MySQL timezone to Philippine Time (applies to database NOW(), CURDATE(), etc.)
+$conn->query("SET time_zone = '+08:00'");
 ?>

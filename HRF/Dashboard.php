@@ -381,7 +381,7 @@ button[id^="resetPasswordBtn_"][disabled] {
                         <!-- Row 3: Hire Date, Email, Phone -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Hire Date *</label>
-                            <input type="date" name="hire_date" required value="<?= htmlspecialchars($form_data['hire_date'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <input type="date" name="hire_date" max="<?= date('Y-m-d') ?>" required value="<?= htmlspecialchars($form_data['hire_date'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
 
                         <div>
@@ -391,7 +391,7 @@ button[id^="resetPasswordBtn_"][disabled] {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Phone *</label>
-                            <input type="text" name="phone" required value="<?= htmlspecialchars($form_data['phone'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] phone-input" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits (e.g., 09123456789)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
+                            <input type="tel" name="phone" id="phoneField" required placeholder="+63 9XX-XXX-XXXX" value="<?= htmlspecialchars($form_data['phone'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)" oninput="formatPhilippinePhone(this)">
                             <p class="field-error-message text-red-600 text-sm mt-1 font-medium hidden"></p>
                         </div>
                         
@@ -784,6 +784,52 @@ function toggleCreateAccountRFID() {
 if (createAccountChk) createAccountFieldsBound = (createAccountChk.addEventListener('change', updateAccountFieldsVisibility), true);
 if (roleSelect) roleSelect.addEventListener('change', updateRFIDRequirement);
 try { updateAccountFieldsVisibility(); } catch(e) { /* no-op */ }
+
+// Format Philippine phone number with +63 prefix
+function formatPhilippinePhone(input) {
+    // Remove all non-numeric characters except +
+    let value = input.value.replace(/[^\d+]/g, '');
+    
+    // Remove + if it's not at the start
+    if (value.indexOf('+') > 0) {
+        value = value.replace(/\+/g, '');
+    }
+    
+    // If starts with 0, convert to +63
+    if (value.startsWith('0')) {
+        value = '+63' + value.slice(1);
+    }
+    
+    // If doesn't start with +63, add it
+    if (!value.startsWith('+63') && !value.startsWith('+')) {
+        value = '+63' + value;
+    }
+    
+    // Ensure it starts with +63
+    if (value.startsWith('+') && !value.startsWith('+63')) {
+        value = '+63' + value.slice(1);
+    }
+    
+    // Remove +63 prefix for processing
+    let digits = value.replace('+63', '');
+    
+    // Limit to 10 digits (after +63)
+    digits = digits.slice(0, 10);
+    
+    // Format as +63 9XX-XXX-XXXX
+    let formatted = '+63';
+    if (digits.length > 0) {
+        formatted += ' ' + digits.slice(0, 3);
+    }
+    if (digits.length > 3) {
+        formatted += '-' + digits.slice(3, 6);
+    }
+    if (digits.length > 6) {
+        formatted += '-' + digits.slice(6, 10);
+    }
+    
+    input.value = formatted;
+}
 
 // Show notification
 document.addEventListener('DOMContentLoaded', function() {
@@ -1943,16 +1989,80 @@ function confirmAddEmployee() {
     need('input[name="position"]', 'Position is required');
     need('select[name="department"]', 'Department is required');
     need('input[name="hire_date"]', 'Hire date is required');
+    
+    // Validate hire date is not in the future
+    if (hireDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const selectedDate = new Date(hireDate + 'T00:00:00');
+        if (selectedDate > today) {
+            highlightFieldError(form.querySelector('input[name="hire_date"]'), 'Hire date cannot be in the future');
+            hasErrors = true;
+        }
+    }
+    
+    // Email validation - only allow trusted email providers
     if (need('input[name="email"]', 'Email is required')) {
-        invalid('input[name="email"]', v => /^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(v), 'Please enter a valid email address');
+        const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        const allowedDomains = [
+            'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 
+            'icloud.com', 'protonmail.com', 'aol.com', 'zoho.com',
+            'mail.com', 'yandex.com', 'gmx.com', 'tutanota.com'
+        ];
+        
+        if (!emailPattern.test(email)) {
+            highlightFieldError(form.querySelector('input[name="email"]'), 'Please enter a valid email address');
+            hasErrors = true;
+        } else {
+            const domain = email.split('@')[1].toLowerCase();
+            if (!allowedDomains.includes(domain)) {
+                highlightFieldError(form.querySelector('input[name="email"]'), 'Please use a valid email provider (Gmail, Yahoo, Outlook, etc.)');
+                hasErrors = true;
+            }
+        }
     }
+    
+    // Phone validation (accept formatted: +63 9XX-XXX-XXXX)
     if (need('input[name="phone"]', 'Phone is required')) {
-        invalid('input[name="phone"]', v => /^\d{11}$/.test(v), 'Phone must be exactly 11 digits');
+        const phoneDigits = phone.replace(/\D/g, '');
+        if (!phone.startsWith('+63')) {
+            highlightFieldError(form.querySelector('input[name="phone"]'), 'Phone must start with +63');
+            hasErrors = true;
+        }
+        if (phoneDigits.length !== 12) { // 63 + 10 digits
+            highlightFieldError(form.querySelector('input[name="phone"]'), 'Phone must be in format +63 9XX-XXX-XXXX');
+            hasErrors = true;
+        }
+        if (!phoneDigits.startsWith('639')) {
+            highlightFieldError(form.querySelector('input[name="phone"]'), 'Philippine mobile numbers start with 9 after +63');
+            hasErrors = true;
+        }
     }
-    need('textarea[name="address"]', 'Address is required');
-    invalid('textarea[name="address"]', v => v.length >= 20, 'Address must be at least 20 characters long');
-    invalid('textarea[name="address"]', v => v.length <= 500, 'Address must not exceed 500 characters');
-    invalid('textarea[name="address"]', v => /[,\s]/.test(v), 'Complete address must include multiple components (street, barangay, city, etc.) separated by commas or spaces.');
+    
+    // Address validation
+    if (!address) {
+        highlightFieldError(form.querySelector('textarea[name="address"]'), 'Address is required');
+        hasErrors = true;
+    } else if (address.length < 20) {
+        highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must be at least 20 characters long');
+        hasErrors = true;
+    } else if (address.length > 500) {
+        highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must not exceed 500 characters');
+        hasErrors = true;
+    } else {
+        // Count commas to ensure multiple address components
+        const commaCount = (address.match(/,/g) || []).length;
+        if (commaCount < 3) {
+            highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must include at least 4 components separated by commas (e.g., Street, Barangay, City, Province)');
+            hasErrors = true;
+        }
+        // Check if address has meaningful content (not just commas)
+        const addressParts = address.split(',').map(part => part.trim()).filter(part => part.length > 0);
+        if (addressParts.length < 4) {
+            highlightFieldError(form.querySelector('textarea[name="address"]'), 'Complete address must include street, barangay, city/municipality, and province');
+            hasErrors = true;
+        }
+    }
 
     if (createAccount) {
         // Username and password are auto-generated, no need to validate

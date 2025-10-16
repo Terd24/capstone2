@@ -30,6 +30,44 @@ if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($pos
     exit;
 }
 
+// Validate email format if provided
+if (!empty($email)) {
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(['success' => false, 'message' => 'Please enter a valid email address']);
+        exit;
+    }
+    
+    // Validate email domain - only allow trusted providers
+    $allowedDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'protonmail.com', 'aol.com', 'zoho.com', 'mail.com', 'yandex.com', 'gmx.com', 'tutanota.com'];
+    $emailDomain = strtolower(substr(strrchr($email, "@"), 1));
+    if (!in_array($emailDomain, $allowedDomains)) {
+        echo json_encode(['success' => false, 'message' => 'Please use a valid email provider (Gmail, Yahoo, Outlook, etc.)']);
+        exit;
+    }
+}
+
+// Validate address
+if (empty($address)) {
+    echo json_encode(['success' => false, 'message' => 'Complete Address is required']);
+    exit;
+}
+if (strlen($address) < 20) {
+    echo json_encode(['success' => false, 'message' => 'Complete address must be at least 20 characters long']);
+    exit;
+}
+if (strlen($address) > 500) {
+    echo json_encode(['success' => false, 'message' => 'Complete address must not exceed 500 characters']);
+    exit;
+}
+// Validate address has at least 4 components separated by commas
+$addressParts = array_filter(array_map('trim', explode(',', $address)), function($part) {
+    return strlen($part) > 0;
+});
+if (count($addressParts) < 4) {
+    echo json_encode(['success' => false, 'message' => 'Complete address must include at least 4 components separated by commas (e.g., Street, Barangay, City, Province)']);
+    exit;
+}
+
 try {
     // Start transaction
     $conn->begin_transaction();
