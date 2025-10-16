@@ -311,25 +311,28 @@ $all_stmt->close();
       <!-- Student Profile -->
       <div class="lg:col-span-1">
         <div class="bg-white rounded-2xl card-shadow p-6">
+          <div class="mb-4 pb-4 border-b">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">My Profile</h3>
+          </div>
           <div class="text-center">
-            <div class="w-20 h-20 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
-              <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <div class="w-24 h-24 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-4 shadow-lg ring-4 ring-blue-100">
+              <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
               </svg>
             </div>
-            <h3 class="text-lg font-bold text-gray-800"><?= $_SESSION['student_name'] ?? 'Student' ?></h3>
-            <p class="text-gray-600 text-sm">ID: <?= $_SESSION['id_number'] ?></p>
+            <h3 class="text-xl font-bold text-gray-800 mb-1"><?= $_SESSION['student_name'] ?? 'Student' ?></h3>
+            <p class="text-gray-500 text-xs font-medium">Student ID: <?= $_SESSION['id_number'] ?></p>
           </div>
           
           <div class="mt-6 pt-6 border-t">
-            <div class="space-y-3 text-sm">
-              <div>
-                <span class="text-gray-500 font-medium">Program:</span>
-                <p class="text-gray-800"><?= $_SESSION['program'] ?? 'N/A' ?></p>
+            <div class="space-y-4 text-sm">
+              <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-100">
+                <span class="text-gray-600 font-semibold block mb-1.5 text-xs uppercase tracking-wide">Program</span>
+                <p class="text-gray-800 font-bold text-base"><?= $_SESSION['program'] ?? 'N/A' ?></p>
               </div>
-              <div>
-                <span class="text-gray-500 font-medium">Year & Section:</span>
-                <p class="text-gray-800"><?= $_SESSION['year_section'] ?? 'N/A' ?></p>
+              <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3 border border-indigo-100">
+                <span class="text-gray-600 font-semibold block mb-1.5 text-xs uppercase tracking-wide">Year & Section</span>
+                <p class="text-gray-800 font-bold text-base"><?= $_SESSION['year_section'] ?? 'N/A' ?></p>
               </div>
             </div>
           </div>
@@ -340,9 +343,9 @@ $all_stmt->close();
       <div class="lg:col-span-3">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">Student Dashboard</h2>
 
-        <!-- Registrar Section -->
+        <!-- Academic Records Section -->
         <div class="mb-6">
-          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Registrar</h3>
+          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Academic Records</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Grades Card -->
             <div onclick="location.href='Grades.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
@@ -411,9 +414,9 @@ $all_stmt->close();
           </div>
         </div>
 
-        <!-- Cashier Section -->
+        <!-- Financial Information Section -->
         <div class="mb-6">
-          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Cashier</h3>
+          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Financial Information</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Balance Card -->
             <div onclick="location.href='Balances.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">
@@ -430,9 +433,9 @@ $all_stmt->close();
           </div>
         </div>
 
-        <!-- Guidance Section -->
+        <!-- Student Welfare Section -->
         <div class="mb-6">
-          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Guidance Office</h3>
+          <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">Student Welfare</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Guidance Card -->
             <div onclick="location.href='GuidanceRecord.php'" class="bg-white rounded-2xl card-shadow p-6 cursor-pointer hover:shadow-xl transition-all duration-200">

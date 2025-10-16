@@ -21,14 +21,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $student_id = $result['student_id'];
             $doc_name = $result['document_type'];
 
-            // Send notification
+            // Send notification to student
             $message = "📄 Your document '$doc_name' status has been updated to '$status'.";
             $stmt3 = $conn->prepare("INSERT INTO notifications (student_id, message, date_sent, is_read) VALUES (?, ?, NOW(), 0)");
             $stmt3->bind_param("ss", $student_id, $message);
             $stmt3->execute();
             $stmt3->close();
 
-            // If Claimed, update date_claimed and add to submitted_documents if not exists
+            // Check if student is Kinder and send notification to parent
+            $kinder_check = $conn->prepare("SELECT academic_track, grade_level FROM student_account WHERE id_number = ?");
+            $kinder_check->bind_param("s", $student_id);
+            $kinder_check->execute();
+            $kinder_result = $kinder_check->get_result();
+            
+            if ($kinder_result && $kinder_result->num_rows > 0) {
+                $student_info = $kinder_result->fetch_assoc();
+                $is_kinder = (stripos($student_info['academic_track'], 'kinder') !== false || 
+                             stripos($student_info['academic_track'], 'pre-elementary') !== false ||
+                             stripos($student_info['grade_level'], 'kinder') !== false);
+                
+                if ($is_kinder) {
+                    // Get parent_id for this child
+                    $parent_check = $conn->prepare("SELECT parent_id FROM parent_account WHERE child_id = ?");
+                    $parent_check->bind_param("s", $student_id);
+                    $parent_check->execute();
+                    $parent_result = $parent_check->get_result();
+                    
+                    if ($parent_result && $parent_result->num_rows > 0) {
+                        $parent_row = $parent_result->fetch_assoc();
+                        $parent_id = $parent_row['parent_id'];
+                        
+                        // Send notification to parent
+                        $parent_message = "📄 Your child's document request for '$doc_name' has been updated to '$status'.";
+                        $stmt_parent = $conn->prepare("INSERT INTO parent_notifications (parent_id, child_id, message, date_sent, is_read) VALUES (?, ?, ?, NOW(), 0)");
+                        $stmt_parent->bind_param("sss", $parent_id, $student_id, $parent_message);
+                        $stmt_parent->execute();
+                        $stmt_parent->close();
+                    }
+                    $parent_check->close();
+                }
+            }
+            $kinder_check->close();
+
+            // If Claimed or Declined, auto-mark notifications as read
+            if ($status === 'Claimed' || $status === 'Declined' || $status === 'Decline') {
+                // Auto-mark all related notifications as read
+                $stmt_mark_read = $conn->prepare("UPDATE notifications SET is_read = 1 WHERE student_id = ? AND message LIKE ? AND is_read = 0");
+                $doc_pattern = "%$doc_name%";
+                $stmt_mark_read->bind_param("ss", $student_id, $doc_pattern);
+                $stmt_mark_read->execute();
+                $stmt_mark_read->close();
+
+                // Also mark parent notifications as read (for Kinder students)
+                $stmt_parent_read = $conn->prepare("UPDATE parent_notifications SET is_read = 1 WHERE child_id = ? AND message LIKE ? AND is_read = 0");
+                $stmt_parent_read->bind_param("ss", $student_id, $doc_pattern);
+                $stmt_parent_read->execute();
+                $stmt_parent_read->close();
+            }
+
+            // If Claimed specifically, update date_claimed and add to submitted_documents
             if ($status === 'Claimed') {
                 $stmt4 = $conn->prepare("UPDATE document_requests SET date_claimed = NOW() WHERE id=?");
                 $stmt4->bind_param("i", $id);

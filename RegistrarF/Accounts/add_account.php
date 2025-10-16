@@ -1227,27 +1227,27 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 </div>
                 
                 <!-- Personal Account Section -->
-                <div class="col-span-3 bg-gray-50 border-2 border-gray-400 rounded-lg p-4 mt-4">
+                <div id="personalAccountSection" class="col-span-3 bg-gray-50 border-2 border-gray-400 rounded-lg p-4 mt-4">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                         </svg>
                         <span class="tracking-wide">PERSONAL ACCOUNT</span>
                     </h3>
-                    <!-- Row 1: Username (full width) -->
+                    <!-- Row 1: Username & Password -->
                     <div class="grid grid-cols-2 gap-6 mb-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Username <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
                             <input type="text" name="username" autocomplete="off" value="<?= htmlspecialchars($form_data['username'] ?? '') ?>" pattern="^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$" title="Auto-generated: lastname000000muzon@student.cci.edu.ph" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;">
                         </div>
-                                                <div>
+                        <div>
                             <label class="block text-sm font-semibold mb-1">Password <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
                             <input type="text" name="password" autocomplete="new-password" value="<?= htmlspecialchars($form_data['password'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]" readonly style="background-color:#f3f4f6; cursor:not-allowed;" title="Auto-generated when date of birth is entered: surnamemonthddyyyy">
                             <p class="text-xs text-gray-500 mt-1">Format: <span class="font-medium">lastname + birthdate</span> (e.g., studentjanuary152003)</p>
                         </div>
                     </div>
                     
-                    <!-- Row 2: Student ID, Password, RFID Number -->
+                    <!-- Row 2: Student ID -->
                     <div class="grid grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Student ID <span class="text-gray-500 font-normal">(Auto-generated)</span></label>
@@ -1256,9 +1256,27 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_id) ?></p>
                             <?php endif; ?>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- RFID Section (Always Visible) -->
+                <div class="col-span-3 bg-gray-50 border-2 border-gray-400 rounded-lg p-4 mt-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                        </svg>
+                        <span class="tracking-wide">STUDENT RFID CARD</span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">RFID Number <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <label class="block text-sm font-semibold mb-1">Student RFID Number <span class="text-gray-500 text-xs">(Optional)</span></label>
                             <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
+                            <p class="text-xs text-gray-500 mt-1">
+                                <span class="font-medium">For student use:</span> Attendance tracking, cashier transactions, and other school modules
+                            </p>
+                            <p class="text-xs text-blue-600 mt-1 font-medium">
+                                📝 Note: For Kinder students, parents can request documents through their parent account
+                            </p>
                             <?php if (!empty($error_rfid)): ?>
                                 <p class="text-red-500 text-sm mt-1 font-medium"><?= htmlspecialchars($error_rfid) ?></p>
                             <?php endif; ?>
@@ -1378,6 +1396,31 @@ function populateGradeLevels(selectedTrack, selectedGrade = '') {
         if (level === selectedGrade) option.selected = true;
         gradeLevel.appendChild(option);
     });
+    
+    // Toggle Personal Account section visibility based on Academic Track
+    togglePersonalAccountSection(selected, course);
+}
+
+// Function to hide/show Personal Account section for Kinder students
+function togglePersonalAccountSection(selectedGroup, selectedCourse) {
+    const personalAccountSection = document.getElementById('personalAccountSection');
+    if (!personalAccountSection) return;
+    
+    // Hide Personal Account section if Pre-Elementary (Kinder) is selected
+    // Kinder students are too young to have login accounts
+    const isKinder = selectedGroup === 'Pre-Elementary' || selectedCourse === 'Kinder' || 
+                     (selectedCourse && selectedCourse.toLowerCase().includes('kinder'));
+    
+    if (isKinder) {
+        personalAccountSection.style.display = 'none';
+        // Clear username and password fields for Kinder students
+        const usernameField = document.querySelector('input[name="username"]');
+        const passwordField = document.querySelector('input[name="password"]');
+        if (usernameField) usernameField.value = '';
+        if (passwordField) passwordField.value = '';
+    } else {
+        personalAccountSection.style.display = 'block';
+    }
 }
 
 // Wait for DOM to be fully loaded

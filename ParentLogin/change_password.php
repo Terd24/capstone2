@@ -69,9 +69,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md">
         <div class="bg-white rounded-2xl shadow-xl p-8">
+            <?php
+            // Get guardian name from student account
+            $guardian_name = 'Parent';
+            if (isset($_SESSION['child_id'])) {
+                $guard_stmt = $conn->prepare("SELECT guardian_name FROM student_account WHERE id_number = ?");
+                $guard_stmt->bind_param("s", $_SESSION['child_id']);
+                $guard_stmt->execute();
+                $guard_result = $guard_stmt->get_result();
+                if ($guard_result && $guard_result->num_rows === 1) {
+                    $guard_row = $guard_result->fetch_assoc();
+                    $guardian_name = $guard_row['guardian_name'] ?? 'Parent';
+                }
+                $guard_stmt->close();
+            }
+            ?>
             <div class="text-center mb-6">
                 <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="w-16 h-16 mx-auto mb-4">
-                <h1 class="text-2xl font-bold text-gray-800 mb-2">Welcome, <?= htmlspecialchars($_SESSION['parent_name'] ?? 'Parent') ?>!</h1>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Welcome, <?= htmlspecialchars($guardian_name) ?>!</h1>
                 <p class="text-gray-600 text-sm">This is your first time logging in. Please create a new password for your account.</p>
             </div>
 

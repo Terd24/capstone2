@@ -25,19 +25,35 @@ header("Expires: 0");
 // Ensure column exists for read/unread
 $conn->query("ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS is_read TINYINT(1) DEFAULT 0");
 
-// Fetch all requests for client-side pagination - prioritize oldest pending first, then other statuses, claimed last
+// Fetch all requests for client-side pagination - sort by status priority: Pending, Approved, Ready to Claim, Claimed, Declined
 $query = "SELECT * FROM document_requests ORDER BY 
     CASE 
         WHEN status = 'Pending' THEN 1
-        WHEN status = 'Ready to Claim' OR status = 'Ready for Claiming' THEN 2
-        WHEN status = 'Claimed' THEN 3
-        ELSE 4
+        WHEN status = 'Approved' THEN 2
+        WHEN status = 'Ready to Claim' OR status = 'Ready for Claiming' THEN 3
+        WHEN status = 'Claimed' THEN 4
+        WHEN status = 'Declined' OR status = 'Decline' THEN 5
+        ELSE 6
     END ASC,
     date_requested ASC";
 $result = $conn->query($query);
 
-// Fetch recent requests - prioritize unread first, then oldest, exclude claimed and older than 3 days
-$recent = $conn->query("SELECT * FROM document_requests WHERE status != 'Claimed' AND date_requested >= DATE_SUB(NOW(), INTERVAL 3 DAY) ORDER BY is_read ASC, date_requested ASC LIMIT 10");
+// Fetch recent requests - prioritize unread first, then oldest, exclude claimed/declined and older than 3 days
+$recent = $conn->query("SELECT * FROM document_requests WHERE status NOT IN ('Claimed', 'Declined', 'Decline') AND date_requested >= DATE_SUB(NOW(), INTERVAL 3 DAY) ORDER BY is_read ASC, date_requested ASC LIMIT 10");
+
+// Fetch unique document types from document_requests for filter dropdown
+$doc_types_query = $conn->query("SELECT DISTINCT document_type FROM document_requests ORDER BY document_type ASC");
+$document_types = [];
+
+// Get status counts for quick filter buttons
+$status_counts = [
+    'all' => $conn->query("SELECT COUNT(*) as count FROM document_requests")->fetch_assoc()['count'],
+    'pending' => $conn->query("SELECT COUNT(*) as count FROM document_requests WHERE status = 'Pending'")->fetch_assoc()['count'],
+    'approved' => $conn->query("SELECT COUNT(*) as count FROM document_requests WHERE status = 'Approved'")->fetch_assoc()['count'],
+    'ready' => $conn->query("SELECT COUNT(*) as count FROM document_requests WHERE status IN ('Ready to Claim', 'Ready for Claiming')")->fetch_assoc()['count'],
+    'claimed' => $conn->query("SELECT COUNT(*) as count FROM document_requests WHERE status = 'Claimed'")->fetch_assoc()['count'],
+    'declined' => $conn->query("SELECT COUNT(*) as count FROM document_requests WHERE status IN ('Declined', 'Decline')")->fetch_assoc()['count']
+];
 // Helper function for PHP fallback time ago (optional)
 function timeAgo($time) {
     // Use MySQL timestamp directly to avoid timezone conversion issues
@@ -242,7 +258,8 @@ function timeAgo($time) {
                     </svg>
                     Recent Requests
                     <?php 
-                    $unreadCount = $conn->query("SELECT COUNT(*) AS c FROM document_requests WHERE is_read=0")->fetch_assoc()['c'];
+                    // Count only unread requests that are NOT claimed/declined and within 3 days
+                    $unreadCount = $conn->query("SELECT COUNT(*) AS c FROM document_requests WHERE is_read=0 AND status NOT IN ('Claimed', 'Declined', 'Decline') AND date_requested >= DATE_SUB(NOW(), INTERVAL 3 DAY)")->fetch_assoc()['c'];
                     if($unreadCount > 0): ?>
                         <span id="notifBadge" class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full"><?= $unreadCount ?></span>
                     <?php endif; ?>
@@ -309,19 +326,67 @@ function timeAgo($time) {
 
         <div class="bg-white rounded-2xl card-shadow p-6">
             <!-- Filter Dropdown -->
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
                 <h2 class="text-lg font-semibold">All Student Requests</h2>
-                <div>
-                    <label for="statusFilter" class="text-sm text-gray-700 mr-2">Filter by status:</label>
-                    <select id="statusFilter" class="border border-gray-400 rounded px-2 py-1 text-sm">
-                        <option value="all">All</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Ready to Claim">Ready to Claim</option>
-                        <option value="Claimed">Claimed</option>
-                        <option value="Decline">Decline</option>
-                    </select>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <!-- Document Name Filter -->
+                    <div class="flex items-center gap-2">
+                        <label for="documentFilter" class="text-sm text-gray-700 font-medium">Document:</label>
+                        <select id="documentFilter" class="border-2 border-gray-400 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white">
+                            <option value="all">All Documents</option>
+                            <?php 
+                            if ($doc_types_query) {
+                                while ($doc = $doc_types_query->fetch_assoc()) {
+                                    echo '<option value="' . htmlspecialchars($doc['document_type']) . '">' . htmlspecialchars($doc['document_type']) . '</option>';
+                                }
+                            }
+                            ?>
+                        </select>
+                    </div>
+                    <!-- Date Filter -->
+                    <div class="flex items-center gap-2">
+                        <label for="dateFrom" class="text-sm text-gray-700 font-medium">From:</label>
+                        <input type="date" id="dateFrom" max="<?= date('Y-m-d') ?>" class="border-2 border-gray-400 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                        <label for="dateTo" class="text-sm text-gray-700 font-medium">To:</label>
+                        <input type="date" id="dateTo" max="<?= date('Y-m-d') ?>" class="border-2 border-gray-400 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                        <button onclick="clearDateFilter()" class="px-4 py-2 text-sm font-medium text-white bg-[#0B2C62] hover:bg-blue-900 rounded-lg transition-colors">
+                            Clear
+                        </button>
+                    </div>
                 </div>
+            </div>
+            
+            <!-- Hidden status filter for JavaScript -->
+            <select id="statusFilter" class="hidden">
+                <option value="all">All</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Ready to Claim">Ready to Claim</option>
+                <option value="Claimed">Claimed</option>
+                <option value="Declined">Declined</option>
+            </select>
+
+            <!-- Quick Status Filter Buttons -->
+            <div class="flex items-center gap-2 mb-4 flex-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide mr-2">Filter by Status:</span>
+                <button type="button" onclick="quickFilterStatus('all')" id="quickFilter-all" class="quick-filter-btn px-3 py-1.5 rounded-md text-xs font-semibold transition-all bg-[#0B2C62] text-white shadow-sm cursor-pointer">
+                    All <span class="ml-1.5 bg-white bg-opacity-25 px-1.5 py-0.5 rounded text-xs pointer-events-none"><?= $status_counts['all'] ?></span>
+                </button>
+                <button type="button" onclick="quickFilterStatus('Pending')" id="quickFilter-pending" class="quick-filter-btn px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-white text-gray-700 hover:bg-yellow-50 border border-gray-300 cursor-pointer">
+                    Pending <span class="ml-1.5 bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-semibold pointer-events-none"><?= $status_counts['pending'] ?></span>
+                </button>
+                <button type="button" onclick="quickFilterStatus('Approved')" id="quickFilter-approved" class="quick-filter-btn px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-white text-gray-700 hover:bg-blue-50 border border-gray-300 cursor-pointer">
+                    Approved <span class="ml-1.5 bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold pointer-events-none"><?= $status_counts['approved'] ?></span>
+                </button>
+                <button type="button" onclick="quickFilterStatus('Ready to Claim')" id="quickFilter-ready" class="quick-filter-btn px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-white text-gray-700 hover:bg-green-50 border border-gray-300 cursor-pointer">
+                    Ready <span class="ml-1.5 bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold pointer-events-none"><?= $status_counts['ready'] ?></span>
+                </button>
+                <button type="button" onclick="quickFilterStatus('Claimed')" id="quickFilter-claimed" class="quick-filter-btn px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-white text-gray-700 hover:bg-purple-50 border border-gray-300 cursor-pointer">
+                    Claimed <span class="ml-1.5 bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold pointer-events-none"><?= $status_counts['claimed'] ?></span>
+                </button>
+                <button type="button" onclick="quickFilterStatus('Declined')" id="quickFilter-declined" class="quick-filter-btn px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-white text-gray-700 hover:bg-red-50 border border-gray-300 cursor-pointer">
+                    Declined <span class="ml-1.5 bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold pointer-events-none"><?= $status_counts['declined'] ?></span>
+                </button>
             </div>
 
             <div class="overflow-x-auto">
@@ -342,6 +407,8 @@ function timeAgo($time) {
                             <?php while ($r = $result->fetch_assoc()): ?>
                                 <tr class="all-request-row bg-white hover:bg-[#FBB917]/20 transition cursor-pointer" 
                                     data-status="<?= htmlspecialchars($r['status']) ?>"
+                                    data-date-requested="<?= htmlspecialchars($r['date_requested']) ?>"
+                                    data-document-type="<?= htmlspecialchars($r['document_type']) ?>"
                                     data-row-number="<?= $rowNumber ?>"
                                     onclick="viewRequest('<?= htmlspecialchars($r['student_id']) ?>', '<?= htmlspecialchars($r['document_type']) ?>', '<?= $r['status'] ?>')">
                                     <td class="px-4 py-4 text-gray-500 font-medium text-center"><?= $rowNumber ?></td>
@@ -360,8 +427,8 @@ function timeAgo($time) {
                                             <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ready to Claim</span>
                                         <?php elseif ($r['status'] === 'Claimed'): ?>
                                             <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Claimed</span>
-                                        <?php elseif ($r['status'] === 'Decline'): ?>
-                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Decline</span>
+                                        <?php elseif ($r['status'] === 'Decline' || $r['status'] === 'Declined'): ?>
+                                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700">Declined</span>
                                         <?php else: ?>
                                             <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800"><?= htmlspecialchars($r['status']) ?></span>
                                         <?php endif; ?>
@@ -745,23 +812,108 @@ function initializeAllRequests() {
 
 function applyStatusFilter() {
     const statusFilter = document.getElementById('statusFilter');
+    const documentFilter = document.getElementById('documentFilter');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
     const selectedStatus = statusFilter.value;
+    const selectedDocument = documentFilter.value;
     
-    if (selectedStatus === 'all') {
-        filteredRequests = [...allRequests];
-    } else {
-        filteredRequests = allRequests.filter(row => {
+    // Start with all requests for counting
+    let baseFiltered = [...allRequests];
+    
+    // Apply document type filter for base
+    if (selectedDocument !== 'all') {
+        baseFiltered = baseFiltered.filter(row => {
+            const rowDocument = row.getAttribute('data-document-type');
+            return rowDocument === selectedDocument;
+        });
+    }
+    
+    // Apply date filter for base
+    if (dateFrom.value || dateTo.value) {
+        baseFiltered = baseFiltered.filter(row => {
+            const dateRequested = row.getAttribute('data-date-requested');
+            if (!dateRequested) return false;
+            
+            const requestDate = new Date(dateRequested);
+            const fromDate = dateFrom.value ? new Date(dateFrom.value) : null;
+            const toDate = dateTo.value ? new Date(dateTo.value + 'T23:59:59') : null;
+            
+            if (fromDate && requestDate < fromDate) return false;
+            if (toDate && requestDate > toDate) return false;
+            
+            return true;
+        });
+    }
+    
+    // Update status button counts based on current filters
+    updateStatusCounts(baseFiltered);
+    
+    // Now apply status filter for final display
+    let filtered = [...baseFiltered];
+    
+    // Apply status filter
+    if (selectedStatus !== 'all') {
+        filtered = filtered.filter(row => {
             const rowStatus = row.getAttribute('data-status');
             if (selectedStatus === 'Ready to Claim') {
                 return rowStatus === 'Ready to Claim' || rowStatus === 'Ready for Claiming';
+            }
+            if (selectedStatus === 'Decline' || selectedStatus === 'Declined') {
+                return rowStatus === 'Decline' || rowStatus === 'Declined';
             }
             return rowStatus === selectedStatus;
         });
     }
     
+    filteredRequests = filtered;
+    
     // Reset to page 1 when filtering
     currentAllRequestsPage = 1;
     renderAllRequestsPage();
+}
+
+function updateStatusCounts(filteredRows) {
+    // Count each status in the filtered results
+    const counts = {
+        all: filteredRows.length,
+        pending: 0,
+        approved: 0,
+        ready: 0,
+        claimed: 0,
+        declined: 0
+    };
+    
+    filteredRows.forEach(row => {
+        const status = row.getAttribute('data-status');
+        if (status === 'Pending') counts.pending++;
+        else if (status === 'Approved') counts.approved++;
+        else if (status === 'Ready to Claim' || status === 'Ready for Claiming') counts.ready++;
+        else if (status === 'Claimed') counts.claimed++;
+        else if (status === 'Declined' || status === 'Decline') counts.declined++;
+    });
+    
+    // Update button badges
+    const updateBadge = (btnId, count) => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            const badge = btn.querySelector('span');
+            if (badge) badge.textContent = count;
+        }
+    };
+    
+    updateBadge('quickFilter-all', counts.all);
+    updateBadge('quickFilter-pending', counts.pending);
+    updateBadge('quickFilter-approved', counts.approved);
+    updateBadge('quickFilter-ready', counts.ready);
+    updateBadge('quickFilter-claimed', counts.claimed);
+    updateBadge('quickFilter-declined', counts.declined);
+}
+
+function clearDateFilter() {
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    applyStatusFilter();
 }
 
 function renderAllRequestsPage() {
@@ -821,9 +973,66 @@ function renderAllRequestsPage() {
     }
 }
 
-// ===== Status Filter =====
+// ===== Quick Filter Function =====
+window.quickFilterStatus = function(status) {
+    console.log('Quick filter clicked:', status);
+    
+    const statusFilter = document.getElementById('statusFilter');
+    if (!statusFilter) {
+        console.error('Status filter not found');
+        return;
+    }
+    
+    // Update the status dropdown
+    if (status === 'all') {
+        statusFilter.value = 'all';
+    } else {
+        statusFilter.value = status;
+    }
+    
+    // Update button styles - reset all to inactive
+    document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+        btn.classList.remove('bg-[#0B2C62]', 'text-white', 'shadow-sm');
+        btn.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+    });
+    
+    // Highlight active button
+    let btnId = 'quickFilter-all';
+    if (status !== 'all') {
+        const statusLower = status.toLowerCase().replace(/\s+/g, '-');
+        if (statusLower.includes('ready')) {
+            btnId = 'quickFilter-ready';
+        } else if (statusLower === 'decline' || statusLower === 'declined') {
+            btnId = 'quickFilter-declined';
+        } else {
+            btnId = 'quickFilter-' + statusLower;
+        }
+    }
+    
+    const activeBtn = document.getElementById(btnId);
+    if (activeBtn) {
+        activeBtn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+        activeBtn.classList.add('bg-[#0B2C62]', 'text-white', 'shadow-sm');
+    }
+    
+    // Apply the filter
+    if (typeof applyStatusFilter === 'function') {
+        applyStatusFilter();
+    } else {
+        console.error('applyStatusFilter function not found');
+    }
+}
+
+// ===== Status, Document, and Date Filters =====
 const statusFilter = document.getElementById('statusFilter');
+const documentFilter = document.getElementById('documentFilter');
+const dateFrom = document.getElementById('dateFrom');
+const dateTo = document.getElementById('dateTo');
+
 statusFilter.addEventListener('change', applyStatusFilter);
+documentFilter.addEventListener('change', applyStatusFilter);
+dateFrom.addEventListener('change', applyStatusFilter);
+dateTo.addEventListener('change', applyStatusFilter);
 
 // Initialize All Student Requests pagination
 document.addEventListener('DOMContentLoaded', function() {
