@@ -37,7 +37,7 @@ $export = $_GET['export'] ?? '';
 
 $offset = ($page - 1) * $limit;
 
-// Build query
+// Build query - exclude superadmin and owner
 $query = "
     SELECT 
         la.user_type, 
@@ -57,7 +57,8 @@ $query = "
     LEFT JOIN student_account s ON la.id_number = s.id_number AND la.user_type = 'student'
     LEFT JOIN employees e ON la.id_number = e.id_number AND la.user_type = 'employee'
     LEFT JOIN student_account sc ON la.id_number = sc.id_number AND la.user_type = 'parent'
-    WHERE 1=1
+    WHERE la.role NOT IN ('superadmin', 'owner')
+      AND la.username NOT IN ('superadmin', 'owner')
 ";
 
 $params = [];
@@ -149,14 +150,15 @@ if ($export === 'csv') {
     }
 }
 
-// Get total count - build a simpler count query
+// Get total count - build a simpler count query - exclude superadmin and owner
 $countQuery = "
     SELECT COUNT(*)
     FROM login_activity la
     LEFT JOIN student_account s ON la.id_number = s.id_number AND la.user_type = 'student'
     LEFT JOIN employees e ON la.id_number = e.id_number AND la.user_type = 'employee'
     LEFT JOIN student_account sc ON la.id_number = sc.id_number AND la.user_type = 'parent'
-    WHERE 1=1
+    WHERE la.role NOT IN ('superadmin', 'owner')
+      AND la.username NOT IN ('superadmin', 'owner')
 ";
 
 // Add same filters as main query

@@ -82,7 +82,11 @@ if ($type === 'employees') {
         )
         UNION
         (
-            SELECT DISTINCT pa.child_id as id_number, sc.first_name, sc.last_name, sc.middle_name, 'Parent' as user_type
+            SELECT DISTINCT pa.child_id as id_number, 
+                   CONCAT('Parent of ', sc.first_name, ' ', sc.last_name) as first_name,
+                   '' as last_name, 
+                   '' as middle_name, 
+                   'Parent' as user_type
             FROM parent_account pa
             INNER JOIN student_account sc ON pa.child_id = sc.id_number
             LEFT JOIN login_activity la ON pa.child_id = la.id_number AND DATE(la.login_time) = ? AND la.user_type = 'parent'
@@ -98,7 +102,13 @@ if ($type === 'employees') {
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            $full_name = trim($row['first_name'] . ', ' . $row['last_name']);
+            if ($row['user_type'] === 'Parent') {
+                // For parents, first_name already contains "Parent of [Name]"
+                $full_name = $row['first_name'];
+            } else {
+                // For students, format as "First, Last"
+                $full_name = trim($row['first_name'] . ', ' . $row['last_name']);
+            }
             $type_label = $row['user_type'];
             $response['items'][] = "• {$full_name} ({$row['id_number']}) - {$type_label}";
         }

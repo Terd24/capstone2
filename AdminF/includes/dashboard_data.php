@@ -206,6 +206,7 @@ $active_users = [];
 if (table_exists($conn, 'login_activity')) {
     try {
         // Query to get login activity with names from appropriate tables
+        // Exclude superadmin and owner
         $login_query = "
             SELECT 
                 la.user_type, 
@@ -226,6 +227,8 @@ if (table_exists($conn, 'login_activity')) {
             LEFT JOIN employees e ON la.id_number = e.id_number AND la.user_type = 'employee'
             LEFT JOIN student_account sc ON la.id_number = sc.id_number AND la.user_type = 'parent'
             WHERE DATE(la.login_time) = ?
+              AND la.role NOT IN ('superadmin', 'owner')
+              AND la.username NOT IN ('superadmin', 'owner')
             ORDER BY la.login_time DESC 
             LIMIT 50
         ";

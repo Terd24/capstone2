@@ -72,6 +72,30 @@ require_once 'includes/dashboard_data.php';
     <title>Super Admin Dashboard - Cornerstone College Inc.</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="assets/css/dashboard.css">
+    <style>
+        /* Prevent flash of dashboard on page load */
+        .section:not(.active) {
+            display: none !important;
+        }
+    </style>
+    <script>
+        // Restore section state IMMEDIATELY before any rendering
+        (function() {
+            const savedSection = sessionStorage.getItem('currentSection');
+            const activeSection = sessionStorage.getItem('activeSection');
+            const sectionToShow = activeSection === 'deleted-items' ? 'deleted-items' : (savedSection || 'dashboard');
+            
+            // If not dashboard, inject CSS to hide dashboard and show target section
+            if (sectionToShow !== 'dashboard') {
+                const style = document.createElement('style');
+                style.innerHTML = `
+                    #dashboard-section { display: none !important; }
+                    #${sectionToShow}-section { display: block !important; }
+                `;
+                document.head.appendChild(style);
+            }
+        })();
+    </script>
 </head>
 <body class="min-h-screen bg-gray-50 flex">
     <!-- Sidebar -->
@@ -170,7 +194,7 @@ require_once 'includes/dashboard_data.php';
                     <h1 id="page-title" class="text-2xl font-bold text-gray-900">Dashboard</h1>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button onclick="location.reload()" class="p-2 rounded-md hover:bg-gray-100 text-gray-600">
+                    <button onclick="refreshCurrentSection()" class="p-2 rounded-md hover:bg-gray-100 text-gray-600" title="Refresh">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
@@ -525,26 +549,36 @@ require_once 'includes/dashboard_data.php';
                             </div>
                             
                             <!-- Filters -->
-                            <div class="flex flex-wrap gap-3">
+                            <div class="flex flex-wrap gap-3 items-end">
                                 <div class="flex items-center gap-2">
-                                    <label class="text-white text-sm font-medium">User Type:</label>
-                                    <select id="filter-user-type" onchange="updateRoleOptions(); filterLogins();" class="px-3 py-1.5 bg-white/20 text-white border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white/50">
-                                        <option value="all" class="text-gray-900">All</option>
-                                        <option value="student" class="text-gray-900">Student</option>
-                                        <option value="employee" class="text-gray-900">Employee</option>
-                                        <option value="parent" class="text-gray-900">Parent</option>
+                                    <label class="text-white text-sm font-medium whitespace-nowrap">User Type:</label>
+                                    <select id="filter-user-type" onchange="updateRoleOptions(); filterLogins();" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                                        <option value="all">All</option>
+                                        <option value="student">Student</option>
+                                        <option value="employee">Employee</option>
+                                        <option value="parent">Parent</option>
                                     </select>
                                 </div>
                                 
                                 <div class="flex items-center gap-2">
-                                    <label class="text-white text-sm font-medium">Role:</label>
-                                    <select id="filter-role" onchange="filterLogins()" class="px-3 py-1.5 bg-white/20 text-white border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white/50">
-                                        <option value="all" class="text-gray-900">All</option>
+                                    <label class="text-white text-sm font-medium whitespace-nowrap">Role:</label>
+                                    <select id="filter-role" onchange="filterLogins()" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                                        <option value="all">All</option>
                                         <!-- Options will be populated dynamically -->
                                     </select>
                                 </div>
                                 
-                                <button onclick="clearFilters()" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all">
+                                <div class="flex items-center gap-2 flex-1 min-w-[250px] max-w-md">
+                                    <label class="text-white text-sm font-medium whitespace-nowrap">Search:</label>
+                                    <div class="relative flex-1">
+                                        <input type="text" id="filter-search" oninput="filterLogins()" placeholder="Search by ID or Name..." class="w-full pl-9 pr-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                
+                                <button onclick="clearFilters()" class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all shadow-sm whitespace-nowrap">
                                     Clear Filters
                                 </button>
                             </div>
@@ -588,7 +622,7 @@ require_once 'includes/dashboard_data.php';
                                             ];
                                             $roleColor = $roleColors[$login['role']] ?? 'bg-gray-100 text-gray-700';
                                         ?>
-                                        <tr class="hover:bg-blue-50 transition-colors login-row" data-user-type="<?= strtolower(htmlspecialchars($login['user_type'])) ?>" data-role="<?= strtolower(htmlspecialchars($login['role'])) ?>">
+                                        <tr class="hover:bg-blue-50 transition-colors login-row" data-user-type="<?= strtolower(htmlspecialchars($login['user_type'])) ?>" data-role="<?= strtolower(htmlspecialchars($login['role'])) ?>" data-id="<?= htmlspecialchars($login['id_number']) ?>" data-name="<?= htmlspecialchars($login['full_name'] ?: $login['username']) ?>">
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium <?= $userTypeColor ?>">
                                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -688,7 +722,7 @@ require_once 'includes/dashboard_data.php';
                     <!-- Not Logged In Today (Employees) -->
                     <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                         <div class="bg-orange-500 px-6 py-4">
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-3 mb-4">
                                 <div class="bg-white/20 p-2 rounded-lg">
                                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
@@ -698,6 +732,27 @@ require_once 'includes/dashboard_data.php';
                                     <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
                                     <p class="text-orange-100 text-sm">Employees</p>
                                 </div>
+                            </div>
+                            <!-- Employee Filters -->
+                            <div class="flex flex-wrap gap-2">
+                                <div class="relative flex-1 min-w-[200px]">
+                                    <input type="text" id="employee-search" oninput="filterEmployees()" placeholder="Search by name or ID..." class="w-full pl-9 pr-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </div>
+                                <select id="employee-role-filter" onchange="filterEmployees()" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                                    <option value="all">All Roles</option>
+                                    <option value="teacher">Teacher</option>
+                                    <option value="registrar">Registrar</option>
+                                    <option value="hr">HR</option>
+                                    <option value="attendance">Attendance</option>
+                                    <option value="cashier">Cashier</option>
+                                    <option value="guidance">Guidance</option>
+                                </select>
+                                <button onclick="clearEmployeeFilters()" class="px-3 py-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all shadow-sm whitespace-nowrap">
+                                    Clear
+                                </button>
                             </div>
                         </div>
                         <div class="p-6">
@@ -736,7 +791,7 @@ require_once 'includes/dashboard_data.php';
                     <!-- Not Logged In Today (Students) -->
                     <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                         <div class="bg-blue-500 px-6 py-4">
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-3 mb-4">
                                 <div class="bg-white/20 p-2 rounded-lg">
                                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
@@ -748,6 +803,23 @@ require_once 'includes/dashboard_data.php';
                                     <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
                                     <p class="text-blue-100 text-sm">Students & Parents</p>
                                 </div>
+                            </div>
+                            <!-- Student Filters -->
+                            <div class="flex flex-wrap gap-2">
+                                <div class="relative flex-1 min-w-[200px]">
+                                    <input type="text" id="student-search" oninput="filterStudents()" placeholder="Search by name or ID..." class="w-full pl-9 pr-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </div>
+                                <select id="student-type-filter" onchange="filterStudents()" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                                    <option value="all">All Types</option>
+                                    <option value="student">Students</option>
+                                    <option value="parent">Parents</option>
+                                </select>
+                                <button onclick="clearStudentFilters()" class="px-3 py-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all shadow-sm whitespace-nowrap">
+                                    Clear
+                                </button>
                             </div>
                         </div>
                         <div class="p-6">
@@ -1464,42 +1536,34 @@ require_once 'includes/dashboard_data.php';
     <div id="login-history-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <!-- Modal Header -->
-            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="bg-white/20 p-2 rounded-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white/20 p-2 rounded-lg">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Login History</h2>
+                            <p class="text-blue-100 text-sm">View and search past login records</p>
+                        </div>
+                    </div>
+                    <button onclick="closeLoginHistory()" class="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Login History</h2>
-                        <p class="text-blue-100 text-sm">View and search past login records</p>
-                    </div>
+                    </button>
                 </div>
-                <button onclick="closeLoginHistory()" class="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
             </div>
 
             <!-- Filters -->
-            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <!-- Date Range -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                        <input type="date" id="history-date-from" onchange="autoSearchHistory()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                        <input type="date" id="history-date-to" onchange="autoSearchHistory()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    </div>
-                    
-                    <!-- User Type Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">User Type</label>
-                        <select id="history-user-type" onchange="updateHistoryRoleOptions(); autoSearchHistory();" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- User Type -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">User Type:</label>
+                        <select id="history-user-type" onchange="updateHistoryRoleOptions(); autoSearchHistory();" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <option value="all">All</option>
                             <option value="student">Student</option>
                             <option value="employee">Employee</option>
@@ -1507,36 +1571,53 @@ require_once 'includes/dashboard_data.php';
                         </select>
                     </div>
                     
-                    <!-- Role Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                        <select id="history-role" onchange="autoSearchHistory()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <!-- Role -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">Role:</label>
+                        <select id="history-role" onchange="autoSearchHistory()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <option value="all">All</option>
                             <!-- Options will be populated dynamically -->
                         </select>
                     </div>
-                </div>
-                
-                <!-- Search and Actions -->
-                <div class="flex flex-wrap gap-3 mt-4">
-                    <div class="flex-1 min-w-[200px]">
-                        <input type="text" id="history-search" placeholder="Search by name or ID..." oninput="debouncedHistorySearch()" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    
+                    <!-- Search -->
+                    <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+                        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">Search:</label>
+                        <div class="relative flex-1">
+                            <input type="text" id="history-search" placeholder="Name or ID..." oninput="debouncedHistorySearch()" class="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
                     </div>
-                    <button onclick="searchLoginHistory()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                        Search
-                    </button>
-                    <button onclick="clearHistoryFilters()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                    
+                    <!-- From Date -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">From Date:</label>
+                        <input type="date" id="history-date-from" onchange="if(validateDateRange(this)) { updateDateConstraints(); autoSearchHistory(); }" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- To Date -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-700 whitespace-nowrap">To Date:</label>
+                        <input type="date" id="history-date-to" onchange="if(validateDateRange(this)) { updateDateConstraints(); autoSearchHistory(); }" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- Clear Button -->
+                    <button onclick="clearHistoryFilters()" class="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors whitespace-nowrap">
                         Clear
                     </button>
-                    <button onclick="exportLoginHistory()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Export CSV
-                    </button>
+                </div>
+            </div>
+            
+            <!-- Row 3: Date Range Indicator -->
+            <div id="history-date-indicator" class="hidden px-6 py-3 bg-blue-50 border-b border-blue-100">
+                <div class="flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span class="text-gray-600">Viewing records from:</span>
+                    <span id="history-date-range" class="font-semibold text-blue-700"></span>
                 </div>
             </div>
 
@@ -1552,11 +1633,11 @@ require_once 'includes/dashboard_data.php';
                 <table id="history-table" class="w-full text-sm hidden">
                     <thead class="bg-gray-50 border-b border-gray-200 sticky top-0">
                         <tr>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">User Type</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Login Time</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Logout Time</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Duration</th>
@@ -1567,21 +1648,25 @@ require_once 'includes/dashboard_data.php';
                     </tbody>
                 </table>
                 
-                <div id="history-no-results" class="hidden text-center py-12">
-                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <p class="text-gray-500 font-medium">No login records found</p>
-                    <p class="text-gray-400 text-sm mt-1">Try adjusting your filters or select a date range</p>
+                <div id="history-no-results" class="hidden flex items-center justify-center min-h-[400px]">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-gray-500 font-medium text-lg">No login records found</p>
+                        <p class="text-gray-400 text-sm mt-2">Try adjusting your filters or select a date range</p>
+                    </div>
                 </div>
                 
-                <div id="history-initial-message" class="text-center py-12">
-                    <svg class="w-16 h-16 mx-auto mb-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                    <p class="text-gray-600 font-medium mb-2">Search Login History</p>
-                    <p class="text-gray-500 text-sm">Select filters and click Search to view login records</p>
-                    <p class="text-gray-400 text-xs mt-2">💡 Tip: Leave dates empty to search all records</p>
+                <div id="history-initial-message" class="flex items-center justify-center min-h-[400px]">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <p class="text-gray-600 font-medium text-lg mb-2">Search Login History</p>
+                        <p class="text-gray-500 text-sm">Select filters and click Search to view login records</p>
+                        <p class="text-gray-400 text-xs mt-2">💡 Tip: Leave dates empty to search all records</p>
+                    </div>
                 </div>
             </div>
 
@@ -1632,11 +1717,17 @@ require_once 'includes/dashboard_data.php';
             sidebar.classList.toggle('-translate-x-full');
         }
 
+        let currentSection = 'dashboard'; // Track current section
+        
         function showSection(sectionName, clickEvent = null) {
             // Prevent default link behavior to avoid hash in URL
             if (clickEvent) {
                 clickEvent.preventDefault();
             }
+            
+            // Store current section
+            currentSection = sectionName;
+            sessionStorage.setItem('currentSection', sectionName);
             
             // Hide all sections
             document.querySelectorAll('.section').forEach(section => {
@@ -1680,10 +1771,17 @@ require_once 'includes/dashboard_data.php';
                 'dashboard': 'Dashboard',
                 'hr-accounts': 'HR Accounts Management',
                 'system-maintenance': 'System Maintenance',
-                'deleted-items': 'Deleted Items Management'
+                'deleted-items': 'Deleted Items Management',
+                'view-archives': 'View Archives'
             };
             
             document.getElementById('page-title').textContent = titles[sectionName] || 'Dashboard';
+        }
+        
+        // Function to refresh current section without full page reload
+        function refreshCurrentSection() {
+            // Just reload the page - the DOMContentLoaded will restore the section
+            location.reload();
         }
 
         // HR Accounts Functions - Based on HRF Dashboard
@@ -3644,6 +3742,54 @@ function deletePermanently(recordId, recordType) {
             if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
         });
 
+        // Restore section immediately before page is visible (prevents flash)
+        (function() {
+            const savedSection = sessionStorage.getItem('currentSection');
+            const activeSection = sessionStorage.getItem('activeSection');
+            
+            if (activeSection === 'deleted-items' || savedSection) {
+                const sectionToShow = activeSection === 'deleted-items' ? 'deleted-items' : savedSection;
+                
+                // Hide dashboard section immediately
+                const dashboardSection = document.getElementById('dashboard-section');
+                if (dashboardSection) {
+                    dashboardSection.classList.remove('active');
+                    dashboardSection.classList.add('hidden');
+                }
+                
+                // Show target section immediately
+                const targetSection = document.getElementById(sectionToShow + '-section');
+                if (targetSection) {
+                    targetSection.classList.remove('hidden');
+                    targetSection.classList.add('active');
+                }
+                
+                // Update nav items immediately
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                const navItem = document.querySelector(`a[href="#${sectionToShow}"]`);
+                if (navItem) {
+                    navItem.classList.add('active');
+                }
+                
+                // Update page title immediately
+                const titles = {
+                    'dashboard': 'Dashboard',
+                    'hr-accounts': 'HR Accounts Management',
+                    'system-maintenance': 'System Maintenance',
+                    'deleted-items': 'Deleted Items Management',
+                    'view-archives': 'View Archives'
+                };
+                const pageTitle = document.getElementById('page-title');
+                if (pageTitle) {
+                    pageTitle.textContent = titles[sectionToShow] || 'Dashboard';
+                }
+                
+                currentSection = sectionToShow;
+            }
+        })();
+        
         // Handle hash fragment on page load to show correct section
         document.addEventListener('DOMContentLoaded', function() {
             // Set maintenance toggle based on current status
@@ -3653,15 +3799,21 @@ function deletePermanently(recordId, recordType) {
                 toggle.checked = isMaintenanceMode;
             }
             
-            // Check if we should show deleted items section (after restore)
+            // Clean up activeSection flag if it was used
             const activeSection = sessionStorage.getItem('activeSection');
             if (activeSection === 'deleted-items') {
-                sessionStorage.removeItem('activeSection'); // Clear the flag
-                showSection('deleted-items');
-            } else {
+                sessionStorage.removeItem('activeSection');
+            }
+            
+            // Handle hash in URL if no saved section
+            const savedSection = sessionStorage.getItem('currentSection');
+            if (!savedSection && !activeSection) {
                 const hash = window.location.hash;
                 if (hash === '#hr-accounts') {
                     showSection('hr-accounts');
+                } else if (hash) {
+                    const sectionName = hash.substring(1);
+                    showSection(sectionName);
                 }
             }
             
@@ -3981,6 +4133,15 @@ function deletePermanently(recordId, recordType) {
                 // Clear list
                 list.innerHTML = '';
                 
+                // Store all items in global arrays for filtering
+                if (page === 1) {
+                    if (type === 'employees') {
+                        allEmployees = data.all_items || data.items;
+                    } else {
+                        allStudents = data.all_items || data.items;
+                    }
+                }
+                
                 // Add items
                 if (data.items.length === 0) {
                     const emptyIcon = type === 'employees' 
@@ -3990,19 +4151,35 @@ function deletePermanently(recordId, recordType) {
                     list.innerHTML = `<li class="text-center py-8">${emptyIcon}<p class="text-gray-500 font-medium">${message}</p><p class="text-gray-400 text-sm mt-1">Great attendance 🎉</p></li>`;
                     pagination.classList.add('hidden');
                 } else {
+                    // Role color mapping
+                    const roleColors = {
+                        'teacher': { bg: 'bg-green-500', border: 'border-green-100', hover: 'hover:bg-green-50' },
+                        'registrar': { bg: 'bg-indigo-500', border: 'border-indigo-100', hover: 'hover:bg-indigo-50' },
+                        'hr': { bg: 'bg-orange-500', border: 'border-orange-100', hover: 'hover:bg-orange-50' },
+                        'cashier': { bg: 'bg-yellow-500', border: 'border-yellow-100', hover: 'hover:bg-yellow-50' },
+                        'guidance': { bg: 'bg-pink-500', border: 'border-pink-100', hover: 'hover:bg-pink-50' },
+                        'attendance': { bg: 'bg-teal-500', border: 'border-teal-100', hover: 'hover:bg-teal-50' },
+                        'student': { bg: 'bg-blue-500', border: 'border-blue-100', hover: 'hover:bg-blue-50' },
+                        'parent': { bg: 'bg-cyan-500', border: 'border-cyan-100', hover: 'hover:bg-cyan-50' }
+                    };
+                    
                     data.items.forEach(item => {
                         const li = document.createElement('li');
-                        const iconColor = type === 'employees' ? 'text-orange-500' : 'text-blue-500';
-                        const bgColor = type === 'employees' ? 'hover:bg-orange-50' : 'hover:bg-blue-50';
-                        const borderColor = type === 'employees' ? 'border-orange-100' : 'border-blue-100';
-                        
-                        li.className = `flex items-center gap-3 p-3 rounded-lg border ${borderColor} ${bgColor} transition-all`;
                         
                         // Extract name from item (format: "• Name (ID)" or "• First, Last (ID)")
                         // Remove bullet point and extract name before parentheses
                         const cleanItem = item.replace(/•\s*/, '').trim();
                         const nameMatch = cleanItem.match(/^([^(]+)/);
                         const name = nameMatch ? nameMatch[1].trim() : '';
+                        
+                        // Extract role from the string (e.g., "Name (ID) - Role")
+                        const roleMatch = cleanItem.match(/-\s*(\w+)\s*$/i);
+                        const role = roleMatch ? roleMatch[1].toLowerCase() : (type === 'employees' ? 'teacher' : 'student');
+                        
+                        // Get colors based on role
+                        const colors = roleColors[role] || (type === 'employees' ? roleColors['teacher'] : roleColors['student']);
+                        
+                        li.className = `flex items-center gap-3 p-3 rounded-lg border ${colors.border} ${colors.hover} transition-all`;
                         
                         // Split by comma or space to get name parts
                         let nameParts;
@@ -4025,7 +4202,7 @@ function deletePermanently(recordId, recordType) {
                         
                         li.innerHTML = `
                             <div class="flex-shrink-0">
-                                <div class="w-10 h-10 rounded-full ${type === 'employees' ? 'bg-orange-500' : 'bg-blue-500'} flex items-center justify-center text-white font-bold text-sm shadow-md">
+                                <div class="w-10 h-10 rounded-full ${colors.bg} flex items-center justify-center text-white font-bold text-sm shadow-md">
                                     ${initials}
                                 </div>
                             </div>
@@ -4100,6 +4277,175 @@ function deletePermanently(recordId, recordType) {
             studentsPage += direction;
             if (studentsPage < 1) studentsPage = 1;
             loadNotLoggedIn('students', studentsPage);
+        }
+        
+        // Filter functions for Not Logged In sections
+        let allEmployees = [];
+        let allStudents = [];
+        
+        function filterEmployees() {
+            const searchTerm = document.getElementById('employee-search').value.toLowerCase();
+            const roleFilter = document.getElementById('employee-role-filter').value.toLowerCase();
+            
+            const filtered = allEmployees.filter(emp => {
+                const matchesSearch = emp.toLowerCase().includes(searchTerm);
+                const matchesRole = roleFilter === 'all' || emp.toLowerCase().includes(roleFilter);
+                return matchesSearch && matchesRole;
+            });
+            
+            displayFilteredEmployees(filtered);
+        }
+        
+        function filterStudents() {
+            const searchTerm = document.getElementById('student-search').value.toLowerCase();
+            const typeFilter = document.getElementById('student-type-filter').value.toLowerCase();
+            
+            const filtered = allStudents.filter(student => {
+                const matchesSearch = student.toLowerCase().includes(searchTerm);
+                const matchesType = typeFilter === 'all' || 
+                    (typeFilter === 'parent' && student.toLowerCase().includes('parent')) ||
+                    (typeFilter === 'student' && !student.toLowerCase().includes('parent'));
+                return matchesSearch && matchesType;
+            });
+            
+            displayFilteredStudents(filtered);
+        }
+        
+        function clearEmployeeFilters() {
+            document.getElementById('employee-search').value = '';
+            document.getElementById('employee-role-filter').value = 'all';
+            displayFilteredEmployees(allEmployees);
+        }
+        
+        function clearStudentFilters() {
+            document.getElementById('student-search').value = '';
+            document.getElementById('student-type-filter').value = 'all';
+            displayFilteredStudents(allStudents);
+        }
+        
+        function displayFilteredEmployees(employees) {
+            const list = document.getElementById('employees-list');
+            const pagination = document.getElementById('employees-pagination');
+            
+            if (employees.length === 0) {
+                list.innerHTML = '<li class="text-center py-8 text-gray-500">No employees found</li>';
+                pagination.classList.add('hidden');
+                return;
+            }
+            
+            // Role color mapping
+            const roleColors = {
+                'teacher': { bg: 'bg-green-500', border: 'border-green-100', hover: 'hover:bg-green-50' },
+                'registrar': { bg: 'bg-indigo-500', border: 'border-indigo-100', hover: 'hover:bg-indigo-50' },
+                'hr': { bg: 'bg-orange-500', border: 'border-orange-100', hover: 'hover:bg-orange-50' },
+                'cashier': { bg: 'bg-yellow-500', border: 'border-yellow-100', hover: 'hover:bg-yellow-50' },
+                'guidance': { bg: 'bg-pink-500', border: 'border-pink-100', hover: 'hover:bg-pink-50' },
+                'attendance': { bg: 'bg-teal-500', border: 'border-teal-100', hover: 'hover:bg-teal-50' }
+            };
+            
+            list.innerHTML = employees.slice(0, 10).map(emp => {
+                const cleanItem = emp.replace(/•\s*/, '').trim();
+                const nameMatch = cleanItem.match(/^([^(]+)/);
+                const name = nameMatch ? nameMatch[1].trim() : '';
+                
+                // Extract role from the string (e.g., "Name (ID) - Role")
+                const roleMatch = cleanItem.match(/-\s*(\w+)\s*$/i);
+                const role = roleMatch ? roleMatch[1].toLowerCase() : 'teacher';
+                
+                const colors = roleColors[role] || roleColors['teacher'];
+                
+                let nameParts;
+                if (name.includes(',')) {
+                    nameParts = name.split(',').map(p => p.trim()).filter(p => p.length > 0);
+                } else {
+                    nameParts = name.split(' ').filter(p => p.length > 0);
+                }
+                
+                let initials = '?';
+                if (nameParts.length >= 2) {
+                    initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+                } else if (nameParts.length === 1 && nameParts[0].length >= 2) {
+                    initials = nameParts[0].substring(0, 2).toUpperCase();
+                }
+                
+                return `
+                    <li class="flex items-center gap-3 p-3 rounded-lg border ${colors.border} ${colors.hover} transition-all">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 rounded-full ${colors.bg} flex items-center justify-center text-white font-bold text-sm shadow-md">
+                                ${initials}
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">${emp.replace(/•\s*/, '')}</p>
+                            <p class="text-xs text-gray-500">Not logged in today</p>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+            
+            if (employees.length > 10) {
+                pagination.classList.remove('hidden');
+                document.getElementById('employees-total').textContent = employees.length;
+            } else {
+                pagination.classList.add('hidden');
+            }
+        }
+        
+        function displayFilteredStudents(students) {
+            const list = document.getElementById('students-list');
+            const pagination = document.getElementById('students-pagination');
+            
+            if (students.length === 0) {
+                list.innerHTML = '<li class="text-center py-8 text-gray-500">No students found</li>';
+                pagination.classList.add('hidden');
+                return;
+            }
+            
+            list.innerHTML = students.slice(0, 10).map(student => {
+                const cleanItem = student.replace(/•\s*/, '').trim();
+                const nameMatch = cleanItem.match(/^([^(]+)/);
+                const name = nameMatch ? nameMatch[1].trim() : '';
+                
+                let nameParts;
+                if (name.includes(',')) {
+                    nameParts = name.split(',').map(p => p.trim()).filter(p => p.length > 0);
+                } else {
+                    nameParts = name.split(' ').filter(p => p.length > 0);
+                }
+                
+                let initials = '?';
+                if (nameParts.length >= 2) {
+                    initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+                } else if (nameParts.length === 1 && nameParts[0].length >= 2) {
+                    initials = nameParts[0].substring(0, 2).toUpperCase();
+                }
+                
+                const isParent = student.toLowerCase().includes('parent');
+                const bgColor = isParent ? 'bg-cyan-500' : 'bg-blue-500';
+                const borderColor = isParent ? 'border-cyan-100' : 'border-blue-100';
+                const hoverColor = isParent ? 'hover:bg-cyan-50' : 'hover:bg-blue-50';
+                
+                return `
+                    <li class="flex items-center gap-3 p-3 rounded-lg border ${borderColor} ${hoverColor} transition-all">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white font-bold text-sm shadow-md">
+                                ${initials}
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">${student.replace(/•\s*/, '')}</p>
+                            <p class="text-xs text-gray-500">Not logged in today</p>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+            
+            if (students.length > 10) {
+                pagination.classList.remove('hidden');
+                document.getElementById('students-total').textContent = students.length;
+            } else {
+                pagination.classList.add('hidden');
+            }
         }
         
         // Pagination for Today's Logins
@@ -4225,17 +4571,23 @@ function deletePermanently(recordId, recordType) {
         function filterLogins() {
             const userTypeFilter = document.getElementById('filter-user-type').value.toLowerCase();
             const roleFilter = document.getElementById('filter-role').value.toLowerCase();
+            const searchFilter = document.getElementById('filter-search').value.toLowerCase();
             const rows = document.querySelectorAll('.login-row');
             
             let visibleCount = 0;
             rows.forEach(row => {
                 const userType = row.getAttribute('data-user-type');
                 const role = row.getAttribute('data-role');
+                const idNumber = row.getAttribute('data-id') || '';
+                const name = row.getAttribute('data-name') || '';
                 
                 const userTypeMatch = userTypeFilter === 'all' || userType === userTypeFilter;
                 const roleMatch = roleFilter === 'all' || role === roleFilter;
+                const searchMatch = searchFilter === '' || 
+                    idNumber.toLowerCase().includes(searchFilter) || 
+                    name.toLowerCase().includes(searchFilter);
                 
-                if (userTypeMatch && roleMatch) {
+                if (userTypeMatch && roleMatch && searchMatch) {
                     row.classList.remove('hidden');
                     visibleCount++;
                 } else {
@@ -4272,11 +4624,84 @@ function deletePermanently(recordId, recordType) {
         function clearFilters() {
             document.getElementById('filter-user-type').value = 'all';
             document.getElementById('filter-role').value = 'all';
+            document.getElementById('filter-search').value = '';
             filterLogins();
         }
         
+        // Validate date range - prevent dates before 2025 and future dates
+        function validateDateRange(input) {
+            const selectedDate = new Date(input.value);
+            const minDate = new Date('2025-01-01');
+            const maxDate = new Date();
+            maxDate.setHours(23, 59, 59, 999); // End of today
+            
+            if (selectedDate < minDate) {
+                alert('Please select a date from 2025 onwards.');
+                input.value = '';
+                return false;
+            }
+            
+            if (selectedDate > maxDate) {
+                alert('Future dates are not allowed. Please select today or an earlier date.');
+                input.value = '';
+                return false;
+            }
+            
+            // Validate From Date vs To Date
+            const fromDateInput = document.getElementById('history-date-from');
+            const toDateInput = document.getElementById('history-date-to');
+            
+            if (fromDateInput.value && toDateInput.value) {
+                const fromDate = new Date(fromDateInput.value);
+                const toDate = new Date(toDateInput.value);
+                
+                if (fromDate > toDate) {
+                    alert('From Date cannot be later than To Date.');
+                    input.value = '';
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+
+        // Update date range constraints dynamically
+        function updateDateConstraints() {
+            const dateFromInput = document.getElementById('history-date-from');
+            const dateToInput = document.getElementById('history-date-to');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (dateFromInput && dateToInput) {
+                // If From Date is selected, set To Date minimum to From Date
+                if (dateFromInput.value) {
+                    dateToInput.setAttribute('min', dateFromInput.value);
+                } else {
+                    dateToInput.setAttribute('min', '2025-01-01');
+                }
+                
+                // If To Date is selected, set From Date maximum to To Date
+                if (dateToInput.value) {
+                    dateFromInput.setAttribute('max', dateToInput.value);
+                } else {
+                    dateFromInput.setAttribute('max', today);
+                }
+            }
+        }
+
         // Initialize pagination on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Set min and max dates for date inputs to prevent selecting dates before 2025 and future dates
+            const dateFromInput = document.getElementById('history-date-from');
+            const dateToInput = document.getElementById('history-date-to');
+            
+            if (dateFromInput && dateToInput) {
+                const today = new Date().toISOString().split('T')[0];
+                dateFromInput.setAttribute('min', '2025-01-01');
+                dateFromInput.setAttribute('max', today);
+                dateToInput.setAttribute('min', '2025-01-01');
+                dateToInput.setAttribute('max', today);
+            }
+            
             // Initialize role options
             updateRoleOptions();
             
@@ -4489,23 +4914,74 @@ function deletePermanently(recordId, recordType) {
         }
 
         function searchArchives() {
-            currentArchiveSearch = document.getElementById('archive-search').value;
-            currentArchivePage = 1;
-            fetchArchiveData();
+            const searchTerm = document.getElementById('archive-search').value.toLowerCase();
+            
+            if (currentDataArchiveType) {
+                // Searching data archives (login/attendance)
+                if (!searchTerm) {
+                    // If search is empty, reload all data
+                    loadDataArchives(currentDataArchiveType);
+                    return;
+                }
+                
+                // Filter records based on search term
+                const allRecords = allDataArchiveRecords;
+                allDataArchiveRecords = allRecords.filter(record => {
+                    if (currentDataArchiveType === 'login') {
+                        return (record.username && record.username.toLowerCase().includes(searchTerm)) ||
+                               (record.full_name && record.full_name.toLowerCase().includes(searchTerm)) ||
+                               (record.id_number && record.id_number.toLowerCase().includes(searchTerm)) ||
+                               (record.role && record.role.toLowerCase().includes(searchTerm));
+                    } else {
+                        return (record.id_number && record.id_number.toLowerCase().includes(searchTerm)) ||
+                               (record.name && record.name.toLowerCase().includes(searchTerm));
+                    }
+                });
+                
+                currentDataArchivePage = 1;
+                displayDataArchivePage();
+            } else {
+                // Searching regular archives (students/employees)
+                currentArchiveSearch = searchTerm;
+                currentArchivePage = 1;
+                fetchArchiveData();
+            }
         }
 
         function changeArchivePage(direction) {
-            currentArchivePage += direction;
-            if (currentArchivePage < 1) currentArchivePage = 1;
-            fetchArchiveData();
+            if (currentDataArchiveType) {
+                // For data archives
+                changeDataArchivePage(direction);
+            } else {
+                // For regular archives
+                currentArchivePage += direction;
+                if (currentArchivePage < 1) currentArchivePage = 1;
+                fetchArchiveData();
+            }
+        }
+        
+        function changeDataArchivePage(direction) {
+            currentDataArchivePage += direction;
+            if (currentDataArchivePage < 1) currentDataArchivePage = 1;
+            displayDataArchivePage();
         }
 
         function closeArchiveViewer() {
             document.getElementById('archive-viewer').classList.add('hidden');
+            currentDataArchiveType = '';
+            allDataArchiveRecords = [];
         }
 
         // Load Data Archives (Login Logs & Attendance)
+        let currentDataArchivePage = 1;
+        let currentDataArchiveType = '';
+        let allDataArchiveRecords = [];
+        const dataArchivePerPage = 10;
+
         async function loadDataArchives(type) {
+            currentDataArchiveType = type;
+            currentDataArchivePage = 1;
+            
             const viewer = document.getElementById('archive-viewer');
             viewer.classList.remove('hidden');
             
@@ -4518,12 +4994,14 @@ function deletePermanently(recordId, recordType) {
             const headerRow = document.getElementById('archive-table-header');
             if (type === 'login') {
                 headerRow.innerHTML = `
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Login Time</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Logout Time</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Type</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">User Type</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Login Time</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Logout Time</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Duration</th>
                 `;
             } else {
                 headerRow.innerHTML = `
@@ -4537,63 +5015,138 @@ function deletePermanently(recordId, recordType) {
             
             // Fetch and display data
             const tbody = document.getElementById('archive-table-body');
-            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">Loading...</td></tr>';
             
             try {
                 const response = await fetch(`get_data_archives.php?type=${type}`);
                 const data = await response.json();
                 
+                console.log('Archive data received:', data); // Debug log
+                
                 if (!data.success) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Error loading data</td></tr>`;
+                    const errorMsg = data.message || 'Error loading data';
+                    tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-red-500">${errorMsg}</td></tr>`;
+                    console.error('API Error:', errorMsg);
                     return;
                 }
                 
-                if (data.records.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No archived records found</td></tr>';
+                if (!data.records || data.records.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">No archived records found</td></tr>';
                     return;
                 }
                 
-                // Render data
-                tbody.innerHTML = '';
-                data.records.forEach(record => {
-                    const row = document.createElement('tr');
-                    row.className = 'hover:bg-gray-50';
-                    
-                    if (type === 'login') {
-                        const logoutTime = record.logout_time ? new Date(record.logout_time).toLocaleString() : '<span class="text-gray-400">Not logged out</span>';
-                        const duration = record.session_duration ? 
-                            (Math.floor(record.session_duration / 3600) > 0 ? 
-                                Math.floor(record.session_duration / 3600) + 'h ' + Math.floor((record.session_duration % 3600) / 60) + 'm' :
-                                Math.floor(record.session_duration / 60) + ' min') :
-                            '<span class="text-gray-400">---</span>';
-                        
-                        row.innerHTML = `
-                            <td class="px-6 py-4 text-sm text-gray-900">${record.username}</td>
-                            <td class="px-6 py-4 text-sm text-gray-900">${new Date(record.login_time).toLocaleString()}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">${logoutTime}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">${duration}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">${record.ip_address}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">${record.user_type}</td>
-                        `;
-                    } else {
-                        row.innerHTML = `
-                            <td class="px-6 py-4 text-sm text-gray-900">${record.id_number}</td>
-                            <td class="px-6 py-4 text-sm text-gray-900">${record.name}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">${new Date(record.date).toLocaleDateString()}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">${record.time_in || '---'} / ${record.time_out || '---'}</td>
-                            <td class="px-6 py-4 text-sm">
-                                <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">${record.status}</span>
-                            </td>
-                        `;
-                    }
-                    
-                    tbody.appendChild(row);
-                });
+                // Store all records for pagination
+                allDataArchiveRecords = data.records;
+                displayDataArchivePage();
                 
             } catch (error) {
                 console.error('Error:', error);
-                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Error loading data</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-red-500">Error: ${error.message}</td></tr>`;
             }
+        }
+
+        function displayDataArchivePage() {
+            const tbody = document.getElementById('archive-table-body');
+            tbody.innerHTML = '';
+            
+            const start = (currentDataArchivePage - 1) * dataArchivePerPage;
+            const end = start + dataArchivePerPage;
+            const pageRecords = allDataArchiveRecords.slice(start, end);
+            
+            if (pageRecords.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">No records found</td></tr>';
+                return;
+            }
+            
+            const userTypeColors = {
+                'employee': 'bg-purple-100 text-purple-700',
+                'student': 'bg-blue-100 text-blue-700',
+                'parent': 'bg-cyan-100 text-cyan-700'
+            };
+            
+            const roleColors = {
+                'superadmin': 'bg-red-100 text-red-700',
+                'hr': 'bg-orange-100 text-orange-700',
+                'teacher': 'bg-green-100 text-green-700',
+                'registrar': 'bg-indigo-100 text-indigo-700',
+                'cashier': 'bg-yellow-100 text-yellow-700',
+                'guidance': 'bg-pink-100 text-pink-700',
+                'attendance': 'bg-teal-100 text-teal-700',
+                'student': 'bg-blue-100 text-blue-700',
+                'parent': 'bg-cyan-100 text-cyan-700'
+            };
+            
+            pageRecords.forEach(record => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors';
+                
+                if (currentDataArchiveType === 'login') {
+                    // Safely get values with defaults
+                    const userType = record.user_type || 'unknown';
+                    const role = record.role || 'user';
+                    const userTypeColor = userTypeColors[userType.toLowerCase()] || 'bg-gray-100 text-gray-700';
+                    const roleColor = roleColors[role.toLowerCase()] || 'bg-gray-100 text-gray-700';
+                    
+                    const loginDate = new Date(record.login_time);
+                    const logoutTime = record.logout_time ? new Date(record.logout_time) : null;
+                    
+                    let duration = '---';
+                    if (record.session_duration) {
+                        const hours = Math.floor(record.session_duration / 3600);
+                        const minutes = Math.floor((record.session_duration % 3600) / 60);
+                        duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+                    }
+                    
+                    // Format user type and role for display
+                    const userTypeDisplay = userType.charAt(0).toUpperCase() + userType.slice(1);
+                    const roleDisplay = role.charAt(0).toUpperCase() + role.slice(1);
+                    
+                    row.innerHTML = `
+                        <td class="px-4 py-3">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${userTypeColor}">
+                                ${userTypeDisplay}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 font-mono text-gray-600 text-xs">${record.id_number || record.username || '---'}</td>
+                        <td class="px-4 py-3 font-medium text-gray-900">${record.full_name || record.username || '---'}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${roleColor}">
+                                ${roleDisplay}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600">${loginDate.toLocaleDateString()}</td>
+                        <td class="px-4 py-3 text-gray-600 text-xs">${loginDate.toLocaleTimeString()}</td>
+                        <td class="px-4 py-3 text-gray-600 text-xs">
+                            ${logoutTime ? logoutTime.toLocaleTimeString() : '<span class="text-green-600 font-medium">Active</span>'}
+                        </td>
+                        <td class="px-4 py-3 text-gray-600">${duration}</td>
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <td class="px-6 py-4 text-sm text-gray-900">${record.id_number}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${record.name}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${new Date(record.date).toLocaleDateString()}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${record.time_in || '---'} / ${record.time_out || '---'}</td>
+                        <td class="px-6 py-4 text-sm">
+                            <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">${record.status}</span>
+                        </td>
+                    `;
+                }
+                
+                tbody.appendChild(row);
+            });
+            
+            // Update pagination
+            const total = allDataArchiveRecords.length;
+            const startNum = total > 0 ? start + 1 : 0;
+            const endNum = Math.min(end, total);
+            
+            document.getElementById('archive-start').textContent = startNum;
+            document.getElementById('archive-end').textContent = endNum;
+            document.getElementById('archive-total').textContent = total;
+            
+            document.getElementById('archive-prev').disabled = currentDataArchivePage === 1;
+            document.getElementById('archive-next').disabled = endNum >= total;
         }
 
         // Login History Modal Functions
@@ -4691,13 +5244,15 @@ function deletePermanently(recordId, recordType) {
         }
 
         function autoSearchHistory() {
-            // Reset to page 1 when filters change
-            historyPage = 1;
-            searchLoginHistory();
+            // Debounce to prevent rapid-fire searches when changing filters
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                historyPage = 1;
+                searchLoginHistory();
+            }, 300); // Wait 300ms before searching
         }
 
         // Debounce search input to avoid too many requests while typing
-        let searchTimeout;
         function debouncedHistorySearch() {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
@@ -4706,18 +5261,30 @@ function deletePermanently(recordId, recordType) {
             }, 500); // Wait 500ms after user stops typing
         }
 
+        let searchTimeout;
+        let isSearching = false;
+        
         async function searchLoginHistory() {
+            // Prevent multiple simultaneous searches
+            if (isSearching) {
+                return;
+            }
+            
             const loading = document.getElementById('history-loading');
             const table = document.getElementById('history-table');
             const noResults = document.getElementById('history-no-results');
             const initialMessage = document.getElementById('history-initial-message');
             const pagination = document.getElementById('history-pagination');
             
-            loading.classList.remove('hidden');
-            table.classList.add('hidden');
-            noResults.classList.add('hidden');
-            initialMessage.classList.add('hidden');
-            pagination.classList.add('hidden');
+            // Only show loading spinner if request takes longer than 200ms
+            isSearching = true;
+            let showLoadingTimeout = setTimeout(() => {
+                loading.classList.remove('hidden');
+                table.classList.add('hidden');
+                noResults.classList.add('hidden');
+                initialMessage.classList.add('hidden');
+                pagination.classList.add('hidden');
+            }, 200);
             
             try {
                 const dateFrom = document.getElementById('history-date-from').value;
@@ -4752,7 +5319,9 @@ function deletePermanently(recordId, recordType) {
                 console.error('Error loading history:', error);
                 alert('Error loading login history: ' + error.message);
             } finally {
+                clearTimeout(showLoadingTimeout);
                 loading.classList.add('hidden');
+                isSearching = false;
             }
         }
 
@@ -4760,16 +5329,44 @@ function deletePermanently(recordId, recordType) {
             const table = document.getElementById('history-table');
             const tbody = document.getElementById('history-tbody');
             const noResults = document.getElementById('history-no-results');
+            const initialMessage = document.getElementById('history-initial-message');
             const pagination = document.getElementById('history-pagination');
+            const dateIndicator = document.getElementById('history-date-indicator');
+            const dateRange = document.getElementById('history-date-range');
             
             tbody.innerHTML = '';
             
             if (!data.records || data.records.length === 0) {
+                table.classList.add('hidden');
                 noResults.classList.remove('hidden');
+                initialMessage.classList.add('hidden');
+                dateIndicator.classList.add('hidden');
+                pagination.classList.add('hidden');
                 return;
             }
             
+            // Hide messages and show table when we have records
             table.classList.remove('hidden');
+            noResults.classList.add('hidden');
+            initialMessage.classList.add('hidden');
+            
+            // Calculate date range from records
+            const dates = data.records.map(r => new Date(r.login_time).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            }));
+            const uniqueDates = [...new Set(dates)];
+            
+            if (uniqueDates.length === 1) {
+                dateRange.textContent = uniqueDates[0];
+            } else if (uniqueDates.length > 1) {
+                // Sort dates and show range
+                const sortedDates = uniqueDates.sort((a, b) => new Date(a) - new Date(b));
+                dateRange.textContent = `${sortedDates[0]} - ${sortedDates[sortedDates.length - 1]}`;
+            }
+            
+            dateIndicator.classList.remove('hidden');
             
             data.records.forEach(record => {
                 const row = document.createElement('tr');
@@ -4807,7 +5404,6 @@ function deletePermanently(recordId, recordType) {
                 }
                 
                 row.innerHTML = `
-                    <td class="px-4 py-3 text-gray-600">${loginDate.toLocaleDateString()}</td>
                     <td class="px-4 py-3">
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${userTypeColor}">
                             ${record.user_type.charAt(0).toUpperCase() + record.user_type.slice(1)}
@@ -4820,6 +5416,7 @@ function deletePermanently(recordId, recordType) {
                             ${record.role.charAt(0).toUpperCase() + record.role.slice(1)}
                         </span>
                     </td>
+                    <td class="px-4 py-3 text-gray-600">${loginDate.toLocaleDateString()}</td>
                     <td class="px-4 py-3 text-gray-600 text-xs">${loginDate.toLocaleTimeString()}</td>
                     <td class="px-4 py-3 text-gray-600 text-xs">
                         ${logoutTime ? logoutTime.toLocaleTimeString() : '<span class="text-green-600 font-medium">Active</span>'}
