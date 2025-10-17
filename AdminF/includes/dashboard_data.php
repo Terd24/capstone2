@@ -57,12 +57,12 @@ $conn->query("CREATE TABLE IF NOT EXISTS login_activity (
 $total_students = (int) ($conn->query("SELECT COUNT(*) FROM student_account")->fetch_row()[0] ?? 0);
 $total_employees = 0;
 if (table_exists($conn, 'employees')) {
-    // Count only teachers from employee_accounts table
+    // Count ALL employees from employee_accounts table
     if (table_exists($conn, 'employee_accounts')) {
-        $total_employees = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_accounts WHERE role = 'teacher'") ?? 0);
+        $total_employees = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_accounts") ?? 0);
     } else {
-        // Fallback: count employees with role 'teacher' if employee_accounts doesn't exist
-        $total_employees = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employees WHERE role = 'teacher'") ?? 0);
+        // Fallback: count all employees if employee_accounts doesn't exist
+        $total_employees = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employees") ?? 0);
     }
 }
 
@@ -140,28 +140,28 @@ if (table_exists($conn, 'attendance_record')) {
     }
 }
 
-// Teacher Attendance (only teachers, not all employees)
+// Employee Attendance (ALL employees, not just teachers)
 $employee_attendance_today = 0;
 $employee_present_today = 0;
 $employee_absent_today = $total_employees;
 
-// Use teacher_attendance table if available, otherwise try employee_attendance with teacher filter
+// Use teacher_attendance table if available, otherwise try employee_attendance
 if (table_exists($conn, 'teacher_attendance')) {
     try {
         $employee_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM teacher_attendance WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
         $employee_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM teacher_attendance WHERE date = ? AND time_in IS NOT NULL", 's', $today) ?? 0);
         $employee_absent_today = $total_employees - $employee_present_today;
     } catch (Exception $e) {
-        error_log("Teacher attendance error: " . $e->getMessage());
+        error_log("Employee attendance error: " . $e->getMessage());
     }
-} elseif (table_exists($conn, 'employee_attendance') && table_exists($conn, 'employee_accounts')) {
+} elseif (table_exists($conn, 'employee_attendance')) {
     try {
-        // Join with employee_accounts to filter only teachers
-        $employee_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_attendance ea JOIN employee_accounts acc ON ea.teacher_id = acc.employee_id WHERE ea.date = ? AND acc.role = 'teacher' AND (ea.time_in IS NOT NULL OR ea.time_out IS NOT NULL)", 's', $today) ?? 0);
-        $employee_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_attendance ea JOIN employee_accounts acc ON ea.teacher_id = acc.employee_id WHERE ea.date = ? AND acc.role = 'teacher' AND ea.time_in IS NOT NULL", 's', $today) ?? 0);
+        // Count ALL employees attendance (no role filter)
+        $employee_attendance_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_attendance WHERE date = ? AND (time_in IS NOT NULL OR time_out IS NOT NULL)", 's', $today) ?? 0);
+        $employee_present_today = (int) (q_scalar($conn, "SELECT COUNT(*) FROM employee_attendance WHERE date = ? AND time_in IS NOT NULL", 's', $today) ?? 0);
         $employee_absent_today = $total_employees - $employee_present_today;
     } catch (Exception $e) {
-        error_log("Teacher attendance error: " . $e->getMessage());
+        error_log("Employee attendance error: " . $e->getMessage());
     }
 }
 
@@ -213,14 +213,18 @@ if (table_exists($conn, 'login_activity')) {
                 la.username, 
                 la.role, 
                 la.login_time,
+                la.logout_time,
+                la.session_duration,
                 CASE 
                     WHEN la.user_type = 'student' THEN CONCAT(s.first_name, ' ', s.last_name)
                     WHEN la.user_type = 'employee' THEN CONCAT(e.first_name, ' ', e.last_name)
+                    WHEN la.user_type = 'parent' THEN CONCAT('Parent of ', sc.first_name, ' ', sc.last_name)
                     ELSE la.username
                 END as full_name
             FROM login_activity la
             LEFT JOIN student_account s ON la.id_number = s.id_number AND la.user_type = 'student'
             LEFT JOIN employees e ON la.id_number = e.id_number AND la.user_type = 'employee'
+            LEFT JOIN student_account sc ON la.id_number = sc.id_number AND la.user_type = 'parent'
             WHERE DATE(la.login_time) = ?
             ORDER BY la.login_time DESC 
             LIMIT 50

@@ -22,75 +22,91 @@ if (empty($start) || empty($end)) {
     exit;
 }
 
+// Ensure archive table exists
+$conn->query("CREATE TABLE IF NOT EXISTS login_logs_archive (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    original_id INT,
+    username VARCHAR(100),
+    login_time DATETIME,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    user_type VARCHAR(50),
+    status VARCHAR(20),
+    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    archived_by VARCHAR(100),
+    archived_reason VARCHAR(255),
+    INDEX idx_username (username),
+    INDEX idx_login_time (login_time),
+    INDEX idx_archived_at (archived_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 $tableCheck = $conn->query("SHOW TABLES LIKE 'login_activity'");
 $tableName = ($tableCheck && $tableCheck->num_rows > 0) ? 'login_activity' : 'system_logs';
 $dateCol = ($tableName === 'login_activity') ? 'login_time' : 'timestamp';
 
-// Get records to export
-$exportQuery = "SELECT * FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
+// Get records to archive
+$selectQuery = "SELECT * FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
 if ($tableName === 'system_logs') {
-    $exportQuery .= " AND action LIKE '%login%'";
+    $selectQuery .= " AND action LIKE '%login%'";
 }
 
-$exportStmt = $conn->prepare($exportQuery);
-$exportStmt->bind_param('ss', $start, $end);
-$exportStmt->execute();
-$exportResult = $exportStmt->get_result();
+$selectStmt = $conn->prepare($selectQuery);
+$selectStmt->bind_param('ss', $start, $end);
+$selectStmt->execute();
+$result = $selectStmt->get_result();
 
-$records = [];
-while ($row = $exportResult->fetch_assoc()) {
-    $records[] = $row;
-}
-$count = count($records);
+$count = 0;
+$archived_by = $_SESSION['user_id'] ?? $_SESSION['id_number'] ?? 'SuperAdmin';
+$archived_reason = "Archived login logs from $start to $end";
 
-// Generate CSV content
-$csvContent = '';
-$filename = "Login Logs {$start} to {$end}.csv";
-
-if ($count > 0) {
-    // Add UTF-8 BOM
-    $csvContent .= chr(0xEF).chr(0xBB).chr(0xBF);
+// Archive each record
+while ($row = $result->fetch_assoc()) {
+    $archiveStmt = $conn->prepare("INSERT INTO login_logs_archive 
+        (original_id, username, login_time, logout_time, last_activity, session_duration, ip_address, user_agent, user_type, status, archived_by, archived_reason) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     
-    // Add header
-    $csvContent .= implode(',', array_keys($records[0])) . "\n";
+    $original_id = $row['id'];
+    $username = $row['username'] ?? $row['user_id'] ?? 'Unknown';
+    $login_time = $row[$dateCol];
+    $logout_time = $row['logout_time'] ?? null;
+    $last_activity = $row['last_activity'] ?? null;
+    $session_duration = $row['session_duration'] ?? null;
+    $ip_address = $row['ip_address'] ?? 'N/A';
+    $user_agent = $row['user_agent'] ?? 'N/A';
+    $user_type = $row['user_type'] ?? $row['role'] ?? 'Unknown';
+    $status = $row['status'] ?? 'success';
     
-    // Add data rows
-    foreach ($records as $record) {
-        $row = [];
-        foreach ($record as $key => $value) {
-            // Format numeric IDs as text
-            if (in_array($key, ['id', 'id_number', 'student_id', 'employee_id', 'user_id']) && is_numeric($value)) {
-                $row[] = '"' . "'" . $value . '"';
-            } else {
-                $row[] = '"' . str_replace('"', '""', $value) . '"';
-            }
-        }
-        $csvContent .= implode(',', $row) . "\n";
+    $archiveStmt->bind_param('issssissssss', 
+        $original_id, $username, $login_time, $logout_time, $last_activity, 
+        $session_duration, $ip_address, $user_agent, $user_type, $status, 
+        $archived_by, $archived_reason
+    );
+    
+    if ($archiveStmt->execute()) {
+        $count++;
     }
+    $archiveStmt->close();
 }
 
-// Delete records
-$deleteQuery = "DELETE FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
-if ($tableName === 'system_logs') {
-    $deleteQuery .= " AND action LIKE '%login%'";
+// Delete archived records from original table
+if ($count > 0) {
+    $deleteQuery = "DELETE FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
+    if ($tableName === 'system_logs') {
+        $deleteQuery .= " AND action LIKE '%login%'";
+    }
+    
+    $deleteStmt = $conn->prepare($deleteQuery);
+    $deleteStmt->bind_param('ss', $start, $end);
+    $deleteStmt->execute();
+    $deleteStmt->close();
 }
 
-$stmt = $conn->prepare($deleteQuery);
-$stmt->bind_param('ss', $start, $end);
+echo json_encode([
+    'success' => true, 
+    'message' => "$count login records archived successfully",
+    'records_archived' => $count
+]);
 
-if ($stmt->execute()) {
-    $message = $count > 0 ? "Exported $count records and deleted from system" : "No records found";
-    echo json_encode([
-        'success' => true, 
-        'message' => $message, 
-        'records_deleted' => $count, 
-        'csv_data' => base64_encode($csvContent),
-        'filename' => $filename
-    ]);
-} else {
-    echo json_encode(['success' => false, 'message' => 'Delete failed']);
-}
-
-$stmt->close();
+$selectStmt->close();
 $conn->close();
 ob_end_flush();

@@ -496,7 +496,7 @@ require_once 'includes/dashboard_data.php';
                     <!-- Today's Logins -->
                     <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                         <div class="bg-blue-600 px-6 py-4">
-                            <div class="flex items-center justify-between">
+                            <div class="flex items-center justify-between mb-4">
                                 <div class="flex items-center gap-3">
                                     <div class="bg-white/20 p-2 rounded-lg">
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -508,11 +508,44 @@ require_once 'includes/dashboard_data.php';
                                         <p class="text-blue-100 text-sm">Recent system access activity</p>
                                     </div>
                                 </div>
-                                <button onclick="location.reload()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                    </svg>
-                                    Refresh
+                                <div class="flex gap-2">
+                                    <button onclick="openLoginHistory()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Login History
+                                    </button>
+                                    <button onclick="location.reload()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        Refresh
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Filters -->
+                            <div class="flex flex-wrap gap-3">
+                                <div class="flex items-center gap-2">
+                                    <label class="text-white text-sm font-medium">User Type:</label>
+                                    <select id="filter-user-type" onchange="updateRoleOptions(); filterLogins();" class="px-3 py-1.5 bg-white/20 text-white border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white/50">
+                                        <option value="all" class="text-gray-900">All</option>
+                                        <option value="student" class="text-gray-900">Student</option>
+                                        <option value="employee" class="text-gray-900">Employee</option>
+                                        <option value="parent" class="text-gray-900">Parent</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="flex items-center gap-2">
+                                    <label class="text-white text-sm font-medium">Role:</label>
+                                    <select id="filter-role" onchange="filterLogins()" class="px-3 py-1.5 bg-white/20 text-white border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white/50">
+                                        <option value="all" class="text-gray-900">All</option>
+                                        <!-- Options will be populated dynamically -->
+                                    </select>
+                                </div>
+                                
+                                <button onclick="clearFilters()" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all">
+                                    Clear Filters
                                 </button>
                             </div>
                         </div>
@@ -527,12 +560,21 @@ require_once 'includes/dashboard_data.php';
                                         <th class="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
                                         <th class="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
                                         <th class="px-4 py-3 text-left font-semibold text-gray-700">Login Time</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Logout Time</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Duration</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100" id="logins-tbody">
                                     <?php if (!empty($today_logins)): ?>
                                         <?php foreach ($today_logins as $login): 
-                                            $userTypeColor = $login['user_type'] === 'employee' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700';
+                                            // Set user type color
+                                            $userTypeColors = [
+                                                'employee' => 'bg-purple-100 text-purple-700',
+                                                'student' => 'bg-blue-100 text-blue-700',
+                                                'parent' => 'bg-cyan-100 text-cyan-700'
+                                            ];
+                                            $userTypeColor = $userTypeColors[$login['user_type']] ?? 'bg-gray-100 text-gray-700';
+                                            
                                             $roleColors = [
                                                 'superadmin' => 'bg-red-100 text-red-700',
                                                 'hr' => 'bg-orange-100 text-orange-700',
@@ -541,11 +583,12 @@ require_once 'includes/dashboard_data.php';
                                                 'cashier' => 'bg-yellow-100 text-yellow-700',
                                                 'guidance' => 'bg-pink-100 text-pink-700',
                                                 'attendance' => 'bg-teal-100 text-teal-700',
-                                                'student' => 'bg-blue-100 text-blue-700'
+                                                'student' => 'bg-blue-100 text-blue-700',
+                                                'parent' => 'bg-cyan-100 text-cyan-700'
                                             ];
                                             $roleColor = $roleColors[$login['role']] ?? 'bg-gray-100 text-gray-700';
                                         ?>
-                                        <tr class="hover:bg-blue-50 transition-colors login-row">
+                                        <tr class="hover:bg-blue-50 transition-colors login-row" data-user-type="<?= strtolower(htmlspecialchars($login['user_type'])) ?>" data-role="<?= strtolower(htmlspecialchars($login['role'])) ?>">
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium <?= $userTypeColor ?>">
                                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -568,6 +611,36 @@ require_once 'includes/dashboard_data.php';
                                                     </svg>
                                                     <?= date('M j, Y g:i A', strtotime($login['login_time'])) ?>
                                                 </div>
+                                            </td>
+                                            <td class="px-4 py-3 text-gray-600">
+                                                <?php if (!empty($login['logout_time'])): ?>
+                                                    <div class="flex items-center gap-2">
+                                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                                        </svg>
+                                                        <?= date('M j, Y g:i A', strtotime($login['logout_time'])) ?>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <span class="text-green-600 font-medium flex items-center gap-1">
+                                                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                                        Active
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="px-4 py-3 text-gray-600">
+                                                <?php if (!empty($login['session_duration'])): ?>
+                                                    <?php 
+                                                        $hours = floor($login['session_duration'] / 3600);
+                                                        $minutes = floor(($login['session_duration'] % 3600) / 60);
+                                                        if ($hours > 0) {
+                                                            echo $hours . 'h ' . $minutes . 'm';
+                                                        } else {
+                                                            echo $minutes . ' min';
+                                                        }
+                                                    ?>
+                                                <?php else: ?>
+                                                    <span class="text-gray-400">---</span>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -612,7 +685,7 @@ require_once 'includes/dashboard_data.php';
 
                 <!-- Not Logged In Today Sections -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <!-- Not Logged In Today (Teachers) -->
+                    <!-- Not Logged In Today (Employees) -->
                     <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                         <div class="bg-orange-500 px-6 py-4">
                             <div class="flex items-center gap-3">
@@ -623,7 +696,7 @@ require_once 'includes/dashboard_data.php';
                                 </div>
                                 <div>
                                     <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
-                                    <p class="text-orange-100 text-sm">Teachers</p>
+                                    <p class="text-orange-100 text-sm">Employees</p>
                                 </div>
                             </div>
                         </div>
@@ -634,13 +707,13 @@ require_once 'includes/dashboard_data.php';
                                 </ul>
                                 <div id="employees-loading" class="text-center py-8">
                                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-orange-200 border-t-orange-600"></div>
-                                    <p class="text-gray-500 text-sm mt-2">Loading teachers...</p>
+                                    <p class="text-gray-500 text-sm mt-2">Loading employees...</p>
                                 </div>
                             </div>
-                            <!-- Pagination for Teachers -->
+                            <!-- Pagination for Employees -->
                             <div id="employees-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
                                 <div class="text-sm text-gray-600">
-                                    Showing <span id="employees-start" class="font-semibold text-gray-900">1</span> to <span id="employees-end" class="font-semibold text-gray-900">10</span> of <span id="employees-total" class="font-semibold text-gray-900">0</span> teachers
+                                    Showing <span id="employees-start" class="font-semibold text-gray-900">1</span> to <span id="employees-end" class="font-semibold text-gray-900">10</span> of <span id="employees-total" class="font-semibold text-gray-900">0</span> employees
                                 </div>
                                 <div class="flex gap-2">
                                     <button id="employees-prev" onclick="changeEmployeesPage(-1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -673,7 +746,7 @@ require_once 'includes/dashboard_data.php';
                                 </div>
                                 <div>
                                     <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
-                                    <p class="text-blue-100 text-sm">Students</p>
+                                    <p class="text-blue-100 text-sm">Students & Parents</p>
                                 </div>
                             </div>
                         </div>
@@ -684,13 +757,13 @@ require_once 'includes/dashboard_data.php';
                                 </ul>
                                 <div id="students-loading" class="text-center py-8">
                                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"></div>
-                                    <p class="text-gray-500 text-sm mt-2">Loading students...</p>
+                                    <p class="text-gray-500 text-sm mt-2">Loading students & parents...</p>
                                 </div>
                             </div>
-                            <!-- Pagination for Students -->
+                            <!-- Pagination for Students & Parents -->
                             <div id="students-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
                                 <div class="text-sm text-gray-600">
-                                    Showing <span id="students-start" class="font-semibold text-gray-900">1</span> to <span id="students-end" class="font-semibold text-gray-900">10</span> of <span id="students-total" class="font-semibold text-gray-900">0</span> students
+                                    Showing <span id="students-start" class="font-semibold text-gray-900">1</span> to <span id="students-end" class="font-semibold text-gray-900">10</span> of <span id="students-total" class="font-semibold text-gray-900">0</span> users
                                 </div>
                                 <div class="flex gap-2">
                                     <button id="students-prev" onclick="changeStudentsPage(-1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -749,20 +822,19 @@ require_once 'includes/dashboard_data.php';
                 <!-- Employee Table -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div class="overflow-x-auto">
-                        <table class="w-full">
+                        <table class="w-full table-fixed">
                             <thead class="bg-[#0B2C62] text-white">
                                 <tr>
-                                    <th class="px-4 py-3 text-left text-sm font-medium">ID Number</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium">Full Name</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium">Position</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium">Department</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium">Hire Date</th>
-                                    <th class="px-4 py-3 text-left text-sm font-medium">Account Status</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium w-[15%]">ID Number</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium w-[25%]">Full Name</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium w-[20%]">Position</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium w-[25%]">Department</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium w-[15%]">Hire Date</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 <?php
-                                // Get ALL HR employees (with and without system accounts)
+                                // Get ALL HR employees
                                 $hr_query = "
                                     SELECT 
                                         e.id_number,
@@ -771,15 +843,8 @@ require_once 'includes/dashboard_data.php';
                                         e.middle_name,
                                         e.position,
                                         e.department,
-                                        e.hire_date,
-                                        ea.username,
-                                        ea.role,
-                                        CASE 
-                                            WHEN ea.employee_id IS NOT NULL THEN 'Has Account'
-                                            ELSE 'No Account'
-                                        END as account_status
+                                        e.hire_date
                                     FROM employees e
-                                    LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id AND ea.role = 'hr'
                                     WHERE e.department = 'Human Resources'
                                     ORDER BY e.last_name, e.first_name
                                 ";
@@ -798,24 +863,13 @@ require_once 'includes/dashboard_data.php';
                                     <td class="px-4 py-3 text-sm text-gray-900">
                                         <?= $hr['hire_date'] ? date('M d, Y', strtotime($hr['hire_date'])) : 'N/A' ?>
                                     </td>
-                                    <td class="px-4 py-3 text-sm">
-                                        <?php if ($hr['account_status'] === 'Has Account'): ?>
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                Has Account
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                No Account
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
                                 </tr>
                                 <?php 
                                     endwhile;
                                 else: 
                                 ?>
                                 <tr>
-                                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                                    <td colspan="5" class="px-4 py-8 text-center text-gray-500">
                                         No HR employees found. Create HR employees to manage HR staff.
                                     </td>
                                 </tr>
@@ -907,9 +961,9 @@ require_once 'includes/dashboard_data.php';
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <!-- Maintenance Mode -->
-                        <div>
+                        <div class="flex flex-col">
                             <h4 class="text-lg font-semibold text-gray-900 mb-4">Maintenance Mode</h4>
-                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 flex-grow">
                                 <div class="flex items-center justify-between mb-3">
                                     <div>
                                         <div class="font-medium text-gray-900">System Maintenance</div>
@@ -925,15 +979,15 @@ require_once 'includes/dashboard_data.php';
                                     <li>• Displays maintenance message to users</li>
                                 </ul>
                             </div>
-                            <button onclick="updateConfiguration()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                            <button onclick="updateConfiguration()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors mt-auto">
                                 Update Configuration
                             </button>
                         </div>
 
                         <!-- Database Backup -->
-                        <div>
+                        <div class="flex flex-col">
                             <h4 class="text-lg font-semibold text-gray-900 mb-4">Database Backup</h4>
-                            <div class="bg-[#0B2C62]/5 rounded-lg p-4 mb-4">
+                            <div class="bg-[#0B2C62]/5 rounded-lg p-4 mb-4 flex-grow">
                                 <div class="flex items-center gap-2 mb-2">
                                     <svg class="w-5 h-5 text-[#0B2C62]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -943,14 +997,15 @@ require_once 'includes/dashboard_data.php';
                                 <ul class="text-sm text-[#0B2C62] space-y-1">
                                     <li>• Includes all tables and data</li>
                                     <li>• Regular backups recommended before updates</li>
-                                    <li>• Creates timestamped backup files</li>
+                                    <li>• Choose where to save the backup file</li>
+                                    <li>• Creates timestamped SQL backup files</li>
                                 </ul>
                             </div>
-                            <button onclick="createDatabaseBackup()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                            <button onclick="createDatabaseBackup()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 mt-auto">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                                 </svg>
-                                Create Database Backup
+                                Download Database Backup
                             </button>
                         </div>
                     </div>
@@ -984,19 +1039,19 @@ require_once 'includes/dashboard_data.php';
                                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date:</label>
                                     <input type="date" id="loginEndDate" value="30/09/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
-                                <p class="text-sm text-gray-600">All login records between these dates will be deleted and saved to CSV</p>
+                                <p class="text-sm text-gray-600">All login records between these dates will be archived and can be viewed in "View Archives"</p>
                             </div>
                             <button onclick="clearLoginLogs()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                                 </svg>
-                                Clear Login Logs
+                                Archive Login Logs
                             </button>
                         </div>
 
-                        <!-- Clear Attendance Records -->
+                        <!-- Archive Attendance Records -->
                         <div>
-                            <h4 class="text-lg font-semibold text-gray-900 mb-4">Clear Attendance Records</h4>
+                            <h4 class="text-lg font-semibold text-gray-900 mb-4">Archive Attendance Records</h4>
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Start Date:</label>
@@ -1006,13 +1061,13 @@ require_once 'includes/dashboard_data.php';
                                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date:</label>
                                     <input type="date" id="attendanceEndDate" value="30/09/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
-                                <p class="text-sm text-gray-600">All attendance records between these dates will be deleted and saved to CSV</p>
+                                <p class="text-sm text-gray-600">All attendance records between these dates will be archived and can be viewed in "View Archives"</p>
                             </div>
                             <button onclick="clearAttendanceRecords()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                                 </svg>
-                                Clear Attendance Records
+                                Archive Attendance Records
                             </button>
                         </div>
                     </div>
@@ -1316,6 +1371,46 @@ require_once 'includes/dashboard_data.php';
                     </div>
                 </div>
 
+                <!-- Data Archives (Login Logs & Attendance) -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">📊 System Data Archives</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-lg p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <p class="text-blue-100 text-sm font-medium">Login Logs Archive</p>
+                                    <p class="text-sm text-blue-100 mt-1">Archived login history</p>
+                                </div>
+                                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <button onclick="loadDataArchives('login')" class="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                                View Login Archives
+                            </button>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl shadow-lg p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <p class="text-green-100 text-sm font-medium">Attendance Archive</p>
+                                    <p class="text-sm text-green-100 mt-1">Archived attendance records</p>
+                                </div>
+                                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <button onclick="loadDataArchives('attendance')" class="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                                View Attendance Archives
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Archive Viewer -->
                 <div id="archive-viewer" class="bg-white rounded-2xl shadow-lg hidden">
                     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -1363,6 +1458,148 @@ require_once 'includes/dashboard_data.php';
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Login History Modal -->
+    <div id="login-history-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/20 p-2 rounded-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Login History</h2>
+                        <p class="text-blue-100 text-sm">View and search past login records</p>
+                    </div>
+                </div>
+                <button onclick="closeLoginHistory()" class="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Filters -->
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Date Range -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                        <input type="date" id="history-date-from" onchange="autoSearchHistory()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                        <input type="date" id="history-date-to" onchange="autoSearchHistory()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- User Type Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">User Type</label>
+                        <select id="history-user-type" onchange="updateHistoryRoleOptions(); autoSearchHistory();" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="all">All</option>
+                            <option value="student">Student</option>
+                            <option value="employee">Employee</option>
+                            <option value="parent">Parent</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Role Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <select id="history-role" onchange="autoSearchHistory()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="all">All</option>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Search and Actions -->
+                <div class="flex flex-wrap gap-3 mt-4">
+                    <div class="flex-1 min-w-[200px]">
+                        <input type="text" id="history-search" placeholder="Search by name or ID..." oninput="debouncedHistorySearch()" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <button onclick="searchLoginHistory()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Search
+                    </button>
+                    <button onclick="clearHistoryFilters()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                        Clear
+                    </button>
+                    <button onclick="exportLoginHistory()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="flex-1 overflow-auto">
+                <div id="history-loading" class="flex items-center justify-center py-12">
+                    <div class="text-center">
+                        <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+                        <p class="text-gray-500">Loading login history...</p>
+                    </div>
+                </div>
+                
+                <table id="history-table" class="w-full text-sm hidden">
+                    <thead class="bg-gray-50 border-b border-gray-200 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">User Type</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Login Time</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Logout Time</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody" class="divide-y divide-gray-100">
+                        <!-- Data will be loaded here -->
+                    </tbody>
+                </table>
+                
+                <div id="history-no-results" class="hidden text-center py-12">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-gray-500 font-medium">No login records found</p>
+                    <p class="text-gray-400 text-sm mt-1">Try adjusting your filters or select a date range</p>
+                </div>
+                
+                <div id="history-initial-message" class="text-center py-12">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <p class="text-gray-600 font-medium mb-2">Search Login History</p>
+                    <p class="text-gray-500 text-sm">Select filters and click Search to view login records</p>
+                    <p class="text-gray-400 text-xs mt-2">💡 Tip: Leave dates empty to search all records</p>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div id="history-pagination" class="hidden px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                    Showing <span id="history-start">1</span> to <span id="history-end">20</span> of <span id="history-total">0</span> records
+                </div>
+                <div class="flex gap-2">
+                    <button id="history-prev" onclick="changeHistoryPage(-1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Previous
+                    </button>
+                    <button id="history-next" onclick="changeHistoryPage(1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <style>
@@ -2838,50 +3075,39 @@ require_once 'includes/dashboard_data.php';
 
         function createDatabaseBackup() {
             showConfirmationModal({
-                title: 'Create Database Backup',
-                message: 'Are you sure you want to create a complete database backup?',
+                title: 'Download Database Backup',
+                message: 'Are you sure you want to download a complete database backup?',
                 details: [
                     'This will include all tables and data',
                     'The process may take a few minutes',
-                    'Backup file will be created with timestamp'
+                    'You will be prompted to choose where to save the file'
                 ],
-                confirmText: 'Create Backup',
+                confirmText: 'Download Backup',
                 cancelText: 'Cancel',
                 type: 'info',
                 onConfirm: () => {
-                    fetch('create_backup.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            showNotificationModal({
-                                title: 'Backup Created Successfully',
-                                message: data.message,
-                                details: [
-                                    `Filename: ${data.filename}`,
-                                    `Size: ${data.size}`,
-                                    'Backup stored in /backups directory'
-                                ],
-                                type: 'success'
-                            });
-                        } else {
-                            showNotificationModal({
-                                title: 'Backup Failed',
-                                message: data.message,
-                                type: 'error'
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        showNotificationModal({
-                            title: 'Error',
-                            message: 'An error occurred while creating backup',
-                            type: 'error'
-                        });
+                    // Show loading notification
+                    showNotificationModal({
+                        title: 'Creating Backup...',
+                        message: 'Please wait while the backup is being generated. This may take a few moments.',
+                        details: [
+                            'Do not close this window',
+                            'Download will start automatically'
+                        ],
+                        type: 'info'
                     });
+                    
+                    // Trigger download by opening the backup URL
+                    // This will prompt the browser's "Save As" dialog
+                    window.location.href = 'create_backup.php';
+                    
+                    // Close the loading modal after a short delay
+                    setTimeout(() => {
+                        const modal = document.getElementById('notificationModal');
+                        if (modal) {
+                            modal.classList.add('hidden');
+                        }
+                    }, 2000);
                 }
             });
         }
@@ -2905,16 +3131,16 @@ require_once 'includes/dashboard_data.php';
             }
             
             showConfirmationModal({
-                title: 'Clear Login Logs',
-                message: `Are you sure you want to clear all login logs between ${startDate} and ${endDate}?`,
+                title: 'Archive Login Logs',
+                message: `Are you sure you want to archive all login logs between ${startDate} and ${endDate}?`,
                 details: [
-                    'Records will be exported to CSV before deletion',
-                    'CSV file will download automatically',
-                    'Records will be permanently deleted from database'
+                    'Records will be moved to archive',
+                    'Archived records can be viewed in "View Archives"',
+                    'Records will be removed from active logs'
                 ],
-                confirmText: 'Clear Logs',
+                confirmText: 'Archive Logs',
                 cancelText: 'Cancel',
-                type: 'danger',
+                type: 'info',
                 onConfirm: () => {
                     fetch('clear_login_logs.php', {
                         method: 'POST',
@@ -2927,36 +3153,22 @@ require_once 'includes/dashboard_data.php';
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            // Trigger CSV download if data exists
-                            if (data.csv_data && data.filename) {
-                                const csvContent = atob(data.csv_data);
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                link.href = URL.createObjectURL(blob);
-                                link.download = data.filename;
-                                link.click();
-                            }
-                            
-                            const details = [
-                                `Records deleted: ${data.records_deleted}`,
-                                `Date range: ${startDate} to ${endDate}`
-                            ];
-                            if (data.csv_data) {
-                                details.push(`✅ CSV file downloaded: ${data.filename}`);
-                                details.push('📥 Check your Downloads folder');
-                            }
                             showNotificationModal({
-                                title: 'Login Logs Cleared',
+                                title: 'Login Logs Archived',
                                 message: data.message,
-                                details: details,
+                                details: [
+                                    `Records archived: ${data.records_archived}`,
+                                    `Date range: ${startDate} to ${endDate}`,
+                                    'View archived records in "View Archives"'
+                                ],
                                 type: 'success'
                             });
                             // Clear the date inputs
                             document.getElementById('loginStartDate').value = '';
                             document.getElementById('loginEndDate').value = '';
-                        } else{
+                        } else {
                             showNotificationModal({
-                                title: 'Clear Failed',
+                                title: 'Archive Failed',
                                 message: data.message,
                                 type: 'error'
                             });
@@ -2966,7 +3178,7 @@ require_once 'includes/dashboard_data.php';
                         console.error('Error:', error);
                         showNotificationModal({
                             title: 'Error',
-                            message: 'An error occurred while clearing login logs',
+                            message: 'An error occurred while archiving login logs',
                             type: 'error'
                         });
                     });
@@ -2993,16 +3205,16 @@ require_once 'includes/dashboard_data.php';
             }
             
             showConfirmationModal({
-                title: 'Clear Attendance Records',
-                message: `Are you sure you want to clear all attendance records between ${startDate} and ${endDate}?`,
+                title: 'Archive Attendance Records',
+                message: `Are you sure you want to archive all attendance records between ${startDate} and ${endDate}?`,
                 details: [
-                    'Records will be exported to CSV before deletion',
-                    'CSV file will download automatically',
-                    'Records will be permanently deleted from database'
+                    'Records will be moved to archive',
+                    'Archived records can be viewed in "View Archives"',
+                    'Records will be removed from active attendance'
                 ],
-                confirmText: 'Clear Records',
+                confirmText: 'Archive Records',
                 cancelText: 'Cancel',
-                type: 'danger',
+                type: 'info',
                 onConfirm: () => {
                     fetch('clear_attendance_records.php', {
                         method: 'POST',
@@ -3015,28 +3227,14 @@ require_once 'includes/dashboard_data.php';
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            // Trigger CSV download if data exists
-                            if (data.csv_data && data.filename) {
-                                const csvContent = atob(data.csv_data);
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                link.href = URL.createObjectURL(blob);
-                                link.download = data.filename;
-                                link.click();
-                            }
-                            
-                            const details = [
-                                `Records deleted: ${data.records_deleted}`,
-                                `Date range: ${startDate} to ${endDate}`
-                            ];
-                            if (data.csv_data) {
-                                details.push(`✅ CSV file downloaded: ${data.filename}`);
-                                details.push('📥 Check your Downloads folder');
-                            }
                             showNotificationModal({
-                                title: 'Attendance Records Cleared',
+                                title: 'Attendance Records Archived',
                                 message: data.message,
-                                details: details,
+                                details: [
+                                    `Records archived: ${data.records_archived}`,
+                                    `Date range: ${startDate} to ${endDate}`,
+                                    'View archived records in "View Archives"'
+                                ],
                                 type: 'success'
                             });
                             // Clear the date inputs
@@ -3044,7 +3242,7 @@ require_once 'includes/dashboard_data.php';
                             document.getElementById('attendanceEndDate').value = '';
                         } else {
                             showNotificationModal({
-                                title: 'Clear Failed',
+                                title: 'Archive Failed',
                                 message: data.message,
                                 type: 'error'
                             });
@@ -3054,7 +3252,7 @@ require_once 'includes/dashboard_data.php';
                         console.error('Error:', error);
                         showNotificationModal({
                             title: 'Error',
-                            message: 'An error occurred while clearing attendance records',
+                            message: 'An error occurred while archiving attendance records',
                             type: 'error'
                         });
                     });
@@ -3788,7 +3986,8 @@ function deletePermanently(recordId, recordType) {
                     const emptyIcon = type === 'employees' 
                         ? '<svg class="w-12 h-12 mx-auto mb-2 text-orange-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>'
                         : '<svg class="w-12 h-12 mx-auto mb-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>';
-                    list.innerHTML = `<li class="text-center py-8">${emptyIcon}<p class="text-gray-500 font-medium">All ${type} have logged in today!</p><p class="text-gray-400 text-sm mt-1">Great attendance 🎉</p></li>`;
+                    const message = type === 'employees' ? 'All employees have logged in today!' : 'All students & parents have logged in today!';
+                    list.innerHTML = `<li class="text-center py-8">${emptyIcon}<p class="text-gray-500 font-medium">${message}</p><p class="text-gray-400 text-sm mt-1">Great attendance 🎉</p></li>`;
                     pagination.classList.add('hidden');
                 } else {
                     data.items.forEach(item => {
@@ -3909,18 +4108,26 @@ function deletePermanently(recordId, recordType) {
         
         function updateLoginsDisplay() {
             const rows = document.querySelectorAll('.login-row');
-            const total = rows.length;
+            // Only count visible rows (not filtered out)
+            const visibleRows = Array.from(rows).filter(row => !row.classList.contains('hidden'));
+            const total = visibleRows.length;
             
-            if (total === 0) return;
+            if (total === 0) {
+                // Hide all rows if no visible rows
+                rows.forEach(row => row.style.display = 'none');
+                return;
+            }
             
             const start = (loginsPage - 1) * loginsPerPage;
             const end = start + loginsPerPage;
             
-            rows.forEach((row, index) => {
+            // Hide all rows first
+            rows.forEach(row => row.style.display = 'none');
+            
+            // Show only visible rows for current page
+            visibleRows.forEach((row, index) => {
                 if (index >= start && index < end) {
                     row.style.display = '';
-                } else {
-                    row.style.display = 'none';
                 }
             });
             
@@ -3931,7 +4138,7 @@ function deletePermanently(recordId, recordType) {
             const prevBtn = document.getElementById('logins-prev');
             const nextBtn = document.getElementById('logins-next');
             
-            if (startEl) startEl.textContent = start + 1;
+            if (startEl) startEl.textContent = total > 0 ? start + 1 : 0;
             if (endEl) endEl.textContent = Math.min(end, total);
             if (totalEl) totalEl.textContent = total;
             
@@ -3941,7 +4148,7 @@ function deletePermanently(recordId, recordType) {
         }
         
         function changeLoginsPage(direction) {
-            const rows = document.querySelectorAll('.login-row');
+            const rows = document.querySelectorAll('.login-row:not(.hidden)');
             const totalPages = Math.ceil(rows.length / loginsPerPage);
             
             loginsPage += direction;
@@ -3951,8 +4158,128 @@ function deletePermanently(recordId, recordType) {
             updateLoginsDisplay();
         }
         
+        // Filter functions for Today's Logins
+        function updateRoleOptions() {
+            const userTypeFilter = document.getElementById('filter-user-type').value.toLowerCase();
+            const roleSelect = document.getElementById('filter-role');
+            
+            // Define role options for each user type
+            const roleOptions = {
+                'all': [
+                    { value: 'all', label: 'All' },
+                    { value: 'student', label: 'Student' },
+                    { value: 'parent', label: 'Parent' },
+                    { value: 'teacher', label: 'Teacher' },
+                    { value: 'registrar', label: 'Registrar' },
+                    { value: 'cashier', label: 'Cashier' },
+                    { value: 'guidance', label: 'Guidance' },
+                    { value: 'hr', label: 'HR' },
+                    { value: 'attendance', label: 'Attendance' }
+                ],
+                'student': [
+                    { value: 'all', label: 'All' },
+                    { value: 'student', label: 'Student' }
+                ],
+                'parent': [
+                    { value: 'all', label: 'All' },
+                    { value: 'parent', label: 'Parent' }
+                ],
+                'employee': [
+                    { value: 'all', label: 'All' },
+                    { value: 'teacher', label: 'Teacher' },
+                    { value: 'registrar', label: 'Registrar' },
+                    { value: 'cashier', label: 'Cashier' },
+                    { value: 'guidance', label: 'Guidance' },
+                    { value: 'hr', label: 'HR' },
+                    { value: 'attendance', label: 'Attendance' }
+                ]
+            };
+            
+            // Get current selected role
+            const currentRole = roleSelect.value;
+            
+            // Clear existing options
+            roleSelect.innerHTML = '';
+            
+            // Get options for selected user type
+            const options = roleOptions[userTypeFilter] || roleOptions['all'];
+            
+            // Add options
+            options.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.value;
+                optionElement.textContent = option.label;
+                optionElement.className = 'text-gray-900';
+                roleSelect.appendChild(optionElement);
+            });
+            
+            // Try to restore previous selection if it exists in new options
+            const optionExists = options.some(opt => opt.value === currentRole);
+            if (optionExists) {
+                roleSelect.value = currentRole;
+            } else {
+                roleSelect.value = 'all';
+            }
+        }
+        
+        function filterLogins() {
+            const userTypeFilter = document.getElementById('filter-user-type').value.toLowerCase();
+            const roleFilter = document.getElementById('filter-role').value.toLowerCase();
+            const rows = document.querySelectorAll('.login-row');
+            
+            let visibleCount = 0;
+            rows.forEach(row => {
+                const userType = row.getAttribute('data-user-type');
+                const role = row.getAttribute('data-role');
+                
+                const userTypeMatch = userTypeFilter === 'all' || userType === userTypeFilter;
+                const roleMatch = roleFilter === 'all' || role === roleFilter;
+                
+                if (userTypeMatch && roleMatch) {
+                    row.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+            
+            // Reset to page 1 and update display
+            loginsPage = 1;
+            updateLoginsDisplay();
+            
+            // Show message if no results
+            const tbody = document.getElementById('logins-tbody');
+            const existingMessage = tbody.querySelector('.no-results-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            if (visibleCount === 0) {
+                const messageRow = document.createElement('tr');
+                messageRow.className = 'no-results-message';
+                messageRow.innerHTML = `
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        No logins match the selected filters
+                    </td>
+                `;
+                tbody.appendChild(messageRow);
+            }
+        }
+        
+        function clearFilters() {
+            document.getElementById('filter-user-type').value = 'all';
+            document.getElementById('filter-role').value = 'all';
+            filterLogins();
+        }
+        
         // Initialize pagination on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize role options
+            updateRoleOptions();
+            
             // Initialize Today's Logins pagination only if pagination elements exist
             const loginsTable = document.getElementById('logins-table');
             const loginsPagination = document.getElementById('logins-start');
@@ -4177,6 +4504,399 @@ function deletePermanently(recordId, recordType) {
             document.getElementById('archive-viewer').classList.add('hidden');
         }
 
+        // Load Data Archives (Login Logs & Attendance)
+        async function loadDataArchives(type) {
+            const viewer = document.getElementById('archive-viewer');
+            viewer.classList.remove('hidden');
+            
+            // Update title
+            const title = type === 'login' ? 'Login Logs Archive' : 'Attendance Records Archive';
+            document.getElementById('archive-title').textContent = title;
+            document.getElementById('archive-subtitle').textContent = `Viewing archived ${type} records`;
+            
+            // Set up table headers
+            const headerRow = document.getElementById('archive-table-header');
+            if (type === 'login') {
+                headerRow.innerHTML = `
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Login Time</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Logout Time</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Type</th>
+                `;
+            } else {
+                headerRow.innerHTML = `
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID Number</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time In/Out</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                `;
+            }
+            
+            // Fetch and display data
+            const tbody = document.getElementById('archive-table-body');
+            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">Loading...</td></tr>';
+            
+            try {
+                const response = await fetch(`get_data_archives.php?type=${type}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Error loading data</td></tr>`;
+                    return;
+                }
+                
+                if (data.records.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No archived records found</td></tr>';
+                    return;
+                }
+                
+                // Render data
+                tbody.innerHTML = '';
+                data.records.forEach(record => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50';
+                    
+                    if (type === 'login') {
+                        const logoutTime = record.logout_time ? new Date(record.logout_time).toLocaleString() : '<span class="text-gray-400">Not logged out</span>';
+                        const duration = record.session_duration ? 
+                            (Math.floor(record.session_duration / 3600) > 0 ? 
+                                Math.floor(record.session_duration / 3600) + 'h ' + Math.floor((record.session_duration % 3600) / 60) + 'm' :
+                                Math.floor(record.session_duration / 60) + ' min') :
+                            '<span class="text-gray-400">---</span>';
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 text-sm text-gray-900">${record.username}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">${new Date(record.login_time).toLocaleString()}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${logoutTime}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${duration}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${record.ip_address}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${record.user_type}</td>
+                        `;
+                    } else {
+                        row.innerHTML = `
+                            <td class="px-6 py-4 text-sm text-gray-900">${record.id_number}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">${record.name}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${new Date(record.date).toLocaleDateString()}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${record.time_in || '---'} / ${record.time_out || '---'}</td>
+                            <td class="px-6 py-4 text-sm">
+                                <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">${record.status}</span>
+                            </td>
+                        `;
+                    }
+                    
+                    tbody.appendChild(row);
+                });
+                
+            } catch (error) {
+                console.error('Error:', error);
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Error loading data</td></tr>`;
+            }
+        }
+
+        // Login History Modal Functions
+        let historyPage = 1;
+        const historyPerPage = 10;
+        let historyData = [];
+
+        function updateHistoryRoleOptions() {
+            const userTypeFilter = document.getElementById('history-user-type').value.toLowerCase();
+            const roleSelect = document.getElementById('history-role');
+            
+            // Define role options for each user type
+            const roleOptions = {
+                'all': [
+                    { value: 'all', label: 'All' },
+                    { value: 'student', label: 'Student' },
+                    { value: 'parent', label: 'Parent' },
+                    { value: 'teacher', label: 'Teacher' },
+                    { value: 'registrar', label: 'Registrar' },
+                    { value: 'cashier', label: 'Cashier' },
+                    { value: 'guidance', label: 'Guidance' },
+                    { value: 'hr', label: 'HR' },
+                    { value: 'attendance', label: 'Attendance' }
+                ],
+                'student': [
+                    { value: 'all', label: 'All' },
+                    { value: 'student', label: 'Student' }
+                ],
+                'parent': [
+                    { value: 'all', label: 'All' },
+                    { value: 'parent', label: 'Parent' }
+                ],
+                'employee': [
+                    { value: 'all', label: 'All' },
+                    { value: 'teacher', label: 'Teacher' },
+                    { value: 'registrar', label: 'Registrar' },
+                    { value: 'cashier', label: 'Cashier' },
+                    { value: 'guidance', label: 'Guidance' },
+                    { value: 'hr', label: 'HR' },
+                    { value: 'attendance', label: 'Attendance' }
+                ]
+            };
+            
+            // Get current selected role
+            const currentRole = roleSelect.value;
+            
+            // Clear existing options
+            roleSelect.innerHTML = '';
+            
+            // Get options for selected user type
+            const options = roleOptions[userTypeFilter] || roleOptions['all'];
+            
+            // Add options
+            options.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.value;
+                optionElement.textContent = option.label;
+                roleSelect.appendChild(optionElement);
+            });
+            
+            // Try to restore previous selection if it exists in new options
+            const optionExists = options.some(opt => opt.value === currentRole);
+            if (optionExists) {
+                roleSelect.value = currentRole;
+            } else {
+                roleSelect.value = 'all';
+            }
+        }
+
+        function openLoginHistory() {
+            document.getElementById('login-history-modal').classList.remove('hidden');
+            // Prevent background scrolling
+            document.body.style.overflow = 'hidden';
+            
+            // Clear date fields (leave empty to show all records)
+            document.getElementById('history-date-to').value = '';
+            document.getElementById('history-date-from').value = '';
+            
+            // Reset filters
+            document.getElementById('history-user-type').value = 'all';
+            document.getElementById('history-search').value = '';
+            historyPage = 1;
+            
+            // Initialize role options
+            updateHistoryRoleOptions();
+            
+            // Auto-load all records on open
+            searchLoginHistory();
+        }
+
+        function closeLoginHistory() {
+            document.getElementById('login-history-modal').classList.add('hidden');
+            // Restore background scrolling
+            document.body.style.overflow = '';
+        }
+
+        function autoSearchHistory() {
+            // Reset to page 1 when filters change
+            historyPage = 1;
+            searchLoginHistory();
+        }
+
+        // Debounce search input to avoid too many requests while typing
+        let searchTimeout;
+        function debouncedHistorySearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                historyPage = 1;
+                searchLoginHistory();
+            }, 500); // Wait 500ms after user stops typing
+        }
+
+        async function searchLoginHistory() {
+            const loading = document.getElementById('history-loading');
+            const table = document.getElementById('history-table');
+            const noResults = document.getElementById('history-no-results');
+            const initialMessage = document.getElementById('history-initial-message');
+            const pagination = document.getElementById('history-pagination');
+            
+            loading.classList.remove('hidden');
+            table.classList.add('hidden');
+            noResults.classList.add('hidden');
+            initialMessage.classList.add('hidden');
+            pagination.classList.add('hidden');
+            
+            try {
+                const dateFrom = document.getElementById('history-date-from').value;
+                const dateTo = document.getElementById('history-date-to').value;
+                const userType = document.getElementById('history-user-type').value;
+                const role = document.getElementById('history-role').value;
+                const search = document.getElementById('history-search').value;
+                
+                const params = new URLSearchParams({
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    user_type: userType,
+                    role: role,
+                    search: search,
+                    page: historyPage,
+                    limit: 10
+                });
+                
+                const response = await fetch(`get_login_history.php?${params}`);
+                const data = await response.json();
+                
+                console.log('Login history response:', data); // Debug log
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                historyData = data.records || [];
+                displayHistoryResults(data);
+                
+            } catch (error) {
+                console.error('Error loading history:', error);
+                alert('Error loading login history: ' + error.message);
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        function displayHistoryResults(data) {
+            const table = document.getElementById('history-table');
+            const tbody = document.getElementById('history-tbody');
+            const noResults = document.getElementById('history-no-results');
+            const pagination = document.getElementById('history-pagination');
+            
+            tbody.innerHTML = '';
+            
+            if (!data.records || data.records.length === 0) {
+                noResults.classList.remove('hidden');
+                return;
+            }
+            
+            table.classList.remove('hidden');
+            
+            data.records.forEach(record => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors';
+                
+                const userTypeColors = {
+                    'employee': 'bg-purple-100 text-purple-700',
+                    'student': 'bg-blue-100 text-blue-700',
+                    'parent': 'bg-cyan-100 text-cyan-700'
+                };
+                
+                const roleColors = {
+                    'superadmin': 'bg-red-100 text-red-700',
+                    'hr': 'bg-orange-100 text-orange-700',
+                    'teacher': 'bg-green-100 text-green-700',
+                    'registrar': 'bg-indigo-100 text-indigo-700',
+                    'cashier': 'bg-yellow-100 text-yellow-700',
+                    'guidance': 'bg-pink-100 text-pink-700',
+                    'attendance': 'bg-teal-100 text-teal-700',
+                    'student': 'bg-blue-100 text-blue-700',
+                    'parent': 'bg-cyan-100 text-cyan-700'
+                };
+                
+                const userTypeColor = userTypeColors[record.user_type] || 'bg-gray-100 text-gray-700';
+                const roleColor = roleColors[record.role] || 'bg-gray-100 text-gray-700';
+                
+                const loginDate = new Date(record.login_time);
+                const logoutTime = record.logout_time ? new Date(record.logout_time) : null;
+                
+                let duration = '---';
+                if (record.session_duration) {
+                    const hours = Math.floor(record.session_duration / 3600);
+                    const minutes = Math.floor((record.session_duration % 3600) / 60);
+                    duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+                }
+                
+                row.innerHTML = `
+                    <td class="px-4 py-3 text-gray-600">${loginDate.toLocaleDateString()}</td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${userTypeColor}">
+                            ${record.user_type.charAt(0).toUpperCase() + record.user_type.slice(1)}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 font-mono text-gray-600 text-xs">${record.id_number}</td>
+                    <td class="px-4 py-3 font-medium text-gray-900">${record.full_name || record.username}</td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${roleColor}">
+                            ${record.role.charAt(0).toUpperCase() + record.role.slice(1)}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 text-xs">${loginDate.toLocaleTimeString()}</td>
+                    <td class="px-4 py-3 text-gray-600 text-xs">
+                        ${logoutTime ? logoutTime.toLocaleTimeString() : '<span class="text-green-600 font-medium">Active</span>'}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600">${duration}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            // Update pagination
+            const total = data.total || 0;
+            const start = total > 0 ? ((historyPage - 1) * 10) + 1 : 0;
+            const end = Math.min(historyPage * 10, total);
+            
+            document.getElementById('history-start').textContent = start;
+            document.getElementById('history-end').textContent = end;
+            document.getElementById('history-total').textContent = total;
+            
+            document.getElementById('history-prev').disabled = historyPage === 1;
+            document.getElementById('history-next').disabled = end >= total;
+            
+            pagination.classList.remove('hidden');
+        }
+
+        function changeHistoryPage(direction) {
+            historyPage += direction;
+            if (historyPage < 1) historyPage = 1;
+            searchLoginHistory();
+        }
+
+        function clearHistoryFilters() {
+            document.getElementById('history-date-from').value = '';
+            document.getElementById('history-date-to').value = '';
+            document.getElementById('history-user-type').value = 'all';
+            document.getElementById('history-role').value = 'all';
+            document.getElementById('history-search').value = '';
+            historyPage = 1;
+            updateHistoryRoleOptions();
+            searchLoginHistory();
+        }
+
+        function exportLoginHistory() {
+            const dateFrom = document.getElementById('history-date-from').value;
+            const dateTo = document.getElementById('history-date-to').value;
+            const userType = document.getElementById('history-user-type').value;
+            const role = document.getElementById('history-role').value;
+            const search = document.getElementById('history-search').value;
+            
+            const params = new URLSearchParams({
+                date_from: dateFrom,
+                date_to: dateTo,
+                user_type: userType,
+                role: role,
+                search: search,
+                export: 'csv'
+            });
+            
+            window.location.href = `get_login_history.php?${params}`;
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('login-history-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    closeLoginHistory();
+                }
+            }
+        });
+        
+        // Close modal when clicking outside
+        document.getElementById('login-history-modal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLoginHistory();
+            }
+        });
 
     </script>
 </body>

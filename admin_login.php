@@ -5,6 +5,31 @@ require_once 'StudentLogin/db_conn.php';
 $error_msg = '';
 $success_msg = '';
 
+// Helper: log successful logins for reporting (Super Admin dashboard)
+function log_login($conn, $userType, $idNumber, $username, $role) {
+    // Create table if not exists (idempotent)
+    $conn->query("CREATE TABLE IF NOT EXISTS login_activity (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_type VARCHAR(20) NOT NULL,
+        id_number VARCHAR(50) NOT NULL,
+        username VARCHAR(100) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        login_time DATETIME NOT NULL,
+        logout_time DATETIME NULL,
+        session_duration INT NULL,
+        session_id VARCHAR(128) NULL,
+        INDEX idx_login_date (login_time),
+        INDEX idx_id_number (id_number)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    
+    if ($stmt = $conn->prepare("INSERT INTO login_activity (user_type, id_number, username, role, login_time, session_id) VALUES (?,?,?,?,NOW(),?)")) {
+        $sid = session_id();
+        $stmt->bind_param('sssss', $userType, $idNumber, $username, $role, $sid);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = trim($_POST['username']);
     $password = $_POST['password'];
@@ -38,9 +63,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['superadmin_id'] = $superadmin['id'];
                 $_SESSION['superadmin_name'] = $full_name ?: 'Principal/Owner';
                 $_SESSION['username'] = $superadmin['username'];
+                $_SESSION['id_number'] = 'SA-' . $superadmin['id']; // Create ID for tracking
                 $_SESSION['first_name'] = $superadmin['first_name'] ?? 'Principal';
                 $_SESSION['last_name'] = $superadmin['last_name'] ?? 'Owner';
                 $_SESSION['role'] = 'superadmin';
+                
+                // Log SuperAdmin login
+                log_login($conn, 'employee', 'SA-' . $superadmin['id'], $superadmin['username'], 'superadmin');
                 
                 $login_success = true;
                 $redirect_url = "AdminF/SuperAdminDashboard.php";
@@ -68,6 +97,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_SESSION['last_name'] = $superadmin['last_name'];
                     $_SESSION['role'] = 'superadmin';
                     $_SESSION['id_number'] = $superadmin['employee_id'];
+                    
+                    // Log SuperAdmin login
+                    log_login($conn, 'employee', $superadmin['employee_id'], $superadmin['username'], 'superadmin');
                     
                     $login_success = true;
                     $redirect_url = "AdminF/SuperAdminDashboard.php";
@@ -106,9 +138,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_SESSION['owner_id'] = $owner['id'];
                     $_SESSION['owner_name'] = $owner['full_name'];
                     $_SESSION['username'] = $owner['username'];
+                    $_SESSION['id_number'] = 'OWN-' . $owner['id']; // Create ID for tracking
                     $_SESSION['first_name'] = explode(' ', $owner['full_name'])[0] ?? 'Owner';
                     $_SESSION['last_name'] = explode(' ', $owner['full_name'])[1] ?? '';
                     $_SESSION['role'] = 'owner';
+                    
+                    // Log Owner login
+                    log_login($conn, 'employee', 'OWN-' . $owner['id'], $owner['username'], 'owner');
                     
                     $login_success = true;
                     $redirect_url = "OwnerF/Dashboard.php"; // Go to Owner dashboard

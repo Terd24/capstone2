@@ -49,10 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Set session variables
             $_SESSION['parent_id'] = $row['parent_id'];
             $_SESSION['username'] = $row['username'];
+            $_SESSION['id_number'] = $child_id; // Store child_id as id_number for tracking
             $_SESSION['parent_name'] = $child_name;
             $_SESSION['child_id'] = $child_id;
             $_SESSION['child_name'] = $child_name;
             $_SESSION['role'] = 'parent';
+
+            // Record login activity
+            $login_stmt = $conn->prepare("INSERT INTO login_activity (user_type, id_number, username, role, login_time, session_id) VALUES (?, ?, ?, ?, NOW(), ?)");
+            $user_type = 'parent';
+            $role = 'parent';
+            $session_id = session_id();
+            $login_stmt->bind_param("sssss", $user_type, $child_id, $username, $role, $session_id);
+            $login_stmt->execute();
+            $login_stmt->close();
 
             // Check if parent must change password
             if ($must_change_password == 1) {

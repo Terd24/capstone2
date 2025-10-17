@@ -2,6 +2,33 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
+// Record logout time before destroying session
+if (isset($_SESSION['id_number']) || isset($_SESSION['username'])) {
+    $id_number = $_SESSION['id_number'] ?? '';
+    $username = $_SESSION['username'] ?? '';
+    
+    // Simple direct update - try both id_number and username
+    if ($id_number) {
+        $conn->query("UPDATE login_activity 
+            SET logout_time = NOW(), 
+                session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+            WHERE id_number = '" . $conn->real_escape_string($id_number) . "'
+            AND logout_time IS NULL 
+            ORDER BY login_time DESC 
+            LIMIT 1");
+    }
+    
+    if ($username) {
+        $conn->query("UPDATE login_activity 
+            SET logout_time = NOW(), 
+                session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+            WHERE username = '" . $conn->real_escape_string($username) . "'
+            AND logout_time IS NULL 
+            ORDER BY login_time DESC 
+            LIMIT 1");
+    }
+}
+
 // Log the logout if user is logged in
 if (isset($_SESSION['owner_id']) && $_SESSION['role'] === 'owner') {
     $log_stmt = $conn->prepare("INSERT INTO system_logs (action_type, performed_by, user_role, description, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?)");

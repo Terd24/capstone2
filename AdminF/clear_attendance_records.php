@@ -22,6 +22,25 @@ if (empty($start) || empty($end)) {
     exit;
 }
 
+// Ensure archive table exists
+$conn->query("CREATE TABLE IF NOT EXISTS attendance_archive (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    original_id INT,
+    id_number VARCHAR(50),
+    name VARCHAR(255),
+    date DATE,
+    time_in TIME,
+    time_out TIME,
+    status VARCHAR(50),
+    user_type VARCHAR(50),
+    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    archived_by VARCHAR(100),
+    archived_reason VARCHAR(255),
+    INDEX idx_id_number (id_number),
+    INDEX idx_date (date),
+    INDEX idx_archived_at (archived_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 $tableName = 'attendance_record';
 $check = $conn->query("SHOW TABLES LIKE '$tableName'");
 if (!$check || $check->num_rows == 0) {
@@ -40,60 +59,56 @@ while ($col = $cols->fetch_assoc()) {
     }
 }
 
-// Get records to export before deleting
-$exportStmt = $conn->prepare("SELECT * FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?");
-$exportStmt->bind_param('ss', $start, $end);
-$exportStmt->execute();
-$exportResult = $exportStmt->get_result();
+// Get records to archive
+$selectStmt = $conn->prepare("SELECT * FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?");
+$selectStmt->bind_param('ss', $start, $end);
+$selectStmt->execute();
+$result = $selectStmt->get_result();
 
-$records = [];
-while ($row = $exportResult->fetch_assoc()) {
-    $records[] = $row;
-}
-$count = count($records);
+$count = 0;
+$archived_by = $_SESSION['user_id'] ?? $_SESSION['id_number'] ?? 'SuperAdmin';
+$archived_reason = "Archived attendance records from $start to $end";
 
-// Generate CSV content
-$csvContent = '';
-$filename = "Attendance Record {$start} to {$end}.csv";
-
-if ($count > 0) {
-    // Add UTF-8 BOM
-    $csvContent .= chr(0xEF).chr(0xBB).chr(0xBF);
+// Archive each record
+while ($row = $result->fetch_assoc()) {
+    $archiveStmt = $conn->prepare("INSERT INTO attendance_archive 
+        (original_id, id_number, name, date, time_in, time_out, status, user_type, archived_by, archived_reason) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     
-    // Add header
-    $csvContent .= implode(',', array_keys($records[0])) . "\n";
+    $original_id = $row['id'];
+    $id_number = $row['id_number'] ?? 'N/A';
+    $name = $row['name'] ?? 'Unknown';
+    $date = $row[$dateCol];
+    $time_in = $row['time_in'] ?? null;
+    $time_out = $row['time_out'] ?? null;
+    $status = $row['status'] ?? 'Present';
+    $user_type = $row['user_type'] ?? 'Unknown';
     
-    // Add data rows
-    foreach ($records as $record) {
-        $row = [];
-        foreach ($record as $key => $value) {
-            // Format numeric IDs as text
-            if (in_array($key, ['id', 'id_number', 'student_id', 'employee_id']) && is_numeric($value)) {
-                $row[] = '"' . "'" . $value . '"';
-            } else {
-                $row[] = '"' . str_replace('"', '""', $value) . '"';
-            }
-        }
-        $csvContent .= implode(',', $row) . "\n";
+    $archiveStmt->bind_param('isssssssss', 
+        $original_id, $id_number, $name, $date, $time_in, 
+        $time_out, $status, $user_type, $archived_by, $archived_reason
+    );
+    
+    if ($archiveStmt->execute()) {
+        $count++;
     }
+    $archiveStmt->close();
 }
 
-$stmt = $conn->prepare("DELETE FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?");
-$stmt->bind_param('ss', $start, $end);
-
-if ($stmt->execute()) {
-    $message = $count > 0 ? "Exported $count records and deleted from system" : "No records found";
-    echo json_encode([
-        'success' => true, 
-        'message' => $message, 
-        'records_deleted' => $count, 
-        'csv_data' => base64_encode($csvContent),
-        'filename' => $filename
-    ]);
-} else {
-    echo json_encode(['success' => false, 'message' => 'Clear failed']);
+// Delete archived records from original table
+if ($count > 0) {
+    $deleteStmt = $conn->prepare("DELETE FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?");
+    $deleteStmt->bind_param('ss', $start, $end);
+    $deleteStmt->execute();
+    $deleteStmt->close();
 }
 
-$stmt->close();
+echo json_encode([
+    'success' => true, 
+    'message' => "$count attendance records archived successfully",
+    'records_archived' => $count
+]);
+
+$selectStmt->close();
 $conn->close();
 ob_end_flush();
