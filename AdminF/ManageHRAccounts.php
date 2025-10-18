@@ -133,16 +133,16 @@ function getFieldError($field_name, $field_errors = []) {
     return isset($field_errors[$field_name]) ? $field_errors[$field_name] : '';
 }
 
-// Fetch all employees
-$employees = $conn->query("SELECT e.*, ea.username, ea.role FROM employees e LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id ORDER BY e.first_name, e.last_name");
+// Fetch all employees (excluding deleted ones)
+$employees = $conn->query("SELECT e.*, ea.username, ea.role FROM employees e LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id WHERE e.deleted_at IS NULL ORDER BY e.first_name, e.last_name");
 
 
-// Fetch only HR employees (with and without accounts)
+// Fetch only HR employees (with and without accounts, excluding deleted ones)
 $hr_accounts = $conn->query("
     SELECT DISTINCT e.id_number, e.first_name, e.last_name, e.position, e.hire_date, ea.username, ea.created_at 
     FROM employees e 
     LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id 
-    WHERE e.department = 'HR' OR ea.role = 'hr'
+    WHERE (e.department = 'HR' OR ea.role = 'hr') AND e.deleted_at IS NULL
     ORDER BY e.first_name, e.last_name
 ");
 ?>

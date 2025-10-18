@@ -908,7 +908,7 @@ require_once 'includes/dashboard_data.php';
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 <?php
-                                // Get ALL HR employees
+                                // Get ALL HR employees with pending delete status
                                 $hr_query = "
                                     SELECT 
                                         e.id_number,
@@ -917,9 +917,13 @@ require_once 'includes/dashboard_data.php';
                                         e.middle_name,
                                         e.position,
                                         e.department,
-                                        e.hire_date
+                                        e.hire_date,
+                                        (SELECT COUNT(*) FROM owner_approval_requests 
+                                         WHERE request_type = 'delete_hr_employee' 
+                                         AND target_id = e.id_number 
+                                         AND status = 'pending') as has_pending_delete
                                     FROM employees e
-                                    WHERE e.department = 'Human Resources'
+                                    WHERE e.department = 'Human Resources' AND e.deleted_at IS NULL
                                     ORDER BY e.last_name, e.first_name
                                 ";
                                 
@@ -928,14 +932,31 @@ require_once 'includes/dashboard_data.php';
                                 if ($hr_result && $hr_result->num_rows > 0):
                                     while ($hr = $hr_result->fetch_assoc()):
                                         $full_name = trim($hr['first_name'] . ' ' . ($hr['middle_name'] ? $hr['middle_name'] . ' ' : '') . $hr['last_name']);
+                                        $has_pending = $hr['has_pending_delete'] > 0;
+                                        $row_class = $has_pending ? 'bg-gray-300 opacity-70' : 'hover:bg-[#0B2C62]/5';
+                                        $cursor_class = $has_pending ? 'cursor-not-allowed' : 'cursor-pointer';
                                 ?>
-                                <tr class="hover:bg-[#0B2C62]/5 cursor-pointer transition-colors" onclick="viewHRAccount('<?= htmlspecialchars($hr['id_number']) ?>')">
-                                    <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($hr['id_number']) ?></td>
+                                <tr class="<?= $row_class ?> <?= $cursor_class ?> transition-colors" onclick="<?= $has_pending ? '' : "viewHRAccount('" . htmlspecialchars($hr['id_number']) . "')" ?>">
+                                    <td class="px-4 py-3 text-sm text-gray-900">
+                                        <?= htmlspecialchars($hr['id_number']) ?>
+                                    </td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($full_name) ?></td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($hr['position'] ?: 'HR Staff') ?></td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($hr['department'] ?: 'Human Resources') ?></td>
-                                    <td class="px-4 py-3 text-sm text-gray-900">
-                                        <?= $hr['hire_date'] ? date('M d, Y', strtotime($hr['hire_date'])) : 'N/A' ?>
+                                    <td class="px-4 py-3 text-sm">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-900">
+                                                <?= $hr['hire_date'] ? date('M d, Y', strtotime($hr['hire_date'])) : 'N/A' ?>
+                                            </span>
+                                            <?php if ($has_pending): ?>
+                                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-300">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                    Pending Delete
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php 
@@ -2344,19 +2365,61 @@ require_once 'includes/dashboard_data.php';
             
             // Event listeners
             document.getElementById('cancelDeleteBtn').onclick = () => modal.remove();
-            document.getElementById('confirmDeleteBtn').onclick = () => {
+            document.getElementById('confirmDeleteBtn').onclick = async () => {
                 const reason = document.getElementById('deleteReason').value.trim();
                 if (!reason) {
-                    alert('Please provide a reason for deletion');
+                    showToast('Please provide a reason for deletion', 'error');
                     return;
                 }
                 if (reason.length < 5) {
-                    alert('Please provide a more detailed reason');
+                    showToast('Please provide a more detailed reason (at least 5 characters)', 'error');
                     return;
                 }
-                modal.remove();
-                alert('HR Employee deletion request submitted.\n\nThe School Owner will be notified for final approval.\n\nReason: ' + reason);
-                closeHRModal();
+                
+                // Get employee details from the modal
+                const firstName = document.getElementById(`first_name_${employeeId}`)?.value || '';
+                const lastName = document.getElementById(`last_name_${employeeId}`)?.value || '';
+                const position = document.getElementById(`position_${employeeId}`)?.value || '';
+                const department = document.getElementById(`department_${employeeId}`)?.value || '';
+                const employeeName = `${firstName} ${lastName}`.trim();
+                
+                // Disable button and show loading
+                const confirmBtn = document.getElementById('confirmDeleteBtn');
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<svg class="animate-spin h-5 w-5 mx-auto" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'create_delete_hr_request');
+                    formData.append('employee_id', employeeId);
+                    formData.append('employee_name', employeeName);
+                    formData.append('position', position);
+                    formData.append('department', department);
+                    formData.append('deletion_reason', reason);
+                    
+                    const response = await fetch('delete_hr_employee.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        modal.remove();
+                        showToast('✅ Delete request submitted successfully! Waiting for Owner approval.', 'success');
+                        closeHRModal();
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showToast('Error: ' + data.message, 'error');
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = 'Delete';
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while submitting the request', 'error');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Delete';
+                }
             };
         }
 

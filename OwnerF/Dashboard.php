@@ -14,6 +14,17 @@ header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 header("Expires: 0");
 
+// Ensure soft delete columns exist in employees and employee_accounts tables
+$conn->query("ALTER TABLE employees 
+              ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL DEFAULT NULL,
+              ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(100) NULL DEFAULT NULL,
+              ADD COLUMN IF NOT EXISTS deletion_reason TEXT NULL DEFAULT NULL");
+
+$conn->query("ALTER TABLE employee_accounts 
+              ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL DEFAULT NULL,
+              ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(100) NULL DEFAULT NULL,
+              ADD COLUMN IF NOT EXISTS deletion_reason TEXT NULL DEFAULT NULL");
+
 // Create necessary tables if they don't exist
 $conn->query("CREATE TABLE IF NOT EXISTS system_notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,7 +47,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
     request_title VARCHAR(255) NOT NULL,
     request_description TEXT NOT NULL,
-    request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'other') NOT NULL,
+    request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'other') NOT NULL,
     priority ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
     requester_name VARCHAR(100) NOT NULL,
     requester_role VARCHAR(50) NOT NULL,
@@ -50,6 +61,9 @@ $conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
     reviewed_at TIMESTAMP NULL,
     reviewed_by VARCHAR(100)
 )");
+
+// Alter existing table to add new enum values if they don't exist
+$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'other') NOT NULL");
 
 // Handle approval/rejection actions
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -114,14 +128,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                             break;
                             
                         case 'delete_hr_employee':
-                            // Delete HR employee and their account
-                            $del_acc_stmt = $conn->prepare("DELETE FROM employee_accounts WHERE employee_id = ?");
-                            $del_acc_stmt->bind_param('s', $target_id);
-                            $del_acc_stmt->execute();
+                            // Soft delete HR employee and their account
+                            $conn->begin_transaction();
                             
-                            $del_emp_stmt = $conn->prepare("DELETE FROM employees WHERE id_number = ?");
-                            $del_emp_stmt->bind_param('s', $target_id);
-                            $del_emp_stmt->execute();
+                            // Get deletion reason from target_data
+                            $deletion_reason = $target_data['deletion_reason'] ?? 'Approved by Owner';
+                            $deleted_by = $_SESSION['owner_name'] ?? 'Owner';
+                            
+                            // Soft delete employee account first
+                            $del_acc_stmt = $conn->prepare("UPDATE employee_accounts SET deleted_at = NOW(), deleted_by = ?, deletion_reason = ? WHERE employee_id = ?");
+                            if ($del_acc_stmt) {
+                                $del_acc_stmt->bind_param('sss', $deleted_by, $deletion_reason, $target_id);
+                                if (!$del_acc_stmt->execute()) {
+                                    error_log("Failed to soft delete employee account: " . $del_acc_stmt->error);
+                                }
+                                $del_acc_stmt->close();
+                            }
+                            
+                            // Soft delete employee record
+                            $del_emp_stmt = $conn->prepare("UPDATE employees SET deleted_at = NOW(), deleted_by = ?, deletion_reason = ? WHERE id_number = ?");
+                            if ($del_emp_stmt) {
+                                $del_emp_stmt->bind_param('sss', $deleted_by, $deletion_reason, $target_id);
+                                if (!$del_emp_stmt->execute()) {
+                                    error_log("Failed to soft delete employee: " . $del_emp_stmt->error);
+                                    throw new Exception("Failed to delete employee");
+                                }
+                                $affected = $del_emp_stmt->affected_rows;
+                                error_log("Soft deleted employee $target_id - Affected rows: $affected");
+                                $del_emp_stmt->close();
+                            }
+                            
+                            $conn->commit();
                             break;
                     }
                 } catch (Exception $e) {
@@ -136,9 +173,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             $notif_title = "Request " . ucfirst($action) . "d";
             $notif_message = "Owner has {$action}d request: {$request_data['request_title']}";
             $notif_type = ($action === 'approve') ? 'success' : 'warning';
+            $notif_module = 'Owner';
+            $notif_role = 'owner';
+            $notif_action_type = 'request_' . $action;
             
             $notif_stmt = $conn->prepare("INSERT INTO system_notifications (title, message, type, module, performed_by, user_role, action_type, target_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $notif_stmt->bind_param("ssssssss", $notif_title, $notif_message, $notif_type, 'Owner', $_SESSION['owner_name'], 'owner', 'request_' . $action, $request_id);
+            $notif_stmt->bind_param("sssssssi", $notif_title, $notif_message, $notif_type, $notif_module, $_SESSION['owner_name'], $notif_role, $notif_action_type, $request_id);
             $notif_stmt->execute();
             
             $_SESSION['success_msg'] = "Request has been " . $action . "d successfully." . ($action === 'approve' ? " Action has been executed." : "");
@@ -522,73 +562,230 @@ $module_stats_result = $conn->query($module_stats_query);
 
                     <!-- Statistics Cards -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <div class="text-gray-600 text-sm font-medium">Pending</div>
-                            <div class="text-2xl font-bold text-gray-800"><?= $stats['pending_requests'] ?></div>
+                        <!-- Pending Card -->
+                        <div class="bg-yellow-50 border border-gray-200 rounded-lg p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <?php if ($stats['pending_requests'] > 0): ?>
+                                    <span class="bg-yellow-500 text-white text-xs font-bold px-2 py-0.5 rounded">NEW</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="text-gray-700 text-sm font-medium mb-1">Pending</div>
+                            <div class="text-3xl font-bold text-gray-900"><?= $stats['pending_requests'] ?></div>
                         </div>
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <div class="text-gray-600 text-sm font-medium">Approved</div>
-                            <div class="text-2xl font-bold text-gray-800"><?= $stats['approved_requests'] ?></div>
+
+                        <!-- Approved Card -->
+                        <div class="bg-green-50 border border-gray-200 rounded-lg p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="text-gray-700 text-sm font-medium mb-1">Approved</div>
+                            <div class="text-3xl font-bold text-gray-900"><?= $stats['approved_requests'] ?></div>
                         </div>
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <div class="text-gray-600 text-sm font-medium">Rejected</div>
-                            <div class="text-2xl font-bold text-gray-800"><?= $stats['rejected_requests'] ?></div>
+
+                        <!-- Rejected Card -->
+                        <div class="bg-red-50 border border-gray-200 rounded-lg p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="text-gray-700 text-sm font-medium mb-1">Rejected</div>
+                            <div class="text-3xl font-bold text-gray-900"><?= $stats['rejected_requests'] ?></div>
                         </div>
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <div class="text-gray-600 text-sm font-medium">Total</div>
-                            <div class="text-2xl font-bold text-gray-800"><?= $stats['total_requests'] ?></div>
+
+                        <!-- Total Card -->
+                        <div class="bg-blue-50 border border-gray-200 rounded-lg p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="text-gray-700 text-sm font-medium mb-1">Total</div>
+                            <div class="text-3xl font-bold text-gray-900"><?= $stats['total_requests'] ?></div>
                         </div>
                     </div>
 
                     <!-- Pending Requests List -->
-                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
                         <?php 
                         // Reset the result pointer for pending requests
                         $pending_result = $conn->query($pending_query);
                         if ($pending_result && $pending_result->num_rows > 0): 
                         ?>
-                            <?php while ($request = $pending_result->fetch_assoc()): ?>
-                                <div class="border rounded-lg p-4 priority-<?= $request['priority'] ?>">
-                                    <div class="flex justify-between items-start mb-3">
-                                        <div class="flex-1">
-                                            <div class="flex items-center gap-2 mb-2">
-                                                <h3 class="font-semibold text-gray-900"><?= htmlspecialchars($request['request_title']) ?></h3>
-                                                <span class="px-2 py-1 rounded-full text-xs font-medium
-                                                    <?= $request['priority'] === 'critical' ? 'bg-red-100 text-red-800' : 
-                                                       ($request['priority'] === 'high' ? 'bg-orange-100 text-orange-800' : 
-                                                       ($request['priority'] === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800')) ?>">
-                                                    <?= strtoupper($request['priority']) ?>
-                                                </span>
-                                            </div>
-                                            <p class="text-sm text-gray-600 mb-2">
-                                                <strong>Requested by:</strong> <?= htmlspecialchars($request['requester_name']) ?> 
-                                                (<?= ucfirst($request['requester_role']) ?>) • 
-                                                <strong>Type:</strong> <?= ucwords(str_replace('_', ' ', $request['request_type'])) ?>
-                                            </p>
-                                            <p class="text-sm text-gray-700 mb-3"><?= htmlspecialchars($request['request_description']) ?></p>
-                                            
-                                            <?php if ($request['target_data']): ?>
-                                                <div class="bg-gray-50 rounded p-2 mb-3">
-                                                    <p class="text-xs font-medium text-gray-600 mb-1">Technical Details:</p>
-                                                    <pre class="text-xs text-gray-700 whitespace-pre-wrap"><?= htmlspecialchars(json_encode(json_decode($request['target_data']), JSON_PRETTY_PRINT)) ?></pre>
+                            <?php while ($request = $pending_result->fetch_assoc()): 
+                                $priorityColors = [
+                                    'critical' => ['bg' => 'bg-red-50', 'border' => 'border-red-200', 'badge' => 'bg-red-100 text-red-800', 'icon' => 'text-red-600'],
+                                    'high' => ['bg' => 'bg-orange-50', 'border' => 'border-orange-200', 'badge' => 'bg-orange-100 text-orange-800', 'icon' => 'text-orange-600'],
+                                    'medium' => ['bg' => 'bg-yellow-50', 'border' => 'border-yellow-200', 'badge' => 'bg-yellow-100 text-yellow-800', 'icon' => 'text-yellow-600'],
+                                    'low' => ['bg' => 'bg-green-50', 'border' => 'border-green-200', 'badge' => 'bg-green-100 text-green-800', 'icon' => 'text-green-600']
+                                ];
+                                $colors = $priorityColors[$request['priority']] ?? $priorityColors['medium'];
+                            ?>
+                                <div class="border-2 <?= $colors['border'] ?> rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
+                                    <!-- Summary Row (Always Visible) -->
+                                    <div class="<?= $colors['bg'] ?> p-5 cursor-pointer hover:opacity-90 transition-opacity" onclick="toggleRequestDetails(<?= $request['id'] ?>)">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="flex items-start gap-4 flex-1">
+                                                <!-- Icon -->
+                                                <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0">
+                                                    <svg class="w-6 h-6 <?= $colors['icon'] ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                                    </svg>
                                                 </div>
-                                            <?php endif; ?>
+                                                
+                                                <!-- Content -->
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center gap-2 mb-2">
+                                                        <span class="px-3 py-1 rounded-full text-xs font-bold <?= $colors['badge'] ?> shadow-sm">
+                                                            <?= strtoupper($request['priority']) ?>
+                                                        </span>
+                                                        <span class="px-2 py-1 rounded bg-white text-xs font-medium text-gray-600 shadow-sm">
+                                                            <?= ucwords(str_replace('_', ' ', $request['request_type'])) ?>
+                                                        </span>
+                                                    </div>
+                                                    <h3 class="font-bold text-gray-900 text-base mb-1"><?= htmlspecialchars($request['request_title']) ?></h3>
+                                                    <div class="flex items-center gap-2 text-xs text-gray-600">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                                        </svg>
+                                                        <span class="font-medium"><?= htmlspecialchars($request['requester_name']) ?></span>
+                                                        <span class="text-gray-400">•</span>
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                        </svg>
+                                                        <span><?= date('M j, Y g:i A', strtotime($request['requested_at'])) ?></span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             
-                                            <p class="text-xs text-gray-500">
-                                                Submitted: <?= date('M j, Y g:i A', strtotime($request['requested_at'])) ?>
-                                            </p>
+                                            <!-- Arrow -->
+                                            <div class="flex-shrink-0">
+                                                <svg id="arrow-<?= $request['id'] ?>" class="w-6 h-6 text-gray-600 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
                                         </div>
                                     </div>
                                     
-                                    <div class="flex space-x-2 pt-3 border-t border-gray-200">
-                                        <button onclick="showApprovalModal(<?= $request['id'] ?>, 'approve', '<?= htmlspecialchars($request['request_title']) ?>')" 
-                                                class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition font-medium">
-                                            ✅ Approve
-                                        </button>
-                                        <button onclick="showApprovalModal(<?= $request['id'] ?>, 'reject', '<?= htmlspecialchars($request['request_title']) ?>')" 
-                                                class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition font-medium">
-                                            ❌ Reject
-                                        </button>
+                                    <!-- Detailed View (Hidden by Default) -->
+                                    <div id="details-<?= $request['id'] ?>" class="hidden border-t-2 <?= $colors['border'] ?> bg-white p-6">
+                                        <div class="space-y-4">
+                                            <!-- Description -->
+                                            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                                <div class="flex items-start gap-2 mb-2">
+                                                    <svg class="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                    <div class="flex-1">
+                                                        <p class="text-sm font-bold text-gray-700 mb-1">Description</p>
+                                                        <p class="text-sm text-gray-600 leading-relaxed"><?= htmlspecialchars($request['request_description']) ?></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Requester Info -->
+                                            <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                                <div class="flex items-start gap-2">
+                                                    <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                                    </svg>
+                                                    <div class="flex-1">
+                                                        <p class="text-sm font-bold text-gray-700 mb-1">Requested by</p>
+                                                        <p class="text-sm text-gray-600">
+                                                            <span class="font-semibold"><?= htmlspecialchars($request['requester_name']) ?></span>
+                                                            <span class="text-gray-400 mx-1">•</span>
+                                                            <span class="text-blue-600"><?= ucfirst($request['requester_role']) ?></span>
+                                                            <span class="text-gray-400 mx-1">•</span>
+                                                            <span><?= htmlspecialchars($request['requester_module']) ?></span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Employee Details -->
+                                            <?php if ($request['target_data']): 
+                                                $target_data = json_decode($request['target_data'], true);
+                                            ?>
+                                                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                                                    <div class="flex items-center gap-2 mb-3">
+                                                        <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                        </svg>
+                                                        <p class="text-sm font-bold text-gray-800">Employee Details</p>
+                                                    </div>
+                                                    <div class="bg-white rounded-lg p-3 space-y-2.5 shadow-sm">
+                                                        <?php if (isset($target_data['id_number'])): ?>
+                                                            <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                <span class="text-gray-600 font-medium block mb-1.5">Employee ID</span>
+                                                                <span class="font-bold text-gray-900 bg-white px-3 py-1.5 rounded border border-gray-300 inline-block"><?= htmlspecialchars($target_data['id_number']) ?></span>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                        <?php if (isset($target_data['first_name']) || isset($target_data['last_name'])): ?>
+                                                            <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                <span class="text-gray-600 font-medium block mb-1.5">Full Name</span>
+                                                                <span class="font-bold text-gray-900 text-base">
+                                                                    <?= htmlspecialchars(trim(($target_data['first_name'] ?? '') . ' ' . ($target_data['middle_name'] ?? '') . ' ' . ($target_data['last_name'] ?? ''))) ?>
+                                                                </span>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                        <?php if (isset($target_data['position'])): ?>
+                                                            <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                <span class="text-gray-600 font-medium block mb-1.5">Position</span>
+                                                                <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['position']) ?></span>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                        <?php if (isset($target_data['department'])): ?>
+                                                            <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                <span class="text-gray-600 font-medium block mb-1.5">Department</span>
+                                                                <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['department']) ?></span>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                        <?php if (isset($target_data['deletion_reason'])): ?>
+                                                            <div class="p-3 bg-red-50 rounded-lg border-2 border-red-200">
+                                                                <div class="flex items-center gap-2 mb-2">
+                                                                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                                                    </svg>
+                                                                    <span class="text-red-800 font-bold">Deletion Reason</span>
+                                                                </div>
+                                                                <p class="font-medium text-gray-900 bg-white p-3 rounded-lg border border-red-300 leading-relaxed"><?= htmlspecialchars($target_data['deletion_reason']) ?></p>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        
+                                        <!-- Action Buttons -->
+                                        <div class="flex gap-3 pt-5 mt-5 border-t-2 border-gray-200">
+                                            <button onclick="event.stopPropagation(); confirmAndSubmit(<?= $request['id'] ?>, 'approve')" 
+                                                    class="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-sm font-bold hover:from-green-700 hover:to-green-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                Approve Request
+                                            </button>
+                                            <button onclick="event.stopPropagation(); confirmAndSubmit(<?= $request['id'] ?>, 'reject')" 
+                                                    class="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-sm font-bold hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                Reject Request
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             <?php endwhile; ?>
@@ -655,38 +852,7 @@ $module_stats_result = $conn->query($module_stats_query);
             </div>
 
 
-<!-- Approval Modal -->
-<div id="approvalModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-        <div class="flex justify-between items-center mb-4">
-            <h3 id="modalTitle" class="text-lg font-bold text-gray-800"></h3>
-            <button onclick="closeApprovalModal()" class="text-gray-500 hover:text-gray-700">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
-        </div>
-        
-        <form method="POST">
-            <input type="hidden" id="modalRequestId" name="request_id">
-            <input type="hidden" id="modalAction" name="action">
-            
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Comments (Optional)</label>
-                <textarea name="comments" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Add your comments or reasoning..."></textarea>
-            </div>
-            
-            <div class="flex space-x-3">
-                <button type="button" onclick="closeApprovalModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">
-                    Cancel
-                </button>
-                <button type="submit" id="modalSubmitBtn" class="flex-1 py-2 rounded-lg text-white font-medium">
-                    Confirm
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
+
 
 <!-- Success/Error Notifications -->
 <?php if (!empty($success_msg)): ?>
@@ -745,26 +911,118 @@ function showSection(sectionId, event) {
     document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
 }
 
-// Approval modal functions
-function showApprovalModal(requestId, action, title) {
-    document.getElementById('modalRequestId').value = requestId;
-    document.getElementById('modalAction').value = action;
-    document.getElementById('modalTitle').textContent = (action === 'approve' ? '✅ Approve' : '❌ Reject') + ' Request';
+// Toggle request details
+function toggleRequestDetails(requestId) {
+    const detailsDiv = document.getElementById('details-' + requestId);
+    const arrow = document.getElementById('arrow-' + requestId);
     
-    const submitBtn = document.getElementById('modalSubmitBtn');
-    if (action === 'approve') {
-        submitBtn.className = 'flex-1 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 font-medium';
-        submitBtn.textContent = '✅ Approve';
+    if (detailsDiv.classList.contains('hidden')) {
+        detailsDiv.classList.remove('hidden');
+        arrow.classList.add('rotate-180');
     } else {
-        submitBtn.className = 'flex-1 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 font-medium';
-        submitBtn.textContent = '❌ Reject';
+        detailsDiv.classList.add('hidden');
+        arrow.classList.remove('rotate-180');
     }
-    
-    document.getElementById('approvalModal').classList.remove('hidden');
 }
 
-function closeApprovalModal() {
-    document.getElementById('approvalModal').classList.add('hidden');
+// Show custom confirmation modal
+function confirmAndSubmit(requestId, action) {
+    // Store data for later use
+    window.pendingApproval = { requestId, action };
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'confirmModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    
+    const isApprove = action === 'approve';
+    const iconColor = isApprove ? 'text-green-600' : 'text-red-600';
+    const iconBg = isApprove ? 'bg-green-50' : 'bg-red-50';
+    const btnColor = isApprove ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700';
+    const title = isApprove ? 'Approve Request' : 'Reject Request';
+    const message = isApprove 
+        ? 'Are you sure you want to approve this request? This action will execute the requested changes and cannot be undone.'
+        : 'Are you sure you want to reject this request? The requester will be notified of the rejection.';
+    const actionText = isApprove ? 'Approve' : 'Reject';
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-scale-in">
+            <div class="p-8 text-center">
+                <div class="mx-auto w-20 h-20 ${iconBg} rounded-full flex items-center justify-center mb-6">
+                    <svg class="w-10 h-10 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">${title}</h3>
+                <p class="text-gray-600 leading-relaxed mb-6">${message}</p>
+            </div>
+            <div class="px-8 pb-8 flex gap-3">
+                <button onclick="closeConfirmModal()" class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all">
+                    Cancel
+                </button>
+                <button onclick="submitApproval()" class="flex-1 px-6 py-3 ${btnColor} text-white rounded-xl font-semibold transition-all">
+                    ${actionText}
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add animation style if not present
+    if (!document.getElementById('modal-animations')) {
+        const style = document.createElement('style');
+        style.id = 'modal-animations';
+        style.textContent = `
+            @keyframes scale-in {
+                from { opacity: 0; transform: scale(0.9); }
+                to { opacity: 1; transform: scale(1); }
+            }
+            .animate-scale-in { animation: scale-in 0.2s ease-out; }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+function closeConfirmModal() {
+    const modal = document.getElementById('confirmModal');
+    if (modal) {
+        modal.remove();
+    }
+    window.pendingApproval = null;
+}
+
+function submitApproval() {
+    if (!window.pendingApproval) return;
+    
+    const { requestId, action } = window.pendingApproval;
+    
+    // Create and submit form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '';
+    
+    const requestIdInput = document.createElement('input');
+    requestIdInput.type = 'hidden';
+    requestIdInput.name = 'request_id';
+    requestIdInput.value = requestId;
+    
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = action;
+    
+    const commentsInput = document.createElement('input');
+    commentsInput.type = 'hidden';
+    commentsInput.name = 'comments';
+    commentsInput.value = '';
+    
+    form.appendChild(requestIdInput);
+    form.appendChild(actionInput);
+    form.appendChild(commentsInput);
+    
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // Show notifications
@@ -793,9 +1051,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Auto-refresh every 30 seconds to check for new requests (only on dashboard)
 setInterval(function() {
-    // Only refresh if no modal is open and we're on dashboard
-    if (document.getElementById('approvalModal').classList.contains('hidden') && 
-        !document.getElementById('dashboard-section').classList.contains('hidden')) {
+    // Only refresh if we're on dashboard
+    if (!document.getElementById('dashboard-section').classList.contains('hidden')) {
         window.location.reload();
     }
 }, 30000);

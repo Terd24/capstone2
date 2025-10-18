@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         // Create approval request
         $request_title = "Delete HR Employee: $employeeName";
-        $request_description = "Request to delete HR employee with ID: $employeeId ($position - $department)\n\nReason: $deletionReason";
+        $request_description = "Request to delete HR employee with ID: $employeeId ($position - $department)";
         $request_type = 'delete_hr_employee';
         $priority = 'high';
         $requester_name = $_SESSION['superadmin_name'] ?? 'Super Admin';
