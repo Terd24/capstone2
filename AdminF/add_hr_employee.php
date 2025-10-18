@@ -177,11 +177,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
 
-        // Commit transaction
+        // Commit the transaction - add employee immediately without approval
         $conn->commit();
-
-        $success_message = "HR Employee added successfully with system account";
-        $_SESSION['success_msg'] = $success_message;
+        $_SESSION['success_msg'] = "HR Employee added successfully!";
 
     } catch (Exception $e) {
         $conn->rollback();
@@ -191,7 +189,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     // Redirect back to dashboard
-    header("Location: SuperAdminDashboard.php#hr-accounts");
+    header("Location: SuperAdminDashboard.php");
     exit;
 }
 ?>

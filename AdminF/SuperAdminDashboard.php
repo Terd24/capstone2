@@ -73,9 +73,12 @@ require_once 'includes/dashboard_data.php';
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="assets/css/dashboard.css">
     <style>
-        /* Prevent flash of dashboard on page load */
-        .section:not(.active) {
+        /* Prevent flash of dashboard on page load and ensure proper section isolation */
+        .section {
             display: none !important;
+        }
+        .section.active {
+            display: block !important;
         }
     </style>
     <script>
@@ -85,15 +88,14 @@ require_once 'includes/dashboard_data.php';
             const activeSection = sessionStorage.getItem('activeSection');
             const sectionToShow = activeSection === 'deleted-items' ? 'deleted-items' : (savedSection || 'dashboard');
             
-            // If not dashboard, inject CSS to hide dashboard and show target section
-            if (sectionToShow !== 'dashboard') {
-                const style = document.createElement('style');
-                style.innerHTML = `
-                    #dashboard-section { display: none !important; }
-                    #${sectionToShow}-section { display: block !important; }
-                `;
-                document.head.appendChild(style);
-            }
+            // Inject CSS to show only the target section
+            const style = document.createElement('style');
+            style.id = 'section-visibility';
+            style.innerHTML = `
+                .section { display: none !important; }
+                #${sectionToShow}-section { display: block !important; }
+            `;
+            document.head.appendChild(style);
         })();
     </script>
 </head>
@@ -1729,16 +1731,20 @@ require_once 'includes/dashboard_data.php';
             currentSection = sectionName;
             sessionStorage.setItem('currentSection', sectionName);
             
-            // Hide all sections
+            // Remove any injected section visibility styles
+            const oldStyle = document.getElementById('section-visibility');
+            if (oldStyle) {
+                oldStyle.remove();
+            }
+            
+            // Hide all sections by removing active class
             document.querySelectorAll('.section').forEach(section => {
                 section.classList.remove('active');
-                section.classList.add('hidden');
             });
             
-            // Show selected section
+            // Show selected section by adding active class
             const targetSection = document.getElementById(sectionName + '-section');
             if (targetSection) {
-                targetSection.classList.remove('hidden');
                 targetSection.classList.add('active');
             }
             
@@ -2271,17 +2277,87 @@ require_once 'includes/dashboard_data.php';
 
         // Delete HR Employee (entire record) handlers
         function showDeleteHREmployeeConfirmation(employeeId) {
-            if (confirm('⚠️ DELETE HR EMPLOYEE WARNING ⚠️\n\nAre you sure you want to delete this HR employee record?\n\nEmployee ID: ' + employeeId + '\n\nThis action:\n• Cannot be undone\n• Will remove all associated data\n• Requires School Owner approval\n• Will be logged for audit purposes\n\nThis will permanently remove the HR employee from the system.')) {
-                const confirmation = prompt('To confirm deletion, type "DELETE" (in capital letters):');
-                
-                if (confirmation === "DELETE") {
-                    alert('HR Employee deletion request submitted.\n\nThe School Owner will be notified for final approval.\n\nThis action has been logged for audit purposes.');
-                    // Here you would make an AJAX call to request permanent deletion
-                    closeHRModal();
-                } else {
-                    alert('HR Employee deletion cancelled.\n\nThe record has not been deleted.');
-                }
+            // Create modern delete confirmation modal
+            const modal = document.createElement('div');
+            modal.id = 'deleteConfirmModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
+            
+            const modalContent = document.createElement('div');
+            modalContent.className = 'bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-in';
+            modalContent.innerHTML = `
+                <div class="p-8 text-center">
+                    <div class="mx-auto w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-3">Delete Employee</h3>
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Are you sure you want to delete this employee record?<br>
+                        This will also remove their system accounts and cannot be undone.
+                    </p>
+                    <div class="mb-6 text-left">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Reason for Deletion <span class="text-red-500">*</span>
+                        </label>
+                        <textarea 
+                            id="deleteReason" 
+                            rows="3" 
+                            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none text-sm"
+                            placeholder="e.g., resignation, termination, retirement..."
+                            required
+                        ></textarea>
+                    </div>
+                </div>
+                <div class="px-8 pb-8 flex gap-3">
+                    <button 
+                        id="cancelDeleteBtn"
+                        class="flex-1 px-6 py-3.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all duration-200"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        id="confirmDeleteBtn"
+                        class="flex-1 px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all duration-200"
+                    >
+                        Delete
+                    </button>
+                </div>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Add animation style if not present
+            if (!document.getElementById('modal-animations')) {
+                const style = document.createElement('style');
+                style.id = 'modal-animations';
+                style.textContent = `
+                    @keyframes scale-in {
+                        from { opacity: 0; transform: scale(0.9); }
+                        to { opacity: 1; transform: scale(1); }
+                    }
+                    .animate-scale-in { animation: scale-in 0.2s ease-out; }
+                `;
+                document.head.appendChild(style);
             }
+            
+            // Event listeners
+            document.getElementById('cancelDeleteBtn').onclick = () => modal.remove();
+            document.getElementById('confirmDeleteBtn').onclick = () => {
+                const reason = document.getElementById('deleteReason').value.trim();
+                if (!reason) {
+                    alert('Please provide a reason for deletion');
+                    return;
+                }
+                if (reason.length < 5) {
+                    alert('Please provide a more detailed reason');
+                    return;
+                }
+                modal.remove();
+                alert('HR Employee deletion request submitted.\n\nThe School Owner will be notified for final approval.\n\nReason: ' + reason);
+                closeHRModal();
+            };
         }
 
         function deleteHRAccount(employeeId) {
@@ -3799,23 +3875,18 @@ function deletePermanently(recordId, recordType) {
                 toggle.checked = isMaintenanceMode;
             }
             
-            // Clean up activeSection flag if it was used
+            // Restore the saved section or show dashboard
             const activeSection = sessionStorage.getItem('activeSection');
+            const savedSection = sessionStorage.getItem('currentSection');
+            const sectionToShow = activeSection === 'deleted-items' ? 'deleted-items' : (savedSection || 'dashboard');
+            
+            // Clean up activeSection flag if it was used
             if (activeSection === 'deleted-items') {
                 sessionStorage.removeItem('activeSection');
             }
             
-            // Handle hash in URL if no saved section
-            const savedSection = sessionStorage.getItem('currentSection');
-            if (!savedSection && !activeSection) {
-                const hash = window.location.hash;
-                if (hash === '#hr-accounts') {
-                    showSection('hr-accounts');
-                } else if (hash) {
-                    const sectionName = hash.substring(1);
-                    showSection(sectionName);
-                }
-            }
+            // Always call showSection to properly set active classes
+            showSection(sectionToShow);
             
             // Initialize pagination for deleted items
             initDeletedItemsPagination();

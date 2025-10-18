@@ -69,6 +69,69 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             $req_stmt->execute();
             $request_data = $req_stmt->get_result()->fetch_assoc();
             
+            // If approved, execute the action
+            if ($action === 'approve') {
+                $request_type = $request_data['request_type'];
+                $target_id = $request_data['target_id'];
+                $target_data = json_decode($request_data['target_data'], true);
+                
+                try {
+                    switch ($request_type) {
+                        case 'add_hr_employee':
+                            // Add the HR employee
+                            if ($target_data) {
+                                $conn->begin_transaction();
+                                
+                                // Insert employee
+                                $emp_stmt = $conn->prepare("INSERT INTO employees (id_number, first_name, middle_name, last_name, position, department, email, phone, address, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                $emp_stmt->bind_param("ssssssssss", 
+                                    $target_data['id_number'],
+                                    $target_data['first_name'],
+                                    $target_data['middle_name'],
+                                    $target_data['last_name'],
+                                    $target_data['position'],
+                                    $target_data['department'],
+                                    $target_data['email'],
+                                    $target_data['phone'],
+                                    $target_data['address'],
+                                    $target_data['hire_date']
+                                );
+                                $emp_stmt->execute();
+                                
+                                // Create account
+                                $hashed_password = password_hash($target_data['password'], PASSWORD_DEFAULT);
+                                $acc_stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
+                                $acc_stmt->bind_param("ssss", 
+                                    $target_data['id_number'],
+                                    $target_data['username'],
+                                    $hashed_password,
+                                    $target_data['role']
+                                );
+                                $acc_stmt->execute();
+                                
+                                $conn->commit();
+                            }
+                            break;
+                            
+                        case 'delete_hr_employee':
+                            // Delete HR employee and their account
+                            $del_acc_stmt = $conn->prepare("DELETE FROM employee_accounts WHERE employee_id = ?");
+                            $del_acc_stmt->bind_param('s', $target_id);
+                            $del_acc_stmt->execute();
+                            
+                            $del_emp_stmt = $conn->prepare("DELETE FROM employees WHERE id_number = ?");
+                            $del_emp_stmt->bind_param('s', $target_id);
+                            $del_emp_stmt->execute();
+                            break;
+                    }
+                } catch (Exception $e) {
+                    if (isset($conn)) {
+                        $conn->rollback();
+                    }
+                    error_log("Error executing approved action: " . $e->getMessage());
+                }
+            }
+            
             // Create notification
             $notif_title = "Request " . ucfirst($action) . "d";
             $notif_message = "Owner has {$action}d request: {$request_data['request_title']}";
@@ -78,7 +141,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             $notif_stmt->bind_param("ssssssss", $notif_title, $notif_message, $notif_type, 'Owner', $_SESSION['owner_name'], 'owner', 'request_' . $action, $request_id);
             $notif_stmt->execute();
             
-            $_SESSION['success_msg'] = "Request has been " . $action . "d successfully.";
+            $_SESSION['success_msg'] = "Request has been " . $action . "d successfully." . ($action === 'approve' ? " Action has been executed." : "");
         } else {
             $_SESSION['error_msg'] = "Error processing request: " . $conn->error;
         }
@@ -315,14 +378,6 @@ $module_stats_result = $conn->query($module_stats_query);
             <h3 class="text-lg font-semibold text-gray-800 mb-4">System Overview</h3>
             <div class="space-y-3">
                 <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">Total Requests</span>
-                    <span class="font-bold text-gray-800"><?= $stats['total_requests'] ?></span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">Pending Approvals</span>
-                    <span class="font-bold text-gray-800"><?= $stats['pending_requests'] ?></span>
-                </div>
-                <div class="flex justify-between items-center">
                     <span class="text-sm text-gray-600">Unread Notifications</span>
                     <span class="font-bold text-gray-800"><?= $notif_stats['unread_notifications'] ?></span>
                 </div>
@@ -336,74 +391,6 @@ $module_stats_result = $conn->query($module_stats_query);
 
     <!-- Main Content -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Pending Approval Requests -->
-        <div class="lg:col-span-2 bg-white rounded-xl card-shadow p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-800">🔔 Approval Requests</h2>
-                <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                    <?= $stats['pending_requests'] ?> Pending
-                </span>
-            </div>
-
-            <div class="space-y-4 max-h-96 overflow-y-auto">
-                <?php if ($pending_result && $pending_result->num_rows > 0): ?>
-                    <?php while ($request = $pending_result->fetch_assoc()): ?>
-                        <div class="border rounded-lg p-4 priority-<?= $request['priority'] ?>">
-                            <div class="flex justify-between items-start mb-3">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <h3 class="font-semibold text-gray-900"><?= htmlspecialchars($request['request_title']) ?></h3>
-                                        <span class="px-2 py-1 rounded-full text-xs font-medium
-                                            <?= $request['priority'] === 'critical' ? 'bg-red-100 text-red-800' : 
-                                               ($request['priority'] === 'high' ? 'bg-orange-100 text-orange-800' : 
-                                               ($request['priority'] === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800')) ?>">
-                                            <?= strtoupper($request['priority']) ?>
-                                        </span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mb-2">
-                                        <strong>Requested by:</strong> <?= htmlspecialchars($request['requested_by']) ?> 
-                                        (<?= ucfirst($request['requester_role']) ?>) • 
-                                        <strong>Type:</strong> <?= ucwords(str_replace('_', ' ', $request['request_type'])) ?>
-                                    </p>
-                                    <p class="text-sm text-gray-700 mb-3"><?= htmlspecialchars($request['request_description']) ?></p>
-                                    
-                                    <?php if ($request['target_data']): ?>
-                                        <div class="bg-gray-50 rounded p-2 mb-3">
-                                            <p class="text-xs font-medium text-gray-600 mb-1">Technical Details:</p>
-                                            <pre class="text-xs text-gray-700 whitespace-pre-wrap"><?= htmlspecialchars(json_encode(json_decode($request['target_data']), JSON_PRETTY_PRINT)) ?></pre>
-                                        </div>
-                                    <?php endif; ?>
-                                    
-                                    <p class="text-xs text-gray-500">
-                                        Submitted: <?= date('M j, Y g:i A', strtotime($request['requested_at'])) ?>
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex space-x-2 pt-3 border-t border-gray-200">
-                                <button onclick="showApprovalModal(<?= $request['id'] ?>, 'approve', '<?= htmlspecialchars($request['request_title']) ?>')" 
-                                        class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition font-medium">
-                                    ✅ Approve
-                                </button>
-                                <button onclick="showApprovalModal(<?= $request['id'] ?>, 'reject', '<?= htmlspecialchars($request['request_title']) ?>')" 
-                                        class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition font-medium">
-                                    ❌ Reject
-                                </button>
-                            </div>
-                        </div>
-                    <?php endwhile; ?>
-                <?php else: ?>
-                    <div class="text-center py-12">
-                        <svg class="w-16 h-16 mx-auto text-green-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <p class="text-gray-500 text-lg font-medium">All caught up!</p>
-                        <p class="text-gray-400 text-sm">No pending approval requests</p>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
         <!-- Recent Activity & Quick Stats -->
         <div class="space-y-6">
             <!-- Quick Actions -->
@@ -579,6 +566,14 @@ $module_stats_result = $conn->query($module_stats_query);
                                                 <strong>Type:</strong> <?= ucwords(str_replace('_', ' ', $request['request_type'])) ?>
                                             </p>
                                             <p class="text-sm text-gray-700 mb-3"><?= htmlspecialchars($request['request_description']) ?></p>
+                                            
+                                            <?php if ($request['target_data']): ?>
+                                                <div class="bg-gray-50 rounded p-2 mb-3">
+                                                    <p class="text-xs font-medium text-gray-600 mb-1">Technical Details:</p>
+                                                    <pre class="text-xs text-gray-700 whitespace-pre-wrap"><?= htmlspecialchars(json_encode(json_decode($request['target_data']), JSON_PRETTY_PRINT)) ?></pre>
+                                                </div>
+                                            <?php endif; ?>
+                                            
                                             <p class="text-xs text-gray-500">
                                                 Submitted: <?= date('M j, Y g:i A', strtotime($request['requested_at'])) ?>
                                             </p>
