@@ -63,7 +63,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
 )");
 
 // Alter existing table to add new enum values if they don't exist
-$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'other') NOT NULL");
+$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'other') NOT NULL");
 
 // Handle approval/rejection actions
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -96,30 +96,45 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                             if ($target_data) {
                                 $conn->begin_transaction();
                                 
+                                // Extract variables for bind_param
+                                $emp_id_number = $target_data['id_number'];
+                                $emp_first_name = $target_data['first_name'];
+                                $emp_middle_name = $target_data['middle_name'];
+                                $emp_last_name = $target_data['last_name'];
+                                $emp_position = $target_data['position'];
+                                $emp_department = $target_data['department'];
+                                $emp_email = $target_data['email'];
+                                $emp_phone = $target_data['phone'];
+                                $emp_address = $target_data['address'];
+                                $emp_hire_date = $target_data['hire_date'];
+                                
                                 // Insert employee
                                 $emp_stmt = $conn->prepare("INSERT INTO employees (id_number, first_name, middle_name, last_name, position, department, email, phone, address, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                                 $emp_stmt->bind_param("ssssssssss", 
-                                    $target_data['id_number'],
-                                    $target_data['first_name'],
-                                    $target_data['middle_name'],
-                                    $target_data['last_name'],
-                                    $target_data['position'],
-                                    $target_data['department'],
-                                    $target_data['email'],
-                                    $target_data['phone'],
-                                    $target_data['address'],
-                                    $target_data['hire_date']
+                                    $emp_id_number,
+                                    $emp_first_name,
+                                    $emp_middle_name,
+                                    $emp_last_name,
+                                    $emp_position,
+                                    $emp_department,
+                                    $emp_email,
+                                    $emp_phone,
+                                    $emp_address,
+                                    $emp_hire_date
                                 );
                                 $emp_stmt->execute();
                                 
                                 // Create account
                                 $hashed_password = password_hash($target_data['password'], PASSWORD_DEFAULT);
+                                $emp_username = $target_data['username'];
+                                $emp_role = $target_data['role'];
+                                
                                 $acc_stmt = $conn->prepare("INSERT INTO employee_accounts (employee_id, username, password, role) VALUES (?, ?, ?, ?)");
                                 $acc_stmt->bind_param("ssss", 
-                                    $target_data['id_number'],
-                                    $target_data['username'],
+                                    $emp_id_number,
+                                    $emp_username,
                                     $hashed_password,
-                                    $target_data['role']
+                                    $emp_role
                                 );
                                 $acc_stmt->execute();
                                 
@@ -156,6 +171,168 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                                 $affected = $del_emp_stmt->affected_rows;
                                 error_log("Soft deleted employee $target_id - Affected rows: $affected");
                                 $del_emp_stmt->close();
+                            }
+                            
+                            $conn->commit();
+                            break;
+                            
+                        case 'restore_student':
+                            // Restore student from soft delete
+                            error_log("Owner approving restore for student: $target_id");
+                            $conn->begin_transaction();
+                            
+                            $restore_stmt = $conn->prepare("UPDATE student_account SET deleted_at = NULL, deleted_by = NULL, deleted_reason = NULL WHERE id_number = ?");
+                            if ($restore_stmt) {
+                                $restore_stmt->bind_param('s', $target_id);
+                                if ($restore_stmt->execute()) {
+                                    $affected = $restore_stmt->affected_rows;
+                                    error_log("Restored student $target_id - Affected rows: $affected");
+                                    if ($affected === 0) {
+                                        error_log("WARNING: No student found with id_number: $target_id");
+                                    }
+                                } else {
+                                    error_log("Failed to restore student: " . $restore_stmt->error);
+                                    throw new Exception("Failed to restore student");
+                                }
+                                $restore_stmt->close();
+                            }
+                            
+                            $conn->commit();
+                            break;
+                            
+                        case 'restore_employee':
+                            // Restore employee from soft delete
+                            error_log("Owner approving restore for employee: $target_id");
+                            $conn->begin_transaction();
+                            
+                            $restore_stmt = $conn->prepare("UPDATE employees SET deleted_at = NULL, deleted_by = NULL, deleted_reason = NULL WHERE id_number = ?");
+                            if ($restore_stmt) {
+                                $restore_stmt->bind_param('s', $target_id);
+                                if ($restore_stmt->execute()) {
+                                    $affected = $restore_stmt->affected_rows;
+                                    error_log("Restored employee $target_id - Affected rows: $affected");
+                                    if ($affected === 0) {
+                                        error_log("WARNING: No employee found with id_number: $target_id");
+                                    }
+                                } else {
+                                    error_log("Failed to restore employee: " . $restore_stmt->error);
+                                    throw new Exception("Failed to restore employee");
+                                }
+                                $restore_stmt->close();
+                            }
+                            
+                            $conn->commit();
+                            break;
+                            
+                        case 'archive_student':
+                            // Permanently archive student
+                            error_log("Owner approving archive for student: $target_id");
+                            $conn->begin_transaction();
+                            
+                            // Get full student data
+                            $get_stmt = $conn->prepare("SELECT * FROM student_account WHERE id_number = ?");
+                            $get_stmt->bind_param('s', $target_id);
+                            $get_stmt->execute();
+                            $student_result = $get_stmt->get_result();
+                            
+                            if ($student_result->num_rows > 0) {
+                                $student = $student_result->fetch_assoc();
+                                
+                                // Insert into archive table
+                                $archive_stmt = $conn->prepare("INSERT INTO archived_students (
+                                    original_id, lrn, password, academic_track, enrollment_status, school_type,
+                                    last_name, first_name, middle_name, school_year, grade_level, semester,
+                                    dob, birthplace, gender, religion, credentials, payment_mode, address,
+                                    father_name, father_occupation, father_contact,
+                                    mother_name, mother_occupation, mother_contact,
+                                    guardian_name, guardian_occupation, guardian_contact,
+                                    last_school, last_school_year, id_number, username, rfid_uid,
+                                    created_at, class_schedule, deleted_at, deleted_by, deleted_reason,
+                                    must_change_password, archived_at, archived_by, archive_reason
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)");
+                                
+                                $archived_by = $_SESSION['owner_name'] ?? 'Owner';
+                                $archive_reason = 'Approved by Owner: ' . $comments;
+                                
+                                $archive_stmt->bind_param("issssssssssssssssssssssssssssssssssssiss",
+                                    $student['id'], $student['lrn'], $student['password'], $student['academic_track'],
+                                    $student['enrollment_status'], $student['school_type'], $student['last_name'],
+                                    $student['first_name'], $student['middle_name'], $student['school_year'],
+                                    $student['grade_level'], $student['semester'], $student['dob'], $student['birthplace'],
+                                    $student['gender'], $student['religion'], $student['credentials'], $student['payment_mode'],
+                                    $student['address'], $student['father_name'], $student['father_occupation'],
+                                    $student['father_contact'], $student['mother_name'], $student['mother_occupation'],
+                                    $student['mother_contact'], $student['guardian_name'], $student['guardian_occupation'],
+                                    $student['guardian_contact'], $student['last_school'], $student['last_school_year'],
+                                    $student['id_number'], $student['username'], $student['rfid_uid'], $student['created_at'],
+                                    $student['class_schedule'], $student['deleted_at'], $student['deleted_by'],
+                                    $student['deleted_reason'], $student['must_change_password'], $archived_by, $archive_reason
+                                );
+                                
+                                if ($archive_stmt->execute()) {
+                                    // Delete from main table
+                                    $delete_stmt = $conn->prepare("DELETE FROM student_account WHERE id_number = ?");
+                                    $delete_stmt->bind_param('s', $target_id);
+                                    $delete_stmt->execute();
+                                    error_log("Archived and deleted student $target_id");
+                                } else {
+                                    throw new Exception("Failed to archive student: " . $archive_stmt->error);
+                                }
+                            } else {
+                                error_log("WARNING: No student found to archive with id_number: $target_id");
+                            }
+                            
+                            $conn->commit();
+                            break;
+                            
+                        case 'archive_employee':
+                            // Permanently archive employee
+                            error_log("Owner approving archive for employee: $target_id");
+                            $conn->begin_transaction();
+                            
+                            // Get full employee data
+                            $get_stmt = $conn->prepare("SELECT * FROM employees WHERE id_number = ?");
+                            $get_stmt->bind_param('s', $target_id);
+                            $get_stmt->execute();
+                            $employee_result = $get_stmt->get_result();
+                            
+                            if ($employee_result->num_rows > 0) {
+                                $employee = $employee_result->fetch_assoc();
+                                
+                                // Insert into archive table
+                                $archive_stmt = $conn->prepare("INSERT INTO archived_employees (
+                                    original_id, id_number, first_name, middle_name, last_name,
+                                    position, department, email, phone, address, created_at, hire_date,
+                                    rfid_uid, deleted_at, deleted_by, deleted_reason,
+                                    archive_scheduled, archive_scheduled_by, archive_scheduled_at,
+                                    archived_at, archived_by, archive_reason
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)");
+                                
+                                $archived_by = $_SESSION['owner_name'] ?? 'Owner';
+                                $archive_reason = 'Approved by Owner: ' . $comments;
+                                
+                                $archive_stmt->bind_param("isssssssssssssssissss",
+                                    $employee['id'], $employee['id_number'], $employee['first_name'],
+                                    $employee['middle_name'], $employee['last_name'], $employee['position'],
+                                    $employee['department'], $employee['email'], $employee['phone'],
+                                    $employee['address'], $employee['created_at'], $employee['hire_date'],
+                                    $employee['rfid_uid'], $employee['deleted_at'], $employee['deleted_by'],
+                                    $employee['deleted_reason'], $employee['archive_scheduled'],
+                                    $employee['archive_scheduled_by'], $employee['archive_scheduled_at'],
+                                    $archived_by, $archive_reason
+                                );
+                                
+                                if ($archive_stmt->execute()) {
+                                    // Delete from main table
+                                    $delete_stmt = $conn->prepare("DELETE FROM employees WHERE id_number = ?");
+                                    $delete_stmt->bind_param('s', $target_id);
+                                    $delete_stmt->execute();
+                                    error_log("Archived and deleted employee $target_id");
+                                } else {
+                                    throw new Exception("Failed to archive employee: " . $archive_stmt->error);
+                                }
+                            } else {
+                                error_log("WARNING: No employee found to archive with id_number: $target_id");
                             }
                             
                             $conn->commit();

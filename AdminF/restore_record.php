@@ -1,124 +1,111 @@
 <?php
-// Prevent any output before JSON
-ob_start();
-error_reporting(0);
-ini_set('display_errors', 0);
-
 session_start();
 require_once '../StudentLogin/db_conn.php';
 
-// Clear any output buffer
-ob_end_clean();
-
-// Set JSON header first
 header('Content-Type: application/json');
 
-// Require Super Admin login
 if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin') {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit;
 }
 
-// Get JSON input
 $input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';
 $record_type = $input['record_type'] ?? '';
 $record_id = $input['record_id'] ?? '';
+$reason = $input['reason'] ?? '';
 
-if ($action !== 'restore' || empty($record_type) || empty($record_id)) {
-    echo json_encode(['success' => false, 'message' => 'Invalid request parameters']);
+if ($action !== 'restore' || empty($record_type) || empty($record_id) || empty($reason)) {
+    echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
     exit;
 }
 
 try {
     if ($record_type === 'student') {
-        // Restore student record
-        $stmt = $conn->prepare("UPDATE student_account 
-                               SET deleted_at = NULL, 
-                                   deleted_by = NULL, 
-                                   deleted_reason = NULL 
-                               WHERE id = ? AND deleted_at IS NOT NULL");
-        $stmt->bind_param("i", $record_id);
+        // Log what we're searching for
+        file_put_contents('restore_debug.log', date('Y-m-d H:i:s') . " - Searching for student ID: '$record_id'\n", FILE_APPEND);
         
-        if ($stmt->execute() && $stmt->affected_rows > 0) {
-            // Get the student's id_number for the response
-            $id_stmt = $conn->prepare("SELECT id_number FROM student_account WHERE id = ?");
-            $id_stmt->bind_param("i", $record_id);
-            $id_stmt->execute();
-            $id_result = $id_stmt->get_result();
-            $student_id_number = $id_result->fetch_assoc()['id_number'] ?? $record_id;
-            
-            // Log the restoration (optional - won't fail if table doesn't exist)
-            try {
-                $conn->query("CREATE TABLE IF NOT EXISTS system_logs (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    action VARCHAR(100) NOT NULL,
-                    details TEXT,
-                    performed_by VARCHAR(100),
-                    performed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )");
-                
-                $log_stmt = $conn->prepare("INSERT INTO system_logs (action, details, performed_by) 
-                                           VALUES ('RESTORE_STUDENT', ?, ?)");
-                $details = "Restored student record ID: " . $record_id . " (" . $student_id_number . ")";
-                $performed_by = $_SESSION['superadmin_name'] ?? 'Super Admin';
-                $log_stmt->bind_param("ss", $details, $performed_by);
-                $log_stmt->execute();
-            } catch (Exception $e) {
-                // Logging failed but restoration succeeded
+        $stmt = $conn->prepare("SELECT * FROM student_account WHERE id_number = ?");
+        $stmt->bind_param("s", $record_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        file_put_contents('restore_debug.log', date('Y-m-d H:i:s') . " - Found rows: " . $result->num_rows . "\n", FILE_APPEND);
+        
+        if ($result->num_rows === 0) {
+            // Try to find what IDs actually exist
+            $all_ids = $conn->query("SELECT id_number FROM student_account WHERE deleted_at IS NOT NULL LIMIT 5");
+            $existing = [];
+            while ($row = $all_ids->fetch_assoc()) {
+                $existing[] = $row['id_number'];
             }
             
-            echo json_encode(['success' => true, 'message' => 'Student record restored successfully', 'student_id' => $student_id_number]);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Student record not found or already restored']);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Student not found',
+                'searched_for' => $record_id,
+                'existing_deleted_ids' => $existing
+            ]);
+            exit;
         }
+        
+        $student = $result->fetch_assoc();
+        $stmt->close();
+        
+        $request_title = "Restore Student: " . $student['first_name'] . " " . $student['last_name'];
+        $request_description = "Request to restore deleted student with ID: " . $student['id_number'] . "\n\nReason: " . $reason;
+        $request_type = 'restore_student';
+        $priority = 'high';
+        $requester_name = $_SESSION['superadmin_name'] ?? 'Super Admin';
+        $requester_role = 'superadmin';
+        $requester_module = 'Student Management';
+        $target_id = $student['id_number'];
+        $target_data = json_encode($student);
+        
+        $approval_stmt = $conn->prepare("INSERT INTO owner_approval_requests (request_title, request_description, request_type, priority, requester_name, requester_role, requester_module, target_id, target_data, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+        $approval_stmt->bind_param("sssssssss", $request_title, $request_description, $request_type, $priority, $requester_name, $requester_role, $requester_module, $target_id, $target_data);
+        
+        if ($approval_stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Restore request submitted successfully! Waiting for Owner approval.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to create approval request']);
+        }
+        $approval_stmt->close();
         
     } else if ($record_type === 'employee') {
-        // Restore employee record
-        $stmt = $conn->prepare("UPDATE employees 
-                               SET deleted_at = NULL, 
-                                   deleted_by = NULL, 
-                                   deleted_reason = NULL 
-                               WHERE id = ? AND deleted_at IS NOT NULL");
-        $stmt->bind_param("i", $record_id);
+        $stmt = $conn->prepare("SELECT * FROM employees WHERE id_number = ?");
+        $stmt->bind_param("s", $record_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
         
-        if ($stmt->execute() && $stmt->affected_rows > 0) {
-            // Get the employee's id_number for the response
-            $id_stmt = $conn->prepare("SELECT id_number FROM employees WHERE id = ?");
-            $id_stmt->bind_param("i", $record_id);
-            $id_stmt->execute();
-            $id_result = $id_stmt->get_result();
-            $employee_id_number = $id_result->fetch_assoc()['id_number'] ?? $record_id;
-            
-            // Log the restoration (optional - won't fail if table doesn't exist)
-            try {
-                $conn->query("CREATE TABLE IF NOT EXISTS system_logs (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    action VARCHAR(100) NOT NULL,
-                    details TEXT,
-                    performed_by VARCHAR(100),
-                    performed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )");
-                
-                $log_stmt = $conn->prepare("INSERT INTO system_logs (action, details, performed_by) 
-                                           VALUES ('RESTORE_EMPLOYEE', ?, ?)");
-                $details = "Restored employee record ID: " . $record_id . " (" . $employee_id_number . ")";
-                $performed_by = $_SESSION['superadmin_name'] ?? 'Super Admin';
-                $log_stmt->bind_param("ss", $details, $performed_by);
-                $log_stmt->execute();
-            } catch (Exception $e) {
-                // Logging failed but restoration succeeded
-            }
-            
-            echo json_encode(['success' => true, 'message' => 'Employee record restored successfully', 'employee_id' => $employee_id_number]);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Employee record not found or already restored']);
+        if ($result->num_rows === 0) {
+            echo json_encode(['success' => false, 'message' => 'Employee not found']);
+            exit;
         }
         
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Invalid record type']);
+        $employee = $result->fetch_assoc();
+        $stmt->close();
+        
+        $request_title = "Restore Employee: " . $employee['first_name'] . " " . $employee['last_name'];
+        $request_description = "Request to restore deleted employee with ID: " . $employee['id_number'] . "\n\nReason: " . $reason;
+        $request_type = 'restore_employee';
+        $priority = 'high';
+        $requester_name = $_SESSION['superadmin_name'] ?? 'Super Admin';
+        $requester_role = 'superadmin';
+        $requester_module = 'HR Management';
+        $target_id = $employee['id_number'];
+        $target_data = json_encode($employee);
+        
+        $approval_stmt = $conn->prepare("INSERT INTO owner_approval_requests (request_title, request_description, request_type, priority, requester_name, requester_role, requester_module, target_id, target_data, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+        $approval_stmt->bind_param("sssssssss", $request_title, $request_description, $request_type, $priority, $requester_name, $requester_role, $requester_module, $target_id, $target_data);
+        
+        if ($approval_stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Restore request submitted successfully! Waiting for Owner approval.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to create approval request']);
+        }
+        $approval_stmt->close();
     }
-    
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }

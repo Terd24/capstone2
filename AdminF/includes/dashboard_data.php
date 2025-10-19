@@ -269,6 +269,25 @@ if (table_exists($conn, 'student_account')) {
             $stmt->execute();
             $res = $stmt->get_result();
             while ($row = $res->fetch_assoc()) {
+                // Check for pending restore or archive requests
+                $row['pending_restore'] = false;
+                $row['pending_archive'] = false;
+                
+                if (table_exists($conn, 'owner_approval_requests')) {
+                    $check_stmt = $conn->prepare("SELECT request_type FROM owner_approval_requests WHERE target_id = ? AND request_type IN ('restore_student', 'archive_student') AND status = 'pending' LIMIT 1");
+                    $check_stmt->bind_param("s", $row['id_number']);
+                    $check_stmt->execute();
+                    $check_res = $check_stmt->get_result();
+                    if ($check_row = $check_res->fetch_assoc()) {
+                        if ($check_row['request_type'] === 'restore_student') {
+                            $row['pending_restore'] = true;
+                        } else if ($check_row['request_type'] === 'archive_student') {
+                            $row['pending_archive'] = true;
+                        }
+                    }
+                    $check_stmt->close();
+                }
+                
                 $deleted_students[] = $row;
             }
             $stmt->close();
@@ -287,6 +306,25 @@ if (table_exists($conn, 'employees')) {
             $stmt->execute();
             $res = $stmt->get_result();
             while ($row = $res->fetch_assoc()) {
+                // Check for pending restore or archive requests
+                $row['pending_restore'] = false;
+                $row['pending_archive'] = false;
+                
+                if (table_exists($conn, 'owner_approval_requests')) {
+                    $check_stmt = $conn->prepare("SELECT request_type FROM owner_approval_requests WHERE target_id = ? AND request_type IN ('restore_employee', 'archive_employee') AND status = 'pending' LIMIT 1");
+                    $check_stmt->bind_param("s", $row['id_number']);
+                    $check_stmt->execute();
+                    $check_res = $check_stmt->get_result();
+                    if ($check_row = $check_res->fetch_assoc()) {
+                        if ($check_row['request_type'] === 'restore_employee') {
+                            $row['pending_restore'] = true;
+                        } else if ($check_row['request_type'] === 'archive_employee') {
+                            $row['pending_archive'] = true;
+                        }
+                    }
+                    $check_stmt->close();
+                }
+                
                 $deleted_employees[] = $row;
             }
             $stmt->close();

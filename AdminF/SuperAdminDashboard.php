@@ -908,7 +908,7 @@ require_once 'includes/dashboard_data.php';
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 <?php
-                                // Get ALL HR employees with pending delete status
+                                // Get ALL HR employees (no pending delete check needed anymore)
                                 $hr_query = "
                                     SELECT 
                                         e.id_number,
@@ -917,11 +917,7 @@ require_once 'includes/dashboard_data.php';
                                         e.middle_name,
                                         e.position,
                                         e.department,
-                                        e.hire_date,
-                                        (SELECT COUNT(*) FROM owner_approval_requests 
-                                         WHERE request_type = 'delete_hr_employee' 
-                                         AND target_id = e.id_number 
-                                         AND status = 'pending') as has_pending_delete
+                                        e.hire_date
                                     FROM employees e
                                     WHERE e.department = 'Human Resources' AND e.deleted_at IS NULL
                                     ORDER BY e.last_name, e.first_name
@@ -932,31 +928,16 @@ require_once 'includes/dashboard_data.php';
                                 if ($hr_result && $hr_result->num_rows > 0):
                                     while ($hr = $hr_result->fetch_assoc()):
                                         $full_name = trim($hr['first_name'] . ' ' . ($hr['middle_name'] ? $hr['middle_name'] . ' ' : '') . $hr['last_name']);
-                                        $has_pending = $hr['has_pending_delete'] > 0;
-                                        $row_class = $has_pending ? 'bg-gray-300 opacity-70' : 'hover:bg-[#0B2C62]/5';
-                                        $cursor_class = $has_pending ? 'cursor-not-allowed' : 'cursor-pointer';
                                 ?>
-                                <tr class="<?= $row_class ?> <?= $cursor_class ?> transition-colors" onclick="<?= $has_pending ? '' : "viewHRAccount('" . htmlspecialchars($hr['id_number']) . "')" ?>">
+                                <tr class="hover:bg-[#0B2C62]/5 cursor-pointer transition-colors" onclick="viewHRAccount('<?= htmlspecialchars($hr['id_number']) ?>')">
                                     <td class="px-4 py-3 text-sm text-gray-900">
                                         <?= htmlspecialchars($hr['id_number']) ?>
                                     </td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($full_name) ?></td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($hr['position'] ?: 'HR Staff') ?></td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($hr['department'] ?: 'Human Resources') ?></td>
-                                    <td class="px-4 py-3 text-sm">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-gray-900">
-                                                <?= $hr['hire_date'] ? date('M d, Y', strtotime($hr['hire_date'])) : 'N/A' ?>
-                                            </span>
-                                            <?php if ($has_pending): ?>
-                                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-300">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                    </svg>
-                                                    Pending Delete
-                                                </span>
-                                            <?php endif; ?>
-                                        </div>
+                                    <td class="px-4 py-3 text-sm text-gray-900">
+                                        <?= $hr['hire_date'] ? date('M d, Y', strtotime($hr['hire_date'])) : 'N/A' ?>
                                     </td>
                                 </tr>
                                 <?php 
@@ -1257,19 +1238,30 @@ require_once 'includes/dashboard_data.php';
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-sm font-medium">
-                                            <div class="flex gap-2">
-                                                <button onclick="restoreStudent(<?= $student['id'] ?>)" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                                    </svg>
-                                                    Restore
-                                                </button>
-                                                <button onclick="archiveStudent(<?= $student['id'] ?>)" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-                                                    </svg>
-                                                    Archive
-                                                </button>
+                                            <div class="action-buttons-container" data-student-id="<?= htmlspecialchars($student['id_number']) ?>">
+                                                <?php if ($student['pending_restore'] || $student['pending_archive']): ?>
+                                                    <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded text-sm font-medium inline-flex items-center gap-2">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                        </svg>
+                                                        Request Pending
+                                                    </div>
+                                                <?php else: ?>
+                                                    <div class="flex gap-2">
+                                                        <button onclick="restoreStudent('<?= htmlspecialchars($student['id_number']) ?>')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                            </svg>
+                                                            Restore
+                                                        </button>
+                                                        <button onclick="archiveStudent('<?= htmlspecialchars($student['id_number']) ?>')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                                            </svg>
+                                                            Archive
+                                                        </button>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
                                     </tr>
@@ -1356,19 +1348,30 @@ require_once 'includes/dashboard_data.php';
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-sm font-medium">
-                                            <div class="flex gap-2">
-                                                <button onclick="restoreEmployee(<?= $employee['id'] ?>)" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                                    </svg>
-                                                    Restore
-                                                </button>
-                                                <button onclick="archiveEmployee(<?= $employee['id'] ?>)" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-                                                    </svg>
-                                                    Archive
-                                                </button>
+                                            <div class="action-buttons-container" data-employee-id="<?= htmlspecialchars($employee['id_number']) ?>">
+                                                <?php if ($employee['pending_restore'] || $employee['pending_archive']): ?>
+                                                    <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded text-sm font-medium inline-flex items-center gap-2">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                        </svg>
+                                                        Request Pending
+                                                    </div>
+                                                <?php else: ?>
+                                                    <div class="flex gap-2">
+                                                        <button onclick="restoreEmployee('<?= htmlspecialchars($employee['id_number']) ?>')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                            </svg>
+                                                            Restore
+                                                        </button>
+                                                        <button onclick="archiveEmployee('<?= htmlspecialchars($employee['id_number']) ?>')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                                            </svg>
+                                                            Archive
+                                                        </button>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
                                     </tr>
@@ -2313,22 +2316,12 @@ require_once 'includes/dashboard_data.php';
                         </svg>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-3">Delete Employee</h3>
-                    <p class="text-gray-600 mb-6 leading-relaxed">
-                        Are you sure you want to delete this employee record?<br>
+                    <p class="text-gray-600 mb-2 leading-relaxed">
+                        Are you sure you want to delete this employee record?
+                    </p>
+                    <p class="text-sm text-gray-500 mb-6">
                         This will also remove their system accounts and cannot be undone.
                     </p>
-                    <div class="mb-6 text-left">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Reason for Deletion <span class="text-red-500">*</span>
-                        </label>
-                        <textarea 
-                            id="deleteReason" 
-                            rows="3" 
-                            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none text-sm"
-                            placeholder="e.g., resignation, termination, retirement..."
-                            required
-                        ></textarea>
-                    </div>
                 </div>
                 <div class="px-8 pb-8 flex gap-3">
                     <button 
@@ -2366,16 +2359,6 @@ require_once 'includes/dashboard_data.php';
             // Event listeners
             document.getElementById('cancelDeleteBtn').onclick = () => modal.remove();
             document.getElementById('confirmDeleteBtn').onclick = async () => {
-                const reason = document.getElementById('deleteReason').value.trim();
-                if (!reason) {
-                    showToast('Please provide a reason for deletion', 'error');
-                    return;
-                }
-                if (reason.length < 5) {
-                    showToast('Please provide a more detailed reason (at least 5 characters)', 'error');
-                    return;
-                }
-                
                 // Get employee details from the modal
                 const firstName = document.getElementById(`first_name_${employeeId}`)?.value || '';
                 const lastName = document.getElementById(`last_name_${employeeId}`)?.value || '';
@@ -2390,12 +2373,12 @@ require_once 'includes/dashboard_data.php';
                 
                 try {
                     const formData = new FormData();
-                    formData.append('action', 'create_delete_hr_request');
+                    formData.append('action', 'delete_hr_employee');
                     formData.append('employee_id', employeeId);
                     formData.append('employee_name', employeeName);
                     formData.append('position', position);
                     formData.append('department', department);
-                    formData.append('deletion_reason', reason);
+                    formData.append('deletion_reason', 'Deleted by Super Admin');
                     
                     const response = await fetch('delete_hr_employee.php', {
                         method: 'POST',
@@ -2406,7 +2389,7 @@ require_once 'includes/dashboard_data.php';
                     
                     if (data.success) {
                         modal.remove();
-                        showToast('✅ Delete request submitted successfully! Waiting for Owner approval.', 'success');
+                        showToast('✅ Employee deleted successfully and moved to Deleted Items', 'success');
                         closeHRModal();
                         setTimeout(() => location.reload(), 1500);
                     } else {
@@ -2416,7 +2399,7 @@ require_once 'includes/dashboard_data.php';
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    showToast('An error occurred while submitting the request', 'error');
+                    showToast('An error occurred while deleting the employee', 'error');
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = 'Delete';
                 }
@@ -3113,7 +3096,7 @@ require_once 'includes/dashboard_data.php';
 
 
         // Modal Functions for Better Notifications
-        function showConfirmationModal({title, message, details = [], confirmText = 'Confirm', cancelText = 'Cancel', type = 'info', onConfirm = null}) {
+        function showConfirmationModal({title, message, details = [], confirmText = 'Confirm', cancelText = 'Cancel', type = 'info', onConfirm = null, requireReason = false, reasonPlaceholder = ''}) {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             
@@ -3146,9 +3129,15 @@ require_once 'includes/dashboard_data.php';
                         </div>
                         <p class="text-gray-600 mb-4">${message}</p>
                         ${details.length > 0 ? `
-                            <ul class="text-sm text-gray-500 space-y-1 mb-6">
+                            <ul class="text-sm text-gray-500 space-y-1 mb-4">
                                 ${details.map(detail => `<li>• ${detail}</li>`).join('')}
                             </ul>
+                        ` : ''}
+                        ${requireReason ? `
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Reason <span class="text-red-500">*</span></label>
+                                <textarea id="modalReasonField" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm" placeholder="${reasonPlaceholder}" required></textarea>
+                            </div>
                         ` : ''}
                         <div class="flex justify-end gap-3">
                             <button onclick="closeConfirmationModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
@@ -3165,6 +3154,7 @@ require_once 'includes/dashboard_data.php';
             document.body.appendChild(modal);
             window.currentConfirmationModal = modal;
             window.currentConfirmAction = onConfirm;
+            window.currentRequiresReason = requireReason;
         }
         
         function showNotificationModal({title, message, details = [], type = 'info', onClose = null}) {
@@ -3193,8 +3183,8 @@ require_once 'includes/dashboard_data.php';
                         </div>
                         <p class="text-gray-600 mb-4">${message}</p>
                         ${details.length > 0 ? `
-                            <ul class="text-sm text-gray-500 space-y-1 mb-6">
-                                ${details.map(detail => `<li>• ${detail}</li>`).join('')}
+                            <ul class="text-sm text-gray-500 mb-6">
+                                ${details.map(detail => `<li class="mb-2">• ${detail}</li>`).join('')}
                             </ul>
                         ` : ''}
                         <div class="flex justify-end">
@@ -3212,8 +3202,20 @@ require_once 'includes/dashboard_data.php';
         }
         
         function confirmAction() {
-            if (window.currentConfirmAction) {
-                window.currentConfirmAction();
+            if (window.currentRequiresReason) {
+                const reasonField = document.getElementById('modalReasonField');
+                const reason = reasonField ? reasonField.value.trim() : '';
+                if (!reason) {
+                    showToast('Please provide a reason', 'error');
+                    return;
+                }
+                if (window.currentConfirmAction) {
+                    window.currentConfirmAction(reason);
+                }
+            } else {
+                if (window.currentConfirmAction) {
+                    window.currentConfirmAction();
+                }
             }
             closeConfirmationModal();
         }
@@ -3499,86 +3501,58 @@ require_once 'includes/dashboard_data.php';
 
         // Deleted Items Functions - Working with existing backend
 function restoreStudent(studentId) {
+    console.log('DEBUG: Restore clicked for student ID:', studentId);
     showConfirmationModal({
         title: 'Restore Student Record',
-        message: 'Are you sure you want to restore this student record?',
+        message: 'This action requires Owner approval. Are you sure you want to submit a restore request?',
         details: [
-            'The student will be reactivated',
-            'Student will appear in Registrar system',
-            'All data will be restored'
+            'Request will be sent to Owner for approval',
+            'Student will be reactivated once approved',
+            'You will be notified of the decision'
         ],
         confirmText: 'Restore',
         cancelText: 'Cancel',
         type: 'info',
-        onConfirm: () => {
+        requireReason: true,
+        reasonPlaceholder: 'e.g., error in deletion, student re-enrolled, data correction needed...',
+        onConfirm: (reason) => {
             fetch('restore_record.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'restore',
                     record_type: 'student', 
-                    record_id: studentId
+                    record_id: studentId,
+                    reason: reason
                 })
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(response => response.text())
+            .then(text => {
+                console.log('Raw response:', text);
+                const data = JSON.parse(text);
                 if (data.success) {
+                    // Update button state immediately to show "Request Pending"
+                    const actionContainer = document.querySelector(`.action-buttons-container[data-student-id="${studentId}"]`);
+                    if (actionContainer) {
+                        actionContainer.innerHTML = `
+                            <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded text-sm font-medium inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Request Pending
+                            </div>
+                        `;
+                    }
+                    
                     showNotificationModal({
-                        title: 'Student Restored',
+                        title: 'Restore Request Submitted',
                         message: data.message,
                         details: [
                             `Student ID: ${data.student_id || studentId}`,
-                            'Record is now active',
-                            'Visible in Registrar system'
+                            'Waiting for Owner approval',
+                            'You will be notified once approved'
                         ],
-                        type: 'success',
-                        onClose: () => {
-                            // Remove the restored student from the list smoothly (no page reload)
-                            const studentRow = document.querySelector(`tr[data-student-id="${studentId}"]`);
-                            if (studentRow) {
-                                // Fade out and slide the row
-                                studentRow.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
-                                studentRow.style.opacity = '0';
-                                studentRow.style.transform = 'translateX(-20px)';
-                                
-                                setTimeout(() => {
-                                    studentRow.remove();
-                                    
-                                    // Update the deleted students count in the card
-                                    const deletedStudentsCard = document.querySelector('.bg-red-500.text-white.rounded-2xl');
-                                    if (deletedStudentsCard) {
-                                        const countElement = deletedStudentsCard.querySelector('.text-4xl.font-bold.text-white');
-                                        if (countElement) {
-                                            const currentCount = parseInt(countElement.textContent);
-                                            const newCount = Math.max(0, currentCount - 1);
-                                            countElement.textContent = newCount;
-                                        }
-                                    }
-                                    
-                                    // Update the table header count
-                                    const tableHeaders = document.querySelectorAll('h3.text-lg.font-bold.text-gray-900');
-                                    tableHeaders.forEach(header => {
-                                        if (header.textContent.includes('Deleted Students')) {
-                                            const match = header.textContent.match(/\((\d+)\)/);
-                                            if (match) {
-                                                const newCount = Math.max(0, parseInt(match[1]) - 1);
-                                                header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
-                                            }
-                                        }
-                                    });
-                                    
-                                    // Check if table is empty and show "no deleted students" message
-                                    const tbody = document.querySelector('tbody');
-                                    const remainingRows = tbody.querySelectorAll('tr[data-student-id]');
-                                    if (remainingRows.length === 0) {
-                                        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500"><svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg><p>No deleted students found</p></td></tr>';
-                                    }
-                                    
-                                    // Update pagination after removing item
-                                    updateStudentsPagination();
-                                }, 300);
-                            }
-                        }
+                        type: 'success'
                     });
                 } else {
                     showNotificationModal({
@@ -3603,92 +3577,53 @@ function restoreStudent(studentId) {
 function restoreEmployee(employeeId) {
     showConfirmationModal({
         title: 'Restore Employee Record',
-        message: 'Are you sure you want to restore this employee record?',
+        message: 'This action requires Owner approval. Are you sure you want to submit a restore request?',
         details: [
-            'The employee will be reactivated',
-            'Employee will appear in HR system',
-            'All data will be restored'
+            'Request will be sent to Owner for approval',
+            'Employee will be reactivated once approved',
+            'You will be notified of the decision'
         ],
         confirmText: 'Restore',
         cancelText: 'Cancel',
         type: 'info',
-        onConfirm: () => {
+        requireReason: true,
+        reasonPlaceholder: 'e.g., error in deletion, employee rehired, data correction needed...',
+        onConfirm: (reason) => {
             fetch('restore_record.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'restore',
                     record_type: 'employee',
-                    record_id: employeeId
+                    record_id: employeeId,
+                    reason: reason
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // Update button state immediately to show "Request Pending"
+                    const actionContainer = document.querySelector(`.action-buttons-container[data-employee-id="${employeeId}"]`);
+                    if (actionContainer) {
+                        actionContainer.innerHTML = `
+                            <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded text-sm font-medium inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Request Pending
+                            </div>
+                        `;
+                    }
+                    
                     showNotificationModal({
-                        title: 'Employee Restored',
+                        title: 'Restore Request Submitted',
                         message: data.message,
                         details: [
                             `Employee ID: ${data.employee_id || employeeId}`,
-                            'Record is now active',
-                            'Visible in HR system'
+                            'Waiting for Owner approval',
+                            'You will be notified once approved'
                         ],
-                        type: 'success',
-                        onClose: () => {
-                            // Save current scroll position before making changes
-                            const scrollPosition = window.scrollY || window.pageYOffset;
-                            
-                            // Remove the restored employee from the list smoothly (no page reload)
-                            const employeeRow = document.querySelector(`tr[data-employee-id="${employeeId}"]`);
-                            if (employeeRow) {
-                                // Fade out and slide the row
-                                employeeRow.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
-                                employeeRow.style.opacity = '0';
-                                employeeRow.style.transform = 'translateX(-20px)';
-                                
-                                setTimeout(() => {
-                                    employeeRow.remove();
-                                    
-                                    // Update the deleted employees count in the card
-                                    const deletedEmployeesCard = document.querySelector('.bg-orange-500.text-white.rounded-2xl');
-                                    if (deletedEmployeesCard) {
-                                        const countElement = deletedEmployeesCard.querySelector('.text-4xl.font-bold.text-white');
-                                        if (countElement) {
-                                            const currentCount = parseInt(countElement.textContent);
-                                            const newCount = Math.max(0, currentCount - 1);
-                                            countElement.textContent = newCount;
-                                        }
-                                    }
-                                    
-                                    // Update the table header count
-                                    const tableHeaders = document.querySelectorAll('h3.text-lg.font-bold.text-gray-900');
-                                    tableHeaders.forEach(header => {
-                                        if (header.textContent.includes('Deleted Employees')) {
-                                            const match = header.textContent.match(/\((\d+)\)/);
-                                            if (match) {
-                                                const newCount = Math.max(0, parseInt(match[1]) - 1);
-                                                header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
-                                            }
-                                        }
-                                    });
-                                    
-                                    // Check if table is empty and show "no deleted employees" message
-                                    const employeeTbody = employeeRow.closest('tbody');
-                                    if (employeeTbody) {
-                                        const remainingRows = employeeTbody.querySelectorAll('tr[data-employee-id]');
-                                        if (remainingRows.length === 0) {
-                                            employeeTbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500"><svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg><p>No deleted employees found</p></td></tr>';
-                                        } else {
-                                            // Update pagination after removing item
-                                            updateEmployeesPagination();
-                                        }
-                                    }
-                                    
-                                    // Restore scroll position to prevent unwanted scrolling
-                                    window.scrollTo(0, scrollPosition);
-                                }, 300);
-                            }
-                        }
+                        type: 'success'
                     });
                 } else {
                     showNotificationModal({
@@ -3714,48 +3649,54 @@ function restoreEmployee(employeeId) {
 function archiveStudent(studentId) {
     showConfirmationModal({
         title: 'Archive Student Record',
-        message: 'Are you sure you want to archive this student record?',
+        message: 'This action requires Owner approval. Are you sure you want to submit an archive request?',
         details: [
-            'Student will be moved to permanent archive',
-            'Record will be removed from deleted items',
-            'This action preserves the data permanently',
-            'Cannot be restored once archived'
+            'Request will be sent to Owner for approval',
+            'Student will be permanently archived once approved',
+            'Cannot be restored once archived',
+            'You will be notified of the decision'
         ],
         confirmText: 'Archive',
         cancelText: 'Cancel',
         type: 'warning',
-        onConfirm: () => {
+        requireReason: true,
+        reasonPlaceholder: 'e.g., data retention policy, student graduated, record cleanup...',
+        onConfirm: (reason) => {
             fetch('archive_record.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'archive',
                     record_type: 'student',
-                    record_id: studentId
+                    record_id: studentId,
+                    reason: reason
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // Update button state immediately to show "Request Pending"
+                    const actionContainer = document.querySelector(`.action-buttons-container[data-student-id="${studentId}"]`);
+                    if (actionContainer) {
+                        actionContainer.innerHTML = `
+                            <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded text-sm font-medium inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Request Pending
+                            </div>
+                        `;
+                    }
+                    
                     showNotificationModal({
-                        title: 'Student Archived',
+                        title: 'Archive Request Submitted',
                         message: data.message,
                         details: [
                             `Student ID: ${data.student_id}`,
-                            'Moved to permanent archive',
-                            'Data preserved for records'
+                            'Waiting for Owner approval',
+                            'You will be notified once approved'
                         ],
-                        type: 'success',
-                        onClose: () => {
-                            // Remove the archived student from the list
-                            const row = document.querySelector(`tr[data-student-id="${studentId}"]`);
-                            if (row) {
-                                row.remove();
-                            }
-                            // Update the counts
-                            updateDeletedCounts();
-                            loadArchiveCounts();
-                        }
+                        type: 'success'
                     });
                 } else {
                     showNotificationModal({
@@ -3780,36 +3721,52 @@ function archiveStudent(studentId) {
 function archiveEmployee(employeeId) {
     showConfirmationModal({
         title: 'Archive Employee Record',
-        message: 'Are you sure you want to archive this employee record?',
+        message: 'This action requires Owner approval. Are you sure you want to submit an archive request?',
         details: [
-            'Employee will be moved to permanent archive',
-            'Record will be removed from deleted items',
-            'This action preserves the data permanently',
-            'Cannot be restored once archived'
+            'Request will be sent to Owner for approval',
+            'Employee will be permanently archived once approved',
+            'Cannot be restored once archived',
+            'You will be notified of the decision'
         ],
         confirmText: 'Archive',
         cancelText: 'Cancel',
         type: 'warning',
-        onConfirm: () => {
+        requireReason: true,
+        reasonPlaceholder: 'e.g., data retention policy, employee retired, record cleanup...',
+        onConfirm: (reason) => {
             fetch('archive_record.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'archive',
                     record_type: 'employee',
-                    record_id: employeeId
+                    record_id: employeeId,
+                    reason: reason
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // Update button state immediately to show "Request Pending"
+                    const actionContainer = document.querySelector(`.action-buttons-container[data-employee-id="${employeeId}"]`);
+                    if (actionContainer) {
+                        actionContainer.innerHTML = `
+                            <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded text-sm font-medium inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Request Pending
+                            </div>
+                        `;
+                    }
+                    
                     showNotificationModal({
-                        title: 'Employee Archived',
+                        title: 'Archive Request Submitted',
                         message: data.message,
                         details: [
                             `Employee ID: ${data.employee_id}`,
-                            'Moved to permanent archive',
-                            'Data preserved for records'
+                            'Waiting for Owner approval',
+                            'You will be notified once approved'
                         ],
                         type: 'success',
                         onClose: () => {

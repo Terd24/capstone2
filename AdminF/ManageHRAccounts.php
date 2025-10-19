@@ -444,7 +444,28 @@ $hr_accounts = $conn->query("
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
+<!-- Delete Employee Modal -->
+<div id="deleteEmployeeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index:10090;">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+        <div class="flex flex-col items-center text-center">
+            <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Delete Employee</h3>
+            <p class="text-gray-600 mb-2">Are you sure you want to delete this employee record?</p>
+            <p class="text-sm text-gray-500 mb-6">This will also remove their system accounts and cannot be undone.</p>
+            
+            <div class="flex w-full gap-3">
+                <button onclick="closeDeleteEmployeeModal()" class="flex-1 py-2.5 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 font-medium">Cancel</button>
+                <button onclick="confirmDeleteEmployee()" class="flex-1 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal (for account removal) -->
 <div id="deleteConfirmationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index:10090;">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
         <div class="flex flex-col items-center text-center">
@@ -636,9 +657,11 @@ function viewEmployeeDetails(employeeId) {
 // Show employee details modal
 let currentEmployeeId = null;
 let isEditMode = false;
+window.currentEmployeeData = null;
 
 function showEmployeeDetailsModal(employee) {
     currentEmployeeId = employee.id_number;
+    window.currentEmployeeData = employee;
     const content = document.getElementById('employeeDetailsContent');
     
     // Ensure top Delete (entire employee) button is visible
@@ -1046,29 +1069,48 @@ function createNewAccount(event) {
 }
 
 // Show delete employee confirmation
+let currentEmployeeToDelete = null;
+
 function showDeleteEmployeeConfirmation(employeeId) {
-    if (confirm('Are you sure you want to delete this employee completely? This action cannot be undone and will remove all employee data and associated accounts.')) {
-        deleteEmployee(employeeId);
-    }
+    currentEmployeeToDelete = employeeId;
+    document.getElementById('deleteEmployeeModal').classList.remove('hidden');
 }
 
-// Delete employee completely
-function deleteEmployee(employeeId) {
-    fetch('delete_employee.php', {
+function closeDeleteEmployeeModal() {
+    document.getElementById('deleteEmployeeModal').classList.add('hidden');
+    currentEmployeeToDelete = null;
+}
+
+function confirmDeleteEmployee() {
+    if (!currentEmployeeToDelete) {
+        alert('No employee selected');
+        return;
+    }
+    
+    // Get employee details for the request
+    const employeeData = window.currentEmployeeData;
+    
+    const formData = new FormData();
+    formData.append('action', 'delete_hr_employee');
+    formData.append('employee_id', currentEmployeeToDelete);
+    formData.append('employee_name', employeeData ? `${employeeData.first_name} ${employeeData.last_name}` : '');
+    formData.append('position', employeeData ? employeeData.position : '');
+    formData.append('department', employeeData ? employeeData.department : '');
+    formData.append('deletion_reason', 'Deleted by Super Admin');
+    
+    fetch('delete_hr_employee.php', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'employee_id=' + encodeURIComponent(employeeId)
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showNotification('Employee deleted successfully');
+            closeDeleteEmployeeModal();
             closeViewModal();
-            location.reload();
+            showNotification(data.message, 'success');
+            setTimeout(() => location.reload(), 1500);
         } else {
-            showNotification('Error deleting employee: ' + data.message, 'error');
+            showNotification(data.message, 'error');
         }
     })
     .catch(error => {
