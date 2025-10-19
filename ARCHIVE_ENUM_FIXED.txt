@@ -1,0 +1,35 @@
+ARCHIVE LOGIN LOGS - ENUM FIX APPLIED
+=====================================
+
+PROBLEM IDENTIFIED:
+-------------------
+The owner_approval_requests table's request_type ENUM was missing:
+- 'archive_login_logs'
+- 'archive_attendance'
+
+This caused MySQL to reject these values when inserting, resulting in an empty request_type field.
+When the Owner tried to approve the request, the switch statement couldn't match any case because request_type was blank.
+
+FIX APPLIED:
+------------
+Updated OwnerF/Dashboard.php line 66 to include the missing ENUM values:
+
+BEFORE:
+ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'other')
+
+AFTER:
+ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'other')
+
+TESTING INSTRUCTIONS:
+---------------------
+1. Open Owner Dashboard (this will run the ALTER TABLE to update the ENUM)
+2. Go to Super Admin Dashboard
+3. Click "Archive Login Logs" and submit a request
+4. Go back to Owner Dashboard
+5. Approve the request
+6. Check Apache error logs - you should now see:
+   - Request Type: archive_login_logs (NOT empty!)
+   - The actual archive operation executing
+   - Success message
+
+The request_type field will now be properly populated and the switch statement will execute the archive_login_logs case!

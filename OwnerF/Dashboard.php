@@ -63,7 +63,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
 )");
 
 // Alter existing table to add new enum values if they don't exist
-$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'other') NOT NULL");
+$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'other') NOT NULL");
 
 // Handle approval/rejection actions
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -88,6 +88,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                 $request_type = $request_data['request_type'];
                 $target_id = $request_data['target_id'];
                 $target_data = json_decode($request_data['target_data'], true);
+                
+                error_log("=== OWNER APPROVAL EXECUTION START ===");
+                error_log("Request ID: $request_id");
+                error_log("Request Type: $request_type");
+                error_log("Target ID: $target_id");
+                error_log("Target Data: " . json_encode($target_data));
                 
                 try {
                     switch ($request_type) {
@@ -426,13 +432,217 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                             
                             $conn->commit();
                             break;
+                            
+                        case 'archive_login_logs':
+                            // Archive login logs - copied from clear_login_logs.php
+                            error_log("=== ARCHIVE LOGIN LOGS START ===");
+                            error_log("Owner approving archive login logs from {$target_data['start_date']} to {$target_data['end_date']}");
+                            
+                            try {
+                                $conn->begin_transaction();
+                                
+                                $start = $target_data['start_date'];
+                                $end = $target_data['end_date'];
+                                error_log("Archiving from $start to $end");
+                            
+                            // Ensure archive table exists
+                            $conn->query("CREATE TABLE IF NOT EXISTS login_logs_archive (
+                                id INT AUTO_INCREMENT PRIMARY KEY,
+                                original_id INT,
+                                username VARCHAR(100),
+                                login_time DATETIME,
+                                logout_time DATETIME,
+                                last_activity DATETIME,
+                                session_duration INT,
+                                ip_address VARCHAR(45),
+                                user_agent TEXT,
+                                user_type VARCHAR(50),
+                                status VARCHAR(20),
+                                archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                archived_by VARCHAR(100),
+                                archived_reason VARCHAR(255),
+                                INDEX idx_username (username),
+                                INDEX idx_login_time (login_time),
+                                INDEX idx_archived_at (archived_at)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                            
+                            $tableCheck = $conn->query("SHOW TABLES LIKE 'login_activity'");
+                            $tableName = ($tableCheck && $tableCheck->num_rows > 0) ? 'login_activity' : 'system_logs';
+                            $dateCol = ($tableName === 'login_activity') ? 'login_time' : 'timestamp';
+                            
+                            // Get records to archive
+                            $selectQuery = "SELECT * FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
+                            if ($tableName === 'system_logs') {
+                                $selectQuery .= " AND action LIKE '%login%'";
+                            }
+                            
+                            $selectStmt = $conn->prepare($selectQuery);
+                            $selectStmt->bind_param('ss', $start, $end);
+                            $selectStmt->execute();
+                            $result = $selectStmt->get_result();
+                            
+                            $count = 0;
+                            $archived_by = $_SESSION['owner_name'] ?? 'Owner';
+                            $archived_reason = "Archived login logs from $start to $end";
+                            
+                            // Archive each record
+                            while ($row = $result->fetch_assoc()) {
+                                $archiveStmt = $conn->prepare("INSERT INTO login_logs_archive 
+                                    (original_id, username, login_time, logout_time, last_activity, session_duration, ip_address, user_agent, user_type, status, archived_by, archived_reason) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                
+                                $original_id = $row['id'];
+                                $username = $row['username'] ?? $row['user_id'] ?? 'Unknown';
+                                $login_time = $row[$dateCol];
+                                $logout_time = $row['logout_time'] ?? null;
+                                $last_activity = $row['last_activity'] ?? null;
+                                $session_duration = $row['session_duration'] ?? null;
+                                $ip_address = $row['ip_address'] ?? 'N/A';
+                                $user_agent = $row['user_agent'] ?? 'N/A';
+                                $user_type = $row['user_type'] ?? $row['role'] ?? 'Unknown';
+                                $status = $row['status'] ?? 'success';
+                                
+                                $archiveStmt->bind_param('isssssisssss', 
+                                    $original_id, $username, $login_time, $logout_time, $last_activity, 
+                                    $session_duration, $ip_address, $user_agent, $user_type, $status, 
+                                    $archived_by, $archived_reason
+                                );
+                                
+                                if ($archiveStmt->execute()) {
+                                    $count++;
+                                }
+                                $archiveStmt->close();
+                            }
+                            
+                            // Delete archived records from original table
+                            if ($count > 0) {
+                                $deleteQuery = "DELETE FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
+                                if ($tableName === 'system_logs') {
+                                    $deleteQuery .= " AND action LIKE '%login%'";
+                                }
+                                
+                                $deleteStmt = $conn->prepare($deleteQuery);
+                                $deleteStmt->bind_param('ss', $start, $end);
+                                $deleteStmt->execute();
+                                $deleteStmt->close();
+                            }
+                            
+                                $selectStmt->close();
+                                $conn->commit();
+                                error_log("Successfully archived $count login records from $tableName");
+                            } catch (Exception $archive_ex) {
+                                $conn->rollback();
+                                error_log("ERROR in archive_login_logs: " . $archive_ex->getMessage());
+                                error_log("Stack: " . $archive_ex->getTraceAsString());
+                                // Don't re-throw, just log
+                            }
+                            error_log("=== ARCHIVE LOGIN LOGS END ===");
+                            break;
+                            
+                        case 'archive_attendance':
+                            // Archive attendance records
+                            error_log("=== ARCHIVE ATTENDANCE START ===");
+                            error_log("Owner approving archive attendance from {$target_data['start_date']} to {$target_data['end_date']}");
+                            
+                            try {
+                                $conn->begin_transaction();
+                                
+                                $start = $target_data['start_date'];
+                                $end = $target_data['end_date'];
+                                error_log("Archiving attendance from $start to $end");
+                            
+                                // Ensure archive table exists
+                                $conn->query("CREATE TABLE IF NOT EXISTS attendance_archive (
+                                    id INT AUTO_INCREMENT PRIMARY KEY,
+                                    original_id INT,
+                                    employee_id VARCHAR(50),
+                                    employee_name VARCHAR(255),
+                                    date DATE,
+                                    time_in TIME,
+                                    time_out TIME,
+                                    status VARCHAR(50),
+                                    hours_worked DECIMAL(5,2),
+                                    notes TEXT,
+                                    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    archived_by VARCHAR(100),
+                                    archived_reason VARCHAR(255),
+                                    INDEX idx_employee_id (employee_id),
+                                    INDEX idx_date (date),
+                                    INDEX idx_archived_at (archived_at)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                                
+                                // Get records to archive from attendance table
+                                $selectQuery = "SELECT * FROM attendance WHERE date BETWEEN ? AND ?";
+                                $selectStmt = $conn->prepare($selectQuery);
+                                $selectStmt->bind_param('ss', $start, $end);
+                                $selectStmt->execute();
+                                $result = $selectStmt->get_result();
+                                
+                                $count = 0;
+                                $archived_by = $_SESSION['owner_name'] ?? 'Owner';
+                                $archived_reason = "Archived attendance records from $start to $end";
+                                
+                                // Archive each record
+                                while ($row = $result->fetch_assoc()) {
+                                    $archiveStmt = $conn->prepare("INSERT INTO attendance_archive 
+                                        (original_id, employee_id, employee_name, date, time_in, time_out, status, hours_worked, notes, archived_by, archived_reason) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                    
+                                    $original_id = $row['id'];
+                                    $employee_id = $row['employee_id'] ?? 'Unknown';
+                                    $employee_name = $row['employee_name'] ?? 'Unknown';
+                                    $date = $row['date'];
+                                    $time_in = $row['time_in'] ?? null;
+                                    $time_out = $row['time_out'] ?? null;
+                                    $status = $row['status'] ?? 'present';
+                                    $hours_worked = $row['hours_worked'] ?? null;
+                                    $notes = $row['notes'] ?? null;
+                                    
+                                    $archiveStmt->bind_param('issssssdsss', 
+                                        $original_id, $employee_id, $employee_name, $date, $time_in, $time_out, 
+                                        $status, $hours_worked, $notes, $archived_by, $archived_reason
+                                    );
+                                    
+                                    if ($archiveStmt->execute()) {
+                                        $count++;
+                                    }
+                                    $archiveStmt->close();
+                                }
+                                
+                                // Delete archived records from original table
+                                if ($count > 0) {
+                                    $deleteQuery = "DELETE FROM attendance WHERE date BETWEEN ? AND ?";
+                                    $deleteStmt = $conn->prepare($deleteQuery);
+                                    $deleteStmt->bind_param('ss', $start, $end);
+                                    $deleteStmt->execute();
+                                    $deleteStmt->close();
+                                }
+                                
+                                $selectStmt->close();
+                                $conn->commit();
+                                error_log("Successfully archived $count attendance records");
+                            } catch (Exception $archive_ex) {
+                                $conn->rollback();
+                                error_log("ERROR in archive_attendance: " . $archive_ex->getMessage());
+                                error_log("Stack: " . $archive_ex->getTraceAsString());
+                                // Don't re-throw, just log
+                            }
+                            error_log("=== ARCHIVE ATTENDANCE END ===");
+                            break;
                     }
                 } catch (Exception $e) {
+                    error_log("=== EXCEPTION CAUGHT IN APPROVAL EXECUTION ===");
+                    error_log("Error: " . $e->getMessage());
+                    error_log("File: " . $e->getFile());
+                    error_log("Line: " . $e->getLine());
+                    error_log("Trace: " . $e->getTraceAsString());
                     if (isset($conn)) {
                         $conn->rollback();
                     }
                     error_log("Error executing approved action: " . $e->getMessage());
                 }
+                
+                error_log("=== OWNER APPROVAL EXECUTION END ===");
             }
             
             // Create notification
@@ -1009,12 +1219,17 @@ $module_stats_result = $conn->query($module_stats_query);
                                             </div>
                                             
                                             <!-- Student/Employee Details -->
-                                            <?php if ($request['target_data']): 
+                                            <?php 
+                                            $isArchiveRequest = (strpos($request['request_type'], 'archive') !== false);
+                                            if ($request['target_data'] && !$isArchiveRequest): 
                                                 $target_data = json_decode($request['target_data'], true);
-                                                // Determine if it's a student or employee based on request type
-                                                $isStudent = (strpos($request['request_type'], 'student') !== false);
-                                                $detailsTitle = $isStudent ? 'Student Details' : 'Employee Details';
-                                                $idLabel = $isStudent ? 'Student ID' : 'Employee ID';
+                                                // Only show if we have actual person data (id_number, first_name, or last_name)
+                                                $hasPersonData = isset($target_data['id_number']) || isset($target_data['first_name']) || isset($target_data['last_name']);
+                                                if ($hasPersonData):
+                                                    // Determine if it's a student or employee based on request type
+                                                    $isStudent = (strpos($request['request_type'], 'student') !== false);
+                                                    $detailsTitle = $isStudent ? 'Student Details' : 'Employee Details';
+                                                    $idLabel = $isStudent ? 'Student ID' : 'Employee ID';
                                             ?>
                                                 <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
                                                     <div class="flex items-center gap-2 mb-3">
@@ -1089,7 +1304,10 @@ $module_stats_result = $conn->query($module_stats_query);
                                                         <?php endif; ?>
                                                     </div>
                                                 </div>
-                                            <?php endif; ?>
+                                            <?php 
+                                                endif; // End of hasPersonData check
+                                            endif; // End of target_data && !isArchiveRequest check 
+                                            ?>
                                         </div>
                                         
                                         <!-- Action Buttons -->
@@ -1503,25 +1721,25 @@ async function checkForNewRequests() {
 
 function updateRequestCounts(counts) {
     // Update pending count
-    const pendingCount = document.querySelector('.text-yellow-600')?.closest('.bg-yellow-50')?.querySelector('.text-3xl');
+    const pendingCount = document.querySelector('.bg-yellow-50 .text-3xl');
     if (pendingCount) {
         pendingCount.textContent = counts.pending_requests || 0;
     }
     
     // Update approved count
-    const approvedCount = document.querySelector('.text-green-600')?.closest('.bg-green-50')?.querySelector('.text-3xl');
+    const approvedCount = document.querySelector('.bg-green-50 .text-3xl');
     if (approvedCount) {
         approvedCount.textContent = counts.approved_requests || 0;
     }
     
     // Update rejected count
-    const rejectedCount = document.querySelector('.text-red-600')?.closest('.bg-red-50')?.querySelector('.text-3xl');
+    const rejectedCount = document.querySelector('.bg-red-50 .text-3xl');
     if (rejectedCount) {
         rejectedCount.textContent = counts.rejected_requests || 0;
     }
     
     // Update total count
-    const totalCount = document.querySelector('.text-blue-600')?.closest('.bg-blue-50')?.querySelector('.text-3xl');
+    const totalCount = document.querySelector('.bg-blue-50 .text-3xl');
     if (totalCount) {
         totalCount.textContent = counts.total_requests || 0;
     }
@@ -1530,6 +1748,14 @@ function updateRequestCounts(counts) {
     const badge = document.querySelector('.nav-item [onclick*="approval-requests"] .bg-yellow-500');
     if (badge && counts.pending_requests > 0) {
         badge.textContent = counts.pending_requests;
+    } else if (badge && counts.pending_requests === 0) {
+        badge.style.display = 'none';
+    }
+    
+    // Update header pending count
+    const headerPending = document.querySelector('#approval-requests-section .bg-gray-100');
+    if (headerPending) {
+        headerPending.textContent = `${counts.pending_requests || 0} Pending`;
     }
 }
 
@@ -1654,12 +1880,13 @@ function addRequestToList(request) {
     }
     
     const isStudent = request.type.includes('student');
+    const isArchiveRequest = request.type.includes('archive');
     const detailsTitle = isStudent ? 'Student Details' : 'Employee Details';
     const idLabel = isStudent ? 'Student ID' : 'Employee ID';
     
-    // Build target details HTML
+    // Build target details HTML (skip for archive requests)
     let targetDetailsHTML = '';
-    if (Object.keys(targetData).length > 0) {
+    if (Object.keys(targetData).length > 0 && !isArchiveRequest) {
         let detailsContent = '';
         
         if (targetData.id_number) {

@@ -64,6 +64,22 @@ $system_status_color = $is_maintenance ? 'text-red-600' : 'text-green-600';
 // Include dashboard data processing
 require_once 'includes/dashboard_data.php';
 
+// Check for pending archive requests
+$pending_login_logs = false;
+$pending_attendance = false;
+
+$check_pending = $conn->query("SELECT request_type FROM owner_approval_requests WHERE status = 'pending' AND requester_role = 'superadmin' AND (request_type = 'archive_login_logs' OR request_type = 'archive_attendance')");
+if ($check_pending && $check_pending->num_rows > 0) {
+    while ($row = $check_pending->fetch_assoc()) {
+        if ($row['request_type'] === 'archive_login_logs') {
+            $pending_login_logs = true;
+        }
+        if ($row['request_type'] === 'archive_attendance') {
+            $pending_attendance = true;
+        }
+    }
+}
+
 // Don't load old approvals on page load - real-time system will catch new ones
 ?>
 <!DOCTYPE html>
@@ -1111,20 +1127,21 @@ require_once 'includes/dashboard_data.php';
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Start Date:</label>
-                                    <input type="date" id="loginStartDate" value="31/08/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                                    <input type="date" id="loginStartDate" min="2025-01-01" max="<?php echo date('Y-m-d'); ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date:</label>
-                                    <input type="date" id="loginEndDate" value="30/09/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                                    <input type="date" id="loginEndDate" min="2025-01-01" max="<?php echo date('Y-m-d'); ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
                                 <p class="text-sm text-gray-600">All login records between these dates will be archived and can be viewed in "View Archives"</p>
                             </div>
-                            <button onclick="clearLoginLogs()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                            <button id="archiveLoginLogsBtn" onclick="clearLoginLogs()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                                 </svg>
-                                Archive Login Logs
+                                <span id="archiveLoginLogsText">Archive Login Logs</span>
                             </button>
+                            <p id="archiveLoginLogsPending" class="hidden text-sm text-yellow-600 mt-2 font-medium">⏳ Request pending approval from Owner</p>
                         </div>
 
                         <!-- Archive Attendance Records -->
@@ -1133,20 +1150,21 @@ require_once 'includes/dashboard_data.php';
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Start Date:</label>
-                                    <input type="date" id="attendanceStartDate" value="31/08/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                                    <input type="date" id="attendanceStartDate" min="2025-01-01" max="<?php echo date('Y-m-d'); ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date:</label>
-                                    <input type="date" id="attendanceEndDate" value="30/09/2025" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                                    <input type="date" id="attendanceEndDate" min="2025-01-01" max="<?php echo date('Y-m-d'); ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                                 </div>
                                 <p class="text-sm text-gray-600">All attendance records between these dates will be archived and can be viewed in "View Archives"</p>
                             </div>
-                            <button onclick="clearAttendanceRecords()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                            <button id="archiveAttendanceBtn" onclick="clearAttendanceRecords()" class="w-full mt-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                                 </svg>
-                                Archive Attendance Records
+                                <span id="archiveAttendanceText">Archive Attendance Records</span>
                             </button>
+                            <p id="archiveAttendancePending" class="hidden text-sm text-yellow-600 mt-2 font-medium">⏳ Request pending approval from Owner</p>
                         </div>
                     </div>
                 </div>
@@ -3499,43 +3517,60 @@ require_once 'includes/dashboard_data.php';
             
             showConfirmationModal({
                 title: 'Archive Login Logs',
-                message: `Are you sure you want to archive all login logs between ${startDate} and ${endDate}?`,
+                message: `This action requires Owner approval. Submit request to archive login logs between ${startDate} and ${endDate}?`,
                 details: [
-                    'Records will be moved to archive',
-                    'Archived records can be viewed in "View Archives"',
-                    'Records will be removed from active logs'
+                    'Request will be sent to Owner for approval',
+                    'Records will be moved to archive once approved',
+                    'You will be notified of the decision'
                 ],
-                confirmText: 'Archive Logs',
+                confirmText: 'Submit Request',
                 cancelText: 'Cancel',
                 type: 'info',
-                onConfirm: () => {
+                requireReason: true,
+                reasonLabel: 'Reason for archiving these login logs',
+                reasonPlaceholder: 'e.g., routine maintenance, storage optimization, compliance requirement...',
+                onConfirm: (reason) => {
                     fetch('clear_login_logs.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             start_date: startDate, 
-                            end_date: endDate 
+                            end_date: endDate,
+                            reason: reason
                         })
                     })
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
                             showNotificationModal({
-                                title: 'Login Logs Archived',
-                                message: data.message,
+                                title: 'Request Submitted',
+                                message: 'Archive login logs request has been sent to the Owner for approval.',
                                 details: [
-                                    `Records archived: ${data.records_archived}`,
                                     `Date range: ${startDate} to ${endDate}`,
-                                    'View archived records in "View Archives"'
+                                    'Owner will review your request',
+                                    'You will be notified once approved'
                                 ],
                                 type: 'success'
                             });
                             // Clear the date inputs
                             document.getElementById('loginStartDate').value = '';
                             document.getElementById('loginEndDate').value = '';
+                            
+                            // Disable the button and show pending message
+                            const btn = document.getElementById('archiveLoginLogsBtn');
+                            const msg = document.getElementById('archiveLoginLogsPending');
+                            if (btn && msg) {
+                                btn.disabled = true;
+                                btn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                                btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                                btn.onclick = null;
+                                msg.classList.remove('hidden');
+                                // Set flag to prevent auto-enable
+                                localStorage.setItem('loginLogsRequestPending', 'true');
+                            }
                         } else {
                             showNotificationModal({
-                                title: 'Archive Failed',
+                                title: 'Request Failed',
                                 message: data.message,
                                 type: 'error'
                             });
@@ -3545,7 +3580,7 @@ require_once 'includes/dashboard_data.php';
                         console.error('Error:', error);
                         showNotificationModal({
                             title: 'Error',
-                            message: 'An error occurred while archiving login logs',
+                            message: 'An error occurred while submitting the request',
                             type: 'error'
                         });
                     });
@@ -3573,43 +3608,60 @@ require_once 'includes/dashboard_data.php';
             
             showConfirmationModal({
                 title: 'Archive Attendance Records',
-                message: `Are you sure you want to archive all attendance records between ${startDate} and ${endDate}?`,
+                message: `This action requires Owner approval. Submit request to archive attendance records between ${startDate} and ${endDate}?`,
                 details: [
-                    'Records will be moved to archive',
-                    'Archived records can be viewed in "View Archives"',
-                    'Records will be removed from active attendance'
+                    'Request will be sent to Owner for approval',
+                    'Records will be moved to archive once approved',
+                    'You will be notified of the decision'
                 ],
-                confirmText: 'Archive Records',
+                confirmText: 'Submit Request',
                 cancelText: 'Cancel',
                 type: 'info',
-                onConfirm: () => {
+                requireReason: true,
+                reasonLabel: 'Reason for archiving these attendance records',
+                reasonPlaceholder: 'e.g., end of semester, storage optimization, compliance requirement...',
+                onConfirm: (reason) => {
                     fetch('clear_attendance_records.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             start_date: startDate, 
-                            end_date: endDate 
+                            end_date: endDate,
+                            reason: reason
                         })
                     })
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
                             showNotificationModal({
-                                title: 'Attendance Records Archived',
-                                message: data.message,
+                                title: 'Request Submitted',
+                                message: 'Archive attendance records request has been sent to the Owner for approval.',
                                 details: [
-                                    `Records archived: ${data.records_archived}`,
                                     `Date range: ${startDate} to ${endDate}`,
-                                    'View archived records in "View Archives"'
+                                    'Owner will review your request',
+                                    'You will be notified once approved'
                                 ],
                                 type: 'success'
                             });
                             // Clear the date inputs
                             document.getElementById('attendanceStartDate').value = '';
                             document.getElementById('attendanceEndDate').value = '';
+                            
+                            // Disable the button and show pending message
+                            const btn = document.getElementById('archiveAttendanceBtn');
+                            const msg = document.getElementById('archiveAttendancePending');
+                            if (btn && msg) {
+                                btn.disabled = true;
+                                btn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                                btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                                btn.onclick = null;
+                                msg.classList.remove('hidden');
+                                // Set flag to prevent auto-enable
+                                localStorage.setItem('attendanceRequestPending', 'true');
+                            }
                         } else {
                             showNotificationModal({
-                                title: 'Archive Failed',
+                                title: 'Request Failed',
                                 message: data.message,
                                 type: 'error'
                             });
@@ -3619,7 +3671,7 @@ require_once 'includes/dashboard_data.php';
                         console.error('Error:', error);
                         showNotificationModal({
                             title: 'Error',
-                            message: 'An error occurred while archiving attendance records',
+                            message: 'An error occurred while submitting the request',
                             type: 'error'
                         });
                     });
@@ -4043,6 +4095,34 @@ function deletePermanently(recordId, recordType) {
             const toggle = document.getElementById('maintenanceToggle');
             if (toggle) {
                 toggle.checked = isMaintenanceMode;
+            }
+            
+            // Check for pending archive requests and disable buttons
+            const pendingLoginLogs = <?= $pending_login_logs ? 'true' : 'false' ?>;
+            const pendingAttendance = <?= $pending_attendance ? 'true' : 'false' ?>;
+            
+            if (pendingLoginLogs) {
+                const btn = document.getElementById('archiveLoginLogsBtn');
+                const msg = document.getElementById('archiveLoginLogsPending');
+                if (btn && msg) {
+                    btn.disabled = true;
+                    btn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                    btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                    btn.onclick = null;
+                    msg.classList.remove('hidden');
+                }
+            }
+            
+            if (pendingAttendance) {
+                const btn = document.getElementById('archiveAttendanceBtn');
+                const msg = document.getElementById('archiveAttendancePending');
+                if (btn && msg) {
+                    btn.disabled = true;
+                    btn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                    btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                    btn.onclick = null;
+                    msg.classList.remove('hidden');
+                }
             }
             
             // Restore the saved section or show dashboard
@@ -5814,11 +5894,122 @@ function deletePermanently(recordId, recordType) {
         // Check immediately on load
         checkForNewApprovals();
         checkForNewDeletions();
+        checkArchiveRequestStatus();
         // Then check for new approvals every 1 second for instant updates
         notificationCheckInterval = setInterval(checkForNewApprovals, 1000);
         // Check for new deletions every 2 seconds
         deletionCheckInterval = setInterval(checkForNewDeletions, 2000);
+        // Check archive request status every 2 seconds
+        setInterval(checkArchiveRequestStatus, 2000);
+        
+        // Date validation for archive forms
+        const loginStartDate = document.getElementById('loginStartDate');
+        const loginEndDate = document.getElementById('loginEndDate');
+        const attendanceStartDate = document.getElementById('attendanceStartDate');
+        const attendanceEndDate = document.getElementById('attendanceEndDate');
+        
+        // Update end date minimum when start date changes (Login Logs)
+        if (loginStartDate && loginEndDate) {
+            loginStartDate.addEventListener('change', function() {
+                loginEndDate.min = this.value;
+                if (loginEndDate.value && loginEndDate.value < this.value) {
+                    loginEndDate.value = this.value;
+                }
+            });
+        }
+        
+        // Update end date minimum when start date changes (Attendance)
+        if (attendanceStartDate && attendanceEndDate) {
+            attendanceStartDate.addEventListener('change', function() {
+                attendanceEndDate.min = this.value;
+                if (attendanceEndDate.value && attendanceEndDate.value < this.value) {
+                    attendanceEndDate.value = this.value;
+                }
+            });
+        }
     });
+    
+    // Function to check archive request status and update buttons
+    async function checkArchiveRequestStatus() {
+        try {
+            console.log('Checking archive request status...');
+            const response = await fetch('check_archive_status.php');
+            console.log('Archive status response:', response.status, response.ok);
+            
+            if (!response.ok) {
+                console.error('Failed to check archive status:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            console.log('Archive status check:', data);
+            
+            // Update login logs button
+            const loginBtn = document.getElementById('archiveLoginLogsBtn');
+            const loginMsg = document.getElementById('archiveLoginLogsPending');
+            
+            if (loginBtn && loginMsg) {
+                if (data.pending_login_logs) {
+                    // Keep disabled
+                    console.log('Login logs: Keeping button disabled (pending request exists)');
+                    if (!loginBtn.disabled) {
+                        loginBtn.disabled = true;
+                        loginBtn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        loginBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                        loginBtn.onclick = null;
+                        loginMsg.classList.remove('hidden');
+                    }
+                } else {
+                    // Re-enable button when no pending request in database
+                    if (loginBtn.disabled) {
+                        console.log('Login logs: Re-enabling button (no pending request in database)');
+                        loginBtn.disabled = false;
+                        loginBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        loginBtn.classList.add('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        loginBtn.onclick = clearLoginLogs;
+                        loginMsg.classList.add('hidden');
+                        // Clear the localStorage flag
+                        localStorage.removeItem('loginLogsRequestPending');
+                    }
+                }
+            }
+            
+            // Update attendance button
+            const attendanceBtn = document.getElementById('archiveAttendanceBtn');
+            const attendanceMsg = document.getElementById('archiveAttendancePending');
+            
+            if (attendanceBtn && attendanceMsg) {
+                if (data.pending_attendance) {
+                    // Keep disabled
+                    console.log('Attendance: Keeping button disabled (pending request exists)');
+                    if (!attendanceBtn.disabled) {
+                        attendanceBtn.disabled = true;
+                        attendanceBtn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        attendanceBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                        attendanceBtn.onclick = null;
+                        attendanceMsg.classList.remove('hidden');
+                    }
+                } else {
+                    // Re-enable button when no pending request in database
+                    if (attendanceBtn.disabled) {
+                        console.log('Attendance: Re-enabling button (no pending request in database)');
+                        attendanceBtn.disabled = false;
+                        attendanceBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        attendanceBtn.classList.add('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        attendanceBtn.onclick = clearAttendanceRecords;
+                        attendanceMsg.classList.add('hidden');
+                        // Clear the localStorage flag
+                        localStorage.removeItem('attendanceRequestPending');
+                    }
+                }
+            }
+            
+            // Note: Auto-notifications for approvals/rejections have been removed
+            // The button will automatically re-enable when the request is no longer pending
+        } catch (error) {
+            console.error('Error checking archive status:', error);
+        }
+    }
     
     // Function to check for new approvals
     async function checkForNewApprovals() {

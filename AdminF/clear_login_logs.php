@@ -4,6 +4,7 @@ session_start();
 ob_clean();
 header('Content-Type: application/json');
 
+// Only SuperAdmin can request to clear logs
 if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin') {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     ob_end_flush();
@@ -15,98 +16,75 @@ require_once '../StudentLogin/db_conn.php';
 $data = json_decode(file_get_contents('php://input'), true);
 $start = $data['start_date'] ?? '';
 $end = $data['end_date'] ?? '';
+$reason = $data['reason'] ?? '';
 
-if (empty($start) || empty($end)) {
-    echo json_encode(['success' => false, 'message' => 'Dates required']);
+if (empty($start) || empty($end) || empty($reason)) {
+    echo json_encode(['success' => false, 'message' => 'Start date, end date, and reason are required']);
     ob_end_flush();
     exit;
 }
 
-// Ensure archive table exists
-$conn->query("CREATE TABLE IF NOT EXISTS login_logs_archive (
+// Ensure approval requests table exists
+$conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    original_id INT,
-    username VARCHAR(100),
-    login_time DATETIME,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    user_type VARCHAR(50),
-    status VARCHAR(20),
-    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    archived_by VARCHAR(100),
-    archived_reason VARCHAR(255),
-    INDEX idx_username (username),
-    INDEX idx_login_time (login_time),
-    INDEX idx_archived_at (archived_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    request_title VARCHAR(255) NOT NULL,
+    request_description TEXT NOT NULL,
+    request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'other') NOT NULL,
+    priority ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
+    requester_name VARCHAR(100) NOT NULL,
+    requester_role VARCHAR(50) NOT NULL,
+    requester_module VARCHAR(50) NOT NULL,
+    target_table VARCHAR(50),
+    target_id VARCHAR(50),
+    target_data JSON,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    owner_comments TEXT,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP NULL,
+    reviewed_by VARCHAR(100)
+)");
 
-$tableCheck = $conn->query("SHOW TABLES LIKE 'login_activity'");
-$tableName = ($tableCheck && $tableCheck->num_rows > 0) ? 'login_activity' : 'system_logs';
-$dateCol = ($tableName === 'login_activity') ? 'login_time' : 'timestamp';
+// Create approval request for Owner
+$request_title = "Archive Login Logs";
+$request_description = "Request to archive login logs from $start to $end\n\nReason: $reason";
+$request_type = 'archive_login_logs';
+$priority = 'medium';
+$requester_name = $_SESSION['superadmin_name'] ?? 'Super Admin';
+$requester_role = 'superadmin';
+$requester_module = 'System Maintenance';
+$target_id = $start . '_to_' . $end;
+$target_data = json_encode(['start_date' => $start, 'end_date' => $end, 'reason' => $reason]);
 
-// Get records to archive
-$selectQuery = "SELECT * FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
-if ($tableName === 'system_logs') {
-    $selectQuery .= " AND action LIKE '%login%'";
+// Log the request for debugging
+error_log("=== CLEAR LOGIN LOGS REQUEST ===");
+error_log("Start: $start, End: $end, Reason: $reason");
+error_log("Requester: $requester_name ($requester_role)");
+
+$approval_stmt = $conn->prepare("INSERT INTO owner_approval_requests (request_title, request_description, request_type, priority, requester_name, requester_role, requester_module, target_id, target_data, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+
+if (!$approval_stmt) {
+    error_log("Failed to prepare statement: " . $conn->error);
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $conn->error]);
+    ob_end_flush();
+    exit;
 }
 
-$selectStmt = $conn->prepare($selectQuery);
-$selectStmt->bind_param('ss', $start, $end);
-$selectStmt->execute();
-$result = $selectStmt->get_result();
+$approval_stmt->bind_param("sssssssss", $request_title, $request_description, $request_type, $priority, $requester_name, $requester_role, $requester_module, $target_id, $target_data);
 
-$count = 0;
-$archived_by = $_SESSION['user_id'] ?? $_SESSION['id_number'] ?? 'SuperAdmin';
-$archived_reason = "Archived login logs from $start to $end";
-
-// Archive each record
-while ($row = $result->fetch_assoc()) {
-    $archiveStmt = $conn->prepare("INSERT INTO login_logs_archive 
-        (original_id, username, login_time, logout_time, last_activity, session_duration, ip_address, user_agent, user_type, status, archived_by, archived_reason) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    
-    $original_id = $row['id'];
-    $username = $row['username'] ?? $row['user_id'] ?? 'Unknown';
-    $login_time = $row[$dateCol];
-    $logout_time = $row['logout_time'] ?? null;
-    $last_activity = $row['last_activity'] ?? null;
-    $session_duration = $row['session_duration'] ?? null;
-    $ip_address = $row['ip_address'] ?? 'N/A';
-    $user_agent = $row['user_agent'] ?? 'N/A';
-    $user_type = $row['user_type'] ?? $row['role'] ?? 'Unknown';
-    $status = $row['status'] ?? 'success';
-    
-    $archiveStmt->bind_param('issssissssss', 
-        $original_id, $username, $login_time, $logout_time, $last_activity, 
-        $session_duration, $ip_address, $user_agent, $user_type, $status, 
-        $archived_by, $archived_reason
-    );
-    
-    if ($archiveStmt->execute()) {
-        $count++;
-    }
-    $archiveStmt->close();
+if ($approval_stmt->execute()) {
+    $insert_id = $approval_stmt->insert_id;
+    error_log("Successfully created approval request with ID: $insert_id");
+    echo json_encode([
+        'success' => true,
+        'message' => 'Archive request submitted successfully! Waiting for Owner approval.',
+        'requires_approval' => true,
+        'request_id' => $insert_id
+    ]);
+} else {
+    error_log("Failed to execute statement: " . $approval_stmt->error);
+    echo json_encode(['success' => false, 'message' => 'Failed to create approval request: ' . $approval_stmt->error]);
 }
 
-// Delete archived records from original table
-if ($count > 0) {
-    $deleteQuery = "DELETE FROM $tableName WHERE DATE($dateCol) BETWEEN ? AND ?";
-    if ($tableName === 'system_logs') {
-        $deleteQuery .= " AND action LIKE '%login%'";
-    }
-    
-    $deleteStmt = $conn->prepare($deleteQuery);
-    $deleteStmt->bind_param('ss', $start, $end);
-    $deleteStmt->execute();
-    $deleteStmt->close();
-}
-
-echo json_encode([
-    'success' => true, 
-    'message' => "$count login records archived successfully",
-    'records_archived' => $count
-]);
-
-$selectStmt->close();
+$approval_stmt->close();
 $conn->close();
 ob_end_flush();

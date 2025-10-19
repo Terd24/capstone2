@@ -12,7 +12,7 @@ require_once '../StudentLogin/db_conn.php';
 $status = $_GET['status'] ?? 'pending';
 
 try {
-    $query = "SELECT * FROM approval_requests WHERE status = ? ORDER BY requested_at DESC";
+    $query = "SELECT * FROM owner_approval_requests WHERE status = ? ORDER BY requested_at DESC";
     $stmt = $conn->prepare($query);
     $stmt->bind_param('s', $status);
     $stmt->execute();
