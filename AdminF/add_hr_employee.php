@@ -5,6 +5,7 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 include '../StudentLogin/db_conn.php';
+include '../includes/log_system_notification.php';
 
 // Require Super Admin login
 if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin') {
@@ -49,7 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 email VARCHAR(100) NOT NULL,
                 phone VARCHAR(20) NOT NULL,
                 address TEXT NOT NULL,
-                hire_date DATE NOT NULL,
+                hire_date DATE NOT NULL,i revret it becuase 
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )";
@@ -186,6 +187,43 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Commit the transaction - add employee immediately without approval
         $conn->commit();
+        
+        // Log system notification for Owner
+        try {
+            $employee_name = $first_name . ' ' . $last_name;
+            $admin_name = $_SESSION['superadmin_name'] ?? 'Super Admin';
+            $notif_title = "New HR Employee Added";
+            $notif_message = formatActionMessage('employee_added', $employee_name, $id_number);
+            
+            $new_data = [
+                'name' => $employee_name,
+                'id_number' => $id_number,
+                'position' => $position,
+                'department' => $department,
+                'role' => $role ?? 'N/A'
+            ];
+            
+            $notif_result = logSystemNotification(
+                $conn,
+                $notif_title,
+                $notif_message,
+                'success',
+                'Super Admin',
+                $admin_name,
+                'Super Admin',
+                'employee_added',
+                'employees',
+                $id_number,
+                null,
+                $new_data
+            );
+            
+            if (!$notif_result) {
+                error_log("Failed to log notification for employee add: " . $id_number);
+            }
+        } catch (Exception $notif_error) {
+            error_log("Error logging notification: " . $notif_error->getMessage());
+        }
         
         // Return JSON response for AJAX
         echo json_encode([

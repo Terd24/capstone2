@@ -3285,13 +3285,6 @@ function editTuitionFee(id) {
                                 <label class="block text-sm font-medium mb-1">Other Fees</label>
                                 <input type="number" step="0.01" name="other_fees" value="${fee.other_fees}" required class="w-full border rounded-lg px-3 py-2">
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium mb-1">Term/Semester</label>
-                                <select name="term" required class="w-full border rounded-lg px-3 py-2">
-                                    <option value="1st Semester" ${fee.term === '1st Semester' ? 'selected' : ''}>1st Semester</option>
-                                    <option value="2nd Semester" ${fee.term === '2nd Semester' ? 'selected' : ''}>2nd Semester</option>
-                                </select>
-                            </div>
                         </div>
                         <div class="flex gap-3 mt-6">
                             <button type="button" onclick="closeEditFeeModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">Cancel</button>
@@ -3322,12 +3315,98 @@ function submitEditFee(event, id) {
     .then(data => {
         if (data.success) {
             closeEditFeeModal();
-            loadTuitionFees();
+            // Smooth update: only refresh the specific fee data without losing state
+            updateSingleFee(id, formData);
             showNotification('Tuition fee updated successfully!', 'success');
         } else {
             showNotification('Error: ' + data.message, 'error');
         }
     });
+}
+
+function updateSingleFee(feeId, formData) {
+    // Find and update the fee in allTuitionFees array
+    const feeIndex = allTuitionFees.findIndex(f => f.id == feeId);
+    if (feeIndex === -1) return;
+    
+    const fee = allTuitionFees[feeIndex];
+    
+    // Update the fee object with new values
+    fee.tuition_fee = formData.get('tuition_fee');
+    fee.other_fees = formData.get('other_fees');
+    fee.total_fee = parseFloat(fee.tuition_fee) + parseFloat(fee.other_fees);
+    
+    // Get the sanitized yearId (same format used in displayTuitionFees)
+    const yearId = fee.school_year.replace(/[^a-zA-Z0-9]/g, '');
+    
+    // Update in yearFeesData as well (using sanitized yearId)
+    if (yearFeesData[yearId]) {
+        const yearFeeIndex = yearFeesData[yearId].findIndex(f => f.id == feeId);
+        if (yearFeeIndex !== -1) {
+            yearFeesData[yearId][yearFeeIndex] = fee;
+        }
+    }
+    
+    // Re-render only the affected year section with current filters and pagination
+    const currentPage = yearCurrentPage[yearId] || 1;
+    
+    // Apply current filters
+    const searchBar = document.getElementById(`searchBar-${yearId}`)?.value.toLowerCase() || '';
+    const term = document.getElementById(`filterTerm-${yearId}`)?.value || '';
+    const level = document.getElementById(`filterLevel-${yearId}`)?.value || '';
+    const track = document.getElementById(`filterTrack-${yearId}`)?.value || '';
+    
+    let filtered = yearFeesData[yearId] || [];
+    
+    // Apply search filter
+    if (searchBar) {
+        filtered = filtered.filter(f => {
+            const searchText = `${f.grade_level} ${f.term} ${f.academic_track || ''}`.toLowerCase();
+            return searchText.includes(searchBar);
+        });
+    }
+    
+    // Apply term filter
+    if (term) {
+        filtered = filtered.filter(f => f.term === term);
+    }
+    
+    // Apply level filter
+    if (level) {
+        filtered = filtered.filter(f => {
+            const gradeText = f.grade_level.toLowerCase().trim();
+            switch(level) {
+                case 'kinder': return gradeText.includes('kinder');
+                case 'elementary': return gradeText.match(/\bgrade\s*[1-6]\b/);
+                case 'jhs': return gradeText.match(/\bgrade\s*(7|8|9|10)\b/);
+                case 'shs': return gradeText.match(/\bgrade\s*(11|12)\b/);
+                case 'college': return gradeText.includes('year');
+                default: return true;
+            }
+        });
+    }
+    
+    // Apply track filter
+    if (track) {
+        filtered = filtered.filter(f => {
+            const academicTrack = f.academic_track || '';
+            if (track === 'BPEd') {
+                return academicTrack.includes('BPEd') || academicTrack.includes('Bachelor of Physical Education');
+            } else if (track === 'BECEd') {
+                return academicTrack.includes('BECEd') || academicTrack.includes('Bachelor of Early Childhood Education');
+            }
+            return academicTrack === track;
+        });
+    }
+    
+    // Update filter count
+    const filterCountEl = document.getElementById(`filterCount-${yearId}`);
+    if (filterCountEl) {
+        filterCountEl.textContent = filtered.length;
+    }
+    
+    // Re-render with current page
+    renderYearCards(yearId, filtered, currentPage);
 }
 
 // ==================== FEE TYPES MANAGEMENT ====================
@@ -3629,22 +3708,6 @@ function displayDocumentFees(documentFees) {
     }
     
     let html = `
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                    </svg>
-                </div>
-                <div class="ml-3">
-                    <p class="text-sm text-blue-700">
-                        <strong>How it works:</strong> When a student requests a document with a fee > ₱0, 
-                        a balance will automatically be created in the Cashier system. If the fee is ₱0, no balance is created.
-                    </p>
-                </div>
-            </div>
-        </div>
-        
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="bg-gray-50 border-b-2 border-gray-200">

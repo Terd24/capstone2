@@ -8,6 +8,7 @@ if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin')
 }
 
 require_once '../StudentLogin/db_conn.php';
+require_once '../includes/log_system_notification.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_hr_employee') {
     $employeeId = $_POST['employee_id'] ?? '';
@@ -39,6 +40,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $update_stmt->bind_param('sss', $deleted_by, $deletionReason, $employeeId);
         
         if ($update_stmt->execute()) {
+            // Log system notification for Owner
+            try {
+                $employee_name = $employee['first_name'] . ' ' . $employee['last_name'];
+                $notif_title = "HR Employee Account Deleted";
+                $notif_message = formatActionMessage('employee_deleted', $employee_name, $employeeId);
+                
+                $notif_result = logSystemNotification(
+                    $conn,
+                    $notif_title,
+                    $notif_message,
+                    'warning',
+                    'Super Admin',
+                    $deleted_by,
+                    'Super Admin',
+                    'employee_deleted',
+                    'employees',
+                    $employeeId,
+                    $employee,
+                    null
+                );
+                
+                if (!$notif_result) {
+                    error_log("Failed to log notification for employee delete: " . $employeeId);
+                }
+            } catch (Exception $notif_error) {
+                error_log("Error logging notification: " . $notif_error->getMessage());
+            }
+            
             echo json_encode([
                 'success' => true,
                 'message' => 'Employee deleted successfully and moved to Deleted Items'

@@ -3,6 +3,7 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 include(__DIR__ . "/../../StudentLogin/db_conn.php");
+include(__DIR__ . "/../../includes/log_system_notification.php");
 
 // Require registrar login
 if (!isset($_SESSION['registrar_id'])) {
@@ -575,6 +576,36 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
 
                 // All good: commit
                 $conn->commit();
+                
+                // Log system notification for Owner
+                $student_name = $first_name . ' ' . $last_name;
+                $registrar_name = $_SESSION['registrar_name'] ?? 'Registrar';
+                $notif_title = "New Student Account Added";
+                $notif_message = formatActionMessage('student_added', $student_name, $student_id);
+                
+                $new_data = [
+                    'name' => $student_name,
+                    'id_number' => $student_id,
+                    'grade_level' => $grade_level,
+                    'academic_track' => $academic_track,
+                    'enrollment_status' => $enrollment_status
+                ];
+                
+                logSystemNotification(
+                    $conn,
+                    $notif_title,
+                    $notif_message,
+                    'success',
+                    'Registrar',
+                    $registrar_name,
+                    'Registrar',
+                    'student_added',
+                    'student_account',
+                    $student_id,
+                    null,
+                    $new_data
+                );
+                
                 $_SESSION['success_msg'] = !empty($parent_username) ? "Student and parent accounts created successfully!" : "Student account created successfully!";
                 // Clear any lingering duplicate flags in session
                 $_SESSION['error_id'] = '';

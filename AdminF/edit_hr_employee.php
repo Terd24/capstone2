@@ -1,6 +1,7 @@
 <?php
 session_start();
 include("../StudentLogin/db_conn.php");
+include("../includes/log_system_notification.php");
 
 // Require Super Admin access
 if (!isset($_SESSION['role']) || strtolower($_SESSION['role']) !== 'superadmin') {
@@ -112,6 +113,42 @@ try {
 
     // Commit transaction
     $conn->commit();
+
+    // Log system notification for Owner
+    try {
+        $employee_name = $first_name . ' ' . $last_name;
+        $admin_name = $_SESSION['superadmin_name'] ?? 'Super Admin';
+        $notif_title = "HR Employee Account Edited";
+        $notif_message = formatActionMessage('employee_edited', $employee_name, $employee_id);
+        
+        $new_data = [
+            'name' => $employee_name,
+            'position' => $position,
+            'department' => $department,
+            'email' => $email
+        ];
+        
+        $notif_result = logSystemNotification(
+            $conn,
+            $notif_title,
+            $notif_message,
+            'info',
+            'Super Admin',
+            $admin_name,
+            'Super Admin',
+            'employee_edited',
+            'employees',
+            $employee_id,
+            null,
+            $new_data
+        );
+        
+        if (!$notif_result) {
+            error_log("Failed to log notification for employee edit: " . $employee_id);
+        }
+    } catch (Exception $notif_error) {
+        error_log("Error logging notification: " . $notif_error->getMessage());
+    }
 
     $_SESSION['success_msg'] = 'HR Employee information updated successfully!';
     echo json_encode(['success' => true, 'message' => 'HR Employee updated successfully', 'reload' => true]);

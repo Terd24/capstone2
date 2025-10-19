@@ -7,6 +7,7 @@ header("Pragma: no-cache");
 header("Expires: 0");
 
 include(__DIR__ . "/../../StudentLogin/db_conn.php");
+include(__DIR__ . "/../../includes/log_system_notification.php");
 
 // Require registrar login
 if (!isset($_SESSION['registrar_id'])) {
@@ -60,6 +61,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_student'])) {
     $conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) NULL");
     $conn->query("ALTER TABLE student_account ADD COLUMN IF NOT EXISTS deleted_reason TEXT NULL");
     
+    // Get student info before deleting for notification
+    $student_info_stmt = $conn->prepare("SELECT first_name, last_name, id_number FROM student_account WHERE id_number = ?");
+    $student_info_stmt->bind_param("s", $target_id);
+    $student_info_stmt->execute();
+    $student_info_result = $student_info_stmt->get_result();
+    $student_info = $student_info_result->fetch_assoc();
+    $student_info_stmt->close();
+    
     // Use soft delete - mark as deleted but keep in database
     $delete_stmt = $conn->prepare("UPDATE student_account SET deleted_at = NOW(), deleted_by = ?, deleted_reason = ? WHERE id_number = ?");
     $deleted_by = $_SESSION['registrar_name'] ?? 'Registrar';
@@ -67,6 +76,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_student'])) {
     $delete_stmt->bind_param("sss", $deleted_by, $deleted_reason, $target_id);
     
     if ($delete_stmt->execute()) {
+        // Log system notification for Owner
+        if ($student_info) {
+            $student_name = $student_info['first_name'] . ' ' . $student_info['last_name'];
+            $notif_title = "Student Account Deleted";
+            $notif_message = formatActionMessage('student_deleted', $student_name, $target_id);
+            logSystemNotification(
+                $conn,
+                $notif_title,
+                $notif_message,
+                'warning',
+                'Registrar',
+                $deleted_by,
+                'Registrar',
+                'student_deleted',
+                'student_account',
+                $target_id,
+                $student_info,
+                null
+            );
+        }
+        
         $_SESSION['success_msg'] = "Student account deleted successfully!";
         header("Location: /onecci/RegistrarF/AccountList.php");
         exit;
@@ -368,6 +398,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             $up_parent->execute();
             $up_parent->close();
         }
+        
+        // Log system notification for Owner
+        $student_name = $first_name . ' ' . $last_name;
+        $registrar_name = $_SESSION['registrar_name'] ?? 'Registrar';
+        $notif_title = "Student Account Edited";
+        $notif_message = formatActionMessage('student_edited', $student_name, $student_id);
+        
+        // Prepare new data for logging
+        $new_data = [
+            'name' => $student_name,
+            'grade_level' => $grade_level,
+            'academic_track' => $academic_track,
+            'enrollment_status' => $enrollment_status
+        ];
+        
+        logSystemNotification(
+            $conn,
+            $notif_title,
+            $notif_message,
+            'info',
+            'Registrar',
+            $registrar_name,
+            'Registrar',
+            'student_edited',
+            'student_account',
+            $student_id,
+            null,
+            $new_data
+        );
+        
         $_SESSION['success_msg'] = "Student information updated successfully!";
         header("Location: /onecci/RegistrarF/AccountList.php?type=student");
         exit;
