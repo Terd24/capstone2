@@ -987,7 +987,7 @@ $history_result = $conn->query($history_query);
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 overflow-auto">
+    <div class="flex-1 lg:ml-64">
         <!-- Top Header -->
         <header class="bg-white shadow-sm border-b border-gray-200">
             <div class="flex items-center justify-between px-6 py-4">
