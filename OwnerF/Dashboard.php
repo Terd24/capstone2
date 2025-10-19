@@ -908,21 +908,21 @@ $history_result = $conn->query($history_query);
 <body class="min-h-screen bg-gray-50 flex">
 
     <!-- Sidebar -->
-    <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#0B2C62] to-[#153e86] text-white transform -translate-x-full transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0">
-        <div class="flex items-center justify-between h-16 px-6 border-b border-white/10">
-            <div class="flex items-center gap-3">
-                <img src="../images/LogoCCI.png" class="h-8 w-8 rounded-full bg-white p-1" alt="Logo">
-                <div class="leading-tight">
-                    <div class="font-bold text-sm">Cornerstone College</div>
-                    <div class="text-xs text-blue-200">Owner Portal</div>
-                </div>
+    <div id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#0B2C62] to-[#153e86] text-white transform -translate-x-full transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto flex flex-col">
+        <!-- Header with Logo -->
+        <div class="flex items-center gap-3 h-16 px-6 border-b border-white/10 flex-shrink-0">
+            <img src="../images/LogoCCI.png" class="h-8 w-8 rounded-full bg-white p-1" alt="Logo">
+            <div class="leading-tight">
+                <div class="font-bold text-sm">Cornerstone College</div>
+                <div class="text-xs text-blue-200">Owner Portal</div>
             </div>
         </div>
         
-        <nav class="mt-8 px-4">
-            <div class="space-y-2">
+        <!-- Navigation - Flex grow to fill space -->
+        <nav class="flex-1 px-4 py-6">
+            <div class="space-y-1">
                 <!-- Dashboard -->
-                <a href="#dashboard" onclick="showSection('dashboard', event)" class="nav-item active flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                <a href="#dashboard" onclick="showSection('dashboard', event)" class="nav-item active flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
                     </svg>
@@ -932,7 +932,7 @@ $history_result = $conn->query($history_query);
                 <!-- Management Tools -->
                 <div class="pt-4">
                     <div class="text-xs font-semibold text-blue-200 uppercase tracking-wider px-4 mb-2">Management</div>
-                    <a href="#notifications" onclick="showSection('notifications', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                    <a href="#notifications" onclick="showSection('notifications', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h8v-2H4v2zM4 11h8V9H4v2z"/>
                         </svg>
@@ -941,7 +941,7 @@ $history_result = $conn->query($history_query);
                             <span class="bg-red-500 text-white text-xs rounded-full px-2 py-1 ml-auto"><?= $notif_stats['unread_notifications'] ?></span>
                         <?php endif; ?>
                     </a>
-                    <a href="#approval-requests" onclick="showSection('approval-requests', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                    <a href="#approval-requests" onclick="showSection('approval-requests', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -950,38 +950,44 @@ $history_result = $conn->query($history_query);
                             <span class="bg-yellow-500 text-white text-xs rounded-full px-2 py-1 ml-auto"><?= $stats['pending_requests'] ?></span>
                         <?php endif; ?>
                     </a>
-                    <a href="#request-history" onclick="showSection('request-history', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                    <a href="#request-history" onclick="showSection('request-history', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                         <span>Request History</span>
                     </a>
-                    
-                    <!-- User Info & Logout -->
-                    <div class="mt-6 pt-4 border-t border-white/10">
-                        <div class="flex items-center gap-3 mb-3 px-4">
-                            <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                                <span class="text-sm font-semibold"><?= substr($_SESSION['owner_name'] ?? 'OW', 0, 2) ?></span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['owner_name'] ?? 'School Owner') ?></div>
-                                <div class="text-xs text-blue-200">Owner</div>
-                            </div>
-                        </div>
-                        <a href="../StudentLogin/logout.php" class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 rounded-lg transition mx-4">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                            </svg>
-                            Logout
-                        </a>
-                    </div>
+                    <a href="#tuition-fees" onclick="showSection('tuition-fees', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Tuition Fees</span>
+                    </a>
                 </div>
             </div>
         </nav>
+        
+        <!-- User Info & Logout - Pinned to bottom -->
+        <div class="border-t border-white/10 p-4 flex-shrink-0">
+            <div class="flex items-center gap-3 px-2 mb-3">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-sm font-semibold"><?= substr($_SESSION['owner_name'] ?? 'OW', 0, 2) ?></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['owner_name'] ?? 'School Owner') ?></div>
+                    <div class="text-xs text-blue-200">Owner</div>
+                </div>
+            </div>
+            <a href="../StudentLogin/logout.php" class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 rounded-lg transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                Logout
+            </a>
+        </div>
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 lg:ml-0">
+    <div class="flex-1 overflow-auto">
         <!-- Top Header -->
         <header class="bg-white shadow-sm border-b border-gray-200">
             <div class="flex items-center justify-between px-6 py-4">
@@ -1479,6 +1485,25 @@ $history_result = $conn->query($history_query);
                 </div>
             </div>
 
+            <!-- Tuition Fees Section -->
+            <div id="tuition-fees-section" class="section-content hidden">
+                <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">💰 Tuition Fee Management</h2>
+                        <button onclick="showAddFeeModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
+                            + Add New Fee Structure
+                        </button>
+                    </div>
+
+                    <div id="tuition-fees-list" class="space-y-4">
+                        <div class="text-center py-8">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <p class="text-gray-600 mt-2">Loading tuition fees...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Request History Section -->
             <div id="request-history-section" class="section-content hidden">
                 <div class="bg-white rounded-xl card-shadow p-6 mb-6">
@@ -1589,9 +1614,15 @@ function showSection(sectionId, event) {
         'dashboard': 'Dashboard',
         'notifications': 'System Notifications',
         'approval-requests': 'Approval Requests',
-        'request-history': 'Request History'
+        'request-history': 'Request History',
+        'tuition-fees': 'Tuition Fee Management'
     };
     document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
+    
+    // Load tuition fees when section is shown
+    if (sectionId === 'tuition-fees') {
+        loadTuitionFees();
+    }
 }
 
 // Toggle notification details (expand/collapse)
@@ -2554,6 +2585,210 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener("pageshow", function(event) {
   if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
 });
+
+// ===== TUITION FEE MANAGEMENT =====
+function loadTuitionFees() {
+    fetch('ManageTuitionFees.php?action=get_fees')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayTuitionFees(data.fees);
+            }
+        })
+        .catch(error => console.error('Error loading tuition fees:', error));
+}
+
+function displayTuitionFees(fees) {
+    const container = document.getElementById('tuition-fees-list');
+    if (fees.length === 0) {
+        container.innerHTML = '<div class="text-center py-12 text-gray-500">No tuition fee structures found</div>';
+        return;
+    }
+    
+    // Group by school year
+    const grouped = {};
+    fees.forEach(fee => {
+        if (!grouped[fee.school_year]) grouped[fee.school_year] = [];
+        grouped[fee.school_year].push(fee);
+    });
+    
+    let html = '';
+    Object.keys(grouped).sort().reverse().forEach(year => {
+        html += `<div class="mb-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">School Year: ${year}</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
+        
+        grouped[year].forEach(fee => {
+            html += `
+                <div class="border rounded-lg p-4 hover:shadow-md transition">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-semibold text-gray-900">${fee.grade_level}</h4>
+                            <p class="text-sm text-gray-600">${fee.academic_track}</p>
+                        </div>
+                        <button onclick="editTuitionFee(${fee.id})" class="text-blue-600 hover:text-blue-800">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="space-y-1 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Tuition Fee:</span>
+                            <span class="font-medium">₱${parseFloat(fee.tuition_fee).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Other Fees:</span>
+                            <span class="font-medium">₱${parseFloat(fee.other_fees).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between border-t pt-1 mt-1">
+                            <span class="text-gray-800 font-semibold">Total:</span>
+                            <span class="font-bold text-blue-600">₱${parseFloat(fee.total_fee).toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        
+        html += `</div></div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+function showAddFeeModal() {
+    const modal = document.createElement('div');
+    modal.id = 'addFeeModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">Add Tuition Fee Structure</h3>
+            <form onsubmit="submitAddFee(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Grade Level</label>
+                        <input type="text" name="grade_level" required class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Academic Track</label>
+                        <input type="text" name="academic_track" required class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Tuition Fee</label>
+                        <input type="number" step="0.01" name="tuition_fee" required class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Other Fees</label>
+                        <input type="number" step="0.01" name="other_fees" required class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">School Year</label>
+                        <input type="text" name="school_year" placeholder="2024-2025" required class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeAddFeeModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Add</button>
+                </div>
+            </form>
+        </div>`;
+    document.body.appendChild(modal);
+}
+
+function closeAddFeeModal() {
+    const modal = document.getElementById('addFeeModal');
+    if (modal) modal.remove();
+}
+
+function submitAddFee(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    formData.append('action', 'add_fee');
+    
+    fetch('ManageTuitionFees.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeAddFeeModal();
+            loadTuitionFees();
+            alert('Tuition fee structure added successfully!');
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function editTuitionFee(id) {
+    // Get current fee data
+    fetch(`ManageTuitionFees.php?action=get_fees`)
+        .then(response => response.json())
+        .then(data => {
+            const fee = data.fees.find(f => f.id == id);
+            if (!fee) return;
+            
+            const modal = document.createElement('div');
+            modal.id = 'editFeeModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+                    <h3 class="text-xl font-bold mb-4">Edit Tuition Fee</h3>
+                    <form onsubmit="submitEditFee(event, ${id})">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Grade Level</label>
+                                <input type="text" value="${fee.grade_level}" readonly class="w-full border rounded-lg px-3 py-2 bg-gray-100">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Academic Track</label>
+                                <input type="text" value="${fee.academic_track}" readonly class="w-full border rounded-lg px-3 py-2 bg-gray-100">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Tuition Fee</label>
+                                <input type="number" step="0.01" name="tuition_fee" value="${fee.tuition_fee}" required class="w-full border rounded-lg px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Other Fees</label>
+                                <input type="number" step="0.01" name="other_fees" value="${fee.other_fees}" required class="w-full border rounded-lg px-3 py-2">
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mt-6">
+                            <button type="button" onclick="closeEditFeeModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">Cancel</button>
+                            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Update</button>
+                        </div>
+                    </form>
+                </div>`;
+            document.body.appendChild(modal);
+        });
+}
+
+function closeEditFeeModal() {
+    const modal = document.getElementById('editFeeModal');
+    if (modal) modal.remove();
+}
+
+function submitEditFee(event, id) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    formData.append('action', 'update_fee');
+    formData.append('id', id);
+    
+    fetch('ManageTuitionFees.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeEditFeeModal();
+            loadTuitionFees();
+            alert('Tuition fee updated successfully!');
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
 </script>
 
 </body>

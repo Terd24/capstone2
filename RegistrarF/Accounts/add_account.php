@@ -466,6 +466,42 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                     }
                 }
 
+                // AUTO-CREATE TUITION FEE RECORD FOR CASHIER
+                // Find the tuition fee structure for this student's grade level and academic track
+                $tuition_query = "SELECT * FROM tuition_fee_structure 
+                                  WHERE grade_level = ? 
+                                  AND academic_track = ? 
+                                  AND school_year = ? 
+                                  LIMIT 1";
+                $tuition_stmt = $conn->prepare($tuition_query);
+                $tuition_stmt->bind_param("sss", $grade_level, $academic_track, $school_year);
+                $tuition_stmt->execute();
+                $tuition_result = $tuition_stmt->get_result();
+                
+                if ($tuition_result->num_rows > 0) {
+                    $tuition_data = $tuition_result->fetch_assoc();
+                    $total_amount = $tuition_data['total_fee'];
+                    
+                    // Create student fee item record for tuition fee (for Cashier)
+                    $school_year_term = $school_year . ' - ' . $semester;
+                    $fee_type = 'Tuition Fee';
+                    $paid_amount = 0.00;
+                    
+                    $fee_sql = "INSERT INTO student_fee_items (
+                        id_number, 
+                        school_year_term, 
+                        fee_type, 
+                        amount, 
+                        paid
+                    ) VALUES (?, ?, ?, ?, ?)";
+                    
+                    $fee_stmt = $conn->prepare($fee_sql);
+                    $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $total_amount, $paid_amount);
+                    $fee_stmt->execute();
+                    $fee_stmt->close();
+                }
+                $tuition_stmt->close();
+
                 // All good: commit
                 $conn->commit();
                 $_SESSION['success_msg'] = !empty($parent_username) ? "Student and parent accounts created successfully!" : "Student account created successfully!";

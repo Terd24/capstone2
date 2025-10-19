@@ -1,0 +1,85 @@
+TUITION FEE INTEGRATION - COMPLETE
+=====================================
+
+This integration connects Registrar, Cashier, and Owner modules for automatic tuition fee management.
+
+HOW IT WORKS:
+-------------
+
+1. OWNER - Manages Tuition Fee Prices
+   - Navigate to Owner Dashboard → Tuition Fees section
+   - View all tuition fee structures by school year, grade level, and academic track
+   - Add new fee structures with tuition fee + other fees
+   - Edit existing fee structures to update prices
+   - File: OwnerF/ManageTuitionFees.php
+
+2. REGISTRAR - Creates Student Account
+   - When registrar adds a new student account via RegistrarF/Accounts/add_account.php
+   - System automatically:
+     a) Looks up the tuition fee structure matching:
+        - Student's grade level
+        - Student's academic track
+        - Student's school year
+     b) Creates a fee item record in student_fee_items table with:
+        - Fee Type: "Tuition Fee"
+        - Amount: Total fee from tuition_fee_structure
+        - Paid: 0.00 (unpaid initially)
+        - School Year Term: e.g., "2024-2025 - 1st Semester"
+
+3. CASHIER - Views and Collects Payment
+   - Cashier can immediately see the student's tuition balance
+   - Navigate to Cashier Dashboard → Search student by name/ID or scan RFID
+   - Student Balance tab shows:
+     - Tuition Fee with amount due
+     - Amount paid
+     - Remaining balance
+   - Cashier can record payments which update the "paid" amount
+   - Files: CashierF/Dashboard.php, CashierF/GetBalance.php
+
+DATABASE TABLES:
+----------------
+- tuition_fee_structure: Stores fee prices set by Owner
+  - Columns: grade_level, academic_track, tuition_fee, other_fees, total_fee, school_year
+  
+- student_fee_items: Stores individual student fee records
+  - Columns: id_number, school_year_term, fee_type, amount, paid
+  - Auto-created when registrar adds student
+
+WORKFLOW EXAMPLE:
+-----------------
+1. Owner sets: Grade 11 STEM = ₱45,000 tuition + ₱9,000 other fees = ₱54,000 total
+2. Registrar creates student: John Doe, Grade 11, STEM, 2024-2025, 1st Semester
+3. System automatically creates fee record: John Doe owes ₱54,000 for Tuition Fee
+4. Cashier sees: John Doe - Tuition Fee: ₱54,000 due, ₱0 paid, ₱54,000 balance
+5. Cashier records payment: ₱20,000 paid
+6. Balance updates: ₱54,000 due, ₱20,000 paid, ₱34,000 remaining
+
+BENEFITS:
+---------
+✅ No manual fee entry needed by cashier
+✅ Consistent pricing across all students
+✅ Owner has centralized control over tuition prices
+✅ Automatic fee creation when student is enrolled
+✅ Real-time balance tracking for cashier
+
+FILES MODIFIED/CREATED:
+-----------------------
+- OwnerF/Dashboard.php (Added Tuition Fees section)
+- OwnerF/ManageTuitionFees.php (NEW - API for fee management)
+- RegistrarF/Accounts/add_account.php (Added auto-create tuition fee logic)
+- CashierF/Dashboard.php (Already supports viewing fees)
+- CashierF/GetBalance.php (Already supports viewing fees)
+
+TESTING:
+--------
+1. Login as Owner → Go to Tuition Fees → Verify fee structures exist
+2. Login as Registrar → Add a new student → Check grade level and track match a fee structure
+3. Login as Cashier → Search for the new student → Verify Tuition Fee appears with correct amount
+4. Record a payment → Verify balance updates correctly
+
+NOTES:
+------
+- If no matching tuition fee structure exists for a student's grade/track/year, no fee is auto-created
+- Owner should ensure all grade levels and tracks have fee structures defined
+- Tuition fees are created per semester (e.g., 1st Semester, 2nd Semester)
+- Cashier can add additional fees manually if needed (books, uniforms, etc.)
