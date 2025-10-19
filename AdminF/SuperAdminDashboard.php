@@ -2393,7 +2393,9 @@ require_once 'includes/dashboard_data.php';
                         modal.remove();
                         showToast('✅ Employee deleted successfully and moved to Deleted Items', 'success');
                         closeHRModal();
-                        setTimeout(() => location.reload(), 1500);
+                        
+                        // Remove the row from the table dynamically
+                        removeHRAccountRow(employeeId);
                     } else {
                         showToast('Error: ' + data.message, 'error');
                         confirmBtn.disabled = false;
@@ -2984,12 +2986,41 @@ require_once 'includes/dashboard_data.php';
                     Creating Employee...
                 `;
                 
-                // Submit the form (this will create the employee and redirect back to HR accounts)
-                window.confirmationData.form.submit();
+                // Submit via AJAX for smooth experience
+                const formData = new FormData(window.confirmationData.form);
                 
-                // Close both modals
-                closeConfirmationModal();
-                closeAddHRModal();
+                fetch('add_hr_employee.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Close both modals
+                        closeConfirmationModal();
+                        closeAddHRModal();
+                        
+                        // Show success notification
+                        showNotification('HR Employee added successfully!', 'success');
+                        
+                        // Add new row to HR accounts table dynamically
+                        addHRAccountRow(data.employee);
+                        
+                        // Reset form
+                        window.confirmationData.form.reset();
+                    } else {
+                        // Show error notification
+                        showNotification('Error: ' + data.message, 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = 'Yes, Create Employee';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Yes, Create Employee';
+                    showNotification('Error creating employee. Please try again.', 'error');
+                });
             }
         }
 
@@ -3041,11 +3072,106 @@ require_once 'includes/dashboard_data.php';
             errorMessages.forEach(msg => msg.remove());
         }
 
+        function addHRAccountRow(employee) {
+            // Find the HR accounts table tbody
+            const hrSection = document.getElementById('hr-accounts-section');
+            if (!hrSection) return;
+            
+            const tbody = hrSection.querySelector('tbody');
+            if (!tbody) return;
+            
+            // Remove "no employees found" message if it exists
+            const noDataRow = tbody.querySelector('td[colspan="5"]');
+            if (noDataRow) {
+                noDataRow.parentElement.remove();
+            }
+            
+            // Format the full name
+            const fullName = [employee.first_name, employee.middle_name, employee.last_name]
+                .filter(n => n && n.trim())
+                .join(' ');
+            
+            // Format hire date
+            const hireDate = new Date(employee.hire_date);
+            const formattedDate = hireDate.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: '2-digit', 
+                year: 'numeric' 
+            });
+            
+            // Create new row
+            const newRow = document.createElement('tr');
+            newRow.className = 'hover:bg-[#0B2C62]/5 cursor-pointer transition-colors';
+            newRow.onclick = function() { viewHRAccount(employee.id_number); };
+            newRow.setAttribute('data-employee-id', employee.id_number);
+            
+            newRow.innerHTML = `
+                <td class="px-4 py-3 text-sm text-gray-900">${employee.id_number}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${fullName}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${employee.position || 'HR Staff'}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${employee.department || 'Human Resources'}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${formattedDate}</td>
+            `;
+            
+            // Add row to the top of the table
+            tbody.insertBefore(newRow, tbody.firstChild);
+            
+            // Update the total count badge
+            const countBadge = hrSection.querySelector('.bg-\\[\\#0B2C62\\]');
+            if (countBadge) {
+                const currentCount = parseInt(countBadge.textContent.match(/\d+/)[0]);
+                countBadge.textContent = `Total: ${currentCount + 1}`;
+            }
+        }
+
+        function removeHRAccountRow(employeeId) {
+            // Find the HR accounts table tbody
+            const hrSection = document.getElementById('hr-accounts-section');
+            if (!hrSection) return;
+            
+            const tbody = hrSection.querySelector('tbody');
+            if (!tbody) return;
+            
+            // Find and remove the row with matching employee ID
+            const rows = tbody.querySelectorAll('tr');
+            let rowFound = false;
+            
+            rows.forEach(row => {
+                const firstCell = row.querySelector('td:first-child');
+                if (firstCell && firstCell.textContent.trim() === employeeId) {
+                    row.remove();
+                    rowFound = true;
+                }
+            });
+            
+            // Update the total count badge
+            if (rowFound) {
+                const countBadge = hrSection.querySelector('.bg-\\[\\#0B2C62\\]');
+                if (countBadge) {
+                    const currentCount = parseInt(countBadge.textContent.match(/\d+/)[0]);
+                    const newCount = Math.max(0, currentCount - 1);
+                    countBadge.textContent = `Total: ${newCount}`;
+                }
+                
+                // Check if table is now empty and show "no employees" message
+                const remainingRows = tbody.querySelectorAll('tr');
+                if (remainingRows.length === 0) {
+                    const noDataRow = document.createElement('tr');
+                    noDataRow.innerHTML = `
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                            No HR employees found. Create HR employees to manage HR staff.
+                        </td>
+                    `;
+                    tbody.appendChild(noDataRow);
+                }
+            }
+        }
+
         function showNotification(message, type = 'info') {
             const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 z-[70] max-w-md w-full transform translate-x-full opacity-0 transition-all duration-300`;
+            notification.className = `fixed top-5 right-5 z-[9999] max-w-md w-full transform translate-x-full opacity-0 transition-all duration-300`;
             
-            const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
+            const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-emerald-500' : 'bg-blue-500';
             const icon = type === 'error' ? 
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>' :
                 type === 'success' ?
@@ -3053,13 +3179,13 @@ require_once 'includes/dashboard_data.php';
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>';
             
             notification.innerHTML = `
-                <div class="${bgColor} text-white px-6 py-4 rounded-lg shadow-lg">
+                <div class="${bgColor} text-white px-6 py-4 rounded-lg shadow-2xl">
                     <div class="flex items-center gap-3">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             ${icon}
                         </svg>
                         <span class="font-medium">${message}</span>
-                        <button onclick="this.parentElement.parentElement.parentElement.remove()" class="ml-auto text-white hover:text-gray-200">
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" class="ml-auto text-white hover:text-gray-200 transition">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -3075,7 +3201,7 @@ require_once 'includes/dashboard_data.php';
                 notification.classList.remove('translate-x-full', 'opacity-0');
             }, 100);
             
-            // Auto-hide after 5 seconds
+            // Auto-hide after 4 seconds
             setTimeout(() => {
                 if (notification.parentElement) {
                     notification.classList.add('translate-x-full', 'opacity-0');
@@ -3085,7 +3211,7 @@ require_once 'includes/dashboard_data.php';
                         }
                     }, 300);
                 }
-            }, 5000);
+            }, 4000);
         }
 
         function closeAddHRModal() {
@@ -3889,7 +4015,29 @@ function deletePermanently(recordId, recordType) {
         })();
         
         // Handle hash fragment on page load to show correct section
+        // Restore section BEFORE page renders to prevent flashing
+        (function() {
+            const savedSection = sessionStorage.getItem('currentSection') || 'dashboard';
+            const activeSection = sessionStorage.getItem('activeSection');
+            const sectionToShow = activeSection === 'deleted-items' ? 'deleted-items' : savedSection;
+            
+            // Inject CSS to hide all sections except the one we want
+            const style = document.createElement('style');
+            style.id = 'section-preload';
+            style.textContent = `
+                .section { display: none !important; }
+                #${sectionToShow}-section { display: block !important; }
+            `;
+            document.head.appendChild(style);
+        })();
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Remove preload styles
+            const preloadStyle = document.getElementById('section-preload');
+            if (preloadStyle) {
+                preloadStyle.remove();
+            }
+            
             // Set maintenance toggle based on current status
             const isMaintenanceMode = <?= $is_maintenance ? 'true' : 'false' ?>;
             const toggle = document.getElementById('maintenanceToggle');
@@ -4156,16 +4304,21 @@ function deletePermanently(recordId, recordType) {
     <style>
         .toast-success { background-color: #10b981; }
         .toast-error { background-color: #ef4444; }
+        #toast { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
     </style>
     <script>
         function showToast(message, type='success'){
             const t = document.getElementById('toast');
             const ti = document.getElementById('toastInner');
-            ti.className = 'px-4 py-3 rounded shadow-lg text-white ' + (type==='success'?'toast-success':'toast-error');
+            ti.className = 'px-6 py-4 rounded-lg shadow-2xl text-white ' + (type==='success'?'toast-success':'toast-error');
             ti.textContent = message;
             t.classList.remove('hidden');
             clearTimeout(window.__toastTimer);
-            window.__toastTimer = setTimeout(()=>{ t.classList.add('hidden'); }, 3000);
+            window.__toastTimer = setTimeout(()=>{ t.classList.add('hidden'); }, 4000);
         }
         
         // Pagination for Not Logged In Today sections

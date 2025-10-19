@@ -93,8 +93,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (!in_array($emailDomain, $allowedDomains)) {
             throw new Exception("Please use a valid email provider (Gmail, Yahoo, Outlook, etc.)");
         }
-        if (empty($phone) || !preg_match('/^[0-9]{11}$/', $phone)) {
-            throw new Exception("Phone must be exactly 11 digits (numbers only).");
+        // Clean phone number (remove +63 and formatting)
+        $phone_clean = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($phone_clean) == 12 && substr($phone_clean, 0, 2) == '63') {
+            // Convert +63 9XX XXX XXXX to 09XX XXX XXXX
+            $phone = '0' . substr($phone_clean, 2);
+        } else if (strlen($phone_clean) == 11 && substr($phone_clean, 0, 1) == '0') {
+            $phone = $phone_clean;
+        } else {
+            throw new Exception("Phone must be in format +63 9XX-XXX-XXXX or 09XX-XXX-XXXX");
         }
         if (empty($address)) {
             throw new Exception("Complete Address is required.");
@@ -179,17 +186,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Commit the transaction - add employee immediately without approval
         $conn->commit();
-        $_SESSION['success_msg'] = "HR Employee added successfully!";
+        
+        // Return JSON response for AJAX
+        echo json_encode([
+            'success' => true,
+            'message' => 'HR Employee added successfully!',
+            'employee' => [
+                'id_number' => $id_number,
+                'first_name' => $first_name,
+                'middle_name' => $middle_name,
+                'last_name' => $last_name,
+                'position' => $position,
+                'department' => $department,
+                'email' => $email,
+                'phone' => $phone,
+                'hire_date' => $hire_date,
+                'username' => $username ?? null
+            ]
+        ]);
+        exit;
 
     } catch (Exception $e) {
         $conn->rollback();
-        $_SESSION['error_msg'] = "Error: " . $e->getMessage();
+        
+        // Return JSON error response for AJAX
+        echo json_encode([
+            'success' => false,
+            'message' => $e->getMessage()
+        ]);
         error_log("HR Employee creation error: " . $e->getMessage());
         error_log("POST data: " . print_r($_POST, true));
+        exit;
     }
-
-    // Redirect back to dashboard
-    header("Location: SuperAdminDashboard.php");
-    exit;
 }
 ?>

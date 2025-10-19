@@ -213,7 +213,7 @@ $hr_accounts = $conn->query("
             <p class="text-amber-700 text-sm mt-2">As IT Personnel, HR management operations require School Owner approval. All actions will be logged and may require additional authorization.</p>
         </div>
 
-        <form method="POST" class="space-y-8">
+        <form id="hrAccountForm" method="POST" class="space-y-8">
             <input type="hidden" name="action" value="create_hr">
             
             <!-- Personal Information Section -->
@@ -344,7 +344,7 @@ $hr_accounts = $conn->query("
             </div>
             
             <div class="flex justify-end pt-4">
-                <button type="submit" class="bg-[#0B2C62] text-white px-10 py-4 rounded-xl hover:bg-blue-800 transition font-semibold text-lg shadow-lg">
+                <button type="submit" id="saveEmployeeBtn" class="bg-[#0B2C62] text-white px-10 py-4 rounded-xl hover:bg-blue-800 transition font-semibold text-lg shadow-lg">
                     Save Employee
                 </button>
             </div>
@@ -367,7 +367,7 @@ $hr_accounts = $conn->query("
                         <th class="px-4 py-2 text-left">Account Status</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="hrAccountsTableBody">
                     <?php if ($hr_accounts->num_rows > 0): ?>
                         <?php while ($hr = $hr_accounts->fetch_assoc()): ?>
                             <tr class="border-b hover:bg-blue-50 cursor-pointer transition-colors" onclick="viewEmployeeDetails('<?= htmlspecialchars($hr['id_number']) ?>')">
@@ -396,7 +396,7 @@ $hr_accounts = $conn->query("
                             </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
-                        <tr>
+                        <tr id="noRecordsRow">
                             <td colspan="6" class="px-4 py-6 text-center text-gray-500">No HR employees found</td>
                         </tr>
                     <?php endif; ?>
@@ -608,6 +608,104 @@ document.addEventListener('DOMContentLoaded', function() {
     accountFields.classList.remove('hidden');
     usernameField.required = true;
     passwordField.required = true;
+    
+    // Handle form submission with AJAX
+    const form = document.getElementById('hrAccountForm');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        const submitBtn = document.getElementById('saveEmployeeBtn');
+        
+        // Disable submit button
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        
+        fetch('ManageHRAccounts.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.text())
+        .then(html => {
+            // Parse the response to check for success
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const successMsg = doc.querySelector('.bg-green-50');
+            const errorMsg = doc.querySelector('.bg-red-50');
+            
+            if (successMsg) {
+                // Show success notification
+                showNotification('HR Employee added successfully!', 'success');
+                
+                // Add new row to table
+                const employeeId = formData.get('employee_id');
+                const firstName = formData.get('first_name');
+                const lastName = formData.get('last_name');
+                const position = formData.get('position');
+                const hireDate = formData.get('hire_date');
+                const username = formData.get('username');
+                const createAccount = formData.get('create_account');
+                
+                // Format hire date
+                const date = new Date(hireDate);
+                const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                // Remove "no records" row if it exists
+                const noRecordsRow = document.getElementById('noRecordsRow');
+                if (noRecordsRow) {
+                    noRecordsRow.remove();
+                }
+                
+                // Create new row
+                const tbody = document.getElementById('hrAccountsTableBody');
+                const newRow = document.createElement('tr');
+                newRow.className = 'border-b hover:bg-blue-50 cursor-pointer transition-colors';
+                newRow.onclick = function() { viewEmployeeDetails(employeeId); };
+                
+                newRow.innerHTML = `
+                    <td class="px-4 py-3">${employeeId}</td>
+                    <td class="px-4 py-3">${firstName} ${lastName}</td>
+                    <td class="px-4 py-3">${position}</td>
+                    <td class="px-4 py-3">
+                        ${createAccount && username ? username : '<span class="text-gray-400 italic">No account</span>'}
+                    </td>
+                    <td class="px-4 py-3">${formattedDate}</td>
+                    <td class="px-4 py-3">
+                        ${createAccount && username ? 
+                            '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Has Account</span>' : 
+                            '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No Account</span>'
+                        }
+                    </td>
+                `;
+                
+                // Add row to top of table
+                tbody.insertBefore(newRow, tbody.firstChild);
+                
+                // Reset form
+                form.reset();
+                checkbox.checked = true;
+                accountFields.classList.remove('hidden');
+                usernameField.required = true;
+                passwordField.required = true;
+                
+            } else if (errorMsg) {
+                const errorText = errorMsg.textContent.trim();
+                showNotification(errorText, 'error');
+            } else {
+                showNotification('An error occurred. Please try again.', 'error');
+            }
+            
+            // Re-enable submit button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Employee';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred. Please try again.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Employee';
+        });
+    });
 });
 <?php endif; ?>
 

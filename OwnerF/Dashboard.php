@@ -939,7 +939,7 @@ $module_stats_result = $conn->query($module_stats_query);
                                             
                                             <!-- View Details Button -->
                                             <div class="flex-shrink-0">
-                                                <button onclick="event.stopPropagation();" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm">
+                                                <button onclick="event.stopPropagation(); openRequestModal(<?= $request['id'] ?>);" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm">
                                                     View Details
                                                 </button>
                                             </div>
@@ -1072,7 +1072,11 @@ $module_stats_result = $conn->query($module_stats_query);
                                                                 </div>
                                                             <?php endif; ?>
                                                         <?php endif; ?>
-                                                        <?php if (isset($target_data['deletion_reason'])): ?>
+                                                        <?php 
+                                                        // Only show deletion reason for delete/archive requests, not restore requests
+                                                        $isRestoreRequest = strpos($request['request_type'], 'restore') !== false;
+                                                        if (isset($target_data['deletion_reason']) && !$isRestoreRequest): 
+                                                        ?>
                                                             <div class="p-3 bg-red-50 rounded-lg border-2 border-red-200">
                                                                 <div class="flex items-center gap-2 mb-2">
                                                                     <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1707,7 +1711,9 @@ function addRequestToList(request) {
             }
         }
         
-        if (targetData.deletion_reason) {
+        // Only show deletion reason for delete/archive requests, not restore requests
+        const isRestoreRequest = request.type.includes('restore');
+        if (targetData.deletion_reason && !isRestoreRequest) {
             detailsContent += `
                 <div class="p-3 bg-red-50 rounded-lg border-2 border-red-200">
                     <div class="flex items-center gap-2 mb-2">
