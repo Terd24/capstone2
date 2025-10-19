@@ -115,10 +115,6 @@ header("Expires: 0");
           onclick="searchStudent()"
           class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors"
         >Search</button>
-        <button onclick="showFeeTypeModal()" 
-                class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors">
-          Manage Fee Types
-        </button>
         <button id="scanQrBtn"
                 onclick="showQRScanner()"
                 class="inline-flex items-center gap-2 bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-medium transition-colors"
@@ -317,8 +313,8 @@ header("Expires: 0");
     </div>
   </div>
 
-  <!-- Fee Type Modal -->
-  <div id="feeTypeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <!-- Fee Type Modal - REMOVED: Fee management moved to Owner Dashboard -->
+  <!-- <div id="feeTypeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-6">
         <h3 class="text-xl font-bold text-gray-800">Manage Fee Types</h3>
@@ -383,7 +379,7 @@ header("Expires: 0");
         </div>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <!-- Add Balance Modal -->
   <div id="addBalanceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -980,6 +980,12 @@ $history_result = $conn->query($history_query);
                         </svg>
                         <span>Tuition Fees</span>
                     </a>
+                    <a href="#fee-types" onclick="showSection('fee-types', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                        </svg>
+                        <span>Fee Types</span>
+                    </a>
                 </div>
             </div>
         </nav>
@@ -1522,6 +1528,28 @@ $history_result = $conn->query($history_query);
                 </div>
             </div>
 
+            <!-- Fee Types Section -->
+            <div id="fee-types-section" class="section-content hidden">
+                <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">📋 Fee Types Management</h2>
+                            <p class="text-sm text-gray-600 mt-1">Manage additional fee types and their default amounts</p>
+                        </div>
+                        <button onclick="showAddFeeTypeModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
+                            + Add Fee Type
+                        </button>
+                    </div>
+
+                    <div id="fee-types-list" class="space-y-4">
+                        <div class="text-center py-8">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <p class="text-gray-600 mt-2">Loading fee types...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Request History Section -->
             <div id="request-history-section" class="section-content hidden">
                 <div class="bg-white rounded-xl card-shadow p-6 mb-6">
@@ -1633,13 +1661,19 @@ function showSection(sectionId, event) {
         'notifications': 'System Notifications',
         'approval-requests': 'Approval Requests',
         'request-history': 'Request History',
-        'tuition-fees': 'Tuition Fee Management'
+        'tuition-fees': 'Tuition Fee Management',
+        'fee-types': 'Fee Types Management'
     };
     document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
     
     // Load tuition fees when section is shown
     if (sectionId === 'tuition-fees') {
         loadTuitionFees();
+    }
+    
+    // Load fee types when section is shown
+    if (sectionId === 'fee-types') {
+        loadFeeTypes();
     }
 }
 
@@ -3264,6 +3298,263 @@ function submitEditFee(event, id) {
         }
     });
 }
+
+// ==================== FEE TYPES MANAGEMENT ====================
+
+function loadFeeTypes() {
+    fetch('ManageFeeTypes.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayFeeTypes(data.data);
+            } else {
+                document.getElementById('fee-types-list').innerHTML = `
+                    <div class="text-center py-8 text-red-600">
+                        <p>Error loading fee types: ${data.message}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading fee types:', error);
+            document.getElementById('fee-types-list').innerHTML = `
+                <div class="text-center py-8 text-red-600">
+                    <p>Error loading fee types</p>
+                </div>
+            `;
+        });
+}
+
+function displayFeeTypes(feeTypes) {
+    const container = document.getElementById('fee-types-list');
+    
+    if (feeTypes.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <p class="text-gray-500 text-lg">No fee types found</p>
+                <p class="text-gray-400 text-sm mt-2">Click "Add Fee Type" to create your first fee type</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b-2 border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fee Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Default Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+    `;
+    
+    feeTypes.forEach(fee => {
+        const createdDate = new Date(fee.created_at).toLocaleDateString();
+        const updatedDate = new Date(fee.updated_at).toLocaleDateString();
+        
+        html += `
+            <tr class="hover:bg-gray-50 transition">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${fee.fee_name}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">₱${parseFloat(fee.default_amount).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-500">${createdDate}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-500">${updatedDate}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <button onclick='editFeeType(${JSON.stringify(fee)})' class="text-blue-600 hover:text-blue-800 mr-3">
+                        <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>
+                    <button onclick="deleteFeeType(${fee.id}, '${fee.fee_name}')" class="text-red-600 hover:text-red-800">
+                        <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function showAddFeeTypeModal() {
+    const modal = document.createElement('div');
+    modal.id = 'fee-type-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Add New Fee Type</h3>
+            <form id="fee-type-form" onsubmit="saveFeeType(event)">
+                <input type="hidden" id="fee-type-id" name="id" value="">
+                <input type="hidden" name="action" value="add">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Fee Name *</label>
+                    <input type="text" name="fee_name" id="fee-name" required 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="e.g., Library Fee, Laboratory Fee">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Default Amount (₱) *</label>
+                    <input type="number" name="default_amount" id="fee-amount" required min="0" step="0.01"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="0.00">
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeFeeTypeModal()" 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Save Fee Type
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function editFeeType(fee) {
+    const modal = document.createElement('div');
+    modal.id = 'fee-type-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Edit Fee Type</h3>
+            <form id="fee-type-form" onsubmit="saveFeeType(event)">
+                <input type="hidden" id="fee-type-id" name="id" value="${fee.id}">
+                <input type="hidden" name="action" value="edit">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Fee Name *</label>
+                    <input type="text" name="fee_name" id="fee-name" required value="${fee.fee_name}"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Default Amount (₱) *</label>
+                    <input type="number" name="default_amount" id="fee-amount" required min="0" step="0.01" value="${fee.default_amount}"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeFeeTypeModal()" 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Update Fee Type
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeFeeTypeModal() {
+    const modal = document.getElementById('fee-type-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function saveFeeType(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    fetch('ManageFeeTypes.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeFeeTypeModal();
+            loadFeeTypes();
+            showNotification(data.message, 'success');
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving fee type:', error);
+        showNotification('Error saving fee type', 'error');
+    });
+}
+
+function deleteFeeType(id, name) {
+    if (!confirm(`Are you sure you want to delete "${name}"?\n\nThis will remove the fee type from the system.`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'delete');
+    formData.append('id', id);
+    
+    fetch('ManageFeeTypes.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadFeeTypes();
+            showNotification(data.message, 'success');
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting fee type:', error);
+        showNotification('Error deleting fee type', 'error');
+    });
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500' : 
+        type === 'error' ? 'bg-red-500' : 
+        'bg-blue-500'
+    } text-white`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
 </script>
 
 </body>
