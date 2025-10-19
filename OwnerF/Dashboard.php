@@ -694,8 +694,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                                 
                                 error_log("Database backup created: $filename");
                                 
-                                // Store filename in session for download
-                                $_SESSION['backup_file'] = $filename;
+                                // Update the approval request with the backup filename
+                                $updateStmt = $conn->prepare("UPDATE owner_approval_requests SET target_data = ? WHERE id = ?");
+                                $updatedTargetData = json_encode(['reason' => $target_data['reason'], 'requested_at' => $target_data['requested_at'], 'backup_filename' => $filename]);
+                                $updateStmt->bind_param('si', $updatedTargetData, $request_id);
+                                $updateStmt->execute();
+                                $updateStmt->close();
+                                
+                                error_log("Backup filename stored in approval request: $filename");
                                 
                             } catch (Exception $backup_ex) {
                                 error_log("ERROR in database_backup: " . $backup_ex->getMessage());

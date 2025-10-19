@@ -6211,6 +6211,27 @@ function deletePermanently(recordId, recordType) {
                     }
                 }
             }
+            
+            // Check if backup was approved and trigger download
+            if (data.approved_backup_filename) {
+                const downloadKey = `backup_downloaded_${data.approved_backup_filename}`;
+                
+                // Check if we haven't already triggered this download
+                if (!localStorage.getItem(downloadKey)) {
+                    console.log('Backup approved! Triggering download:', data.approved_backup_filename);
+                    
+                    // Trigger download
+                    window.location.href = `download_backup.php?file=${encodeURIComponent(data.approved_backup_filename)}`;
+                    
+                    // Mark as downloaded
+                    localStorage.setItem(downloadKey, 'true');
+                    
+                    // Clean up old download flags (older than 1 hour)
+                    setTimeout(() => {
+                        localStorage.removeItem(downloadKey);
+                    }, 3600000);
+                }
+            }
         } catch (error) {
             console.error('Error checking system config status:', error);
         }

@@ -44,6 +44,28 @@ if ($check_backup && $check_backup->num_rows > 0) {
     $pending_backup = true;
 }
 
+// Check for recently approved backup (within last 10 seconds) to trigger download
+$approved_backup_filename = null;
+$check_approved_backup = $conn->query("
+    SELECT id, target_data, reviewed_at
+    FROM owner_approval_requests 
+    WHERE requester_role = 'superadmin' 
+    AND request_type = 'database_backup'
+    AND status = 'approved'
+    AND reviewed_at > DATE_SUB(NOW(), INTERVAL 10 SECOND)
+    ORDER BY reviewed_at DESC
+    LIMIT 1
+");
+
+if ($check_approved_backup && $check_approved_backup->num_rows > 0) {
+    $backup_row = $check_approved_backup->fetch_assoc();
+    $backup_data = json_decode($backup_row['target_data'], true);
+    if (isset($backup_data['backup_filename'])) {
+        $approved_backup_filename = $backup_data['backup_filename'];
+        error_log("Approved backup ready for download: $approved_backup_filename");
+    }
+}
+
 // Get current maintenance mode status
 $current_maintenance = '0';
 $maintenance_result = $conn->query("SELECT config_value, updated_at FROM system_config WHERE config_key = 'maintenance_mode'");
@@ -60,6 +82,7 @@ echo json_encode([
     'pending_maintenance' => $pending_maintenance,
     'pending_backup' => $pending_backup,
     'current_maintenance_mode' => $current_maintenance,
+    'approved_backup_filename' => $approved_backup_filename,
     'debug' => [
         'has_config' => ($maintenance_result && $maintenance_result->num_rows > 0),
         'value' => $current_maintenance
