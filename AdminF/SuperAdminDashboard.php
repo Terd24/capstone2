@@ -1198,7 +1198,7 @@ require_once 'includes/dashboard_data.php';
                     </div>
                     
                     <div class="overflow-x-auto">
-                        <table class="min-w-full">
+                        <table id="deleted-students-table" class="min-w-full">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Info</th>
@@ -1308,7 +1308,7 @@ require_once 'includes/dashboard_data.php';
                     </div>
                     
                     <div class="overflow-x-auto">
-                        <table class="min-w-full">
+                        <table id="deleted-employees-table" class="min-w-full">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Info</th>
@@ -5652,12 +5652,19 @@ function deletePermanently(recordId, recordType) {
     // This prevents showing old approvals when refreshing the page
     
     // Start real-time polling for new approvals
+    // Track last check time for deletions
+    let lastDeletionCheckTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    let deletionCheckInterval;
+    
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Starting notification polling...');
         // Check immediately on load
         checkForNewApprovals();
+        checkForNewDeletions();
         // Then check for new approvals every 1 second for instant updates
         notificationCheckInterval = setInterval(checkForNewApprovals, 1000);
+        // Check for new deletions every 2 seconds
+        deletionCheckInterval = setInterval(checkForNewDeletions, 2000);
     });
     
     // Function to check for new approvals
@@ -5711,6 +5718,229 @@ function deletePermanently(recordId, recordType) {
         }
     }
     
+    // Function to check for new deletions
+    async function checkForNewDeletions() {
+        try {
+            console.log('Checking for new deletions since:', lastDeletionCheckTime);
+            const response = await fetch(`check_new_deletions.php?last_check=${encodeURIComponent(lastDeletionCheckTime)}`);
+            
+            if (!response.ok) {
+                console.error('Failed to check deletions:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            console.log('Deletion check response:', data);
+            
+            if (data.success) {
+                // Add new deleted students to the table
+                if (data.new_students && data.new_students.length > 0) {
+                    console.log('Found', data.new_students.length, 'new deleted students');
+                    data.new_students.forEach(student => {
+                        addDeletedStudentToTable(student);
+                    });
+                }
+                
+                // Add new deleted employees to the table
+                if (data.new_employees && data.new_employees.length > 0) {
+                    console.log('Found', data.new_employees.length, 'new deleted employees');
+                    data.new_employees.forEach(employee => {
+                        addDeletedEmployeeToTable(employee);
+                    });
+                }
+                
+                // Update last check time
+                lastDeletionCheckTime = data.current_time;
+            }
+        } catch (error) {
+            console.error('Error checking for deletions:', error);
+        }
+    }
+    
+    // Function to add a deleted student to the table
+    function addDeletedStudentToTable(student) {
+        const tbody = document.querySelector('#deleted-students-table tbody');
+        if (!tbody) {
+            console.log('Student table not found, might not be on Deleted Items page');
+            return;
+        }
+        
+        // Check if student already exists by checking both data-student-id-number and data-student-id
+        const existingRow = tbody.querySelector(`tr[data-student-id-number="${student.id_number}"]`);
+        if (existingRow) {
+            console.log('Student already in table:', student.id_number);
+            return;
+        }
+        
+        // Get initials
+        const initials = (student.first_name.charAt(0) + student.last_name.charAt(0)).toUpperCase();
+        
+        // Create new row
+        const row = document.createElement('tr');
+        row.setAttribute('data-student-id-number', student.id_number);
+        row.className = 'hover:bg-gray-50 transition-colors new-deletion-row';
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(-10px)';
+        row.style.transition = 'all 0.5s ease-out';
+        
+        const fullName = `${student.first_name} ${student.middle_name || ''} ${student.last_name}`.trim();
+        const deletedDate = new Date(student.deleted_at);
+        const formattedDate = deletedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + 
+                             deletedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        
+        row.innerHTML = `
+            <td class="px-6 py-4">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                        <span class="text-red-600 font-medium text-sm">${initials}</span>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">${fullName}</div>
+                        <div class="text-sm text-gray-500">ID: ${student.id_number}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4">
+                <div class="text-sm text-gray-900">${student.academic_track || 'N/A'}</div>
+                <div class="text-sm text-gray-500">${student.grade_level || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4">
+                <div class="text-sm text-gray-900">
+                    <div class="font-medium">${formattedDate}</div>
+                    <div class="text-gray-500">By: ${student.deleted_by || 'Unknown'}</div>
+                    ${student.deleted_reason ? `<div class="text-gray-500 text-xs mt-1">Reason: ${student.deleted_reason}</div>` : ''}
+                </div>
+            </td>
+            <td class="px-6 py-4 text-sm font-medium">
+                <div class="action-buttons-container" data-student-id="${student.id_number}">
+                    <div class="flex gap-2">
+                        <button onclick="restoreStudent('${student.id_number}')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Restore
+                        </button>
+                        <button onclick="archiveStudent('${student.id_number}')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                            </svg>
+                            Archive
+                        </button>
+                    </div>
+                </div>
+            </td>
+        `;
+        
+        // Insert at the beginning of the table
+        tbody.insertBefore(row, tbody.firstChild);
+        
+        // Animate in
+        setTimeout(() => {
+            row.style.opacity = '1';
+            row.style.transform = 'translateY(0)';
+        }, 100);
+        
+        // Remove highlight after 5 seconds
+        setTimeout(() => {
+            row.classList.remove('new-deletion-row');
+        }, 5000);
+        
+        // Update counts
+        updateDeletedCounts();
+    }
+    
+    // Function to add a deleted employee to the table
+    function addDeletedEmployeeToTable(employee) {
+        const tbody = document.querySelector('#deleted-employees-table tbody');
+        if (!tbody) {
+            console.log('Employee table not found, might not be on Deleted Items page');
+            return;
+        }
+        
+        // Check if employee already exists by checking data-employee-id-number
+        const existingRow = tbody.querySelector(`tr[data-employee-id-number="${employee.id_number}"]`);
+        if (existingRow) {
+            console.log('Employee already in table:', employee.id_number);
+            return;
+        }
+        
+        // Get initials
+        const initials = (employee.first_name.charAt(0) + employee.last_name.charAt(0)).toUpperCase();
+        
+        // Create new row
+        const row = document.createElement('tr');
+        row.setAttribute('data-employee-id-number', employee.id_number);
+        row.className = 'hover:bg-gray-50 transition-colors new-deletion-row';
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(-10px)';
+        row.style.transition = 'all 0.5s ease-out';
+        
+        const fullName = `${employee.first_name} ${employee.middle_name || ''} ${employee.last_name}`.trim();
+        const deletedDate = new Date(employee.deleted_at);
+        const formattedDate = deletedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + 
+                             deletedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        
+        row.innerHTML = `
+            <td class="px-6 py-4">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                        <span class="text-orange-600 font-medium text-sm">${initials}</span>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">${fullName}</div>
+                        <div class="text-sm text-gray-500">ID: ${employee.id_number}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4">
+                <div class="text-sm text-gray-900">${employee.position || 'N/A'}</div>
+                <div class="text-sm text-gray-500">${employee.department || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4">
+                <div class="text-sm text-gray-900">
+                    <div class="font-medium">${formattedDate}</div>
+                    <div class="text-gray-500">By: ${employee.deleted_by || 'Unknown'}</div>
+                    ${employee.deleted_reason ? `<div class="text-gray-500 text-xs mt-1">Reason: ${employee.deleted_reason}</div>` : ''}
+                </div>
+            </td>
+            <td class="px-6 py-4 text-sm font-medium">
+                <div class="action-buttons-container" data-employee-id="${employee.id_number}">
+                    <div class="flex gap-2">
+                        <button onclick="restoreEmployee('${employee.id_number}')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Restore
+                        </button>
+                        <button onclick="archiveEmployee('${employee.id_number}')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                            </svg>
+                            Archive
+                        </button>
+                    </div>
+                </div>
+            </td>
+        `;
+        
+        // Insert at the beginning of the table
+        tbody.insertBefore(row, tbody.firstChild);
+        
+        // Animate in
+        setTimeout(() => {
+            row.style.opacity = '1';
+            row.style.transform = 'translateY(0)';
+        }, 100);
+        
+        // Remove highlight after 5 seconds
+        setTimeout(() => {
+            row.classList.remove('new-deletion-row');
+        }, 5000);
+        
+        // Update counts
+        updateDeletedCounts();
+    }
+    
     // Function to remove approved record from table
     function removeApprovedRecordFromTable(approval) {
         console.log('Removing record from table:', approval.title);
@@ -5722,6 +5952,7 @@ function deletePermanently(recordId, recordType) {
         // For employees: find by data-employee-id attribute
         const isStudent = approval.type.includes('student');
         const isEmployee = approval.type.includes('employee');
+        const isArchive = approval.type.includes('archive');
         
         // Try to find and remove the row
         // We'll search by the name in the title
@@ -5742,6 +5973,11 @@ function deletePermanently(recordId, recordType) {
                             row.remove();
                             // Update counts after row is removed
                             updateDeletedCounts();
+                            
+                            // If this was an archive request, increment archived counts
+                            if (isArchive) {
+                                incrementArchivedCount('student');
+                            }
                         }, 500);
                     }
                 });
@@ -5758,10 +5994,44 @@ function deletePermanently(recordId, recordType) {
                             row.remove();
                             // Update counts after row is removed
                             updateDeletedCounts();
+                            
+                            // If this was an archive request, increment archived counts
+                            if (isArchive) {
+                                incrementArchivedCount('employee');
+                            }
                         }, 500);
                     }
                 });
             }
+        }
+    }
+    
+    // Function to increment archived counts in real-time
+    function incrementArchivedCount(type) {
+        console.log('Incrementing archived count for:', type);
+        
+        if (type === 'student') {
+            const studentCountEl = document.getElementById('archived-students-count');
+            if (studentCountEl) {
+                const currentCount = parseInt(studentCountEl.textContent) || 0;
+                studentCountEl.textContent = currentCount + 1;
+                console.log('Updated archived students count to:', currentCount + 1);
+            }
+        } else if (type === 'employee') {
+            const employeeCountEl = document.getElementById('archived-employees-count');
+            if (employeeCountEl) {
+                const currentCount = parseInt(employeeCountEl.textContent) || 0;
+                employeeCountEl.textContent = currentCount + 1;
+                console.log('Updated archived employees count to:', currentCount + 1);
+            }
+        }
+        
+        // Update total archived count
+        const totalCountEl = document.getElementById('total-archived-count');
+        if (totalCountEl) {
+            const currentTotal = parseInt(totalCountEl.textContent) || 0;
+            totalCountEl.textContent = currentTotal + 1;
+            console.log('Updated total archived count to:', currentTotal + 1);
         }
     }
     

@@ -229,6 +229,55 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                             error_log("Owner approving archive for student: $target_id");
                             $conn->begin_transaction();
                             
+                            // Ensure archived_students table exists
+                            $conn->query("CREATE TABLE IF NOT EXISTS archived_students (
+                                archive_id INT AUTO_INCREMENT PRIMARY KEY,
+                                original_id INT,
+                                lrn VARCHAR(50),
+                                password VARCHAR(255),
+                                academic_track VARCHAR(100),
+                                enrollment_status VARCHAR(50),
+                                school_type VARCHAR(50),
+                                last_name VARCHAR(100),
+                                first_name VARCHAR(100),
+                                middle_name VARCHAR(100),
+                                school_year VARCHAR(20),
+                                grade_level VARCHAR(50),
+                                semester VARCHAR(20),
+                                dob DATE,
+                                birthplace VARCHAR(255),
+                                gender VARCHAR(20),
+                                religion VARCHAR(100),
+                                credentials TEXT,
+                                payment_mode VARCHAR(50),
+                                address TEXT,
+                                father_name VARCHAR(100),
+                                father_occupation VARCHAR(100),
+                                father_contact VARCHAR(50),
+                                mother_name VARCHAR(100),
+                                mother_occupation VARCHAR(100),
+                                mother_contact VARCHAR(50),
+                                guardian_name VARCHAR(100),
+                                guardian_occupation VARCHAR(100),
+                                guardian_contact VARCHAR(50),
+                                last_school VARCHAR(255),
+                                last_school_year VARCHAR(20),
+                                id_number VARCHAR(50),
+                                username VARCHAR(100),
+                                rfid_uid VARCHAR(50),
+                                created_at DATETIME,
+                                class_schedule TEXT,
+                                deleted_at DATETIME,
+                                deleted_by VARCHAR(100),
+                                deleted_reason TEXT,
+                                must_change_password TINYINT(1) DEFAULT 0,
+                                archived_at DATETIME,
+                                archived_by VARCHAR(100),
+                                archive_reason TEXT,
+                                INDEX(id_number),
+                                INDEX(archived_at)
+                            )");
+                            
                             // Get full student data
                             $get_stmt = $conn->prepare("SELECT * FROM student_account WHERE id_number = ?");
                             $get_stmt->bind_param('s', $target_id);
@@ -237,6 +286,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                             
                             if ($student_result->num_rows > 0) {
                                 $student = $student_result->fetch_assoc();
+                                error_log("Found student to archive: " . $student['first_name'] . " " . $student['last_name']);
                                 
                                 // Insert into archive table
                                 $archive_stmt = $conn->prepare("INSERT INTO archived_students (
@@ -254,28 +304,67 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                                 $archived_by = $_SESSION['owner_name'] ?? 'Owner';
                                 $archive_reason = 'Approved by Owner: ' . $comments;
                                 
-                                $archive_stmt->bind_param("issssssssssssssssssssssssssssssssssssiss",
-                                    $student['id'], $student['lrn'], $student['password'], $student['academic_track'],
-                                    $student['enrollment_status'], $student['school_type'], $student['last_name'],
-                                    $student['first_name'], $student['middle_name'], $student['school_year'],
-                                    $student['grade_level'], $student['semester'], $student['dob'], $student['birthplace'],
-                                    $student['gender'], $student['religion'], $student['credentials'], $student['payment_mode'],
-                                    $student['address'], $student['father_name'], $student['father_occupation'],
-                                    $student['father_contact'], $student['mother_name'], $student['mother_occupation'],
-                                    $student['mother_contact'], $student['guardian_name'], $student['guardian_occupation'],
-                                    $student['guardian_contact'], $student['last_school'], $student['last_school_year'],
-                                    $student['id_number'], $student['username'], $student['rfid_uid'], $student['created_at'],
-                                    $student['class_schedule'], $student['deleted_at'], $student['deleted_by'],
-                                    $student['deleted_reason'], $student['must_change_password'], $archived_by, $archive_reason
+                                // Count: 41 parameters total (original_id=int, must_change_password=int, rest=strings)
+                                // Type string: i + 37s + i + 2s = 41 total
+                                $archive_stmt->bind_param("isssssssssssssssssssssssssssssssssssssiss",
+                                    $student['id'], 
+                                    $student['lrn'], 
+                                    $student['password'], 
+                                    $student['academic_track'],
+                                    $student['enrollment_status'], 
+                                    $student['school_type'], 
+                                    $student['last_name'],
+                                    $student['first_name'], 
+                                    $student['middle_name'], 
+                                    $student['school_year'],
+                                    $student['grade_level'], 
+                                    $student['semester'], 
+                                    $student['dob'], 
+                                    $student['birthplace'],
+                                    $student['gender'], 
+                                    $student['religion'], 
+                                    $student['credentials'], 
+                                    $student['payment_mode'],
+                                    $student['address'], 
+                                    $student['father_name'], 
+                                    $student['father_occupation'],
+                                    $student['father_contact'], 
+                                    $student['mother_name'], 
+                                    $student['mother_occupation'],
+                                    $student['mother_contact'], 
+                                    $student['guardian_name'], 
+                                    $student['guardian_occupation'],
+                                    $student['guardian_contact'], 
+                                    $student['last_school'], 
+                                    $student['last_school_year'],
+                                    $student['id_number'], 
+                                    $student['username'], 
+                                    $student['rfid_uid'], 
+                                    $student['created_at'],
+                                    $student['class_schedule'], 
+                                    $student['deleted_at'], 
+                                    $student['deleted_by'],
+                                    $student['deleted_reason'], 
+                                    $student['must_change_password'], 
+                                    $archived_by, 
+                                    $archive_reason
                                 );
                                 
                                 if ($archive_stmt->execute()) {
+                                    $archive_id = $conn->insert_id;
+                                    error_log("Successfully inserted into archived_students with ID: $archive_id");
+                                    
                                     // Delete from main table
                                     $delete_stmt = $conn->prepare("DELETE FROM student_account WHERE id_number = ?");
                                     $delete_stmt->bind_param('s', $target_id);
-                                    $delete_stmt->execute();
+                                    if ($delete_stmt->execute()) {
+                                        error_log("Successfully deleted student $target_id from student_account");
+                                    } else {
+                                        error_log("Failed to delete student from student_account: " . $delete_stmt->error);
+                                    }
                                     error_log("Archived and deleted student $target_id");
                                 } else {
+                                    error_log("Failed to execute archive_stmt: " . $archive_stmt->error);
                                     throw new Exception("Failed to archive student: " . $archive_stmt->error);
                                 }
                             } else {
@@ -1528,9 +1617,9 @@ function addRequestToList(request) {
     }
     
     // Check if "All caught up!" message is showing and remove it
-    const caughtUpMessage = requestsContainer.querySelector('.text-gray-500.text-center');
+    const caughtUpMessage = requestsContainer.querySelector('.text-center.py-12');
     if (caughtUpMessage) {
-        caughtUpMessage.closest('.bg-white').remove();
+        caughtUpMessage.remove();
     }
     
     // Priority colors matching PHP
