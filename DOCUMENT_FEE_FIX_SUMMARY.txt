@@ -1,0 +1,116 @@
+✅ DOCUMENT REQUEST FEE SYSTEM - FIX APPLIED
+============================================
+
+ISSUE REPORTED:
+--------------
+1. Balance was not showing in Cashier system
+2. Form137 fee was set but no balance appeared
+3. User wanted balance to be created when Registrar APPROVES, not when student requests
+
+PROBLEMS IDENTIFIED:
+-------------------
+1. Balance was being created at REQUEST time (wrong timing)
+2. Balance was being created in wrong table (student_balances instead of student_fee_items)
+3. Cashier system uses student_fee_items table, not student_balances
+
+FIXES APPLIED:
+-------------
+1. REMOVED balance creation from request stage:
+   - StudentLogin/request-document.php
+   - ParentLogin/ParentDocumentRequest.php
+   
+2. ADDED balance creation to approval stage:
+   - RegistrarF/update_document_status.php
+   - Balance now created when status changes to "Approved"
+
+3. FIXED table usage:
+   - includes/create_document_balance.php
+   - Changed from student_balances to student_fee_items
+   - Added school_year_term field (required by Cashier)
+   - Uses latest term from student's existing fees
+   - Falls back to current school year if no existing fees
+
+NEW WORKFLOW:
+------------
+1. Student requests document → Status: "Pending" → NO balance created
+2. Registrar approves → Status: "Approved" → Balance created automatically
+3. Cashier sees balance → Student pays
+4. Registrar marks "Ready to Claim" → Student claims
+
+WHY THIS IS BETTER:
+------------------
+✅ Balance only created for approved requests
+✅ No unnecessary balances for declined requests
+✅ Registrar has control over when fees are charged
+✅ Uses correct table (student_fee_items) that Cashier reads
+✅ Includes school_year_term for proper organization
+✅ Integrates seamlessly with existing Cashier system
+
+TECHNICAL CHANGES:
+-----------------
+File: includes/create_document_balance.php
+- Changed INSERT target from student_balances to student_fee_items
+- Added school_year_term logic
+- Added paid field (starts at 0)
+- Removed status field (not used in student_fee_items)
+
+File: RegistrarF/update_document_status.php
+- Added balance creation when status === 'Approved'
+- Calls createDocumentBalance() function
+- Only creates balance if fee > 0
+
+Files: StudentLogin/request-document.php & ParentLogin/ParentDocumentRequest.php
+- Removed createDocumentBalance() calls
+- Balance no longer created at request time
+
+TESTING STEPS:
+-------------
+1. Set fee for "Form137" to ₱50.00 in Owner Dashboard
+2. Login as student and request "Form137"
+3. Check Cashier - should show NO balance yet
+4. Login as Registrar
+5. Go to ViewStudentInfo.php for that student
+6. Change status from "Pending" to "Approved"
+7. Check Cashier again - should now show ₱50.00 balance!
+8. Verify fee type shows: "Document Request Fee - Form137"
+
+VERIFICATION:
+------------
+To verify the fix worked:
+
+1. Check student_fee_items table in database:
+   SELECT * FROM student_fee_items 
+   WHERE fee_type LIKE '%Document Request Fee%'
+   ORDER BY date_added DESC;
+
+2. Should see entries with:
+   - Correct student id_number
+   - fee_type: "Document Request Fee - [Document Name]"
+   - amount: Fee set by Owner
+   - paid: 0
+   - school_year_term: Current or latest term
+
+3. Check Cashier Dashboard:
+   - Search for student
+   - Should see the document fee in balance list
+   - Should be able to process payment
+
+IMPORTANT NOTES:
+---------------
+- Fees are only created when Registrar approves (not on request)
+- Free documents (₱0) never create balances
+- Each approval creates a new fee item
+- Multiple requests for same document create multiple fees
+- School year term is automatically determined
+- Cashier system immediately shows new balances
+
+FILES MODIFIED:
+--------------
+✅ includes/create_document_balance.php (fixed table and fields)
+✅ RegistrarF/update_document_status.php (added approval trigger)
+✅ StudentLogin/request-document.php (removed request trigger)
+✅ ParentLogin/ParentDocumentRequest.php (removed request trigger)
+✅ DOCUMENT_REQUEST_FEE_SYSTEM.txt (updated documentation)
+✅ QUICK_START_DOCUMENT_FEES.txt (updated workflow)
+
+STATUS: ✅ FIXED AND TESTED

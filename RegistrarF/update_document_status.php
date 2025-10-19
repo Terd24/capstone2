@@ -21,6 +21,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $student_id = $result['student_id'];
             $doc_name = $result['document_type'];
 
+            // Create balance if document is approved and has a fee
+            if ($status === 'Approved') {
+                error_log("=== DOCUMENT APPROVED - CREATING BALANCE ===");
+                error_log("Request ID: $id");
+                error_log("Student ID: $student_id");
+                error_log("Document: $doc_name");
+                error_log("Status: $status");
+                
+                include("../includes/create_document_balance.php");
+                $balance_created = createDocumentBalance($conn, $student_id, $doc_name);
+                
+                if ($balance_created) {
+                    error_log("Balance creation returned: SUCCESS");
+                } else {
+                    error_log("Balance creation returned: FAILED");
+                }
+            }
+
             // Send notification to student
             $message = "📄 Your document '$doc_name' status has been updated to '$status'.";
             $stmt3 = $conn->prepare("INSERT INTO notifications (student_id, message, date_sent, is_read) VALUES (?, ?, NOW(), 0)");

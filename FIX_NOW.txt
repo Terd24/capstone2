@@ -1,0 +1,95 @@
+🔧 IMMEDIATE FIX - Missing date_added Column
+============================================
+
+PROBLEM FOUND:
+-------------
+The error shows: "Unknown column 'date_added' in 'field list'"
+This means the student_fee_items table is missing the date_added column.
+
+SOLUTION (Choose ONE):
+---------------------
+
+OPTION 1: Run Fix Script (EASIEST - 30 seconds)
+-----------------------------------------------
+1. Open browser: http://localhost/onecci/fix_table_and_create_balance.php
+2. It will:
+   - Check table structure
+   - Add missing date_added column
+   - Create a test balance
+   - Show all balances
+3. Refresh Cashier page
+4. Balance should now appear!
+
+OPTION 2: Run SQL Manually (1 minute)
+-------------------------------------
+1. Open phpMyAdmin
+2. Select onecci_db database
+3. Click SQL tab
+4. Run this:
+
+-- Add missing column
+ALTER TABLE student_fee_items 
+ADD COLUMN date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- Verify it was added
+DESCRIBE student_fee_items;
+
+-- Create a test balance
+INSERT INTO student_fee_items 
+(id_number, student_name, grade_level, school_year_term, fee_type, amount, paid)
+VALUES 
+('02200000001', 'Gesterd Go', 'Grade 12', '2025-2026 1st Semester', 'Document Request Fee - Form137', 50.00, 0);
+
+-- Check if it was created
+SELECT * FROM student_fee_items 
+WHERE id_number = '02200000001' 
+ORDER BY id DESC LIMIT 1;
+
+5. Refresh Cashier page
+6. Should see the balance!
+
+OPTION 3: Quick SQL Fix (10 seconds)
+------------------------------------
+Just run this one line in phpMyAdmin SQL tab:
+
+ALTER TABLE student_fee_items ADD COLUMN date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+Then approve a document request again and it should work!
+
+VERIFICATION:
+------------
+After fixing, verify by:
+1. Login as Cashier
+2. Search for student: 02200000001 or "ges"
+3. Should see: "Document Request Fee - Form137: ₱50.00"
+4. If you see it, SUCCESS! ✅
+
+WHY THIS HAPPENED:
+-----------------
+The student_fee_items table was created without the date_added column,
+but our code expects it to exist. Adding the column fixes the issue.
+
+AFTER FIXING:
+------------
+Once the column is added:
+1. The automatic balance creation will work
+2. When Registrar approves a document request
+3. Balance will automatically appear in Cashier
+4. No more manual intervention needed!
+
+NEXT STEPS:
+----------
+1. Run Option 1 (fix_table_and_create_balance.php)
+2. Check if balance appears in Cashier
+3. If yes, test by:
+   - Creating new document request
+   - Approving it
+   - Checking if balance appears automatically
+4. If it works, you're done! ✅
+
+NEED HELP?
+---------
+If Option 1 doesn't work:
+- Check what error it shows
+- Try Option 2 (manual SQL)
+- Check PHP error log for details

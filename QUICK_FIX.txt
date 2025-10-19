@@ -1,0 +1,115 @@
+⚡ QUICK FIX - Balance Not Showing
+===================================
+
+TRY THESE IN ORDER:
+------------------
+
+FIX #1: Run Debug Scripts (2 minutes)
+-------------------------------------
+1. Open: http://localhost/onecci/check_term_format.php
+2. Look at section "4. Document Request Fees"
+3. If it says "No document request fees found" → Balance wasn't created
+4. Continue to Fix #2
+
+FIX #2: Manual Balance Creation (1 minute)
+------------------------------------------
+Open phpMyAdmin and run this SQL:
+
+-- Check student's current term
+SELECT school_year_term FROM student_fee_items 
+WHERE id_number = '02200000001' 
+ORDER BY school_year_term DESC LIMIT 1;
+
+-- If you get a term (e.g., "2025-2026 1st Semester"), use it below
+-- If no results, use "2025-2026 1st Semester"
+
+-- Create the balance manually
+INSERT INTO student_fee_items 
+(id_number, student_name, grade_level, school_year_term, fee_type, amount, paid, date_added)
+VALUES 
+('02200000001', 'Gesterd Go', 'Grade 12', '2025-2026 1st Semester', 'Document Request Fee - Form137', 50.00, 0, NOW());
+
+-- Verify it was created
+SELECT * FROM student_fee_items 
+WHERE id_number = '02200000001' 
+AND fee_type LIKE '%Form137%';
+
+3. Refresh Cashier page
+4. Search for student again
+5. Should now see the balance!
+
+FIX #3: If Manual Insert Worked (Fix the System)
+------------------------------------------------
+If the manual INSERT worked and you can see the balance in Cashier,
+then the automatic system has an issue. To fix:
+
+1. Check document name matches:
+   SELECT document_name FROM document_fees WHERE is_active = 1;
+   SELECT DISTINCT document_type FROM document_requests;
+   
+   They must match EXACTLY (case-sensitive!)
+
+2. Make sure status is "Approved" (capital A):
+   UPDATE document_requests 
+   SET status = 'Approved' 
+   WHERE id = [your_request_id];
+
+3. Test again by:
+   - Creating new document request
+   - Approving it
+   - Checking if balance appears
+
+FIX #4: Emergency - Bypass Automatic System
+-------------------------------------------
+If automatic system keeps failing, you can manually create balances:
+
+1. Student requests document
+2. Registrar approves
+3. Registrar manually runs this SQL:
+
+INSERT INTO student_fee_items 
+(id_number, student_name, grade_level, school_year_term, fee_type, amount, paid)
+SELECT 
+    sa.id_number,
+    CONCAT(sa.first_name, ' ', sa.last_name),
+    sa.grade_level,
+    (SELECT school_year_term FROM student_fee_items WHERE id_number = sa.id_number ORDER BY school_year_term DESC LIMIT 1),
+    CONCAT('Document Request Fee - ', dr.document_type),
+    df.fee_amount,
+    0
+FROM document_requests dr
+JOIN student_account sa ON dr.student_id = sa.id_number
+JOIN document_fees df ON dr.document_type = df.document_name
+WHERE dr.id = [REQUEST_ID]
+AND dr.status = 'Approved'
+AND df.is_active = 1
+AND df.fee_amount > 0;
+
+Replace [REQUEST_ID] with the actual request ID.
+
+VERIFICATION:
+------------
+After any fix, verify by:
+
+1. Login as Cashier
+2. Search: "ges" or "02200000001"
+3. Should see: "Document Request Fee - Form137: ₱50.00"
+4. Try processing a payment
+5. If it works, SUCCESS!
+
+MOST COMMON SOLUTION:
+--------------------
+90% of the time, the issue is:
+- Document name doesn't match exactly
+- Status is not exactly "Approved"
+- School year term mismatch
+
+Run check_term_format.php to see which one it is!
+
+NEED HELP?
+---------
+If none of these work:
+1. Run: http://localhost/onecci/debug_document_balance.php
+2. Copy all the output
+3. Check what it shows
+4. Look for any red error messages

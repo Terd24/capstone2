@@ -2,6 +2,21 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
+// ✅ Check if coming from URL with parameters - store in session and redirect to clean URL
+if (isset($_GET['student_id']) && isset($_GET['type'])) {
+    $_SESSION['view_student_id'] = $_GET['student_id'];
+    $_SESSION['view_doc_type'] = $_GET['type'];
+    header("Location: ViewStudentInfo.php");
+    exit;
+}
+
+// ✅ Handle tab switching
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['switch_tab'])) {
+    $_SESSION['view_doc_type'] = $_POST['switch_tab'];
+    header("Location: ViewStudentInfo.php");
+    exit;
+}
+
 // ✅ Handle Add Submitted Document
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_submitted'])) {
     $id_number     = $_POST['id_number'];
@@ -26,7 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_submitted'])) {
     $stmtNotif->bind_param("ss", $id_number, $message);
     $stmtNotif->execute();
     $stmtNotif->close();
-    header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=submitted");
+    
+    // Store in session and redirect to clean URL
+    $_SESSION['view_student_id'] = $id_number;
+    $_SESSION['view_doc_type'] = 'submitted';
+    header("Location: ViewStudentInfo.php");
     exit;
 }
 
@@ -40,9 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_requested'])) 
         $del->execute();
         $del->close();
     }
-    header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=requested");
+    
+    // Store in session and redirect to clean URL
+    $_SESSION['view_student_id'] = $id_number;
+    $_SESSION['view_doc_type'] = 'requested';
+    header("Location: ViewStudentInfo.php");
     exit;
 }
+
 // ✅ Handle Delete Submitted Document
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_submitted'])) {
     $id_number = $_POST['id_number'] ?? '';
@@ -95,12 +119,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_submitted'])) 
             }
         }
     }
-    header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=submitted");
+    
+    // Store in session and redirect to clean URL
+    $_SESSION['view_student_id'] = $id_number;
+    $_SESSION['view_doc_type'] = 'submitted';
+    header("Location: ViewStudentInfo.php");
     exit;
 }
 
-// ✅ Fetch Student Info
-$student_id = $_GET['student_id'] ?? '';
+// ✅ Get student info from session
+$student_id = $_SESSION['view_student_id'] ?? '';
 if (!$student_id) { 
     echo "No student selected."; 
     exit; 
@@ -120,7 +148,8 @@ if (!$student) {
     exit; 
 }
 
-$docType = $_GET['type'] ?? 'requested';
+// Get document type from session
+$docType = $_SESSION['view_doc_type'] ?? 'requested';
 
 // Load available document types for dropdown (dashboard-managed)
 $docTypes = [];
@@ -265,8 +294,19 @@ if ($docType === 'submitted') {
             });
         }
         function switchTab(type) {
-            const url = `ViewStudentInfo.php?student_id=<?= $student['id_number'] ?>&type=${type}`;
-            window.location.replace(url);
+            // Use POST to update session and redirect to clean URL
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'ViewStudentInfo.php';
+            
+            const typeInput = document.createElement('input');
+            typeInput.type = 'hidden';
+            typeInput.name = 'switch_tab';
+            typeInput.value = type;
+            
+            form.appendChild(typeInput);
+            document.body.appendChild(form);
+            form.submit();
         }
     </script>
 </head>
@@ -388,20 +428,6 @@ if ($docType === 'submitted') {
                                         if (!in_array($name, $submittedDocs)) {
                                             echo "<option value='".htmlspecialchars($name)."'>".htmlspecialchars($name)."</option>";
                                         }
-
-// ✅ Handle Delete Requested Document
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_requested'])) {
-    $id_number = $_POST['id_number'] ?? '';
-    $doc_id    = isset($_POST['doc_id']) ? intval($_POST['doc_id']) : 0;
-    if ($doc_id > 0 && $id_number !== '') {
-        $del = $conn->prepare("DELETE FROM document_requests WHERE id = ? AND student_id = ?");
-        $del->bind_param("is", $doc_id, $id_number);
-        $del->execute();
-        $del->close();
-    }
-    header("Location: ViewStudentInfo.php?student_id=" . urlencode($id_number) . "&type=requested");
-    exit;
-}
                                     endforeach;
                                   else:
                                     // Fallback to legacy list if no types configured yet

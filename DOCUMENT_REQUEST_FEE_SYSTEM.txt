@@ -1,0 +1,203 @@
+✅ DOCUMENT REQUEST FEE SYSTEM - COMPLETE
+==========================================
+
+OVERVIEW:
+--------
+When a student requests a document, if the Owner has set a fee for that 
+document type, a balance is automatically created in the Cashier system.
+If the fee is ₱0, no balance is created.
+
+NEW FILES CREATED:
+-----------------
+1. OwnerF/ManageDocumentFees.php
+   - Backend API for managing document request fees
+   - Fetches document types from document_types table
+   - Stores fees in document_fees table
+   - Handles GET (list fees) and POST (update fees)
+
+2. includes/create_document_balance.php
+   - Helper function to create balance when document is requested
+   - Checks if document has a fee > 0
+   - Creates entry in student_balances table
+   - Links to Cashier system
+
+FILES MODIFIED:
+--------------
+1. OwnerF/Dashboard.php
+   - Added "Document Fees" navigation menu item
+   - Added Document Fees section with table display
+   - Added JavaScript functions:
+     * loadDocumentFees() - Fetches and displays document fees
+     * displayDocumentFees() - Renders fees table
+     * editDocumentFee() - Shows edit modal
+     * saveDocumentFee() - Saves fee updates
+     * closeDocumentFeeModal() - Closes modal
+
+2. StudentLogin/request-document.php
+   - Added call to createDocumentBalance() after document request
+   - Automatically creates balance if fee > 0
+
+3. ParentLogin/ParentDocumentRequest.php
+   - Added call to createDocumentBalance() for parent requests
+   - Automatically creates balance if fee > 0
+
+DATABASE TABLES:
+---------------
+Table: document_fees
+Columns:
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - document_name (VARCHAR(100), UNIQUE, NOT NULL)
+  - fee_amount (DECIMAL(10,2), DEFAULT 0.00)
+  - is_active (BOOLEAN, DEFAULT TRUE)
+  - created_at (TIMESTAMP)
+  - updated_at (TIMESTAMP)
+  - INDEX on document_name
+  - INDEX on is_active
+
+Table: student_fee_items (existing, used by Cashier for storing fees)
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - id_number (student ID)
+  - student_name
+  - grade_level
+  - school_year_term (e.g., "2025-2026 1st Semester")
+  - fee_type (stores "Document Request Fee - [Document Name]")
+  - amount (total fee amount)
+  - paid (amount already paid, starts at 0)
+  - date_added (timestamp)
+
+HOW IT WORKS:
+------------
+1. OWNER SETS FEES:
+   - Owner logs in to Dashboard
+   - Clicks "Document Fees" in sidebar
+   - Sees list of all requestable document types
+   - Clicks "Edit Fee" for any document
+   - Sets fee amount (₱0 or higher)
+   - Saves
+
+2. STUDENT REQUESTS DOCUMENT:
+   - Student/Parent requests a document
+   - Request status: "Pending"
+   - No balance created yet
+
+3. REGISTRAR APPROVES REQUEST:
+   - Registrar changes status to "Approved"
+   - System checks if document has a fee in document_fees table
+   - If fee > ₱0:
+     * Creates entry in student_fee_items table
+     * Fee type: "Document Request Fee - [Document Name]"
+     * Amount: Fee set by Owner
+     * Paid: 0 (unpaid)
+   - If fee = ₱0:
+     * No balance created
+     * Document request proceeds normally
+
+4. CASHIER SEES BALANCE:
+   - Balance appears in Cashier system immediately after approval
+   - Student must pay before claiming document
+   - Cashier can process payment normally
+
+FEATURES:
+--------
+✅ Owner can set fees for any requestable document type
+✅ Fees are optional (₱0 = free)
+✅ Automatic balance creation when fee > 0
+✅ No balance created when fee = 0
+✅ Visual indicators (green badge = creates balance, gray = free)
+✅ Works for both student and parent requests
+✅ Integrates seamlessly with existing Cashier system
+✅ Clear instructions in UI
+
+USER INTERFACE:
+--------------
+Owner Dashboard > Document Fees:
+- Table showing all requestable documents
+- Current fee amount for each
+- Status badge (Creates Balance / Free)
+- Edit Fee button for each document
+- Modal for editing fees with validation
+- Info box explaining how the system works
+
+VALIDATION:
+----------
+✅ Fee amount must be non-negative
+✅ Only requestable documents are shown
+✅ Duplicate prevention (one fee per document)
+✅ Error handling for database operations
+✅ Success/error notifications
+
+INTEGRATION POINTS:
+------------------
+1. Document Types (document_types table)
+   - Source of truth for available documents
+   - Only is_requestable=1 documents shown
+
+2. Document Requests (document_requests table)
+   - Triggers balance creation
+   - Links document type to fee
+
+3. Student Balances (student_balances table)
+   - Stores the fee as a balance
+   - Cashier uses this for payment processing
+
+4. Cashier System
+   - Sees balances automatically
+   - Processes payments normally
+   - No changes needed to Cashier code
+
+WORKFLOW EXAMPLE:
+----------------
+1. Owner sets "Form 137" fee to ₱50.00
+2. Student requests "Form 137" (Status: Pending)
+3. Registrar reviews and approves request (Status: Approved)
+4. System automatically creates balance:
+   - Student: Juan Dela Cruz
+   - Fee Type: "Document Request Fee - Form 137"
+   - Amount: ₱50.00
+   - Paid: ₱0.00
+   - School Year Term: 2025-2026 1st Semester
+5. Cashier sees ₱50.00 balance for Juan
+6. Student pays ₱50.00
+7. Cashier marks as paid
+8. Registrar marks as "Ready to Claim"
+9. Student claims document (Status: Claimed)
+
+BENEFITS:
+--------
+✅ Automated fee collection
+✅ No manual balance entry needed
+✅ Transparent pricing for students
+✅ Owner has full control over fees
+✅ Flexible (can be free or paid)
+✅ Integrated with existing systems
+✅ Audit trail of all fees
+
+SECURITY:
+--------
+✅ Only Owner can set fees
+✅ Role-based access control
+✅ SQL injection prevention (prepared statements)
+✅ Input validation
+✅ Error logging
+
+TESTING CHECKLIST:
+-----------------
+□ Owner can view document fees list
+□ Owner can edit document fees
+□ Setting fee to ₱0 works (no balance created)
+□ Setting fee > ₱0 creates balance
+□ Student document request creates balance
+□ Parent document request creates balance
+□ Balance appears in Cashier system
+□ Cashier can process payment
+□ Multiple requests create multiple balances
+□ Free documents don't create balances
+
+NOTES:
+-----
+- Document types must be configured in Registrar Dashboard first
+- Only documents with is_requestable=1 are shown
+- Fees are stored per document type, not per request
+- Each request creates a separate balance entry
+- Balances are linked to student_id
+- Fee description includes document name for clarity

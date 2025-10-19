@@ -986,6 +986,12 @@ $history_result = $conn->query($history_query);
                         </svg>
                         <span>Fee Types</span>
                     </a>
+                    <a href="#document-fees" onclick="showSection('document-fees', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span>Document Fees</span>
+                    </a>
                 </div>
             </div>
         </nav>
@@ -1550,6 +1556,25 @@ $history_result = $conn->query($history_query);
                 </div>
             </div>
 
+            <!-- Document Fees Section -->
+            <div id="document-fees-section" class="section-content hidden">
+                <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">📄 Document Request Fees</h2>
+                            <p class="text-sm text-gray-600 mt-1">Set fees for document requests. If fee is ₱0, no balance will be created in Cashier.</p>
+                        </div>
+                    </div>
+
+                    <div id="document-fees-list" class="space-y-4">
+                        <div class="text-center py-8">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <p class="text-gray-600 mt-2">Loading document fees...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Request History Section -->
             <div id="request-history-section" class="section-content hidden">
                 <div class="bg-white rounded-xl card-shadow p-6 mb-6">
@@ -1662,7 +1687,8 @@ function showSection(sectionId, event) {
         'approval-requests': 'Approval Requests',
         'request-history': 'Request History',
         'tuition-fees': 'Tuition Fee Management',
-        'fee-types': 'Fee Types Management'
+        'fee-types': 'Fee Types Management',
+        'document-fees': 'Document Request Fees'
     };
     document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
     
@@ -1674,6 +1700,11 @@ function showSection(sectionId, event) {
     // Load fee types when section is shown
     if (sectionId === 'fee-types') {
         loadFeeTypes();
+    }
+    
+    // Load document fees when section is shown
+    if (sectionId === 'document-fees') {
+        loadDocumentFees();
     }
 }
 
@@ -3553,6 +3584,188 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.remove();
     }, 3000);
+}
+
+// ==================== DOCUMENT FEES MANAGEMENT ====================
+
+function loadDocumentFees() {
+    fetch('ManageDocumentFees.php?action=list')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayDocumentFees(data.data);
+            } else {
+                document.getElementById('document-fees-list').innerHTML = `
+                    <div class="text-center py-8 text-red-600">
+                        <p>Error loading document fees: ${data.message}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading document fees:', error);
+            document.getElementById('document-fees-list').innerHTML = `
+                <div class="text-center py-8 text-red-600">
+                    <p>Error loading document fees</p>
+                </div>
+            `;
+        });
+}
+
+function displayDocumentFees(documentFees) {
+    const container = document.getElementById('document-fees-list');
+    
+    if (documentFees.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <p class="text-gray-500 text-lg">No document types found</p>
+                <p class="text-gray-400 text-sm mt-2">Add document types in the Registrar Dashboard first</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        <strong>How it works:</strong> When a student requests a document with a fee > ₱0, 
+                        a balance will automatically be created in the Cashier system. If the fee is ₱0, no balance is created.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b-2 border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Document Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fee Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+    `;
+    
+    documentFees.forEach(doc => {
+        const feeAmount = parseFloat(doc.fee_amount);
+        const statusBadge = feeAmount > 0 
+            ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Creates Balance</span>'
+            : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Free</span>';
+        
+        html += `
+            <tr class="hover:bg-gray-50 transition">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${doc.document_name}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">₱${feeAmount.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    ${statusBadge}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <button onclick='editDocumentFee("${doc.document_name}", ${feeAmount})' 
+                            class="text-blue-600 hover:text-blue-800 font-medium">
+                        Edit Fee
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function editDocumentFee(documentName, currentFee) {
+    const modal = document.createElement('div');
+    modal.id = 'document-fee-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Set Document Fee</h3>
+            <form id="document-fee-form" onsubmit="saveDocumentFee(event)">
+                <input type="hidden" name="action" value="update_fee">
+                <input type="hidden" name="document_name" value="${documentName}">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Document Name</label>
+                    <input type="text" value="${documentName}" disabled
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Fee Amount (₱) *</label>
+                    <input type="number" name="fee_amount" id="doc-fee-amount" required min="0" step="0.01" value="${currentFee}"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="0.00">
+                    <p class="text-xs text-gray-500 mt-1">Set to ₱0 if this document should be free (no balance created)</p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeDocumentFeeModal()" 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Save Fee
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeDocumentFeeModal() {
+    const modal = document.getElementById('document-fee-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function saveDocumentFee(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    fetch('ManageDocumentFees.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeDocumentFeeModal();
+            loadDocumentFees();
+            showNotification(data.message, 'success');
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving document fee:', error);
+        showNotification('Error saving document fee', 'error');
+    });
 }
 
 </script>

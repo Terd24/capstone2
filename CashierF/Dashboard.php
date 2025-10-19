@@ -314,7 +314,8 @@ header("Expires: 0");
   </div>
 
   <!-- Fee Type Modal - REMOVED: Fee management moved to Owner Dashboard -->
-  <!-- <div id="feeTypeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <!--
+  <div id="feeTypeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-6">
         <h3 class="text-xl font-bold text-gray-800">Manage Fee Types</h3>
@@ -324,11 +325,9 @@ header("Expires: 0");
           </svg>
         </button>
       </div>
-      <!-- MESSAGES MOVED TO TOP FOR VISIBILITY -->
       <div id="feeTypeError" class="hidden mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm"></div>
       <div id="feeTypeSuccess" class="hidden mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg text-sm"></div>
       
-      <!-- Add New Fee Type Form -->
       <div class="mb-6 p-4 bg-gray-50 rounded-lg">
         <h4 class="text-lg font-semibold mb-4">Add New Fee Type</h4>
         <form id="addFeeTypeForm" onsubmit="submitFeeType(event); return false;">
@@ -352,7 +351,6 @@ header("Expires: 0");
         </form>
       </div>
       
-      <!-- Existing Fee Types List -->
       <div>
         <h4 class="text-lg font-semibold mb-4">Existing Fee Types</h4>
         <div id="feeTypesList" class="space-y-2">
@@ -362,7 +360,6 @@ header("Expires: 0");
     </div>
   </div>
 
-  <!-- Delete Confirmation Modal (matches Registrar style) -->
   <div id="feeTypeDeleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
     <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4">
       <div class="text-center">
