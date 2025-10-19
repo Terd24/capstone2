@@ -872,17 +872,22 @@ $deleted_employees_count = $deleted_employees_result ? $deleted_employees_result
 
 $total_deleted_accounts = $deleted_students_count + $deleted_employees_count;
 
-// Get module activity statistics
-$module_stats_query = "SELECT 
-    module,
-    user_role,
-    COUNT(*) as activity_count,
-    MAX(created_at) as last_activity
-FROM system_notifications 
-WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-GROUP BY module, user_role
-ORDER BY activity_count DESC";
-$module_stats_result = $conn->query($module_stats_query);
+// Initial load - get first page of request history (will be replaced by AJAX)
+$history_page = 1;
+$history_filter = 'all';
+$history_per_page = 10;
+$history_offset = 0;
+
+// Get total count for initial display
+$history_count_query = "SELECT COUNT(*) as total FROM owner_approval_requests WHERE status IN ('approved', 'rejected')";
+$history_count_result = $conn->query($history_count_query);
+$history_total = $history_count_result->fetch_assoc()['total'];
+$history_total_pages = ceil($history_total / $history_per_page);
+
+// Get first page results
+$history_query = "SELECT * FROM owner_approval_requests WHERE status IN ('approved', 'rejected') ORDER BY reviewed_at DESC LIMIT $history_per_page";
+$history_result = $conn->query($history_query);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -945,11 +950,11 @@ $module_stats_result = $conn->query($module_stats_query);
                             <span class="bg-yellow-500 text-white text-xs rounded-full px-2 py-1 ml-auto"><?= $stats['pending_requests'] ?></span>
                         <?php endif; ?>
                     </a>
-                    <a href="#module-activity" onclick="showSection('module-activity', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
+                    <a href="#request-history" onclick="showSection('request-history', event)" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <span>Module Activity</span>
+                        <span>Request History</span>
                     </a>
                     
                     <!-- User Info & Logout -->
@@ -1474,57 +1479,51 @@ $module_stats_result = $conn->query($module_stats_query);
                 </div>
             </div>
 
-            <!-- Module Activity Section -->
-            <div id="module-activity-section" class="section-content hidden">
+            <!-- Request History Section -->
+            <div id="request-history-section" class="section-content hidden">
                 <div class="bg-white rounded-xl card-shadow p-6 mb-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold text-gray-800">📊 Module Activity</h2>
-                        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-                            Last 7 Days
-                        </span>
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">📜 Request History</h2>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <!-- Filter Dropdown -->
+                            <div class="flex items-center gap-2">
+                                <label for="history-filter" class="text-sm font-medium text-gray-700">Filter:</label>
+                                <select id="history-filter" onchange="filterHistory(this.value)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                    <option value="all">All (<?= $stats['approved_requests'] + $stats['rejected_requests'] ?>)</option>
+                                    <option value="approved">Approved (<?= $stats['approved_requests'] ?>)</option>
+                                    <option value="rejected">Rejected (<?= $stats['rejected_requests'] ?>)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Summary Badges -->
+                            <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+                                <?= $stats['approved_requests'] ?> Approved
+                            </span>
+                            <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-medium">
+                                <?= $stats['rejected_requests'] ?> Rejected
+                            </span>
+                        </div>
                     </div>
 
-                    <div class="space-y-4">
-                        <?php if ($module_stats_result && $module_stats_result->num_rows > 0): ?>
-                            <?php while ($module = $module_stats_result->fetch_assoc()): ?>
-                                <div class="border rounded-lg p-4 hover:bg-gray-50 transition">
-                                    <div class="flex justify-between items-center">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-semibold text-gray-900"><?= htmlspecialchars($module['module']) ?></h3>
-                                                <p class="text-sm text-gray-600">
-                                                    Role: <?= ucfirst($module['user_role']) ?> • 
-                                                    Last Activity: <?= date('M j, Y g:i A', strtotime($module['last_activity'])) ?>
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div class="text-right">
-                                            <div class="text-2xl font-bold text-gray-900"><?= $module['activity_count'] ?></div>
-                                            <div class="text-sm text-gray-500">Activities</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <div class="text-center py-12">
-                                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                                </svg>
-                                <p class="text-gray-500 text-lg font-medium">No recent activity</p>
-                                <p class="text-gray-400 text-sm">Module activity from the last 7 days will appear here</p>
-                            </div>
-                        <?php endif; ?>
+                    <!-- Results Info -->
+                    <div id="history-results-info" class="mb-4 text-sm text-gray-600">
+                        Showing <?= $history_result->num_rows > 0 ? $history_offset + 1 : 0 ?> - <?= min($history_offset + $history_result->num_rows, $history_total) ?> of <?= $history_total ?> requests
                     </div>
+
+                    <!-- Loading Indicator -->
+                    <div id="history-loading" class="hidden text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <p class="text-gray-600 mt-2">Loading...</p>
+                    </div>
+
+                    <div id="history-container" class="space-y-4">
+                        <!-- Initial content will be replaced by AJAX -->
+                    </div>
+
+                    <!-- Pagination Controls (Dynamic) -->
+                    <div id="history-pagination" class="mt-6"></div>
                 </div>
             </div>
-
-
-
 
 <!-- Success/Error Notifications -->
 <?php if (!empty($success_msg)): ?>
@@ -1590,7 +1589,7 @@ function showSection(sectionId, event) {
         'dashboard': 'Dashboard',
         'notifications': 'System Notifications',
         'approval-requests': 'Approval Requests',
-        'module-activity': 'Module Activity'
+        'request-history': 'Request History'
     };
     document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
 }
@@ -1774,6 +1773,299 @@ function submitApproval() {
     form.submit();
 }
 
+// Request History AJAX Functions
+let currentHistoryPage = 1;
+let currentHistoryFilter = 'all';
+let historyTotalPages = <?= $history_total_pages ?>;
+let requestsData = {};
+
+// Load request history via AJAX
+async function loadRequestHistory(page = 1, filter = 'all') {
+    const container = document.getElementById('history-container');
+    const loading = document.getElementById('history-loading');
+    const resultsInfo = document.getElementById('history-results-info');
+    const pagination = document.getElementById('history-pagination');
+    
+    // Show loading
+    container.classList.add('hidden');
+    loading.classList.remove('hidden');
+    
+    try {
+        const formData = new FormData();
+        formData.append('page', page);
+        formData.append('filter', filter);
+        
+        const response = await fetch('get_request_history.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error('Failed to load history');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Store requests data for modal access
+            requestsData = {};
+            data.requests.forEach(request => {
+                requestsData[request.id] = request;
+            });
+            
+            // Update state
+            currentHistoryPage = data.pagination.current_page;
+            currentHistoryFilter = filter;
+            historyTotalPages = data.pagination.total_pages;
+            
+            // Update results info
+            const start = data.pagination.offset + 1;
+            const end = Math.min(data.pagination.offset + data.requests.length, data.pagination.total_records);
+            resultsInfo.textContent = `Showing ${data.requests.length > 0 ? start : 0} - ${end} of ${data.pagination.total_records} requests`;
+            
+            // Render requests
+            container.innerHTML = renderRequests(data.requests);
+            
+            // Render pagination
+            pagination.innerHTML = renderPagination(data.pagination);
+            
+            // Show container
+            container.classList.remove('hidden');
+            loading.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Error loading history:', error);
+        container.innerHTML = '<div class="text-center py-12 text-red-600">Error loading request history. Please try again.</div>';
+        container.classList.remove('hidden');
+        loading.classList.add('hidden');
+    }
+}
+
+// Render requests HTML
+function renderRequests(requests) {
+    if (requests.length === 0) {
+        return `
+            <div class="text-center py-12">
+                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-gray-500 text-lg font-medium">No request history</p>
+                <p class="text-gray-400 text-sm">Approved and rejected requests will appear here</p>
+            </div>
+        `;
+    }
+    
+    return requests.map(request => {
+        const isApproved = request.status === 'approved';
+        const statusColor = isApproved ? 'green' : 'red';
+        const statusIcon = isApproved ? '✅' : '❌';
+        const statusText = isApproved ? 'Approved' : 'Rejected';
+        
+        // Calculate time difference
+        const requestedTime = new Date(request.requested_at).getTime();
+        const reviewedTime = new Date(request.reviewed_at).getTime();
+        const timeDiff = (reviewedTime - requestedTime) / 1000; // seconds
+        
+        const hours = Math.floor(timeDiff / 3600);
+        const minutes = Math.floor((timeDiff % 3600) / 60);
+        const timeToReview = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        
+        const requestedAt = new Date(request.requested_at).toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true 
+        });
+        const reviewedAt = new Date(request.reviewed_at).toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true 
+        });
+        
+        return `
+            <div class="border-2 border-${statusColor}-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
+                <div class="bg-${statusColor}-50 p-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4 flex-1">
+                            <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0">
+                                <span class="text-2xl">${statusIcon}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-${statusColor}-100 text-${statusColor}-800 shadow-sm">
+                                        ${statusText.toUpperCase()}
+                                    </span>
+                                    <span class="px-2 py-1 rounded bg-white text-xs font-medium text-gray-600 shadow-sm">
+                                        ${request.request_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    </span>
+                                </div>
+                                <h3 class="font-bold text-gray-900 text-base mb-2">${escapeHtml(request.request_title)}</h3>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex items-center gap-2 text-gray-600">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                        </svg>
+                                        <span class="font-medium">Requested by:</span>
+                                        <span>${escapeHtml(request.requester_name)}</span>
+                                        <span class="text-gray-400">•</span>
+                                        <span class="text-blue-600">${request.requester_role.charAt(0).toUpperCase() + request.requester_role.slice(1)}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-gray-600">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <span class="font-medium">Requested:</span>
+                                        <span>${requestedAt}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-${statusColor}-700 font-medium">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <span class="font-medium">${statusText}:</span>
+                                        <span>${reviewedAt}</span>
+                                        <span class="text-gray-400">•</span>
+                                        <span class="bg-white px-2 py-0.5 rounded text-xs">${timeToReview} to review</span>
+                                    </div>
+                                    ${request.reviewed_by ? `
+                                    <div class="flex items-center gap-2 text-gray-600">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <span class="font-medium">Reviewed by:</span>
+                                        <span>${escapeHtml(request.reviewed_by)}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                ${request.owner_comments ? `
+                                <div class="mt-3 bg-white rounded-lg p-3 border border-${statusColor}-200">
+                                    <div class="flex items-start gap-2">
+                                        <svg class="w-4 h-4 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                                        </svg>
+                                        <div class="flex-1">
+                                            <p class="text-xs font-semibold text-gray-700 mb-1">Owner Comments:</p>
+                                            <p class="text-sm text-gray-600 italic">"${escapeHtml(request.owner_comments)}"</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <button onclick="alert('View Details - Request ID: ${request.id}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render pagination HTML
+function renderPagination(pagination) {
+    if (pagination.total_pages <= 1) return '';
+    
+    const currentPage = pagination.current_page;
+    const totalPages = pagination.total_pages;
+    
+    let html = `
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200">
+            <div class="text-sm text-gray-600">
+                Page ${currentPage} of ${totalPages}
+            </div>
+            <div class="flex items-center gap-2">
+    `;
+    
+    // First page button
+    if (currentPage > 1) {
+        html += `
+            <button onclick="goToHistoryPage(1)" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+                </svg>
+            </button>
+        `;
+    }
+    
+    // Previous button
+    if (currentPage > 1) {
+        html += `
+            <button onclick="goToHistoryPage(${currentPage - 1})" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                Previous
+            </button>
+        `;
+    }
+    
+    // Page numbers
+    html += '<div class="flex gap-1">';
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const activeClass = i === currentPage ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50';
+        html += `
+            <button onclick="goToHistoryPage(${i})" class="px-4 py-2 border border-gray-300 rounded-lg transition text-sm font-medium ${activeClass}">
+                ${i}
+            </button>
+        `;
+    }
+    html += '</div>';
+    
+    // Next button
+    if (currentPage < totalPages) {
+        html += `
+            <button onclick="goToHistoryPage(${currentPage + 1})" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                Next
+            </button>
+        `;
+    }
+    
+    // Last page button
+    if (currentPage < totalPages) {
+        html += `
+            <button onclick="goToHistoryPage(${totalPages})" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+                </svg>
+            </button>
+        `;
+    }
+    
+    html += `
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="jump-to-page" class="text-sm text-gray-600">Go to:</label>
+                <input type="number" id="jump-to-page" min="1" max="${totalPages}" value="${currentPage}" 
+                       class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       onkeypress="if(event.key === 'Enter') goToHistoryPage(parseInt(this.value))">
+                <button onclick="goToHistoryPage(parseInt(document.getElementById('jump-to-page').value))" 
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+                    Go
+                </button>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+// Filter history by status
+function filterHistory(filter) {
+    currentHistoryFilter = filter;
+    loadRequestHistory(1, filter); // Reset to page 1 when filtering
+}
+
+// Go to specific history page
+function goToHistoryPage(page) {
+    // Validate page number
+    if (page < 1) page = 1;
+    if (page > historyTotalPages) page = historyTotalPages;
+    
+    loadRequestHistory(page, currentHistoryFilter);
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Restore section on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Restore the saved section or show dashboard
@@ -1782,6 +2074,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Always call showSection to properly set active classes
     showSection(sectionToShow);
+    
+    // Load initial history data
+    loadRequestHistory(1, 'all');
     
     const successNotif = document.getElementById('successNotif');
     const errorNotif = document.getElementById('errorNotif');

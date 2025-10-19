@@ -1,0 +1,9 @@
+✅ REQUEST HISTORY FEATURE
+===========================
+
+Owner Dashboard now includes Request History section with:
+- Filter by status (All/Approved/Rejected)
+- Pagination (10 per page)
+- AJAX-based loading
+- Clean URLs
+- View details modal

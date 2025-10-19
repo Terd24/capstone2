@@ -1,0 +1,8 @@
+✅ AJAX PAGINATION UPDATE
+==========================
+
+Request History now uses AJAX for:
+- Clean URLs (no query parameters)
+- Fast navigation
+- No page reload
+- Better user experience
