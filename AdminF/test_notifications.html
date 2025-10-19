@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Notification System</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Notification System Test</h1>
+    <button onclick="testAPI()">Test API Call</button>
+    <button onclick="clearLogs()">Clear Logs</button>
+    <div id="logs"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.className = 'log ' + type;
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            logs.insertBefore(div, logs.firstChild);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        async function testAPI() {
+            log('Testing API call...');
+            try {
+                const lastCheck = new Date(Date.now() - 60000).toISOString().slice(0, 19).replace('T', ' ');
+                log('Last check time: ' + lastCheck);
+                
+                const response = await fetch(`check_approvals.php?last_check=${encodeURIComponent(lastCheck)}`);
+                log('Response status: ' + response.status);
+                
+                if (!response.ok) {
+                    log('API call failed with status: ' + response.status, 'error');
+                    return;
+                }
+                
+                const data = await response.json();
+                log('Response data: ' + JSON.stringify(data, null, 2), 'success');
+                
+                if (data.approvals && data.approvals.length > 0) {
+                    log('Found ' + data.approvals.length + ' approvals!', 'success');
+                } else {
+                    log('No new approvals found');
+                }
+            } catch (error) {
+                log('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Auto test on load
+        window.onload = function() {
+            log('Page loaded. Click "Test API Call" to check the notification system.');
+        };
+    </script>
+</body>
+</html>

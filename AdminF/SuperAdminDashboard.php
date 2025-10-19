@@ -63,6 +63,8 @@ $system_status_color = $is_maintenance ? 'text-red-600' : 'text-green-600';
 
 // Include dashboard data processing
 require_once 'includes/dashboard_data.php';
+
+// Don't load old approvals on page load - real-time system will catch new ones
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -5585,6 +5587,248 @@ function deletePermanently(recordId, recordType) {
                 closeLoginHistory();
             }
         });
+
+    // Real-time notification system for approved requests
+    let lastCheckTime = '<?= date('Y-m-d H:i:s') ?>'; // Start from NOW, only show new approvals from this point
+    let notificationCheckInterval;
+    
+    console.log('Notification system initialized. Will only show approvals after:', lastCheckTime);
+    
+    // Get shown notifications from localStorage
+    function getShownNotifications() {
+        const shown = localStorage.getItem('shownNotifications');
+        return shown ? JSON.parse(shown) : [];
+    }
+    
+    // Mark notification as shown
+    function markNotificationShown(notificationId) {
+        const shown = getShownNotifications();
+        if (!shown.includes(notificationId)) {
+            shown.push(notificationId);
+            // Keep only last 100 notifications to prevent localStorage bloat
+            if (shown.length > 100) {
+                shown.shift();
+            }
+            localStorage.setItem('shownNotifications', JSON.stringify(shown));
+        }
+    }
+    
+    // Check if notification was already shown
+    function wasNotificationShown(notificationId) {
+        return getShownNotifications().includes(notificationId);
+    }
+    
+    // Don't show old notifications on page load - only show NEW approvals from this point forward
+    // This prevents showing old approvals when refreshing the page
+    
+    // Start real-time polling for new approvals
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Starting notification polling...');
+        // Check immediately on load
+        checkForNewApprovals();
+        // Then check for new approvals every 3 seconds
+        notificationCheckInterval = setInterval(checkForNewApprovals, 3000);
+    });
+    
+    // Function to check for new approvals
+    async function checkForNewApprovals() {
+        try {
+            console.log('Checking for new approvals since:', lastCheckTime);
+            const response = await fetch(`check_approvals.php?last_check=${encodeURIComponent(lastCheckTime)}`);
+            
+            if (!response.ok) {
+                console.error('Failed to check approvals:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            console.log('Approval check response:', data);
+            
+            if (data.success && data.approvals && data.approvals.length > 0) {
+                console.log('Found', data.approvals.length, 'new approvals');
+                let hasNewNotifications = false;
+                
+                // Show notification for each new approval (only if not shown before)
+                data.approvals.forEach(approval => {
+                    const notifId = `notif_${approval.id}_${approval.timestamp.replace(/[:\s-]/g, '')}`;
+                    console.log('Processing approval:', notifId, 'Already shown?', wasNotificationShown(notifId));
+                    
+                    if (!wasNotificationShown(notifId)) {
+                        approval.id = notifId;
+                        showApprovalNotification(approval);
+                        markNotificationShown(notifId);
+                        hasNewNotifications = true;
+                        
+                        // Play a subtle notification sound
+                        playNotificationSound();
+                        
+                        // Remove the row from the table dynamically (this will also update counts)
+                        removeApprovedRecordFromTable(approval);
+                    }
+                });
+                
+                // Update last check time
+                lastCheckTime = data.current_time;
+            }
+        } catch (error) {
+            console.error('Error checking for approvals:', error);
+        }
+    }
+    
+    // Function to remove approved record from table
+    function removeApprovedRecordFromTable(approval) {
+        console.log('Removing record from table:', approval.title);
+        
+        // Extract the record ID from the title (e.g., "Restore Student: Lance Lance" or "Archive Employee: John Doe")
+        // The request_details in the database contains the actual record info
+        
+        // For students: find by data-student-id attribute
+        // For employees: find by data-employee-id attribute
+        const isStudent = approval.type.includes('student');
+        const isEmployee = approval.type.includes('employee');
+        
+        // Try to find and remove the row
+        // We'll search by the name in the title
+        const titleParts = approval.title.split(':');
+        if (titleParts.length > 1) {
+            const recordName = titleParts[1].trim();
+            
+            if (isStudent) {
+                // Find student row by name
+                const studentRows = document.querySelectorAll('tr[data-student-id]');
+                studentRows.forEach(row => {
+                    const nameCell = row.querySelector('td:nth-child(1)');
+                    if (nameCell && nameCell.textContent.includes(recordName)) {
+                        console.log('Found and removing student row:', recordName);
+                        row.style.transition = 'opacity 0.5s';
+                        row.style.opacity = '0';
+                        setTimeout(() => {
+                            row.remove();
+                            // Update counts after row is removed
+                            updateDeletedCounts();
+                        }, 500);
+                    }
+                });
+            } else if (isEmployee) {
+                // Find employee row by name
+                const employeeRows = document.querySelectorAll('tr[data-employee-id]');
+                employeeRows.forEach(row => {
+                    const nameCell = row.querySelector('td:nth-child(1)');
+                    if (nameCell && nameCell.textContent.includes(recordName)) {
+                        console.log('Found and removing employee row:', recordName);
+                        row.style.transition = 'opacity 0.5s';
+                        row.style.opacity = '0';
+                        setTimeout(() => {
+                            row.remove();
+                            // Update counts after row is removed
+                            updateDeletedCounts();
+                        }, 500);
+                    }
+                });
+            }
+        }
+    }
+    
+    // Optional: Play notification sound
+    function playNotificationSound() {
+        // Create a subtle beep sound using Web Audio API
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            // Silently fail if audio not supported
+        }
+    }
+    
+    // Clean up interval when page is hidden/closed
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            clearInterval(notificationCheckInterval);
+        } else {
+            notificationCheckInterval = setInterval(checkForNewApprovals, 5000);
+        }
+    });
+
+    function showApprovalNotification(data) {
+        // Create notification container
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 z-50 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-2xl p-5 max-w-md transform translate-x-full transition-transform duration-500 ease-out';
+        
+        // Determine action text based on request type
+        let actionText = 'processed';
+        let actionIcon = '✓';
+        if (data.type.includes('restore')) {
+            actionText = 'restored';
+            actionIcon = '↻';
+        } else if (data.type.includes('archive')) {
+            actionText = 'archived';
+            actionIcon = '📦';
+        }
+        
+        notification.innerHTML = `
+            <div class="flex items-start gap-3">
+                <div class="flex-shrink-0 bg-white bg-opacity-20 rounded-full p-2">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                        <h4 class="text-base font-bold text-white">✅ Request Approved!</h4>
+                        <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200 transition-colors ml-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-sm text-white font-medium">
+                            ${actionIcon} Your request has been <span class="font-bold">${actionText}</span>
+                        </p>
+                        <p class="text-sm text-green-100 break-words">
+                            <strong>Request:</strong> ${data.title}
+                        </p>
+                        <p class="text-xs text-green-200">
+                            <strong>Approved by:</strong> ${data.reviewedBy}
+                        </p>
+                        <p class="text-xs text-green-200">
+                            <strong>Time:</strong> ${data.reviewedAt}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Slide in animation
+        setTimeout(() => {
+            notification.classList.remove('translate-x-full');
+        }, 100);
+        
+        // Auto remove after 15 seconds (longer since no auto-refresh)
+        setTimeout(() => {
+            notification.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 500);
+        }, 15000);
+    }
 
     </script>
 </body>
