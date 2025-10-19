@@ -63,7 +63,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
 )");
 
 // Alter existing table to add new enum values if they don't exist
-$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'other') NOT NULL");
+$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'database_backup', 'maintenance_mode_toggle', 'other') NOT NULL");
 
 // Handle approval/rejection actions
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -628,6 +628,131 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                                 // Don't re-throw, just log
                             }
                             error_log("=== ARCHIVE ATTENDANCE END ===");
+                            break;
+                            
+                        case 'database_backup':
+                            // Execute database backup
+                            error_log("=== DATABASE BACKUP START ===");
+                            error_log("Owner approving database backup request");
+                            
+                            try {
+                                // Generate backup filename with timestamp
+                                $timestamp = date('Y-m-d_H-i-s');
+                                $filename = 'onecci_db_backup_' . $timestamp . '.sql';
+                                
+                                // Get all tables
+                                $tables = [];
+                                $result = $conn->query("SHOW TABLES");
+                                while ($row = $result->fetch_array()) {
+                                    $tables[] = $row[0];
+                                }
+                                
+                                // Start building SQL dump
+                                $sqlDump = "-- OneCCI Database Backup\n";
+                                $sqlDump .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
+                                $sqlDump .= "-- Approved by: " . ($_SESSION['owner_name'] ?? 'Owner') . "\n";
+                                $sqlDump .= "-- Database: onecci_db\n\n";
+                                $sqlDump .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+                                
+                                foreach ($tables as $table) {
+                                    // Get CREATE TABLE statement
+                                    $createTableResult = $conn->query("SHOW CREATE TABLE `$table`");
+                                    $createTableRow = $createTableResult->fetch_array();
+                                    $sqlDump .= "\n-- Table: $table\n";
+                                    $sqlDump .= "DROP TABLE IF EXISTS `$table`;\n";
+                                    $sqlDump .= $createTableRow[1] . ";\n\n";
+                                    
+                                    // Get table data
+                                    $dataResult = $conn->query("SELECT * FROM `$table`");
+                                    if ($dataResult->num_rows > 0) {
+                                        $sqlDump .= "-- Data for table: $table\n";
+                                        while ($row = $dataResult->fetch_assoc()) {
+                                            $sqlDump .= "INSERT INTO `$table` VALUES (";
+                                            $values = [];
+                                            foreach ($row as $value) {
+                                                if ($value === null) {
+                                                    $values[] = 'NULL';
+                                                } else {
+                                                    $values[] = "'" . $conn->real_escape_string($value) . "'";
+                                                }
+                                            }
+                                            $sqlDump .= implode(', ', $values) . ");\n";
+                                        }
+                                        $sqlDump .= "\n";
+                                    }
+                                }
+                                
+                                $sqlDump .= "SET FOREIGN_KEY_CHECKS=1;\n";
+                                
+                                // Save backup file to backups directory
+                                $backupDir = '../backups';
+                                if (!file_exists($backupDir)) {
+                                    mkdir($backupDir, 0755, true);
+                                }
+                                $filepath = $backupDir . '/' . $filename;
+                                file_put_contents($filepath, $sqlDump);
+                                
+                                error_log("Database backup created: $filename");
+                                
+                                // Store filename in session for download
+                                $_SESSION['backup_file'] = $filename;
+                                
+                            } catch (Exception $backup_ex) {
+                                error_log("ERROR in database_backup: " . $backup_ex->getMessage());
+                                error_log("Stack: " . $backup_ex->getTraceAsString());
+                            }
+                            error_log("=== DATABASE BACKUP END ===");
+                            break;
+                            
+                        case 'maintenance_mode_toggle':
+                            // Toggle maintenance mode
+                            error_log("=== MAINTENANCE MODE TOGGLE START ===");
+                            error_log("Target data: " . json_encode($target_data));
+                            $action = $target_data['action'] ?? '';
+                            error_log("Owner approving maintenance mode action: '$action'");
+                            
+                            if (empty($action)) {
+                                error_log("ERROR: Action is empty!");
+                                break;
+                            }
+                            
+                            try {
+                                // Create system_config table if not exists
+                                $conn->query("CREATE TABLE IF NOT EXISTS system_config (
+                                    config_key VARCHAR(50) PRIMARY KEY,
+                                    config_value TEXT,
+                                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                                )");
+                                
+                                $newValue = ($action === 'enable') ? '1' : '0';
+                                
+                                error_log("Setting maintenance_mode to: $newValue (action was: $action)");
+                                
+                                $stmt = $conn->prepare("INSERT INTO system_config (config_key, config_value) 
+                                                        VALUES ('maintenance_mode', ?) 
+                                                        ON DUPLICATE KEY UPDATE config_value = ?");
+                                $stmt->bind_param('ss', $newValue, $newValue);
+                                
+                                if ($stmt->execute()) {
+                                    $affected = $stmt->affected_rows;
+                                    error_log("Maintenance mode $action successful - Affected rows: $affected");
+                                    
+                                    // Verify it was set
+                                    $verify = $conn->query("SELECT config_value FROM system_config WHERE config_key = 'maintenance_mode'");
+                                    if ($verify && $verify->num_rows > 0) {
+                                        $verifyRow = $verify->fetch_assoc();
+                                        error_log("Verified maintenance_mode value in DB: " . $verifyRow['config_value']);
+                                    }
+                                } else {
+                                    error_log("Failed to toggle maintenance mode: " . $stmt->error);
+                                }
+                                $stmt->close();
+                                
+                            } catch (Exception $maint_ex) {
+                                error_log("ERROR in maintenance_mode_toggle: " . $maint_ex->getMessage());
+                                error_log("Stack: " . $maint_ex->getTraceAsString());
+                            }
+                            error_log("=== MAINTENANCE MODE TOGGLE END ===");
                             break;
                     }
                 } catch (Exception $e) {

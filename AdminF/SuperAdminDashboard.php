@@ -1063,9 +1063,9 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                         <div class="font-medium text-gray-900">System Maintenance</div>
                                         <div class="text-sm text-gray-600">Restrict system access for maintenance</div>
                                     </div>
-                                    <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" id="maintenanceToggle" class="sr-only peer" onchange="toggleMaintenance()">
-                                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0B2C62]"></div>
+                                    <label class="relative inline-flex items-center cursor-pointer" id="maintenanceToggleLabel">
+                                        <input type="checkbox" id="maintenanceToggle" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0B2C62] peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
                                     </label>
                                 </div>
                                 <ul class="text-sm text-gray-600 space-y-1">
@@ -1073,9 +1073,10 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                     <li>• Displays maintenance message to users</li>
                                 </ul>
                             </div>
-                            <button onclick="updateConfiguration()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors mt-auto">
-                                Update Configuration
+                            <button id="maintenanceConfigBtn" onclick="updateConfiguration()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors mt-auto">
+                                <span id="maintenanceConfigText">Update Configuration</span>
                             </button>
+                            <p id="maintenancePending" class="hidden text-sm text-yellow-600 mt-2 font-medium">⏳ Request pending approval from Owner</p>
                         </div>
 
                         <!-- Database Backup -->
@@ -1095,12 +1096,13 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                     <li>• Creates timestamped SQL backup files</li>
                                 </ul>
                             </div>
-                            <button onclick="createDatabaseBackup()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 mt-auto">
+                            <button id="backupBtn" onclick="createDatabaseBackup()" class="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 mt-auto">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                                 </svg>
-                                Download Database Backup
+                                <span id="backupBtnText">Download Database Backup</span>
                             </button>
+                            <p id="backupPending" class="hidden text-sm text-yellow-600 mt-2 font-medium">⏳ Request pending approval from Owner</p>
                         </div>
                     </div>
                 </div>
@@ -3395,52 +3397,201 @@ if ($check_pending && $check_pending->num_rows > 0) {
 
         function updateConfiguration() {
             const toggle = document.getElementById('maintenanceToggle');
-            const maintenanceStatus = toggle.checked ? 'enabled' : 'disabled';
+            const action = toggle.checked ? 'enable' : 'disable';
+            const actionText = action === 'enable' ? 'Enable' : 'Disable';
             
+            // If disabling (turning OFF), allow direct action without approval
+            if (action === 'disable') {
+                showConfirmationModal({
+                    title: 'Disable Maintenance Mode',
+                    message: 'Are you sure you want to disable maintenance mode and restore normal system operation?',
+                    details: [
+                        '✅ Users will be able to login again',
+                        '✅ System will return to normal operation',
+                        'No approval required for disabling'
+                    ],
+                    confirmText: 'Disable Now',
+                    cancelText: 'Cancel',
+                    type: 'info',
+                    onConfirm: () => {
+                        fetch('toggle_maintenance_direct.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'disable' })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                showNotificationModal({
+                                    title: 'Maintenance Mode Disabled',
+                                    message: 'System has been restored to normal operation.',
+                                    details: [
+                                        '✅ Users can now login',
+                                        '✅ System is operational',
+                                        'Maintenance mode has been turned off'
+                                    ],
+                                    type: 'success'
+                                });
+                                // Keep toggle in OFF position
+                                toggle.checked = false;
+                            } else {
+                                showNotificationModal({
+                                    title: 'Failed to Disable',
+                                    message: data.message,
+                                    type: 'error'
+                                });
+                                // Reset toggle
+                                toggle.checked = true;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            showNotificationModal({
+                                title: 'Error',
+                                message: 'An error occurred while disabling maintenance mode',
+                                type: 'error'
+                            });
+                            // Reset toggle
+                            toggle.checked = true;
+                        });
+                    }
+                });
+                return;
+            }
+            
+            // If enabling (turning ON), require Owner approval
             showConfirmationModal({
-                title: 'Update System Configuration',
-                message: `Are you sure you want to update the system configuration?`,
+                title: 'Request to Enable Maintenance Mode',
+                message: 'This action requires Owner approval. Submit request to enable system maintenance mode?',
                 details: [
-                    `Maintenance mode will be: <strong>${maintenanceStatus}</strong>`,
-                    'All changes will be logged for audit purposes'
+                    'Request will be sent to Owner for approval',
+                    '⚠️ Will block all users except admins',
+                    'Critical system-wide impact',
+                    'You will be notified of the decision'
                 ],
-                confirmText: 'Update Configuration',
+                confirmText: 'Submit Request',
                 cancelText: 'Cancel',
                 type: 'warning',
-                onConfirm: () => {
-                    fetch('update_configuration.php', {
+                requireReason: true,
+                reasonLabel: 'Reason for enabling maintenance mode',
+                reasonPlaceholder: 'e.g., system upgrade, database maintenance, security patch...',
+                onConfirm: (reason) => {
+                    fetch('request_maintenance_toggle.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ maintenance_mode: maintenanceStatus })
+                        body: JSON.stringify({ action: 'enable', reason: reason })
                     })
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            // Update system status displays dynamically
-                            const statusText = maintenanceStatus === 'enabled' ? '🔴 Maintenance' : '🟢 Online';
-                            const statusColor = maintenanceStatus === 'enabled' ? 'text-red-600' : 'text-green-600';
-                            
-                            // Update all system status displays on the page
-                            document.querySelectorAll('.system-status-display').forEach(el => {
-                                el.textContent = statusText;
-                                // Preserve existing classes and update color
-                                el.classList.remove('text-red-600', 'text-green-600');
-                                el.classList.add(statusColor.replace('text-', '').split('-')[0] === 'red' ? 'text-red-600' : 'text-green-600');
-                            });
-                            
                             showNotificationModal({
-                                title: 'Configuration Updated',
-                                message: data.message,
+                                title: 'Request Submitted',
+                                message: 'Request to enable maintenance mode has been sent to the Owner for approval.',
                                 details: [
-                                    `Maintenance mode: ${data.maintenance_mode}`,
-                                    `System status updated to: ${statusText}`,
-                                    'Changes applied successfully'
+                                    'Owner will review your request',
+                                    'You will be notified once approved',
+                                    'System will enter maintenance mode after approval'
                                 ],
                                 type: 'success'
                             });
+                            
+                            // Disable button and show pending message
+                            const btn = document.getElementById('maintenanceConfigBtn');
+                            const msg = document.getElementById('maintenancePending');
+                            if (btn && msg) {
+                                btn.disabled = true;
+                                btn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                                btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                                msg.classList.remove('hidden');
+                            }
+                            
+                            // Make toggle grey and disabled (showing pending state)
+                            toggle.disabled = true;
+                            toggle.checked = true; // Show ON (pending state)
+                            const toggleLabel = document.getElementById('maintenanceToggleLabel');
+                            if (toggleLabel) {
+                                toggleLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                            }
+                            
+                            // Store pending state
+                            localStorage.setItem('maintenanceRequestPending', 'true');
+                            localStorage.setItem('maintenanceRequestAction', 'enable');
                         } else {
                             showNotificationModal({
-                                title: 'Update Failed',
+                                title: 'Request Failed',
+                                message: data.message,
+                                type: 'error'
+                            });
+                            // Reset toggle
+                            toggle.checked = false;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotificationModal({
+                            title: 'Error',
+                            message: 'An error occurred while submitting the request',
+                            type: 'error'
+                        });
+                        // Reset toggle
+                        toggle.checked = false;
+                    });
+                }
+            });
+        }
+
+        function createDatabaseBackup() {
+            showConfirmationModal({
+                title: 'Request Database Backup',
+                message: 'This action requires Owner approval. Submit request to download complete database backup?',
+                details: [
+                    'Request will be sent to Owner for approval',
+                    'Backup includes all sensitive data',
+                    'You will be notified of the decision',
+                    'High security operation - requires justification'
+                ],
+                confirmText: 'Submit Request',
+                cancelText: 'Cancel',
+                type: 'warning',
+                requireReason: true,
+                reasonLabel: 'Reason for database backup',
+                reasonPlaceholder: 'e.g., system upgrade, data migration, compliance audit, disaster recovery...',
+                onConfirm: (reason) => {
+                    fetch('request_backup.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason: reason })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotificationModal({
+                                title: 'Request Submitted',
+                                message: 'Database backup request has been sent to the Owner for approval.',
+                                details: [
+                                    'Owner will review your request',
+                                    'You will be notified once approved',
+                                    'Backup will be available for download after approval'
+                                ],
+                                type: 'success'
+                            });
+                            
+                            // Disable button and show pending message
+                            const btn = document.getElementById('backupBtn');
+                            const msg = document.getElementById('backupPending');
+                            if (btn && msg) {
+                                btn.disabled = true;
+                                btn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                                btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                                btn.onclick = null;
+                                msg.classList.remove('hidden');
+                            }
+                            
+                            // Store pending state
+                            localStorage.setItem('backupRequestPending', 'true');
+                        } else {
+                            showNotificationModal({
+                                title: 'Request Failed',
                                 message: data.message,
                                 type: 'error'
                             });
@@ -3450,49 +3601,10 @@ if ($check_pending && $check_pending->num_rows > 0) {
                         console.error('Error:', error);
                         showNotificationModal({
                             title: 'Error',
-                            message: 'An error occurred while updating configuration',
+                            message: 'An error occurred while submitting the request',
                             type: 'error'
                         });
                     });
-                }
-            });
-        }
-
-        function createDatabaseBackup() {
-            showConfirmationModal({
-                title: 'Download Database Backup',
-                message: 'Are you sure you want to download a complete database backup?',
-                details: [
-                    'This will include all tables and data',
-                    'The process may take a few minutes',
-                    'You will be prompted to choose where to save the file'
-                ],
-                confirmText: 'Download Backup',
-                cancelText: 'Cancel',
-                type: 'info',
-                onConfirm: () => {
-                    // Show loading notification
-                    showNotificationModal({
-                        title: 'Creating Backup...',
-                        message: 'Please wait while the backup is being generated. This may take a few moments.',
-                        details: [
-                            'Do not close this window',
-                            'Download will start automatically'
-                        ],
-                        type: 'info'
-                    });
-                    
-                    // Trigger download by opening the backup URL
-                    // This will prompt the browser's "Save As" dialog
-                    window.location.href = 'create_backup.php';
-                    
-                    // Close the loading modal after a short delay
-                    setTimeout(() => {
-                        const modal = document.getElementById('notificationModal');
-                        if (modal) {
-                            modal.classList.add('hidden');
-                        }
-                    }, 2000);
                 }
             });
         }
@@ -5927,6 +6039,11 @@ function deletePermanently(recordId, recordType) {
                 }
             });
         }
+        
+        // Check system config status on load
+        checkSystemConfigStatus();
+        // Poll every 2 seconds
+        setInterval(checkSystemConfigStatus, 2000);
     });
     
     // Function to check archive request status and update buttons
@@ -6008,6 +6125,94 @@ function deletePermanently(recordId, recordType) {
             // The button will automatically re-enable when the request is no longer pending
         } catch (error) {
             console.error('Error checking archive status:', error);
+        }
+    }
+    
+    // Function to check system config status (maintenance mode and backup)
+    async function checkSystemConfigStatus() {
+        try {
+            const response = await fetch('check_system_config_status.php');
+            
+            if (!response.ok) {
+                console.error('Failed to check system config status:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            
+            // Update maintenance mode button
+            const maintenanceBtn = document.getElementById('maintenanceConfigBtn');
+            const maintenanceMsg = document.getElementById('maintenancePending');
+            const maintenanceToggle = document.getElementById('maintenanceToggle');
+            const maintenanceToggleLabel = document.getElementById('maintenanceToggleLabel');
+            
+            if (maintenanceBtn && maintenanceMsg && maintenanceToggle) {
+                if (data.pending_maintenance) {
+                    // Keep disabled
+                    if (!maintenanceBtn.disabled) {
+                        maintenanceBtn.disabled = true;
+                        maintenanceBtn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        maintenanceBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                        maintenanceMsg.classList.remove('hidden');
+                        maintenanceToggle.disabled = true;
+                        if (maintenanceToggleLabel) {
+                            maintenanceToggleLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                        }
+                    }
+                } else {
+                    // Re-enable button when no pending request
+                    if (maintenanceBtn.disabled) {
+                        maintenanceBtn.disabled = false;
+                        maintenanceBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        maintenanceBtn.classList.add('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        maintenanceMsg.classList.add('hidden');
+                        maintenanceToggle.disabled = false;
+                        if (maintenanceToggleLabel) {
+                            maintenanceToggleLabel.classList.remove('opacity-50', 'cursor-not-allowed');
+                        }
+                        // Clear localStorage
+                        localStorage.removeItem('maintenanceRequestPending');
+                        localStorage.removeItem('maintenanceRequestAction');
+                    }
+                    
+                    // Always update toggle to reflect current state (even if button wasn't disabled)
+                    const currentState = (data.current_maintenance_mode === '1');
+                    if (maintenanceToggle.checked !== currentState) {
+                        maintenanceToggle.checked = currentState;
+                        console.log('Updated maintenance toggle to:', currentState ? 'ON' : 'OFF');
+                    }
+                }
+            }
+            
+            // Update backup button
+            const backupBtn = document.getElementById('backupBtn');
+            const backupMsg = document.getElementById('backupPending');
+            
+            if (backupBtn && backupMsg) {
+                if (data.pending_backup) {
+                    // Keep disabled
+                    if (!backupBtn.disabled) {
+                        backupBtn.disabled = true;
+                        backupBtn.classList.remove('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        backupBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                        backupBtn.onclick = null;
+                        backupMsg.classList.remove('hidden');
+                    }
+                } else {
+                    // Re-enable button when no pending request
+                    if (backupBtn.disabled) {
+                        backupBtn.disabled = false;
+                        backupBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        backupBtn.classList.add('bg-[#1e3a8a]', 'hover:bg-[#1e40af]');
+                        backupBtn.onclick = createDatabaseBackup;
+                        backupMsg.classList.add('hidden');
+                        // Clear localStorage
+                        localStorage.removeItem('backupRequestPending');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error checking system config status:', error);
         }
     }
     

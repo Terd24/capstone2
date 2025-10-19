@@ -1,0 +1,107 @@
+ONE-TIME TOGGLE FEATURE - MAINTENANCE MODE
+==========================================
+
+FEATURE COMPLETE:
+-----------------
+Maintenance mode now has asymmetric approval logic:
+- ENABLE (turn ON) = Requires Owner approval
+- DISABLE (turn OFF) = No approval needed (instant)
+
+NEW FILE CREATED:
+-----------------
+AdminF/toggle_maintenance_direct.php
+- Allows SuperAdmin to disable maintenance mode instantly
+- No approval required
+- Only works for "disable" action
+- Logs the action for audit trail
+
+HOW IT WORKS:
+-------------
+
+SCENARIO 1: ENABLING MAINTENANCE MODE (Turn ON)
+1. SuperAdmin toggles switch to ON
+2. Clicks "Update Configuration"
+3. Modal: "Request to Enable Maintenance Mode"
+4. Must provide reason
+5. Request sent to Owner
+6. Toggle becomes grey (pending)
+7. Button disabled with pending message
+8. Owner approves
+9. Maintenance mode turns ON
+10. Toggle becomes active (not grey)
+
+SCENARIO 2: DISABLING MAINTENANCE MODE (Turn OFF)
+1. SuperAdmin toggles switch to OFF
+2. Clicks "Update Configuration"
+3. Modal: "Disable Maintenance Mode" (no reason needed)
+4. Confirms action
+5. Maintenance mode turns OFF IMMEDIATELY
+6. No approval needed
+7. System returns to normal operation
+
+SCENARIO 3: RE-ENABLING (Turn ON Again)
+1. After disabling, SuperAdmin wants to enable again
+2. Toggles switch to ON
+3. Clicks "Update Configuration"
+4. REQUIRES APPROVAL AGAIN (back to Scenario 1)
+5. Must submit request to Owner
+6. Cannot enable without approval
+
+LOGIC SUMMARY:
+--------------
+✓ First time ON → Needs approval
+✓ Turn OFF → No approval (instant)
+✓ Turn ON again → Needs approval again
+✓ Turn OFF again → No approval (instant)
+
+Pattern: ON = Approval, OFF = Instant
+
+SECURITY RATIONALE:
+-------------------
+- Enabling blocks all users (critical action)
+- Disabling restores access (safe action)
+- SuperAdmin can quickly restore service
+- But cannot block users without oversight
+
+USER EXPERIENCE:
+----------------
+1. Request to enable → Owner approves
+2. Maintenance mode is ON
+3. Work is done, need to restore service
+4. Toggle OFF → Instant (no waiting!)
+5. System back online immediately
+6. If need maintenance again → Request approval again
+
+BENEFITS:
+---------
+✓ Quick service restoration (no approval delay)
+✓ Owner oversight for blocking users
+✓ Flexible for emergency situations
+✓ Audit trail maintained
+✓ Balance between control and speed
+
+MODALS:
+-------
+ENABLE Modal:
+- Title: "Request to Enable Maintenance Mode"
+- Requires reason input
+- Warning type (yellow)
+- Shows: "⚠️ Will block all users except admins"
+
+DISABLE Modal:
+- Title: "Disable Maintenance Mode"
+- No reason required
+- Info type (blue)
+- Shows: "✅ Users will be able to login again"
+
+TESTING:
+--------
+1. Toggle ON → Submit request → Owner approves
+2. Maintenance mode is ON
+3. Toggle OFF → Confirm → Instant disable
+4. System back online
+5. Toggle ON again → Must request approval again
+6. Cannot enable without Owner approval
+
+This gives SuperAdmin flexibility to restore service quickly
+while maintaining Owner control over blocking users!
