@@ -5656,8 +5656,8 @@ function deletePermanently(recordId, recordType) {
         console.log('Starting notification polling...');
         // Check immediately on load
         checkForNewApprovals();
-        // Then check for new approvals every 3 seconds
-        notificationCheckInterval = setInterval(checkForNewApprovals, 3000);
+        // Then check for new approvals every 1 second for instant updates
+        notificationCheckInterval = setInterval(checkForNewApprovals, 1000);
     });
     
     // Function to check for new approvals
@@ -5678,7 +5678,7 @@ function deletePermanently(recordId, recordType) {
                 console.log('Found', data.approvals.length, 'new approvals');
                 let hasNewNotifications = false;
                 
-                // Show notification for each new approval (only if not shown before)
+                // Show notification for each new approval/rejection (only if not shown before)
                 data.approvals.forEach(approval => {
                     const notifId = `notif_${approval.id}_${approval.timestamp.replace(/[:\s-]/g, '')}`;
                     console.log('Processing approval:', notifId, 'Already shown?', wasNotificationShown(notifId));
@@ -5692,8 +5692,14 @@ function deletePermanently(recordId, recordType) {
                         // Play a subtle notification sound
                         playNotificationSound();
                         
-                        // Remove the row from the table dynamically (this will also update counts)
-                        removeApprovedRecordFromTable(approval);
+                        // Handle the row based on status
+                        if (approval.status === 'approved') {
+                            // Remove the row from the table (approved requests)
+                            removeApprovedRecordFromTable(approval);
+                        } else if (approval.status === 'rejected') {
+                            // Restore the action buttons (rejected requests)
+                            restoreActionButtons(approval);
+                        }
                     }
                 });
                 
@@ -5759,6 +5765,97 @@ function deletePermanently(recordId, recordType) {
         }
     }
     
+    // Function to restore action buttons when request is rejected
+    function restoreActionButtons(approval) {
+        console.log('Restoring action buttons for:', approval.title);
+        
+        // Extract the record name from the title
+        const titleParts = approval.title.split(':');
+        if (titleParts.length > 1) {
+            const recordName = titleParts[1].trim();
+            const isStudent = approval.type.includes('student');
+            const isEmployee = approval.type.includes('employee');
+            
+            if (isStudent) {
+                // Find student row by name - look in all table rows
+                const allRows = document.querySelectorAll('tbody tr');
+                allRows.forEach(row => {
+                    const nameCell = row.querySelector('td:nth-child(1)');
+                    if (nameCell && nameCell.textContent.includes(recordName)) {
+                        console.log('Found student row, restoring buttons:', recordName);
+                        const actionsCell = row.querySelector('td:last-child');
+                        if (actionsCell) {
+                            // Find the action-buttons-container which has the data attribute
+                            const buttonContainer = actionsCell.querySelector('.action-buttons-container');
+                            const studentId = buttonContainer ? buttonContainer.getAttribute('data-student-id') : null;
+                            
+                            if (studentId) {
+                                console.log('Student ID found:', studentId);
+                                // Replace "Request Pending" with normal action buttons
+                                buttonContainer.innerHTML = `
+                                    <div class="flex gap-2">
+                                        <button onclick="restoreStudent('${studentId}')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                            </svg>
+                                            Restore
+                                        </button>
+                                        <button onclick="archiveStudent('${studentId}')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                            </svg>
+                                            Archive
+                                        </button>
+                                    </div>
+                                `;
+                            } else {
+                                console.error('Student ID not found in button container');
+                            }
+                        }
+                    }
+                });
+            } else if (isEmployee) {
+                // Find employee row by name - look in all table rows
+                const allRows = document.querySelectorAll('tbody tr');
+                allRows.forEach(row => {
+                    const nameCell = row.querySelector('td:nth-child(1)');
+                    if (nameCell && nameCell.textContent.includes(recordName)) {
+                        console.log('Found employee row, restoring buttons:', recordName);
+                        const actionsCell = row.querySelector('td:last-child');
+                        if (actionsCell) {
+                            // Find the action-buttons-container which has the data attribute
+                            const buttonContainer = actionsCell.querySelector('.action-buttons-container');
+                            const employeeId = buttonContainer ? buttonContainer.getAttribute('data-employee-id') : null;
+                            
+                            if (employeeId) {
+                                console.log('Employee ID found:', employeeId);
+                                // Replace "Request Pending" with normal action buttons
+                                buttonContainer.innerHTML = `
+                                    <div class="flex gap-2">
+                                        <button onclick="restoreEmployee('${employeeId}')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                            </svg>
+                                            Restore
+                                        </button>
+                                        <button onclick="archiveEmployee('${employeeId}')" class="archive-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                            </svg>
+                                            Archive
+                                        </button>
+                                    </div>
+                                `;
+                            } else {
+                                console.error('Employee ID not found in button container');
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+    
     // Optional: Play notification sound
     function playNotificationSound() {
         // Create a subtle beep sound using Web Audio API
@@ -5788,7 +5885,7 @@ function deletePermanently(recordId, recordType) {
         if (document.hidden) {
             clearInterval(notificationCheckInterval);
         } else {
-            notificationCheckInterval = setInterval(checkForNewApprovals, 5000);
+            notificationCheckInterval = setInterval(checkForNewApprovals, 2000);
         }
     });
 
@@ -5802,32 +5899,46 @@ function deletePermanently(recordId, recordType) {
             document.body.appendChild(notificationContainer);
         }
         
+        // Determine if approved or rejected
+        const isApproved = data.status === 'approved';
+        const isRejected = data.status === 'rejected';
+        
         // Create notification
         const notification = document.createElement('div');
-        notification.className = 'bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-2xl p-5 max-w-md transform translate-x-full transition-all duration-500 ease-out';
+        const bgColor = isApproved ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600';
+        notification.className = `bg-gradient-to-r ${bgColor} text-white rounded-lg shadow-2xl p-5 max-w-md transform translate-x-full transition-all duration-500 ease-out`;
         
         // Determine action text based on request type
-        let actionText = 'processed';
-        let actionIcon = '✓';
-        if (data.type.includes('restore')) {
-            actionText = 'restored';
-            actionIcon = '↻';
-        } else if (data.type.includes('archive')) {
-            actionText = 'archived';
-            actionIcon = '📦';
+        let actionText = isApproved ? 'processed' : 'rejected';
+        let actionIcon = isApproved ? '✓' : '✗';
+        if (isApproved) {
+            if (data.type.includes('restore')) {
+                actionText = 'restored';
+                actionIcon = '↻';
+            } else if (data.type.includes('archive')) {
+                actionText = 'archived';
+                actionIcon = '📦';
+            }
         }
+        
+        const statusText = isApproved ? 'Approved' : 'Rejected';
+        const statusEmoji = isApproved ? '✅' : '❌';
+        const textColor = isApproved ? 'green' : 'red';
         
         notification.innerHTML = `
             <div class="flex items-start gap-3">
                 <div class="flex-shrink-0 bg-white bg-opacity-20 rounded-full p-2">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        ${isApproved ? 
+                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>' :
+                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>'
+                        }
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between mb-1">
-                        <h4 class="text-base font-bold text-white">✅ Request Approved!</h4>
-                        <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200 transition-colors ml-2">
+                        <h4 class="text-base font-bold text-white">${statusEmoji} Request ${statusText}!</h4>
+                        <button onclick="this.closest('.bg-gradient-to-r').remove()" class="text-white hover:text-gray-200 transition-colors ml-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -5837,15 +5948,23 @@ function deletePermanently(recordId, recordType) {
                         <p class="text-sm text-white font-medium">
                             ${actionIcon} Your request has been <span class="font-bold">${actionText}</span>
                         </p>
-                        <p class="text-sm text-green-100 break-words">
+                        <p class="text-sm text-${textColor}-100 break-words">
                             <strong>Request:</strong> ${data.title}
                         </p>
-                        <p class="text-xs text-green-200">
-                            <strong>Approved by:</strong> ${data.reviewedBy}
+                        <p class="text-xs text-${textColor}-200">
+                            <strong>${statusText} by:</strong> ${data.reviewedBy}
                         </p>
-                        <p class="text-xs text-green-200">
+                        <p class="text-xs text-${textColor}-200">
                             <strong>Time:</strong> ${data.reviewedAt}
                         </p>
+                        ${isRejected && data.ownerComments ? `
+                        <div class="mt-2 p-2 bg-white bg-opacity-20 rounded">
+                            <p class="text-xs text-white">
+                                <strong>Owner's Comments:</strong><br>
+                                ${data.ownerComments}
+                            </p>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
             </div>

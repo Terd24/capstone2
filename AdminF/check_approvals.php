@@ -18,9 +18,9 @@ $last_check = isset($_GET['last_check']) ? $_GET['last_check'] : date('Y-m-d H:i
 // Get superadmin name
 $superadmin_name = $_SESSION['superadmin_name'] ?? $_SESSION['username'] ?? 'Super Admin';
 
-// Check for newly approved requests since last check
+// Check for newly approved OR rejected requests since last check
 $query = "SELECT * FROM owner_approval_requests 
-    WHERE status = 'approved' 
+    WHERE status IN ('approved', 'rejected')
     AND requester_name = ? 
     AND reviewed_at > ? 
     ORDER BY reviewed_at DESC";
@@ -36,8 +36,10 @@ while ($row = $result->fetch_assoc()) {
         'id' => $row['id'],
         'title' => $row['request_title'],
         'type' => $row['request_type'],
+        'status' => $row['status'],
         'reviewedAt' => date('M d, Y h:i A', strtotime($row['reviewed_at'])),
         'reviewedBy' => $row['reviewed_by'],
+        'ownerComments' => $row['owner_comments'] ?? '',
         'requestDetails' => $row['request_details'] ?? '',
         'timestamp' => $row['reviewed_at']
     ];

@@ -1369,8 +1369,8 @@ let requestCheckInterval;
 
 // Start polling when on approval-requests section
 document.addEventListener('DOMContentLoaded', function() {
-    // Check every 5 seconds for new requests
-    requestCheckInterval = setInterval(checkForNewRequests, 5000);
+    // Check every 1 second for new requests (instant updates)
+    requestCheckInterval = setInterval(checkForNewRequests, 1000);
 });
 
 async function checkForNewRequests() {
@@ -1798,7 +1798,7 @@ document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
         clearInterval(requestCheckInterval);
     } else {
-        requestCheckInterval = setInterval(checkForNewRequests, 5000);
+        requestCheckInterval = setInterval(checkForNewRequests, 2000);
     }
 });
 
