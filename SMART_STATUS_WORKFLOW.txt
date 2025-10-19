@@ -1,0 +1,101 @@
+✅ SMART STATUS WORKFLOW - Document Requests
+============================================
+
+FEATURE:
+-------
+The status dropdown in ViewStudentInfo.php now shows only valid next statuses
+based on the current status, preventing invalid status transitions.
+
+STATUS WORKFLOW:
+---------------
+
+1. PENDING (Initial State)
+   ├─ Can change to: Approved
+   └─ Can change to: Declined
+
+2. APPROVED
+   └─ Can only change to: Ready to Claim
+   └─ Balance is created automatically
+
+3. READY TO CLAIM
+   └─ Can only change to: Claimed
+
+4. CLAIMED (Final State)
+   └─ Dropdown is DISABLED
+   └─ No further changes allowed
+
+5. DECLINED (Final State)
+   └─ Dropdown is DISABLED
+   └─ No further changes allowed
+
+VISUAL FLOW:
+-----------
+Pending → Approved → Ready to Claim → Claimed
+   ↓
+Declined (End)
+
+BENEFITS:
+--------
+✅ Prevents accidental status changes
+✅ Enforces proper workflow
+✅ Cleaner UI (only shows relevant options)
+✅ Prevents going backwards in workflow
+✅ Final states (Claimed/Declined) are locked
+
+IMPLEMENTATION:
+--------------
+File: RegistrarF/ViewStudentInfo.php
+
+The dropdown now uses PHP logic to:
+1. Check current status
+2. Show only valid next statuses
+3. Disable dropdown for final states (Claimed/Declined)
+
+EXAMPLES:
+--------
+
+Example 1: Pending Request
+- Dropdown shows: Pending (selected), Approved, Declined
+- User can choose: Approved or Declined
+
+Example 2: Approved Request
+- Dropdown shows: Approved (selected), Ready to Claim
+- User can only choose: Ready to Claim
+- Balance is created automatically
+
+Example 3: Ready to Claim
+- Dropdown shows: Ready to Claim (selected), Claimed
+- User can only choose: Claimed
+
+Example 4: Claimed Request
+- Dropdown shows: Claimed (selected, disabled)
+- User cannot change status (final state)
+
+Example 5: Declined Request
+- Dropdown shows: Declined (selected, disabled)
+- User cannot change status (final state)
+
+TESTING:
+-------
+1. Create a document request (Status: Pending)
+2. Check dropdown - should show: Pending, Approved, Declined
+3. Change to Approved
+4. Check dropdown - should show: Approved, Ready to Claim
+5. Change to Ready to Claim
+6. Check dropdown - should show: Ready to Claim, Claimed
+7. Change to Claimed
+8. Check dropdown - should be disabled, showing only Claimed
+
+NOTES:
+-----
+- The workflow is one-way (no going backwards)
+- Once Claimed or Declined, status cannot be changed
+- This prevents mistakes and ensures data integrity
+- Balance is created when status changes to Approved
+
+USER EXPERIENCE:
+---------------
+Before: All 5 options always visible, confusing workflow
+After: Only relevant next steps shown, clear progression
+
+This makes the system more intuitive and prevents errors!

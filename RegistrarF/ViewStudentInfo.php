@@ -293,6 +293,81 @@ if ($docType === 'submitted') {
                 body: `id=${docId}&status=${encodeURIComponent(status)}`
             });
         }
+        
+        function updateStatusSmart(docId, select) {
+            const newStatus = select.value;
+            const selectElement = select;
+            
+            // Disable the dropdown while updating
+            selectElement.disabled = true;
+            
+            fetch('update_document_status.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${docId}&status=${encodeURIComponent(newStatus)}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                // Update the dropdown options based on new status
+                updateDropdownOptions(selectElement, newStatus);
+                
+                // Re-enable the dropdown (unless it's a final state)
+                if (newStatus !== 'Claimed' && newStatus !== 'Declined') {
+                    selectElement.disabled = false;
+                }
+                
+                // Show success message (optional)
+                console.log('Status updated to: ' + newStatus);
+            })
+            .catch(error => {
+                console.error('Error updating status:', error);
+                selectElement.disabled = false;
+            });
+        }
+        
+        function updateDropdownOptions(selectElement, currentStatus) {
+            // Define valid next statuses for each current status
+            const validTransitions = {
+                'Pending': ['Approved', 'Declined'],
+                'Approved': ['Ready to Claim'],
+                'Ready to Claim': ['Claimed'],
+                'Claimed': [],
+                'Declined': []
+            };
+            
+            const validNext = validTransitions[currentStatus] || [];
+            const isFinal = (currentStatus === 'Claimed' || currentStatus === 'Declined');
+            
+            // Clear and rebuild options
+            selectElement.innerHTML = '';
+            
+            const allStatuses = ['Pending', 'Approved', 'Ready to Claim', 'Claimed', 'Declined'];
+            
+            allStatuses.forEach(status => {
+                const option = document.createElement('option');
+                option.value = status;
+                option.textContent = status;
+                
+                // Set selected
+                if (status === currentStatus) {
+                    option.selected = true;
+                }
+                
+                // Disable invalid options and gray them out
+                if (status !== currentStatus && !validNext.includes(status)) {
+                    option.disabled = true;
+                    option.style.color = '#ccc';
+                }
+                
+                selectElement.appendChild(option);
+            });
+            
+            // Disable entire dropdown if final state
+            if (isFinal) {
+                selectElement.disabled = true;
+            }
+        }
+        
         function switchTab(type) {
             // Use POST to update session and redirect to clean URL
             const form = document.createElement('form');
@@ -479,13 +554,52 @@ if ($docType === 'submitted') {
                             <?= ($doc['date_claimed'] && $doc['status']==='Claimed') ? date('M j, Y g:i:s A', strtotime($doc['date_claimed'])) : '---' ?>
                         </td>
                         <td class="py-4 px-6">
-                            <select class="border border-gray-300 px-3 py-2 rounded-lg bg-white text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent"
-                                    onchange="updateStatus(<?= $doc['id'] ?>, this)">
-                                <option value="Pending"        <?= $doc['status']==='Pending' ? 'selected' : '' ?>>Pending</option>
-                                <option value="Approved"       <?= $doc['status']==='Approved' ? 'selected' : '' ?>>Approved</option>
-                                <option value="Ready to Claim" <?= $doc['status']==='Ready to Claim' ? 'selected' : '' ?>>Ready to Claim</option>
-                                <option value="Claimed"        <?= $doc['status']==='Claimed' ? 'selected' : '' ?>>Claimed</option>
-                                <option value="Declined"       <?= $doc['status']==='Declined' ? 'selected' : '' ?>>Declined</option>
+                            <?php
+                            $current_status = $doc['status'];
+                            $is_final = ($current_status === 'Claimed' || $current_status === 'Declined');
+                            
+                            // Define valid transitions for each status
+                            $valid_next = [];
+                            switch($current_status) {
+                                case 'Pending':
+                                    $valid_next = ['Approved', 'Declined'];
+                                    break;
+                                case 'Approved':
+                                    $valid_next = ['Ready to Claim'];
+                                    break;
+                                case 'Ready to Claim':
+                                    $valid_next = ['Claimed'];
+                                    break;
+                                case 'Claimed':
+                                case 'Declined':
+                                    $valid_next = []; // No transitions allowed
+                                    break;
+                            }
+                            ?>
+                            <select id="status-<?= $doc['id'] ?>" 
+                                    class="border border-gray-300 px-3 py-2 rounded-lg bg-white text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent"
+                                    onchange="updateStatusSmart(<?= $doc['id'] ?>, this)"
+                                    <?= $is_final ? 'disabled' : '' ?>>
+                                <option value="Pending" <?= $current_status==='Pending' ? 'selected' : '' ?> 
+                                        <?= ($current_status!=='Pending' && !in_array('Pending', $valid_next)) ? 'disabled style="color:#ccc"' : '' ?>>
+                                    Pending
+                                </option>
+                                <option value="Approved" <?= $current_status==='Approved' ? 'selected' : '' ?>
+                                        <?= ($current_status!=='Approved' && !in_array('Approved', $valid_next)) ? 'disabled style="color:#ccc"' : '' ?>>
+                                    Approved
+                                </option>
+                                <option value="Ready to Claim" <?= $current_status==='Ready to Claim' ? 'selected' : '' ?>
+                                        <?= ($current_status!=='Ready to Claim' && !in_array('Ready to Claim', $valid_next)) ? 'disabled style="color:#ccc"' : '' ?>>
+                                    Ready to Claim
+                                </option>
+                                <option value="Claimed" <?= $current_status==='Claimed' ? 'selected' : '' ?>
+                                        <?= ($current_status!=='Claimed' && !in_array('Claimed', $valid_next)) ? 'disabled style="color:#ccc"' : '' ?>>
+                                    Claimed
+                                </option>
+                                <option value="Declined" <?= $current_status==='Declined' ? 'selected' : '' ?>
+                                        <?= ($current_status!=='Declined' && !in_array('Declined', $valid_next)) ? 'disabled style="color:#ccc"' : '' ?>>
+                                    Declined
+                                </option>
                             </select>
                         </td>
                         <td class="py-4 px-6 text-center">
