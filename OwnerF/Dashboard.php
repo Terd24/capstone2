@@ -813,7 +813,7 @@ $module_stats_result = $conn->query($module_stats_query);
                             ?>
                                 <div class="border-2 <?= $colors['border'] ?> rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
                                     <!-- Summary Row (Always Visible) -->
-                                    <div class="<?= $colors['bg'] ?> p-5 cursor-pointer hover:opacity-90 transition-opacity" onclick="toggleRequestDetails(<?= $request['id'] ?>)">
+                                    <div class="<?= $colors['bg'] ?> p-5 cursor-pointer hover:opacity-90 transition-opacity" onclick="openRequestModal(<?= $request['id'] ?>)">
                                         <div class="flex items-start justify-between gap-4">
                                             <div class="flex items-start gap-4 flex-1">
                                                 <!-- Icon -->
@@ -848,11 +848,11 @@ $module_stats_result = $conn->query($module_stats_query);
                                                 </div>
                                             </div>
                                             
-                                            <!-- Arrow -->
+                                            <!-- View Details Button -->
                                             <div class="flex-shrink-0">
-                                                <svg id="arrow-<?= $request['id'] ?>" class="w-6 h-6 text-gray-600 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                                </svg>
+                                                <button class="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-lg shadow-sm border border-gray-300 transition-colors text-sm">
+                                                    View Details
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -860,7 +860,19 @@ $module_stats_result = $conn->query($module_stats_query);
                                     <!-- Detailed View (Hidden by Default) -->
                                     <div id="details-<?= $request['id'] ?>" class="hidden border-t-2 <?= $colors['border'] ?> bg-white p-6">
                                         <div class="space-y-4">
-                                            <!-- Description -->
+                                            <?php 
+                                            // Extract description and reason separately
+                                            $description = $request['request_description'];
+                                            $reason = '';
+                                            
+                                            if (strpos($description, 'Reason:') !== false) {
+                                                $parts = explode('Reason:', $description);
+                                                $description = trim($parts[0]); // Description without reason
+                                                $reason = trim($parts[1]); // Just the reason
+                                            }
+                                            ?>
+                                            
+                                            <!-- Description (without reason) -->
                                             <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                                 <div class="flex items-start gap-2 mb-2">
                                                     <svg class="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -868,10 +880,25 @@ $module_stats_result = $conn->query($module_stats_query);
                                                     </svg>
                                                     <div class="flex-1">
                                                         <p class="text-sm font-bold text-gray-700 mb-1">Description</p>
-                                                        <p class="text-sm text-gray-600 leading-relaxed"><?= htmlspecialchars($request['request_description']) ?></p>
+                                                        <p class="text-sm text-gray-600 leading-relaxed"><?= htmlspecialchars($description) ?></p>
                                                     </div>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Reason (if exists) -->
+                                            <?php if (!empty($reason)): ?>
+                                            <div class="bg-yellow-50 rounded-lg p-4 border-2 border-yellow-300">
+                                                <div class="flex items-start gap-2">
+                                                    <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                    <div class="flex-1">
+                                                        <p class="text-sm font-bold text-yellow-800 mb-2">Reason for Request</p>
+                                                        <p class="text-sm text-yellow-900 leading-relaxed bg-white px-3 py-2 rounded border border-yellow-200"><?= htmlspecialchars($reason) ?></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <?php endif; ?>
                                             
                                             <!-- Requester Info -->
                                             <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
@@ -892,21 +919,31 @@ $module_stats_result = $conn->query($module_stats_query);
                                                 </div>
                                             </div>
                                             
-                                            <!-- Employee Details -->
+                                            <!-- Student/Employee Details -->
                                             <?php if ($request['target_data']): 
                                                 $target_data = json_decode($request['target_data'], true);
+                                                // Determine if it's a student or employee based on request type
+                                                $isStudent = (strpos($request['request_type'], 'student') !== false);
+                                                $detailsTitle = $isStudent ? 'Student Details' : 'Employee Details';
+                                                $idLabel = $isStudent ? 'Student ID' : 'Employee ID';
                                             ?>
                                                 <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
                                                     <div class="flex items-center gap-2 mb-3">
                                                         <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                            <?php if ($isStudent): ?>
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"/>
+                                                            <?php else: ?>
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                            <?php endif; ?>
                                                         </svg>
-                                                        <p class="text-sm font-bold text-gray-800">Employee Details</p>
+                                                        <p class="text-sm font-bold text-gray-800"><?= $detailsTitle ?></p>
                                                     </div>
                                                     <div class="bg-white rounded-lg p-3 space-y-2.5 shadow-sm">
                                                         <?php if (isset($target_data['id_number'])): ?>
                                                             <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                                                <span class="text-gray-600 font-medium block mb-1.5">Employee ID</span>
+                                                                <span class="text-gray-600 font-medium block mb-1.5"><?= $idLabel ?></span>
                                                                 <span class="font-bold text-gray-900 bg-white px-3 py-1.5 rounded border border-gray-300 inline-block"><?= htmlspecialchars($target_data['id_number']) ?></span>
                                                             </div>
                                                         <?php endif; ?>
@@ -918,17 +955,33 @@ $module_stats_result = $conn->query($module_stats_query);
                                                                 </span>
                                                             </div>
                                                         <?php endif; ?>
-                                                        <?php if (isset($target_data['position'])): ?>
-                                                            <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                                                <span class="text-gray-600 font-medium block mb-1.5">Position</span>
-                                                                <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['position']) ?></span>
-                                                            </div>
-                                                        <?php endif; ?>
-                                                        <?php if (isset($target_data['department'])): ?>
-                                                            <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                                                <span class="text-gray-600 font-medium block mb-1.5">Department</span>
-                                                                <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['department']) ?></span>
-                                                            </div>
+                                                        
+                                                        <?php if ($isStudent): ?>
+                                                            <?php if (isset($target_data['grade_level'])): ?>
+                                                                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                    <span class="text-gray-600 font-medium block mb-1.5">Grade Level</span>
+                                                                    <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['grade_level']) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <?php if (isset($target_data['academic_track'])): ?>
+                                                                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                    <span class="text-gray-600 font-medium block mb-1.5">Academic Track</span>
+                                                                    <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['academic_track']) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                        <?php else: ?>
+                                                            <?php if (isset($target_data['position'])): ?>
+                                                                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                    <span class="text-gray-600 font-medium block mb-1.5">Position</span>
+                                                                    <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['position']) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <?php if (isset($target_data['department'])): ?>
+                                                                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                    <span class="text-gray-600 font-medium block mb-1.5">Department</span>
+                                                                    <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['department']) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
                                                         <?php endif; ?>
                                                         <?php if (isset($target_data['deletion_reason'])): ?>
                                                             <div class="p-3 bg-red-50 rounded-lg border-2 border-red-200">
@@ -1088,17 +1141,66 @@ function showSection(sectionId, event) {
     document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
 }
 
-// Toggle request details
-function toggleRequestDetails(requestId) {
+// Open request details in modal
+function openRequestModal(requestId) {
     const detailsDiv = document.getElementById('details-' + requestId);
-    const arrow = document.getElementById('arrow-' + requestId);
     
-    if (detailsDiv.classList.contains('hidden')) {
-        detailsDiv.classList.remove('hidden');
-        arrow.classList.add('rotate-180');
-    } else {
-        detailsDiv.classList.add('hidden');
-        arrow.classList.remove('rotate-180');
+    // Create modal backdrop
+    const modal = document.createElement('div');
+    modal.id = 'requestModal-' + requestId;
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.onclick = function(e) {
+        if (e.target === modal) closeRequestModal(requestId);
+    };
+    
+    // Create modal content wrapper
+    const modalContent = document.createElement('div');
+    modalContent.className = 'bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col';
+    modalContent.onclick = function(e) {
+        e.stopPropagation();
+    };
+    
+    // Create modal header with close button
+    const modalHeader = document.createElement('div');
+    modalHeader.className = 'flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0';
+    modalHeader.innerHTML = `
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-gray-900">Request Details</h3>
+                <p class="text-xs text-gray-500">Review and take action</p>
+            </div>
+        </div>
+        <button onclick="closeRequestModal(${requestId})" class="group flex items-center justify-center w-10 h-10 rounded-lg hover:bg-red-50 transition-colors">
+            <svg class="w-6 h-6 text-gray-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    `;
+    
+    // Create scrollable content area
+    const modalBody = document.createElement('div');
+    modalBody.className = 'overflow-y-auto p-6';
+    
+    // Clone the details content
+    const content = detailsDiv.cloneNode(true);
+    content.classList.remove('hidden', 'border-t-2', 'p-6');
+    
+    modalBody.appendChild(content);
+    modalContent.appendChild(modalHeader);
+    modalContent.appendChild(modalBody);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+}
+
+function closeRequestModal(requestId) {
+    const modal = document.getElementById('requestModal-' + requestId);
+    if (modal) {
+        modal.remove();
     }
 }
 
