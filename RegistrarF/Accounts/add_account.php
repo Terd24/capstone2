@@ -26,24 +26,26 @@ if (!$conn) {
 }
 
 // Function to generate next Student ID
-function generateNextStudentId($conn) {
-    // Get the highest existing student ID
-    $query = "SELECT id_number FROM student_account WHERE id_number LIKE '022%' ORDER BY id_number DESC LIMIT 1";
-    $result = $conn->query($query);
-    
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        $lastId = $row['id_number'];
-        // Extract the numeric part and increment
-        $numericPart = intval(substr($lastId, 3)); // Remove '022' prefix
-        $nextNumber = $numericPart + 1;
-    } else {
-        // First student, start with 1
-        $nextNumber = 1;
+if (!function_exists('generateNextStudentId')) {
+    function generateNextStudentId($conn) {
+        // Get the highest existing student ID
+        $query = "SELECT id_number FROM student_account WHERE id_number LIKE '022%' ORDER BY id_number DESC LIMIT 1";
+        $result = $conn->query($query);
+        
+        if ($result && $result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            $lastId = $row['id_number'];
+            // Extract the numeric part and increment
+            $numericPart = intval(substr($lastId, 3)); // Remove '022' prefix
+            $nextNumber = $numericPart + 1;
+        } else {
+            // First student, start with 1
+            $nextNumber = 1;
+        }
+        
+        // Format as 02200000001, 02200000002, etc.
+        return '022' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
     }
-    
-    // Format as 02200000001, 02200000002, etc.
-    return '022' . str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
@@ -466,25 +468,32 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                     }
                 }
 
-                // AUTO-CREATE TUITION FEE RECORD FOR CASHIER
-                // Find the tuition fee structure for this student's grade level and academic track
+                // AUTO-CREATE TUITION FEE RECORDS FOR CASHIER
+                // Find the tuition fee structure for this student's grade level, academic track, and term
                 $tuition_query = "SELECT * FROM tuition_fee_structure 
                                   WHERE grade_level = ? 
                                   AND academic_track = ? 
                                   AND school_year = ? 
+                                  AND term = ?
                                   LIMIT 1";
                 $tuition_stmt = $conn->prepare($tuition_query);
-                $tuition_stmt->bind_param("sss", $grade_level, $academic_track, $school_year);
+                $tuition_stmt->bind_param("ssss", $grade_level, $academic_track, $school_year, $semester);
                 $tuition_stmt->execute();
                 $tuition_result = $tuition_stmt->get_result();
                 
+                // Log for debugging
+                error_log("Tuition Fee Query - Grade: $grade_level, Track: $academic_track, Year: $school_year, Term: $semester");
+                error_log("Tuition Fee Query - Rows found: " . $tuition_result->num_rows);
+                
                 if ($tuition_result->num_rows > 0) {
                     $tuition_data = $tuition_result->fetch_assoc();
-                    $total_amount = $tuition_data['total_fee'];
+                    $tuition_fee_amount = floatval($tuition_data['tuition_fee']);
+                    $other_fees_amount = floatval($tuition_data['other_fees']);
                     
-                    // Create student fee item record for tuition fee (for Cashier)
-                    $school_year_term = $school_year . ' - ' . $semester;
-                    $fee_type = 'Tuition Fee';
+                    error_log("Tuition Fee Found - Tuition: $tuition_fee_amount, Other: $other_fees_amount");
+                    
+                    // Create school year term format for cashier (e.g., "2025-2026 1st Semester")
+                    $school_year_term = $school_year . ' ' . $semester;
                     $paid_amount = 0.00;
                     
                     $fee_sql = "INSERT INTO student_fee_items (
@@ -496,9 +505,28 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                     ) VALUES (?, ?, ?, ?, ?)";
                     
                     $fee_stmt = $conn->prepare($fee_sql);
-                    $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $total_amount, $paid_amount);
-                    $fee_stmt->execute();
+                    
+                    // Insert Tuition Fee (even if 0)
+                    $fee_type = 'Tuition Fee';
+                    $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $tuition_fee_amount, $paid_amount);
+                    if ($fee_stmt->execute()) {
+                        error_log("Tuition Fee inserted successfully for student: $student_id");
+                    } else {
+                        error_log("Failed to insert Tuition Fee: " . $fee_stmt->error);
+                    }
+                    
+                    // Insert Other Fees (even if 0)
+                    $fee_type = 'Other Fees';
+                    $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $other_fees_amount, $paid_amount);
+                    if ($fee_stmt->execute()) {
+                        error_log("Other Fees inserted successfully for student: $student_id");
+                    } else {
+                        error_log("Failed to insert Other Fees: " . $fee_stmt->error);
+                    }
+                    
                     $fee_stmt->close();
+                } else {
+                    error_log("No tuition fee structure found for Grade: $grade_level, Track: $academic_track, Year: $school_year, Term: $semester");
                 }
                 $tuition_stmt->close();
 
@@ -1079,8 +1107,8 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                             <label class="block text-sm font-semibold mb-1">Semester *</label>
                             <select name="semester" required class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#2F8D46]">
                                 <option value="">Select Term</option>
-                                <option value="1st" <?= ($form_data['semester'] ?? '') === '1st' ? 'selected' : '' ?>>1st Term</option>
-                                <option value="2nd" <?= ($form_data['semester'] ?? '') === '2nd' ? 'selected' : '' ?>>2nd Term</option>
+                                <option value="1st Semester" <?= ($form_data['semester'] ?? '') === '1st Semester' ? 'selected' : '' ?>>1st Semester</option>
+                                <option value="2nd Semester" <?= ($form_data['semester'] ?? '') === '2nd Semester' ? 'selected' : '' ?>>2nd Semester</option>
                             </select>
                         </div>
                     </div>

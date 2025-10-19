@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinder Migration & Cleanup - Navigation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen p-6">
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">🎓 Kinder Migration & Cleanup</h1>
+            <p class="text-gray-600">Fix your Kinder structure in 2 easy steps</p>
+        </div>
+
+        <!-- Current Situation -->
+        <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-bold text-yellow-900 mb-3">📋 Your Current Situation</h2>
+            <p class="text-yellow-800 mb-2">Your database has:</p>
+            <ul class="list-disc list-inside text-yellow-800 space-y-1">
+                <li>Only <strong>"Kinder"</strong> (not "Kinder 1" or "Kinder 2")</li>
+                <li>3 school years: 2024-2025, 2025-2026, 2026-2027</li>
+                <li>Need to update structure</li>
+            </ul>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border-2 border-purple-200">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-2xl font-bold text-purple-600">1</span>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">Migrate Kinder Structure</h3>
+                    <p class="text-gray-600 mb-4">Convert "Kinder" to "Kinder 1" and create "Kinder 2" records</p>
+                    
+                    <div class="bg-purple-50 rounded-lg p-4 mb-4">
+                        <p class="text-sm text-purple-800 mb-2"><strong>What it does:</strong></p>
+                        <ul class="text-sm text-purple-700 space-y-1 list-disc list-inside">
+                            <li>Renames "Kinder" → "Kinder 1"</li>
+                            <li>Creates duplicate "Kinder 2" records</li>
+                            <li>Keeps all prices the same</li>
+                            <li>Takes ~5 seconds</li>
+                        </ul>
+                    </div>
+                    
+                    <a href="migrate_kinder_to_kinder1_kinder2.php" class="inline-block bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-bold transition transform hover:scale-105">
+                        🔄 Start Migration
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border-2 border-red-200">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-2xl font-bold text-red-600">2</span>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">Delete Old School Years <span class="text-sm text-gray-500">(Optional)</span></h3>
+                    <p class="text-gray-600 mb-4">Remove 2024-2025, 2025-2026, 2026-2027 for a fresh start</p>
+                    
+                    <div class="bg-red-50 rounded-lg p-4 mb-4">
+                        <p class="text-sm text-red-800 mb-2"><strong>What it does:</strong></p>
+                        <ul class="text-sm text-red-700 space-y-1 list-disc list-inside">
+                            <li>Deletes 3 school years</li>
+                            <li>Gives you a clean slate</li>
+                            <li>Allows fresh start with correct structure</li>
+                            <li>Takes ~3 seconds</li>
+                        </ul>
+                    </div>
+                    
+                    <a href="cleanup_and_fix_kinder.php" class="inline-block bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition transform hover:scale-105">
+                        🗑️ Run Cleanup
+                    </a>
+                    <span class="ml-3 text-sm text-gray-500">Run this AFTER Step 1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Link -->
+        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg p-6 mb-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold mb-2">✅ After Migration</h3>
+                    <p class="text-blue-100">Go to your dashboard to verify the changes</p>
+                </div>
+                <a href="OwnerF/Dashboard.php" class="bg-white text-blue-600 hover:bg-blue-50 px-6 py-3 rounded-lg font-bold transition transform hover:scale-105">
+                    Go to Dashboard →
+                </a>
+            </div>
+        </div>
+
+        <!-- Documentation -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">📚 Documentation</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <a href="FINAL_INSTRUCTIONS.md" class="block p-4 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition">
+                    <div class="font-bold text-gray-800">📄 Final Instructions</div>
+                    <div class="text-sm text-gray-600">Quick start guide</div>
+                </a>
+                <a href="STEP_BY_STEP_GUIDE.md" class="block p-4 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition">
+                    <div class="font-bold text-gray-800">📋 Step-by-Step Guide</div>
+                    <div class="text-sm text-gray-600">Detailed walkthrough</div>
+                </a>
+                <a href="VISUAL_GUIDE.txt" class="block p-4 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition">
+                    <div class="font-bold text-gray-800">🎨 Visual Guide</div>
+                    <div class="text-sm text-gray-600">ASCII art diagrams</div>
+                </a>
+                <a href="COMPLETE_SUMMARY.md" class="block p-4 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition">
+                    <div class="font-bold text-gray-800">📖 Complete Summary</div>
+                    <div class="text-sm text-gray-600">Full documentation</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Quick Reference -->
+        <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">⚡ Quick Reference</h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">Current Structure:</span>
+                    <span class="font-mono bg-white px-3 py-1 rounded border">Kinder</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">New Structure:</span>
+                    <span class="font-mono bg-white px-3 py-1 rounded border">Kinder 1 + Kinder 2</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">Records per Year:</span>
+                    <span class="font-mono bg-white px-3 py-1 rounded border">66 → 68</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">Total Time:</span>
+                    <span class="font-mono bg-white px-3 py-1 rounded border">< 1 minute</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-gray-500 text-sm">
+            <p>Last Updated: October 19, 2025</p>
+            <p>Status: ✅ Ready to Use</p>
+        </div>
+
+    </div>
+</body>
+</html>

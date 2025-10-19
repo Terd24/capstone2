@@ -903,6 +903,24 @@ $history_result = $conn->query($history_query);
         .priority-high { border-left: 4px solid #ea580c; background: #fff7ed; }
         .priority-medium { border-left: 4px solid #d97706; background: #fffbeb; }
         .priority-low { border-left: 4px solid #65a30d; background: #f7fee7; }
+        
+        /* Custom notification animation */
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        #customNotification {
+            transition: all 0.3s ease-out;
+        }
     </style>
 </head>
 <body class="min-h-screen bg-gray-50 flex">
@@ -1488,10 +1506,10 @@ $history_result = $conn->query($history_query);
             <!-- Tuition Fees Section -->
             <div id="tuition-fees-section" class="section-content hidden">
                 <div class="bg-white rounded-xl card-shadow p-6 mb-6">
-                    <div class="flex justify-between items-center mb-6">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                         <h2 class="text-xl font-bold text-gray-800">💰 Tuition Fee Management</h2>
-                        <button onclick="showAddFeeModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
-                            + Add New Fee Structure
+                        <button onclick="showAddSchoolYearModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
+                            + Add School Year
                         </button>
                     </div>
 
@@ -2586,20 +2604,358 @@ window.addEventListener("pageshow", function(event) {
   if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
 });
 
+// ===== CUSTOM NOTIFICATION SYSTEM =====
+function showNotification(message, type = 'success') {
+    // Remove any existing notifications
+    const existing = document.getElementById('customNotification');
+    if (existing) existing.remove();
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.id = 'customNotification';
+    notification.className = 'fixed top-4 right-4 z-50 max-w-md animate-slide-in';
+    
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+    
+    notification.innerHTML = `
+        <div class="${bgColor} text-white rounded-lg shadow-lg p-4 flex items-start gap-3">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-white bg-opacity-30 flex items-center justify-center font-bold">
+                ${icon}
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">${message}</p>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0 text-white hover:text-gray-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }, 5000);
+}
+
 // ===== TUITION FEE MANAGEMENT =====
+let allTuitionFees = []; // Store all fees
+let yearFeesData = {}; // Store fees grouped by year for filtering
+
 function loadTuitionFees() {
     fetch('ManageTuitionFees.php?action=get_fees')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                allTuitionFees = data.fees;
                 displayTuitionFees(data.fees);
             }
         })
         .catch(error => console.error('Error loading tuition fees:', error));
 }
 
+function updateAcademicTrackOptions(yearId) {
+    const level = document.getElementById(`filterLevel-${yearId}`).value;
+    const trackSelect = document.getElementById(`filterTrack-${yearId}`);
+    
+    if (!trackSelect) return;
+    
+    // Clear current options
+    trackSelect.innerHTML = '<option value="">All Tracks</option>';
+    
+    if (level === 'shs') {
+        // Show only Senior High School tracks (matching database values from add_account.php)
+        trackSelect.disabled = false;
+        trackSelect.innerHTML = `
+            <option value="">All Tracks</option>
+            <option value="ABM">ABM (Accountancy, Business & Management)</option>
+            <option value="GAS">GAS (General Academic Strand)</option>
+            <option value="HE">HE (Home Economics)</option>
+            <option value="HUMSS">HUMSS (Humanities & Social Sciences)</option>
+            <option value="ICT">ICT (Information and Communications Technology)</option>
+            <option value="SPORTS">SPORTS</option>
+            <option value="STEM">STEM (Science, Technology, Engineering & Mathematics)</option>
+        `;
+    } else if (level === 'college') {
+        // Show only College courses (supporting both database formats)
+        trackSelect.disabled = false;
+        trackSelect.innerHTML = `
+            <option value="">All Tracks</option>
+            <option value="BPEd">BPEd (Bachelor of Physical Education)</option>
+            <option value="BECEd">BECEd (Bachelor of Early Childhood Education)</option>
+        `;
+    } else if (level === '' || level === 'kinder' || level === 'elementary' || level === 'jhs') {
+        // For lower grades or "All Levels", disable the track dropdown
+        trackSelect.disabled = true;
+        trackSelect.innerHTML = '<option value="">Not Applicable</option>';
+    }
+}
+
+function filterYearFees(yearId) {
+    const searchBar = document.getElementById(`searchBar-${yearId}`)?.value.toLowerCase() || '';
+    const term = document.getElementById(`filterTerm-${yearId}`).value;
+    const level = document.getElementById(`filterLevel-${yearId}`).value;
+    const track = document.getElementById(`filterTrack-${yearId}`).value;
+    
+    // Get original fees for this year
+    let filtered = yearFeesData[yearId] || [];
+    
+    // Filter by search bar
+    if (searchBar) {
+        filtered = filtered.filter(f => {
+            const searchText = `${f.grade_level} ${f.term} ${f.academic_track || ''}`.toLowerCase();
+            return searchText.includes(searchBar);
+        });
+    }
+    
+    // Filter by term
+    if (term) {
+        filtered = filtered.filter(f => f.term === term);
+    }
+    
+    // Filter by education level
+    if (level) {
+        filtered = filtered.filter(f => {
+            const gradeText = f.grade_level.toLowerCase().trim();
+            switch(level) {
+                case 'kinder': return gradeText.includes('kinder');
+                case 'elementary': return gradeText.match(/\bgrade\s*[1-6]\b/);
+                case 'jhs': return gradeText.match(/\bgrade\s*(7|8|9|10)\b/);
+                case 'shs': return gradeText.match(/\bgrade\s*(11|12)\b/);
+                case 'college': return gradeText.includes('year');
+                default: return true;
+            }
+        });
+    }
+    
+    // Filter by academic track
+    if (track) {
+        filtered = filtered.filter(f => {
+            const academicTrack = f.academic_track || '';
+            // Handle both formats: "BPEd" matches both "BPEd (Bachelor...)" and "Bachelor... (BPEd)"
+            if (track === 'BPEd') {
+                return academicTrack.includes('BPEd') || academicTrack.includes('Bachelor of Physical Education');
+            } else if (track === 'BECEd') {
+                return academicTrack.includes('BECEd') || academicTrack.includes('Bachelor of Early Childhood Education');
+            }
+            return academicTrack === track;
+        });
+    }
+    
+    // Update count
+    document.getElementById(`filterCount-${yearId}`).textContent = filtered.length;
+    
+    // Re-render cards for this year (reset to page 1)
+    renderYearCards(yearId, filtered, 1);
+}
+
+function clearYearFilters(yearId) {
+    if (document.getElementById(`searchBar-${yearId}`)) {
+        document.getElementById(`searchBar-${yearId}`).value = '';
+    }
+    document.getElementById(`filterTerm-${yearId}`).value = '';
+    document.getElementById(`filterLevel-${yearId}`).value = '';
+    document.getElementById(`filterTrack-${yearId}`).value = '';
+    
+    // Reset Academic Track dropdown to disabled state
+    updateAcademicTrackOptions(yearId);
+    
+    filterYearFees(yearId);
+}
+
+// Store current page for each year
+let yearCurrentPage = {};
+
+function renderYearCards(yearId, fees, page = 1) {
+    const container = document.getElementById(`feeCards-${yearId}`);
+    const paginationContainer = document.getElementById(`pagination-${yearId}`);
+    if (!container) return;
+    
+    const itemsPerPage = 6;
+    yearCurrentPage[yearId] = page;
+    
+    if (fees.length === 0) {
+        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No fee structures match the selected filters</div>';
+        if (paginationContainer) paginationContainer.innerHTML = '';
+        return;
+    }
+    
+    // Sort fees
+    const sortedFees = fees.sort((a, b) => {
+        const getOrder = (gradeLevel) => {
+            const grade = gradeLevel.toLowerCase().trim();
+            // Kinder 1 and Kinder 2
+            if (grade === 'kinder 1') return 0;
+            if (grade === 'kinder 2') return 0.5;
+            if (grade.includes('kinder')) return 0; // Fallback for old "Kinder" entries
+            // Elementary (Grade 1-6) - use word boundaries to avoid matching Grade 10, 11, 12
+            if (grade.match(/\bgrade\s*1\b/)) return 1;
+            if (grade.match(/\bgrade\s*2\b/)) return 2;
+            if (grade.match(/\bgrade\s*3\b/)) return 3;
+            if (grade.match(/\bgrade\s*4\b/)) return 4;
+            if (grade.match(/\bgrade\s*5\b/)) return 5;
+            if (grade.match(/\bgrade\s*6\b/)) return 6;
+            // Junior High (Grade 7-10)
+            if (grade.match(/\bgrade\s*7\b/)) return 7;
+            if (grade.match(/\bgrade\s*8\b/)) return 8;
+            if (grade.match(/\bgrade\s*9\b/)) return 9;
+            if (grade.match(/\bgrade\s*10\b/)) return 10;
+            // Senior High (Grade 11-12)
+            if (grade.match(/\bgrade\s*11\b/)) return 11;
+            if (grade.match(/\bgrade\s*12\b/)) return 12;
+            // College (1st-4th Year)
+            if (grade.includes('1st year')) return 13;
+            if (grade.includes('2nd year')) return 14;
+            if (grade.includes('3rd year')) return 15;
+            if (grade.includes('4th year')) return 16;
+            return 999;
+        };
+        
+        const orderA = getOrder(a.grade_level);
+        const orderB = getOrder(b.grade_level);
+        
+        if (orderA !== orderB) return orderA - orderB;
+        return a.academic_track.localeCompare(b.academic_track);
+    });
+    
+    // Calculate pagination
+    const totalPages = Math.ceil(sortedFees.length / itemsPerPage);
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedFees = sortedFees.slice(startIndex, endIndex);
+    
+    // Render cards
+    let html = '';
+    paginatedFees.forEach(fee => {
+        html += `
+            <div class="group border border-gray-200 rounded-xl p-5 hover:shadow-lg hover:border-blue-300 transition-all duration-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <h4 class="font-bold text-gray-900 text-base mb-1">${fee.grade_level}</h4>
+                        <p class="text-sm text-gray-500 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                            ${fee.academic_track}
+                        </p>
+                    </div>
+                    <button onclick="editTuitionFee(${fee.id})" class="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-blue-50 rounded-lg text-blue-600 hover:text-blue-800">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="space-y-2.5">
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-sm text-gray-600">Tuition Fee</span>
+                        <span class="font-semibold text-gray-900">₱${parseFloat(fee.tuition_fee).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span class="text-sm text-gray-600">Other Fees</span>
+                        <span class="font-semibold text-gray-900">₱${parseFloat(fee.other_fees).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-3 mt-2 border-t-2 border-blue-100">
+                        <span class="text-base font-bold text-gray-800">Total Amount</span>
+                        <span class="text-lg font-bold text-blue-600">₱${parseFloat(fee.total_fee).toLocaleString('en-PH', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                        <div class="flex items-center justify-center gap-2 text-xs">
+                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <span class="font-semibold text-indigo-600">${fee.term || '1st Semester'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    });
+    
+    container.innerHTML = html;
+    
+    // Render pagination if needed
+    if (paginationContainer && totalPages > 1) {
+        let paginationHtml = '<div class="flex items-center justify-center gap-2 mt-6">';
+        
+        // Previous button
+        paginationHtml += `
+            <button onclick="changeYearPage('${yearId}', ${page - 1})" 
+                    ${page === 1 ? 'disabled' : ''}
+                    class="px-3 py-2 rounded-lg border ${page === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50 text-gray-700'} transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>`;
+        
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= page - 1 && i <= page + 1)) {
+                paginationHtml += `
+                    <button onclick="changeYearPage('${yearId}', ${i})" 
+                            class="px-4 py-2 rounded-lg ${i === page ? 'bg-blue-600 text-white' : 'bg-white hover:bg-gray-50 text-gray-700'} border transition">
+                        ${i}
+                    </button>`;
+            } else if (i === page - 2 || i === page + 2) {
+                paginationHtml += '<span class="px-2 text-gray-400">...</span>';
+            }
+        }
+        
+        // Next button
+        paginationHtml += `
+            <button onclick="changeYearPage('${yearId}', ${page + 1})" 
+                    ${page === totalPages ? 'disabled' : ''}
+                    class="px-3 py-2 rounded-lg border ${page === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50 text-gray-700'} transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>`;
+        
+        paginationHtml += '</div>';
+        paginationContainer.innerHTML = paginationHtml;
+    } else if (paginationContainer) {
+        paginationContainer.innerHTML = '';
+    }
+}
+
+function changeYearPage(yearId, page) {
+    const term = document.getElementById(`filterTerm-${yearId}`).value;
+    const level = document.getElementById(`filterLevel-${yearId}`).value;
+    
+    // Get filtered fees
+    let filtered = yearFeesData[yearId] || [];
+    
+    if (term) {
+        filtered = filtered.filter(f => f.term === term);
+    }
+    
+    if (level) {
+        filtered = filtered.filter(f => {
+            const grade = f.grade_level.toLowerCase().trim();
+            switch(level) {
+                case 'kinder': return grade.includes('kinder');
+                case 'elementary': return grade.match(/\bgrade\s*[1-6]\b/);
+                case 'jhs': return grade.match(/\bgrade\s*(7|8|9|10)\b/);
+                case 'shs': return grade.match(/\bgrade\s*(11|12)\b/);
+                case 'college': return grade.includes('year');
+                default: return true;
+            }
+        });
+    }
+    
+    renderYearCards(yearId, filtered, page);
+}
+
 function displayTuitionFees(fees) {
     const container = document.getElementById('tuition-fees-list');
+    
     if (fees.length === 0) {
         container.innerHTML = '<div class="text-center py-12 text-gray-500">No tuition fee structures found</div>';
         return;
@@ -2613,96 +2969,201 @@ function displayTuitionFees(fees) {
     });
     
     let html = '';
-    Object.keys(grouped).sort().reverse().forEach(year => {
-        html += `<div class="mb-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-3">School Year: ${year}</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
+    const years = Object.keys(grouped).sort().reverse();
+    
+    years.forEach((year, index) => {
+        const isExpanded = index === 0; // Only first year expanded by default
+        const yearId = year.replace(/[^a-zA-Z0-9]/g, '');
         
-        grouped[year].forEach(fee => {
-            html += `
-                <div class="border rounded-lg p-4 hover:shadow-md transition">
-                    <div class="flex justify-between items-start mb-3">
-                        <div>
-                            <h4 class="font-semibold text-gray-900">${fee.grade_level}</h4>
-                            <p class="text-sm text-gray-600">${fee.academic_track}</p>
-                        </div>
-                        <button onclick="editTuitionFee(${fee.id})" class="text-blue-600 hover:text-blue-800">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                            </svg>
-                        </button>
+        html += `
+            <div class="mb-4 border rounded-lg overflow-hidden">
+                <button onclick="toggleYearSection('${yearId}')" class="w-full bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 px-6 py-4 flex items-center justify-between transition">
+                    <div class="flex items-center gap-3">
+                        <svg id="icon-${yearId}" class="w-5 h-5 text-blue-600 transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        <h3 class="text-lg font-bold text-gray-800">School Year: ${year}</h3>
                     </div>
-                    <div class="space-y-1 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Tuition Fee:</span>
-                            <span class="font-medium">₱${parseFloat(fee.tuition_fee).toLocaleString()}</span>
+                    <span class="text-sm text-gray-600 bg-white px-3 py-1 rounded-full">${grouped[year].length} fee structures</span>
+                </button>
+                
+                <div id="year-${yearId}" class="${isExpanded ? '' : 'hidden'} p-6 bg-white">
+                    <!-- Filters inside school year section -->
+                    <div class="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
+                        <!-- Search Bar -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                            <input type="text" id="searchBar-${yearId}" oninput="filterYearFees('${yearId}')" placeholder="Search by grade, level, or term..." class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Other Fees:</span>
-                            <span class="font-medium">₱${parseFloat(fee.other_fees).toLocaleString()}</span>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Term/Semester</label>
+                                <select id="filterTerm-${yearId}" onchange="filterYearFees('${yearId}')" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="">All Terms</option>
+                                    <option value="1st Semester">1st Semester</option>
+                                    <option value="2nd Semester">2nd Semester</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Education Level</label>
+                                <select id="filterLevel-${yearId}" onchange="updateAcademicTrackOptions('${yearId}'); filterYearFees('${yearId}')" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="">All Levels</option>
+                                    <option value="kinder">Pre-Elementary (Kinder)</option>
+                                    <option value="elementary">Elementary (Grade 1-6)</option>
+                                    <option value="jhs">Junior High School (Grade 7-10)</option>
+                                    <option value="shs">Senior High School (Grade 11-12)</option>
+                                    <option value="college">College (1st-4th Year)</option>
+                                </select>
+                            </div>
+                            <div id="trackWrapper-${yearId}">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Academic Track</label>
+                                <select id="filterTrack-${yearId}" onchange="filterYearFees('${yearId}')" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" disabled>
+                                    <option value="">All Tracks</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="flex justify-between border-t pt-1 mt-1">
-                            <span class="text-gray-800 font-semibold">Total:</span>
-                            <span class="font-bold text-blue-600">₱${parseFloat(fee.total_fee).toLocaleString()}</span>
+                        <div class="mt-3 flex items-center justify-between">
+                            <p class="text-sm text-gray-600">
+                                <span id="filterCount-${yearId}" class="font-semibold">${grouped[year].length}</span> fee structures
+                            </p>
+                            <button onclick="clearYearFilters('${yearId}')" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                Clear Filters
+                            </button>
                         </div>
                     </div>
-                </div>`;
-        });
+                    
+                    <div id="feeCards-${yearId}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+                    <div id="pagination-${yearId}"></div>
+                </div>
+            </div>`;
         
-        html += `</div></div>`;
+        // Store fees for this year for filtering
+        yearFeesData[yearId] = grouped[year];
     });
     
     container.innerHTML = html;
+    
+    // Render cards for each year
+    Object.keys(yearFeesData).forEach(yearId => {
+        renderYearCards(yearId, yearFeesData[yearId]);
+    });
 }
 
-function showAddFeeModal() {
-    const modal = document.createElement('div');
-    modal.id = 'addFeeModal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-    modal.innerHTML = `
-        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 class="text-xl font-bold mb-4">Add Tuition Fee Structure</h3>
-            <form onsubmit="submitAddFee(event)">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Grade Level</label>
-                        <input type="text" name="grade_level" required class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Academic Track</label>
-                        <input type="text" name="academic_track" required class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Tuition Fee</label>
-                        <input type="number" step="0.01" name="tuition_fee" required class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Other Fees</label>
-                        <input type="number" step="0.01" name="other_fees" required class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">School Year</label>
-                        <input type="text" name="school_year" placeholder="2024-2025" required class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                </div>
-                <div class="flex gap-3 mt-6">
-                    <button type="button" onclick="closeAddFeeModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">Cancel</button>
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Add</button>
-                </div>
-            </form>
-        </div>`;
-    document.body.appendChild(modal);
+function toggleYearSection(yearId) {
+    const section = document.getElementById('year-' + yearId);
+    const icon = document.getElementById('icon-' + yearId);
+    
+    if (section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+        icon.classList.add('rotate-90');
+    } else {
+        section.classList.add('hidden');
+        icon.classList.remove('rotate-90');
+    }
 }
 
-function closeAddFeeModal() {
-    const modal = document.getElementById('addFeeModal');
+function showAddSchoolYearModal() {
+    // Get current year and calculate school year
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 0-11, so add 1
+    
+    // If current month is June-December, school year is current-next
+    // If current month is January-May, school year is previous-current
+    let startYear, endYear;
+    if (currentMonth >= 6) {
+        startYear = currentYear;
+        endYear = currentYear + 1;
+    } else {
+        startYear = currentYear - 1;
+        endYear = currentYear;
+    }
+    
+    const currentSchoolYear = `${startYear}-${endYear}`;
+    
+    // Fetch existing school years for copy option
+    fetch('ManageTuitionFees.php?action=get_fees')
+        .then(response => response.json())
+        .then(data => {
+            const existingYears = [...new Set(data.fees.map(f => f.school_year))].sort().reverse();
+            
+            let yearOptions = '<option value="">Start with ₱0.00 (blank)</option>';
+            existingYears.forEach(year => {
+                yearOptions += `<option value="${year}">Copy from ${year}</option>`;
+            });
+            
+            const modal = document.createElement('div');
+            modal.id = 'addSchoolYearModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+                    <h3 class="text-xl font-bold mb-4">Add School Year</h3>
+                    <p class="text-sm text-gray-600 mb-4">Create all grade levels, tracks, and terms for a new school year.</p>
+                    <form onsubmit="submitAddSchoolYear(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">School Year</label>
+                                <input type="text" name="school_year" value="${currentSchoolYear}" required 
+                                       pattern="[0-9]{4}-[0-9]{4}"
+                                       class="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">
+                                <p class="text-xs text-gray-500 mt-1">Current school year auto-filled</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Copy Prices From</label>
+                                <select name="copy_from_year" id="copyFromYear" onchange="toggleCopyInfo()" class="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500">
+                                    ${yearOptions}
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">Optional: Copy prices from previous year</p>
+                            </div>
+                            <div id="copyInfo" class="hidden bg-green-50 border border-green-200 rounded-lg p-3">
+                                <p class="text-sm text-green-900">✓ Prices will be copied from the selected year</p>
+                            </div>
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <p class="text-sm text-blue-900 font-medium mb-2">What will be created:</p>
+                                <ul class="text-xs text-blue-800 space-y-1">
+                                    <li>✓ All grade levels (Kinder to 4th Year)</li>
+                                    <li>✓ All tracks/strands (Elementary, JHS, SHS, College)</li>
+                                    <li>✓ Both 1st and 2nd Semester</li>
+                                    <li>✓ Total: 66 fee structures</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mt-6">
+                            <button type="button" onclick="closeAddSchoolYearModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">Cancel</button>
+                            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Create School Year</button>
+                        </div>
+                    </form>
+                </div>`;
+            document.body.appendChild(modal);
+        });
+}
+
+function toggleCopyInfo() {
+    const copySelect = document.getElementById('copyFromYear');
+    const copyInfo = document.getElementById('copyInfo');
+    if (copySelect && copyInfo) {
+        if (copySelect.value) {
+            copyInfo.classList.remove('hidden');
+        } else {
+            copyInfo.classList.add('hidden');
+        }
+    }
+}
+
+function closeAddSchoolYearModal() {
+    const modal = document.getElementById('addSchoolYearModal');
     if (modal) modal.remove();
 }
 
-function submitAddFee(event) {
+function submitAddSchoolYear(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
-    formData.append('action', 'add_fee');
+    formData.append('action', 'add_school_year');
+    
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
     
     fetch('ManageTuitionFees.php', {
         method: 'POST',
@@ -2711,12 +3172,19 @@ function submitAddFee(event) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            closeAddFeeModal();
+            closeAddSchoolYearModal();
             loadTuitionFees();
-            alert('Tuition fee structure added successfully!');
+            showNotification(`Success! ${data.inserted} fee structures created for school year ${formData.get('school_year')}. You can now edit the prices.`, 'success');
         } else {
-            alert('Error: ' + data.message);
+            showNotification('Error: ' + data.message, 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Create School Year';
         }
+    })
+    .catch(error => {
+        showNotification('Error: ' + error.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create School Year';
     });
 }
 
@@ -2752,6 +3220,13 @@ function editTuitionFee(id) {
                                 <label class="block text-sm font-medium mb-1">Other Fees</label>
                                 <input type="number" step="0.01" name="other_fees" value="${fee.other_fees}" required class="w-full border rounded-lg px-3 py-2">
                             </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Term/Semester</label>
+                                <select name="term" required class="w-full border rounded-lg px-3 py-2">
+                                    <option value="1st Semester" ${fee.term === '1st Semester' ? 'selected' : ''}>1st Semester</option>
+                                    <option value="2nd Semester" ${fee.term === '2nd Semester' ? 'selected' : ''}>2nd Semester</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="flex gap-3 mt-6">
                             <button type="button" onclick="closeEditFeeModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">Cancel</button>
@@ -2783,9 +3258,9 @@ function submitEditFee(event, id) {
         if (data.success) {
             closeEditFeeModal();
             loadTuitionFees();
-            alert('Tuition fee updated successfully!');
+            showNotification('Tuition fee updated successfully!', 'success');
         } else {
-            alert('Error: ' + data.message);
+            showNotification('Error: ' + data.message, 'error');
         }
     });
 }
