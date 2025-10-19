@@ -677,7 +677,7 @@ $module_stats_result = $conn->query($module_stats_query);
                     <div class="space-y-4 max-h-96 overflow-y-auto">
                         <?php if ($notifications_result && $notifications_result->num_rows > 0): ?>
                             <?php while ($notification = $notifications_result->fetch_assoc()): ?>
-                                <div class="border rounded-lg p-4 <?= $notification['is_read'] ? 'bg-gray-50' : 'bg-white border-l-4 border-blue-500' ?>">
+                                <div class="border rounded-lg p-4 <?= $notification['is_read'] ? 'bg-gray-50' : 'bg-white border-l-4 border-blue-500' ?> cursor-pointer hover:shadow-md transition-all duration-200" onclick="toggleNotificationDetails(<?= $notification['id'] ?>)">
                                     <div class="flex justify-between items-start mb-3">
                                         <div class="flex-1">
                                             <div class="flex items-center gap-2 mb-2">
@@ -704,9 +704,9 @@ $module_stats_result = $conn->query($module_stats_query);
                                             </p>
                                         </div>
                                         <?php if (!$notification['is_read']): ?>
-                                            <form method="POST" class="ml-4">
+                                            <form method="POST" class="ml-4" onclick="event.stopPropagation()">
                                                 <input type="hidden" name="notification_id" value="<?= $notification['id'] ?>">
-                                                <button type="submit" name="mark_read" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                                <button type="submit" name="mark_read" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
                                                     Mark Read
                                                 </button>
                                             </form>
@@ -850,7 +850,7 @@ $module_stats_result = $conn->query($module_stats_query);
                                             
                                             <!-- View Details Button -->
                                             <div class="flex-shrink-0">
-                                                <button class="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-lg shadow-sm border border-gray-300 transition-colors text-sm">
+                                                <button onclick="event.stopPropagation();" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm">
                                                     View Details
                                                 </button>
                                             </div>
@@ -1110,6 +1110,9 @@ function showSection(sectionId, event) {
         event.preventDefault();
     }
     
+    // Store current section in sessionStorage
+    sessionStorage.setItem('ownerCurrentSection', sectionId);
+    
     // Hide all sections
     document.querySelectorAll('.section-content').forEach(section => {
         section.classList.add('hidden');
@@ -1126,9 +1129,18 @@ function showSection(sectionId, event) {
         targetSection.classList.remove('hidden');
     }
     
-    // Add active class to clicked nav item
-    if (event) {
-        event.target.closest('.nav-item').classList.add('active');
+    // Add active class to clicked nav item or find by href
+    if (event && event.target) {
+        const navItem = event.target.closest('.nav-item');
+        if (navItem) {
+            navItem.classList.add('active');
+        }
+    } else {
+        // If no click event, find the nav item by href
+        const navItem = document.querySelector(`a[href="#${sectionId}"]`);
+        if (navItem) {
+            navItem.classList.add('active');
+        }
     }
     
     // Update page title
@@ -1139,6 +1151,22 @@ function showSection(sectionId, event) {
         'module-activity': 'Module Activity'
     };
     document.getElementById('page-title').textContent = titles[sectionId] || 'Dashboard';
+}
+
+// Toggle notification details (expand/collapse)
+function toggleNotificationDetails(notificationId) {
+    const notification = event.currentTarget;
+    const isExpanded = notification.classList.contains('expanded');
+    
+    if (isExpanded) {
+        notification.classList.remove('expanded');
+    } else {
+        // Collapse all other notifications
+        document.querySelectorAll('.border.rounded-lg.p-4.expanded').forEach(n => {
+            n.classList.remove('expanded');
+        });
+        notification.classList.add('expanded');
+    }
 }
 
 // Open request details in modal
@@ -1304,8 +1332,15 @@ function submitApproval() {
     form.submit();
 }
 
-// Show notifications
+// Restore section on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // Restore the saved section or show dashboard
+    const savedSection = sessionStorage.getItem('ownerCurrentSection');
+    const sectionToShow = savedSection || 'dashboard';
+    
+    // Always call showSection to properly set active classes
+    showSection(sectionToShow);
+    
     const successNotif = document.getElementById('successNotif');
     const errorNotif = document.getElementById('errorNotif');
     
@@ -1328,13 +1363,444 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Auto-refresh every 30 seconds to check for new requests (only on dashboard)
-setInterval(function() {
-    // Only refresh if we're on dashboard
-    if (!document.getElementById('dashboard-section').classList.contains('hidden')) {
-        window.location.reload();
+// Real-time polling for new approval requests
+let lastRequestCheck = '<?= date('Y-m-d H:i:s') ?>';
+let requestCheckInterval;
+
+// Start polling when on approval-requests section
+document.addEventListener('DOMContentLoaded', function() {
+    // Check every 5 seconds for new requests
+    requestCheckInterval = setInterval(checkForNewRequests, 5000);
+});
+
+async function checkForNewRequests() {
+    // Only check if we're on the approval-requests section
+    const approvalSection = document.getElementById('approval-requests-section');
+    if (!approvalSection || approvalSection.classList.contains('hidden')) {
+        return;
     }
-}, 30000);
+    
+    try {
+        const response = await fetch(`check_new_requests.php?last_check=${encodeURIComponent(lastRequestCheck)}`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update counts
+            if (data.counts) {
+                updateRequestCounts(data.counts);
+            }
+            
+            // Show notification and add new requests dynamically
+            if (data.new_requests && data.new_requests.length > 0) {
+                data.new_requests.forEach(request => {
+                    showNewRequestNotification(request);
+                    addRequestToList(request);
+                });
+            }
+            
+            // Update last check time
+            lastRequestCheck = data.current_time;
+        }
+    } catch (error) {
+        console.error('Error checking for new requests:', error);
+    }
+}
+
+function updateRequestCounts(counts) {
+    // Update pending count
+    const pendingCount = document.querySelector('.text-yellow-600')?.closest('.bg-yellow-50')?.querySelector('.text-3xl');
+    if (pendingCount) {
+        pendingCount.textContent = counts.pending_requests || 0;
+    }
+    
+    // Update approved count
+    const approvedCount = document.querySelector('.text-green-600')?.closest('.bg-green-50')?.querySelector('.text-3xl');
+    if (approvedCount) {
+        approvedCount.textContent = counts.approved_requests || 0;
+    }
+    
+    // Update rejected count
+    const rejectedCount = document.querySelector('.text-red-600')?.closest('.bg-red-50')?.querySelector('.text-3xl');
+    if (rejectedCount) {
+        rejectedCount.textContent = counts.rejected_requests || 0;
+    }
+    
+    // Update total count
+    const totalCount = document.querySelector('.text-blue-600')?.closest('.bg-blue-50')?.querySelector('.text-3xl');
+    if (totalCount) {
+        totalCount.textContent = counts.total_requests || 0;
+    }
+    
+    // Update badge in sidebar
+    const badge = document.querySelector('.nav-item [onclick*="approval-requests"] .bg-yellow-500');
+    if (badge && counts.pending_requests > 0) {
+        badge.textContent = counts.pending_requests;
+    }
+}
+
+function showNewRequestNotification(request) {
+    // Create notification container if it doesn't exist
+    let notificationContainer = document.getElementById('request-notification-container');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'request-notification-container';
+        notificationContainer.className = 'fixed top-4 right-4 z-50 flex flex-col gap-3';
+        document.body.appendChild(notificationContainer);
+    }
+    
+    // Priority colors
+    const priorityColors = {
+        'critical': 'from-red-500 to-red-600',
+        'high': 'from-orange-500 to-orange-600',
+        'medium': 'from-yellow-500 to-yellow-600',
+        'low': 'from-blue-500 to-blue-600'
+    };
+    
+    const bgColor = priorityColors[request.priority] || 'from-blue-500 to-blue-600';
+    
+    // Create notification
+    const notification = document.createElement('div');
+    notification.className = `bg-gradient-to-r ${bgColor} text-white rounded-lg shadow-2xl p-5 max-w-md transform translate-x-full transition-all duration-500 ease-out`;
+    
+    notification.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 bg-white bg-opacity-20 rounded-full p-2">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between mb-1">
+                    <h4 class="text-base font-bold text-white">🔔 New Request!</h4>
+                    <button onclick="this.closest('.bg-gradient-to-r').remove()" class="text-white hover:text-gray-200 transition-colors ml-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-sm text-white font-medium">
+                        ${request.title}
+                    </p>
+                    <p class="text-xs text-white opacity-90">
+                        <strong>From:</strong> ${request.requester}
+                    </p>
+                    <p class="text-xs text-white opacity-90">
+                        <strong>Priority:</strong> ${request.priority.toUpperCase()}
+                    </p>
+                    <p class="text-xs text-white opacity-90">
+                        <strong>Time:</strong> ${request.requestedAt}
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    notificationContainer.appendChild(notification);
+    
+    // Slide in animation
+    setTimeout(() => {
+        notification.classList.remove('translate-x-full');
+    }, 100);
+    
+    // Play notification sound
+    playNotificationSound();
+    
+    // Auto remove after 10 seconds
+    setTimeout(() => {
+        notification.classList.add('translate-x-full');
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 500);
+    }, 10000);
+}
+
+function addRequestToList(request) {
+    // Find the pending requests container
+    const requestsContainer = document.querySelector('#approval-requests-section .space-y-3');
+    if (!requestsContainer) {
+        console.error('Could not find requests container');
+        return;
+    }
+    
+    // Check if "All caught up!" message is showing and remove it
+    const caughtUpMessage = requestsContainer.querySelector('.text-gray-500.text-center');
+    if (caughtUpMessage) {
+        caughtUpMessage.closest('.bg-white').remove();
+    }
+    
+    // Priority colors matching PHP
+    const priorityColors = {
+        'critical': { bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-800', icon: 'text-red-600' },
+        'high': { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800', icon: 'text-orange-600' },
+        'medium': { bg: 'bg-yellow-50', border: 'border-yellow-200', badge: 'bg-yellow-100 text-yellow-800', icon: 'text-yellow-600' },
+        'low': { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-800', icon: 'text-green-600' }
+    };
+    
+    const colors = priorityColors[request.priority] || priorityColors['medium'];
+    
+    // Parse description and reason
+    let description = request.description || '';
+    let reason = '';
+    if (description.includes('Reason:')) {
+        const parts = description.split('Reason:');
+        description = parts[0].trim();
+        reason = parts[1].trim();
+    }
+    
+    // Parse target data
+    let targetData = {};
+    try {
+        targetData = request.target_data ? JSON.parse(request.target_data) : {};
+    } catch (e) {
+        console.error('Error parsing target_data:', e);
+    }
+    
+    const isStudent = request.type.includes('student');
+    const detailsTitle = isStudent ? 'Student Details' : 'Employee Details';
+    const idLabel = isStudent ? 'Student ID' : 'Employee ID';
+    
+    // Build target details HTML
+    let targetDetailsHTML = '';
+    if (Object.keys(targetData).length > 0) {
+        let detailsContent = '';
+        
+        if (targetData.id_number) {
+            detailsContent += `
+                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <span class="text-gray-600 font-medium block mb-1.5">${idLabel}</span>
+                    <span class="font-bold text-gray-900 bg-white px-3 py-1.5 rounded border border-gray-300 inline-block">${targetData.id_number}</span>
+                </div>`;
+        }
+        
+        if (targetData.first_name || targetData.last_name) {
+            const fullName = [targetData.first_name, targetData.middle_name, targetData.last_name].filter(Boolean).join(' ');
+            detailsContent += `
+                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <span class="text-gray-600 font-medium block mb-1.5">Full Name</span>
+                    <span class="font-bold text-gray-900 text-base">${fullName}</span>
+                </div>`;
+        }
+        
+        if (isStudent) {
+            if (targetData.grade_level) {
+                detailsContent += `
+                    <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="text-gray-600 font-medium block mb-1.5">Grade Level</span>
+                        <span class="font-semibold text-gray-900">${targetData.grade_level}</span>
+                    </div>`;
+            }
+            if (targetData.academic_track) {
+                detailsContent += `
+                    <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="text-gray-600 font-medium block mb-1.5">Academic Track</span>
+                        <span class="font-semibold text-gray-900">${targetData.academic_track}</span>
+                    </div>`;
+            }
+        } else {
+            if (targetData.position) {
+                detailsContent += `
+                    <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="text-gray-600 font-medium block mb-1.5">Position</span>
+                        <span class="font-semibold text-gray-900">${targetData.position}</span>
+                    </div>`;
+            }
+            if (targetData.department) {
+                detailsContent += `
+                    <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="text-gray-600 font-medium block mb-1.5">Department</span>
+                        <span class="font-semibold text-gray-900">${targetData.department}</span>
+                    </div>`;
+            }
+        }
+        
+        if (targetData.deletion_reason) {
+            detailsContent += `
+                <div class="p-3 bg-red-50 rounded-lg border-2 border-red-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <span class="text-red-800 font-bold">Deletion Reason</span>
+                    </div>
+                    <p class="font-medium text-gray-900 bg-white p-3 rounded-lg border border-red-300 leading-relaxed">${targetData.deletion_reason}</p>
+                </div>`;
+        }
+        
+        targetDetailsHTML = `
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        ${isStudent ? 
+                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"/>' :
+                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>'
+                        }
+                    </svg>
+                    <p class="text-sm font-bold text-gray-800">${detailsTitle}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 space-y-2.5 shadow-sm">
+                    ${detailsContent}
+                </div>
+            </div>`;
+    }
+    
+    // Create card HTML matching existing PHP structure
+    const cardHTML = `
+        <div class="border-2 ${colors.border} rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200" style="opacity: 0; transform: scale(0.95); transition: all 0.5s;">
+            <div class="${colors.bg} p-5 cursor-pointer hover:opacity-90 transition-opacity" onclick="openRequestModal(${request.id})">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-4 flex-1">
+                        <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 ${colors.icon}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="px-3 py-1 rounded-full text-xs font-bold ${colors.badge} shadow-sm">${request.priority.toUpperCase()}</span>
+                                <span class="px-2 py-1 rounded bg-white text-xs font-medium text-gray-600 shadow-sm">${request.type.replace(/_/g, ' ')}</span>
+                                <span class="px-2 py-1 rounded bg-green-500 text-white text-xs font-bold shadow-sm new-badge-${request.id}">NEW</span>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-base mb-1">${request.title}</h3>
+                            <div class="flex items-center gap-2 text-xs text-gray-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                                <span class="font-medium">${request.requester}</span>
+                                <span class="text-gray-400">•</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>${request.requestedAt}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="event.stopPropagation(); openRequestModal(${request.id});" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm">
+                        View Details
+                    </button>
+                </div>
+            </div>
+            <div id="details-${request.id}" class="hidden border-t-2 ${colors.border} bg-white p-6">
+                <div class="space-y-4">
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="flex items-start gap-2 mb-2">
+                            <svg class="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-700 mb-1">Description</p>
+                                <p class="text-sm text-gray-600 leading-relaxed">${description}</p>
+                            </div>
+                        </div>
+                    </div>
+                    ${reason ? `
+                    <div class="bg-yellow-50 rounded-lg p-4 border-2 border-yellow-300">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-yellow-800 mb-2">Reason for Request</p>
+                                <p class="text-sm text-yellow-900 leading-relaxed bg-white px-3 py-2 rounded border border-yellow-200">${reason}</p>
+                            </div>
+                        </div>
+                    </div>` : ''}
+                    <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-700 mb-1">Requested by</p>
+                                <p class="text-sm text-gray-600">
+                                    <span class="font-semibold">${request.requester}</span>
+                                    <span class="text-gray-400 mx-1">•</span>
+                                    <span class="text-blue-600">${request.requester_role || ''}</span>
+                                    <span class="text-gray-400 mx-1">•</span>
+                                    <span>${request.requester_module || ''}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    ${targetDetailsHTML}
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex gap-3 pt-5 mt-5 border-t-2 border-gray-200">
+                    <button onclick="event.stopPropagation(); confirmAndSubmit(${request.id}, 'approve')" 
+                            class="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-sm font-bold hover:from-green-700 hover:to-green-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Approve Request
+                    </button>
+                    <button onclick="event.stopPropagation(); confirmAndSubmit(${request.id}, 'reject')" 
+                            class="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-sm font-bold hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Reject Request
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Insert at the beginning
+    requestsContainer.insertAdjacentHTML('afterbegin', cardHTML);
+    
+    // Get the newly added card and animate it
+    const newCard = requestsContainer.firstElementChild;
+    setTimeout(() => {
+        newCard.style.opacity = '1';
+        newCard.style.transform = 'scale(1)';
+    }, 100);
+    
+    // Remove NEW badge after 8 seconds
+    setTimeout(() => {
+        const badge = newCard.querySelector(`.new-badge-${request.id}`);
+        if (badge) {
+            badge.style.transition = 'opacity 0.5s';
+            badge.style.opacity = '0';
+            setTimeout(() => badge.remove(), 500);
+        }
+    }, 8000);
+}
+
+function playNotificationSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (e) {
+        // Silently fail if audio not supported
+    }
+}
+
+// Clean up interval when page is hidden/closed
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        clearInterval(requestCheckInterval);
+    } else {
+        requestCheckInterval = setInterval(checkForNewRequests, 5000);
+    }
+});
 
 // ===== PREVENT BACK BUTTON AFTER LOGOUT =====
 window.addEventListener("pageshow", function(event) {

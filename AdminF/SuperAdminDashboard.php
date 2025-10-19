@@ -4857,6 +4857,21 @@ function deletePermanently(recordId, recordType) {
                     deletedStudentsTableCount.textContent = studentCount;
                 }
                 
+                // Update students pagination text
+                const studentsPagination = document.getElementById('students-pagination');
+                if (studentsPagination) {
+                    const paginationText = studentsPagination.querySelector('.text-sm.text-gray-700');
+                    if (paginationText) {
+                        if (studentCount === 0) {
+                            paginationText.textContent = 'Showing 0 to 0 of 0 students';
+                        } else {
+                            const start = 1;
+                            const end = Math.min(5, studentCount);
+                            paginationText.textContent = `Showing ${start} to ${end} of ${studentCount} students`;
+                        }
+                    }
+                }
+                
                 // Count deleted employees in the table
                 const employeeRows = document.querySelectorAll('tr[data-employee-id]');
                 const employeeCount = employeeRows.length;
@@ -4871,6 +4886,21 @@ function deletePermanently(recordId, recordType) {
                 const deletedEmployeesTableCount = document.getElementById('deleted-employees-table-count');
                 if (deletedEmployeesTableCount) {
                     deletedEmployeesTableCount.textContent = employeeCount;
+                }
+                
+                // Update employees pagination text
+                const employeesPagination = document.getElementById('employees-pagination');
+                if (employeesPagination) {
+                    const paginationText = employeesPagination.querySelector('.text-sm.text-gray-700');
+                    if (paginationText) {
+                        if (employeeCount === 0) {
+                            paginationText.textContent = 'Showing 0 to 0 of 0 employees';
+                        } else {
+                            const start = 1;
+                            const end = Math.min(5, employeeCount);
+                            paginationText.textContent = `Showing ${start} to ${end} of ${employeeCount} employees`;
+                        }
+                    }
                 }
             } catch (error) {
                 console.error('Error updating deleted counts:', error);
@@ -5763,9 +5793,18 @@ function deletePermanently(recordId, recordType) {
     });
 
     function showApprovalNotification(data) {
-        // Create notification container
+        // Create notification container if it doesn't exist
+        let notificationContainer = document.getElementById('notification-container');
+        if (!notificationContainer) {
+            notificationContainer = document.createElement('div');
+            notificationContainer.id = 'notification-container';
+            notificationContainer.className = 'fixed top-4 right-4 z-50 flex flex-col gap-3';
+            document.body.appendChild(notificationContainer);
+        }
+        
+        // Create notification
         const notification = document.createElement('div');
-        notification.className = 'fixed top-4 right-4 z-50 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-2xl p-5 max-w-md transform translate-x-full transition-transform duration-500 ease-out';
+        notification.className = 'bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg shadow-2xl p-5 max-w-md transform translate-x-full transition-all duration-500 ease-out';
         
         // Determine action text based on request type
         let actionText = 'processed';
@@ -5812,7 +5851,7 @@ function deletePermanently(recordId, recordType) {
             </div>
         `;
         
-        document.body.appendChild(notification);
+        notificationContainer.appendChild(notification);
         
         // Slide in animation
         setTimeout(() => {
@@ -5822,6 +5861,7 @@ function deletePermanently(recordId, recordType) {
         // Auto remove after 15 seconds (longer since no auto-refresh)
         setTimeout(() => {
             notification.classList.add('translate-x-full');
+            notification.style.marginBottom = '-' + notification.offsetHeight + 'px';
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.remove();
