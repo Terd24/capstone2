@@ -482,15 +482,32 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 $tuition_result = $tuition_stmt->get_result();
                 
                 // Log for debugging
-                error_log("Tuition Fee Query - Grade: $grade_level, Track: $academic_track, Year: $school_year, Term: $semester");
-                error_log("Tuition Fee Query - Rows found: " . $tuition_result->num_rows);
+                error_log("=== TUITION FEE LOOKUP ===");
+                error_log("Grade Level: '$grade_level'");
+                error_log("Academic Track: '$academic_track'");
+                error_log("School Year: '$school_year'");
+                error_log("Semester: '$semester'");
+                error_log("Payment Mode: '$payment_mode'");
+                error_log("Rows found: " . $tuition_result->num_rows);
+                
+                // If no match found, try to find what's available in the database
+                if ($tuition_result->num_rows == 0) {
+                    error_log("No match found! Checking what's available in database...");
+                    $check_query = "SELECT grade_level, academic_track, school_year, term FROM tuition_fee_structure LIMIT 5";
+                    $check_result = $conn->query($check_query);
+                    if ($check_result) {
+                        while ($row = $check_result->fetch_assoc()) {
+                            error_log("Available: Grade='{$row['grade_level']}', Track='{$row['academic_track']}', Year='{$row['school_year']}', Term='{$row['term']}'");
+                        }
+                    }
+                }
                 
                 if ($tuition_result->num_rows > 0) {
                     $tuition_data = $tuition_result->fetch_assoc();
                     $tuition_fee_amount = floatval($tuition_data['tuition_fee']);
                     $other_fees_amount = floatval($tuition_data['other_fees']);
                     
-                    error_log("Tuition Fee Found - Tuition: $tuition_fee_amount, Other: $other_fees_amount");
+                    error_log("Tuition Fee Found - Tuition: $tuition_fee_amount, Other: $other_fees_amount, Payment Mode: $payment_mode");
                     
                     // Create school year term format for cashier (e.g., "2025-2026 1st Semester")
                     $school_year_term = $school_year . ' ' . $semester;
@@ -506,16 +523,42 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                     
                     $fee_stmt = $conn->prepare($fee_sql);
                     
-                    // Insert Tuition Fee (even if 0)
-                    $fee_type = 'Tuition Fee';
-                    $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $tuition_fee_amount, $paid_amount);
-                    if ($fee_stmt->execute()) {
-                        error_log("Tuition Fee inserted successfully for student: $student_id");
+                    // Check if payment mode is Installment
+                    if ($payment_mode === 'Installment' && $tuition_fee_amount > 0) {
+                        // Determine number of installments based on grade level
+                        // College (1st-4th Year) = 3 quarterly installments
+                        // K-12 (Kinder to Grade 12) = 4 quarterly installments
+                        $is_college = (strpos($grade_level, 'Year') !== false);
+                        $num_installments = $is_college ? 3 : 4;
+                        $installment_label = $is_college ? 'Trimester' : 'Quarter';
+                        
+                        $installment_amount = round($tuition_fee_amount / $num_installments, 2);
+                        $last_installment = $tuition_fee_amount - ($installment_amount * ($num_installments - 1)); // Adjust last payment for rounding
+                        
+                        error_log("Creating $num_installments $installment_label installments of $installment_amount each for " . ($is_college ? 'College' : 'K-12') . " student");
+                        
+                        for ($i = 1; $i <= $num_installments; $i++) {
+                            $amount = ($i == $num_installments) ? $last_installment : $installment_amount;
+                            $fee_type = "Tuition Fee - $installment_label $i of $num_installments";
+                            $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $amount, $paid_amount);
+                            if ($fee_stmt->execute()) {
+                                error_log("$installment_label $i inserted successfully");
+                            } else {
+                                error_log("Failed to insert $installment_label $i: " . $fee_stmt->error);
+                            }
+                        }
                     } else {
-                        error_log("Failed to insert Tuition Fee: " . $fee_stmt->error);
+                        // Cash payment - insert full tuition fee
+                        $fee_type = 'Tuition Fee';
+                        $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $tuition_fee_amount, $paid_amount);
+                        if ($fee_stmt->execute()) {
+                            error_log("Tuition Fee inserted successfully for student: $student_id");
+                        } else {
+                            error_log("Failed to insert Tuition Fee: " . $fee_stmt->error);
+                        }
                     }
                     
-                    // Insert Other Fees (even if 0)
+                    // Insert Other Fees (always as single payment)
                     $fee_type = 'Other Fees';
                     $fee_stmt->bind_param("sssdd", $student_id, $school_year_term, $fee_type, $other_fees_amount, $paid_amount);
                     if ($fee_stmt->execute()) {

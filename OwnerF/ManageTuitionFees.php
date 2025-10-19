@@ -98,14 +98,14 @@ if ($action === 'add_school_year') {
         ['grade_level' => 'Grade 12', 'academic_track' => 'HE'],
         ['grade_level' => 'Grade 11', 'academic_track' => 'SPORTS'],
         ['grade_level' => 'Grade 12', 'academic_track' => 'SPORTS'],
-        ['grade_level' => '1st Year', 'academic_track' => 'Bachelor of Physical Education (BPed)'],
-        ['grade_level' => '2nd Year', 'academic_track' => 'Bachelor of Physical Education (BPed)'],
-        ['grade_level' => '3rd Year', 'academic_track' => 'Bachelor of Physical Education (BPed)'],
-        ['grade_level' => '4th Year', 'academic_track' => 'Bachelor of Physical Education (BPed)'],
-        ['grade_level' => '1st Year', 'academic_track' => 'Bachelor of Early Childhood Education (BECEd)'],
-        ['grade_level' => '2nd Year', 'academic_track' => 'Bachelor of Early Childhood Education (BECEd)'],
-        ['grade_level' => '3rd Year', 'academic_track' => 'Bachelor of Early Childhood Education (BECEd)'],
-        ['grade_level' => '4th Year', 'academic_track' => 'Bachelor of Early Childhood Education (BECEd)'],
+        ['grade_level' => '1st Year', 'academic_track' => 'BPEd (Bachelor of Physical Education)'],
+        ['grade_level' => '2nd Year', 'academic_track' => 'BPEd (Bachelor of Physical Education)'],
+        ['grade_level' => '3rd Year', 'academic_track' => 'BPEd (Bachelor of Physical Education)'],
+        ['grade_level' => '4th Year', 'academic_track' => 'BPEd (Bachelor of Physical Education)'],
+        ['grade_level' => '1st Year', 'academic_track' => 'BECEd (Bachelor of Early Childhood Education)'],
+        ['grade_level' => '2nd Year', 'academic_track' => 'BECEd (Bachelor of Early Childhood Education)'],
+        ['grade_level' => '3rd Year', 'academic_track' => 'BECEd (Bachelor of Early Childhood Education)'],
+        ['grade_level' => '4th Year', 'academic_track' => 'BECEd (Bachelor of Early Childhood Education)'],
     ];
     
     $terms = ['1st Semester', '2nd Semester'];
