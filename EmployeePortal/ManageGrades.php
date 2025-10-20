@@ -374,21 +374,7 @@ function normalizeGradeLabel(gl){
 }
 
 async function fetchOfferedSubjects(gradeLevelText, program, termValue){
-  // First, get teacher's assigned subjects
-  const teacherSubjectsRes = await fetch('api/get_teacher_subjects.php');
-  const teacherSubjectsData = await teacherSubjectsRes.json();
-  const teacherSubjects = teacherSubjectsData.success ? teacherSubjectsData.subjects : [];
-  
-  // If teacher has assigned subjects, only show those
-  if (teacherSubjects.length > 0) {
-    return teacherSubjects.map(subj => ({
-      id: subj.id,
-      name: subj.subject_name,
-      code: ''
-    }));
-  }
-  
-  // Fallback to offered subjects if no teacher subjects assigned
+  // Get the offered subjects for this specific grade/strand/semester
   const gradeStr = normalizeGradeLabel(gradeLevelText);
   const isCollege = /(1st|2nd|3rd|4th)\s+Year$/i.test(gradeStr);
   const strand = isCollege ? '' : mapStrandFromProgram(program);
@@ -397,7 +383,37 @@ async function fetchOfferedSubjects(gradeLevelText, program, termValue){
   const params = new URLSearchParams({action:'list', grade_level: gradeStr, strand, semester, sy});
   const res = await fetch('api/subject_offerings.php?'+params.toString());
   const d = await res.json();
-  if (d && d.success && Array.isArray(d.items)) return d.items;
+  const offeredSubjects = (d && d.success && Array.isArray(d.items)) ? d.items : [];
+  
+  // Get teacher's assigned subjects
+  const teacherSubjectsRes = await fetch('api/get_teacher_subjects.php');
+  const teacherSubjectsData = await teacherSubjectsRes.json();
+  const teacherSubjects = teacherSubjectsData.success ? teacherSubjectsData.subjects : [];
+  
+  // If teacher has assigned subjects, filter them to only show subjects offered for this grade/strand/semester
+  if (teacherSubjects.length > 0 && offeredSubjects.length > 0) {
+    // Create a map of offered subject names (normalized for comparison)
+    const offeredNames = new Set(offeredSubjects.map(s => s.name.toLowerCase().trim()));
+    
+    // Filter teacher subjects to only include those that are offered for this grade/strand/semester
+    const filteredTeacherSubjects = teacherSubjects.filter(ts => 
+      offeredNames.has(ts.subject_name.toLowerCase().trim())
+    );
+    
+    // Return the filtered subjects
+    return filteredTeacherSubjects.map(subj => ({
+      id: subj.id,
+      name: subj.subject_name,
+      code: ''
+    }));
+  }
+  
+  // If teacher has no assigned subjects, return all offered subjects
+  if (teacherSubjects.length === 0) {
+    return offeredSubjects;
+  }
+  
+  // If no offered subjects for this grade/strand/semester, return empty
   return [];
 }
 

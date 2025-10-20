@@ -8,8 +8,107 @@ if (!isset($_SESSION['registrar_id'])) {
     exit;
 }
 
-// Handle form submission for creating/editing schedules
+// Create sections table if it doesn't exist
+$conn->query("CREATE TABLE IF NOT EXISTS sections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    section_name VARCHAR(100) UNIQUE NOT NULL,
+    description VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by INT,
+    INDEX idx_section_name (section_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+// Handle form submission for creating/editing schedules and sections
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
+    // Section management actions
+    if ($_POST['action'] == 'create_section') {
+        $section_name = trim($_POST['section_name'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        
+        if (empty($section_name)) {
+            echo json_encode(['success' => false, 'message' => 'Section name is required']);
+            exit;
+        }
+        
+        $stmt = $conn->prepare("INSERT INTO sections (section_name, description, created_by) VALUES (?, ?, ?)");
+        $stmt->bind_param('ssi', $section_name, $description, $_SESSION['registrar_id']);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Section created successfully']);
+        } else {
+            if ($conn->errno === 1062) {
+                echo json_encode(['success' => false, 'message' => 'Section name already exists']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error creating section']);
+            }
+        }
+        exit;
+    }
+    
+    if ($_POST['action'] == 'update_section') {
+        $id = intval($_POST['id'] ?? 0);
+        $section_name = trim($_POST['section_name'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        
+        if (empty($section_name)) {
+            echo json_encode(['success' => false, 'message' => 'Section name is required']);
+            exit;
+        }
+        
+        $stmt = $conn->prepare("UPDATE sections SET section_name = ?, description = ? WHERE id = ?");
+        $stmt->bind_param('ssi', $section_name, $description, $id);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Section updated successfully']);
+        } else {
+            if ($conn->errno === 1062) {
+                echo json_encode(['success' => false, 'message' => 'Section name already exists']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error updating section']);
+            }
+        }
+        exit;
+    }
+    
+    if ($_POST['action'] == 'delete_section') {
+        $id = intval($_POST['id'] ?? 0);
+        
+        // Check if section is used in class_schedules
+        $check = $conn->prepare("SELECT COUNT(*) as count FROM class_schedules WHERE section_name = (SELECT section_name FROM sections WHERE id = ?)");
+        $check->bind_param('i', $id);
+        $check->execute();
+        $result = $check->get_result()->fetch_assoc();
+        
+        if ($result['count'] > 0) {
+            echo json_encode(['success' => false, 'message' => 'Cannot delete section that is used in schedules']);
+            exit;
+        }
+        
+        $stmt = $conn->prepare("DELETE FROM sections WHERE id = ?");
+        $stmt->bind_param('i', $id);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Section deleted successfully']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error deleting section']);
+        }
+        exit;
+    }
+    
+    if ($_POST['action'] == 'get_sections') {
+        $sections_query = "SELECT s.*, 
+                          (SELECT COUNT(*) FROM class_schedules cs WHERE cs.section_name = s.section_name) as usage_count
+                          FROM sections s 
+                          ORDER BY s.section_name ASC";
+        $sections_result = $conn->query($sections_query);
+        $sections = [];
+        while ($row = $sections_result->fetch_assoc()) {
+            $sections[] = $row;
+        }
+        echo json_encode(['success' => true, 'sections' => $sections]);
+        exit;
+    }
+    
     if ($_POST['action'] == 'create_schedule') {
         $section_name = $_POST['section_name'];
         $schedule_type = $_POST['schedule_type'];
@@ -378,6 +477,12 @@ $schedules_result = $conn->query($schedules_query);
             </svg>
             Create Schedule
         </button>
+        <button onclick="showManageSectionsModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+            Manage Sections
+        </button>
     </div>
 
     <!-- Schedules List -->
@@ -541,9 +646,15 @@ $schedules_result = $conn->query($schedules_query);
         <form id="createScheduleForm" class="space-y-4">
             <input type="hidden" id="scheduleId" name="schedule_id">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Section Name</label>
-                <input type="text" id="sectionName" name="section_name" placeholder="" required 
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                <div class="flex justify-between items-center mb-1">
+                    <label class="block text-sm font-medium text-gray-700">Section Name</label>
+                    <button type="button" onclick="showManageSectionsModal()" class="text-xs text-blue-600 hover:text-blue-700 font-medium">+ Manage Sections</button>
+                </div>
+                <select id="sectionName" name="section_name" required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- Select Section --</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Select a section or click "Manage Sections" to add new ones</p>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -700,7 +811,93 @@ $schedules_result = $conn->query($schedules_query);
     </div>
 </div>
 
+<!-- Manage Sections Modal -->
+<div id="manageSectionsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 rounded-t-xl">
+            <h3 class="text-lg font-bold text-white">Manage Sections</h3>
+            <button onclick="hideManageSectionsModal()" class="text-white hover:text-gray-200 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="overflow-y-auto flex-1 px-6 py-4">
+            <div class="mb-4">
+                <button onclick="showAddSectionForm()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add New Section
+                </button>
+            </div>
+            
+            <div id="addSectionForm" class="hidden mb-4 p-4 bg-gray-50 rounded-lg border-2 border-green-200">
+                <h4 class="font-semibold text-gray-800 mb-3">Add New Section</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Section Name <span class="text-red-500">*</span></label>
+                        <input type="text" id="newSectionName" placeholder="e.g., BSIT 603, ABM - 12A" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="saveNewSection()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium">Save</button>
+                        <button onclick="hideAddSectionForm()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <input type="text" id="sectionSearchInput" placeholder="Search sections..." onkeyup="filterSectionsList()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div id="sectionsListContainer" class="space-y-2 max-h-96 overflow-y-auto">
+                <p class="text-gray-500 text-center py-4">Loading sections...</p>
+            </div>
+        </div>
+        
+    </div>
+</div>
 
+<!-- Edit Section Modal -->
+<div id="editSectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-t-xl">
+            <h3 class="text-lg font-bold">Edit Section</h3>
+        </div>
+        <div class="p-6 space-y-4">
+            <input type="hidden" id="editSectionId">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Section Name <span class="text-red-500">*</span></label>
+                <input type="text" id="editSectionName" class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button onclick="hideEditSectionModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2.5 rounded-lg font-medium">Cancel</button>
+                <button onclick="saveEditSection()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Section Confirmation Modal -->
+<div id="deleteSectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+        <div class="text-center">
+            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Delete Section</h3>
+            <p class="text-sm text-gray-600 mb-6">Are you sure you want to delete this section? This action cannot be undone.</p>
+            <input type="hidden" id="deleteSectionId">
+            <div class="flex gap-3">
+                <button onclick="hideDeleteSectionModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2.5 rounded-lg font-medium">Cancel</button>
+                <button onclick="confirmDeleteSection()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-medium">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 // Show/Hide Modals
@@ -732,6 +929,8 @@ function showCreateScheduleModal() {
     // Hide inline errors
     const sameErr = document.getElementById('sameDaysError'); if (sameErr) sameErr.classList.add('hidden');
     const diffErr = document.getElementById('diffDaysError'); if (diffErr) diffErr.classList.add('hidden');
+    // Load sections into dropdown
+    loadSectionsDropdown();
     // Show modal
     modal.classList.remove('hidden');
 }
@@ -1342,6 +1541,249 @@ function formatTime(t){ try{ const d = new Date(`1970-01-01T${t}`); return d.toL
   // Re-initialize pagination when schedules are added/removed dynamically
   window.reinitializeSchedulePagination = initPagination;
 })();
+
+// ========== SECTION MANAGEMENT FUNCTIONS ==========
+function loadSectionsDropdown() {
+    const formData = new FormData();
+    formData.append('action', 'get_sections');
+    
+    fetch('ManageSchedule.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('sectionName');
+                if (select) {
+                    // Keep the first "Select Section" option
+                    select.innerHTML = '<option value="">-- Select Section --</option>';
+                    
+                    // Separate sections into available and used
+                    const availableSections = data.sections.filter(s => s.usage_count == 0);
+                    const usedSections = data.sections.filter(s => s.usage_count > 0);
+                    
+                    // Add available sections first
+                    if (availableSections.length > 0) {
+                        const availableGroup = document.createElement('optgroup');
+                        availableGroup.label = 'Available Sections';
+                        availableSections.forEach(section => {
+                            const option = document.createElement('option');
+                            option.value = section.section_name;
+                            option.textContent = section.section_name;
+                            availableGroup.appendChild(option);
+                        });
+                        select.appendChild(availableGroup);
+                    }
+                    
+                    // Add used sections (disabled and greyed out)
+                    if (usedSections.length > 0) {
+                        const usedGroup = document.createElement('optgroup');
+                        usedGroup.label = 'Already in Use';
+                        usedSections.forEach(section => {
+                            const option = document.createElement('option');
+                            option.value = section.section_name;
+                            option.textContent = section.section_name + ' (In Use)';
+                            option.disabled = true;
+                            option.style.color = '#9ca3af';
+                            usedGroup.appendChild(option);
+                        });
+                        select.appendChild(usedGroup);
+                    }
+                }
+            }
+        })
+        .catch(err => console.error('Error loading sections:', err));
+}
+
+function showManageSectionsModal() {
+    document.getElementById('manageSectionsModal').classList.remove('hidden');
+    loadSections();
+}
+
+function hideManageSectionsModal() {
+    document.getElementById('manageSectionsModal').classList.add('hidden');
+    hideAddSectionForm();
+    // Reload the sections dropdown in case sections were added/edited
+    loadSectionsDropdown();
+}
+
+function showAddSectionForm() {
+    document.getElementById('addSectionForm').classList.remove('hidden');
+    document.getElementById('newSectionName').value = '';
+    document.getElementById('newSectionDesc').value = '';
+    document.getElementById('newSectionName').focus();
+}
+
+function hideAddSectionForm() {
+    document.getElementById('addSectionForm').classList.add('hidden');
+}
+
+function loadSections() {
+    const formData = new FormData();
+    formData.append('action', 'get_sections');
+    
+    fetch('ManageSchedule.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                displaySections(data.sections);
+            } else {
+                document.getElementById('sectionsListContainer').innerHTML = '<p class="text-red-500 text-center py-4">Error loading sections</p>';
+            }
+        })
+        .catch(() => {
+            document.getElementById('sectionsListContainer').innerHTML = '<p class="text-red-500 text-center py-4">Error loading sections</p>';
+        });
+}
+
+function displaySections(sections) {
+    const container = document.getElementById('sectionsListContainer');
+    
+    if (sections.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">No sections found. Click "Add New Section" to create one.</p>';
+        return;
+    }
+    
+    let html = '';
+    sections.forEach(section => {
+        html += `
+            <div class="section-item bg-gray-50 hover:bg-gray-100 p-4 rounded-lg border border-gray-200 transition">
+                <div class="flex justify-between items-center">
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-gray-800">${escapeHtml(section.section_name)}</h4>
+                        <p class="text-xs text-gray-400 mt-1">Created: ${new Date(section.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <div class="flex gap-2 ml-4">
+                        <button onclick='editSection(${JSON.stringify(section)})' class="text-blue-600 hover:text-blue-800 font-medium text-sm">Edit</button>
+                        <button onclick="deleteSection(${section.id})" class="text-red-600 hover:text-red-800 font-medium text-sm">Delete</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function filterSectionsList() {
+    const search = document.getElementById('sectionSearchInput').value.toLowerCase();
+    const items = document.querySelectorAll('.section-item');
+    
+    items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(search) ? '' : 'none';
+    });
+}
+
+function saveNewSection() {
+    const name = document.getElementById('newSectionName').value.trim();
+    
+    if (!name) {
+        alert('Please enter a section name');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'create_section');
+    formData.append('section_name', name);
+    formData.append('description', '');
+    
+    fetch('ManageSchedule.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                hideAddSectionForm();
+                loadSections();
+                showSuccessMessage(data.message);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(() => alert('Error saving section'));
+}
+
+function editSection(section) {
+    document.getElementById('editSectionId').value = section.id;
+    document.getElementById('editSectionName').value = section.section_name;
+    document.getElementById('editSectionModal').classList.remove('hidden');
+}
+
+function hideEditSectionModal() {
+    document.getElementById('editSectionModal').classList.add('hidden');
+}
+
+function saveEditSection() {
+    const id = document.getElementById('editSectionId').value;
+    const name = document.getElementById('editSectionName').value.trim();
+    
+    if (!name) {
+        alert('Please enter a section name');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'update_section');
+    formData.append('id', id);
+    formData.append('section_name', name);
+    formData.append('description', '');
+    
+    fetch('ManageSchedule.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                hideEditSectionModal();
+                loadSections();
+                showSuccessMessage(data.message);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(() => alert('Error updating section'));
+}
+
+function deleteSection(id) {
+    document.getElementById('deleteSectionId').value = id;
+    document.getElementById('deleteSectionModal').classList.remove('hidden');
+}
+
+function hideDeleteSectionModal() {
+    document.getElementById('deleteSectionModal').classList.add('hidden');
+}
+
+function confirmDeleteSection() {
+    const id = document.getElementById('deleteSectionId').value;
+    
+    const formData = new FormData();
+    formData.append('action', 'delete_section');
+    formData.append('id', id);
+    
+    fetch('ManageSchedule.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                hideDeleteSectionModal();
+                loadSections();
+                showSuccessMessage(data.message);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(() => alert('Error deleting section'));
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showSuccessMessage(message) {
+    const msgEl = document.getElementById('successMessage');
+    const textEl = document.getElementById('successText');
+    if (msgEl && textEl) {
+        textEl.textContent = message;
+        msgEl.classList.remove('hidden');
+        setTimeout(() => msgEl.classList.add('hidden'), 3000);
+    }
+}
 </script>
 
 </body>

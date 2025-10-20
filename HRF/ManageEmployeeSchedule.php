@@ -81,6 +81,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                     UNIQUE KEY unique_teacher_subject (teacher_id, subject_name)
                 )");
                 
+                // Create teacher_sections table if it doesn't exist
+                $conn->query("CREATE TABLE IF NOT EXISTS teacher_sections (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    teacher_id VARCHAR(20) NOT NULL,
+                    section_name VARCHAR(100) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by INT,
+                    UNIQUE KEY unique_teacher_section (teacher_id, section_name)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                
                 // Save subjects for this teacher
                 $subjects = isset($_POST['subjects']) ? $_POST['subjects'] : [];
                 if (!empty($subjects)) {
@@ -96,6 +106,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                         if (!empty($subject)) {
                             $subj_stmt->bind_param("ssi", $teacher_id, $subject, $actorId);
                             $subj_stmt->execute();
+                        }
+                    }
+                }
+                
+                // Save sections for this teacher
+                $sections = isset($_POST['sections']) ? $_POST['sections'] : [];
+                if (!empty($sections)) {
+                    // First, delete existing sections for this teacher
+                    $del_sect = $conn->prepare("DELETE FROM teacher_sections WHERE teacher_id = ?");
+                    $del_sect->bind_param("s", $teacher_id);
+                    $del_sect->execute();
+                    
+                    // Insert new sections
+                    $sect_stmt = $conn->prepare("INSERT INTO teacher_sections (teacher_id, section_name, created_by) VALUES (?, ?, ?)");
+                    foreach ($sections as $section) {
+                        $section = trim($section);
+                        if (!empty($section)) {
+                            $sect_stmt->bind_param("ssi", $teacher_id, $section, $actorId);
+                            $sect_stmt->execute();
                         }
                     }
                 }
@@ -163,6 +192,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                     UNIQUE KEY unique_teacher_subject (teacher_id, subject_name)
                 )");
                 
+                // Create teacher_sections table if it doesn't exist
+                $conn->query("CREATE TABLE IF NOT EXISTS teacher_sections (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    teacher_id VARCHAR(20) NOT NULL,
+                    section_name VARCHAR(100) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by INT,
+                    UNIQUE KEY unique_teacher_section (teacher_id, section_name)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                
                 // Save subjects for this teacher
                 $subjects = isset($_POST['subjects']) ? $_POST['subjects'] : [];
                 if (!empty($subjects)) {
@@ -178,6 +217,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                         if (!empty($subject)) {
                             $subj_stmt->bind_param("ssi", $teacher_id, $subject, $actorId);
                             $subj_stmt->execute();
+                        }
+                    }
+                }
+                
+                // Save sections for this teacher
+                $sections = isset($_POST['sections']) ? $_POST['sections'] : [];
+                if (!empty($sections)) {
+                    // First, delete existing sections for this teacher
+                    $del_sect = $conn->prepare("DELETE FROM teacher_sections WHERE teacher_id = ?");
+                    $del_sect->bind_param("s", $teacher_id);
+                    $del_sect->execute();
+                    
+                    // Insert new sections
+                    $sect_stmt = $conn->prepare("INSERT INTO teacher_sections (teacher_id, section_name, created_by) VALUES (?, ?, ?)");
+                    foreach ($sections as $section) {
+                        $section = trim($section);
+                        if (!empty($section)) {
+                            $sect_stmt->bind_param("ssi", $teacher_id, $section, $actorId);
+                            $sect_stmt->execute();
                         }
                     }
                 }
@@ -332,12 +390,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     }
 }
 
-// Fetch all schedules
-$schedules_query = "SELECT cs.*, COUNT(es.id) as employee_count 
+// Fetch all schedules with teacher name and sections
+$schedules_query = "SELECT cs.*, 
+                           COUNT(es.id) as employee_count,
+                           CONCAT(e.first_name, ' ', e.last_name) as teacher_name,
+                           GROUP_CONCAT(DISTINCT ts.section_name ORDER BY ts.section_name SEPARATOR ', ') as sections
                    FROM employee_work_schedules cs 
-                   LEFT JOIN employee_schedules es ON cs.id = es.schedule_id 
+                   LEFT JOIN employee_schedules es ON cs.id = es.schedule_id
+                   LEFT JOIN employees e ON es.employee_id = e.id_number
+                   LEFT JOIN teacher_sections ts ON e.id_number = ts.teacher_id
                    GROUP BY cs.id 
-                   ORDER BY cs.schedule_name";
+                   ORDER BY teacher_name";
 $schedules_result = $conn->query($schedules_query);
 
 $teachers_sql = "SELECT e.id_number, 
@@ -449,7 +512,12 @@ $sections_result = $conn->query($sections_sql);
                 <?php while ($schedule = $schedules_result->fetch_assoc()): ?>
                     <div class="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition-shadow class-schedule-card">
                         <div class="flex justify-between items-start mb-3">
-                            <h3 class="text-lg font-bold text-gray-800 class-schedule-name"><?= htmlspecialchars($schedule['schedule_name']) ?></h3>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800 class-schedule-name"><?= htmlspecialchars($schedule['teacher_name'] ?: $schedule['schedule_name']) ?></h3>
+                                <?php if (!empty($schedule['sections'])): ?>
+                                    <p class="text-sm text-gray-600 mt-1">Sections: <?= htmlspecialchars($schedule['sections']) ?></p>
+                                <?php endif; ?>
+                            </div>
                             <div class="flex gap-2">
                                 <button onclick="openClassScheduleDetails(<?= (int)$schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">View</button>
                                 <button onclick="editSchedule(<?= (int)$schedule['id'] ?>)" class="text-blue-500 hover:text-blue-700 text-sm">Edit</button>
@@ -504,12 +572,6 @@ $sections_result = $conn->query($sections_sql);
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
                                 <span><?= htmlspecialchars($schedule['days']) ?></span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                                <span>Teacher: <?= htmlspecialchars($schedule['schedule_name']) ?></span>
                             </div>
                         </div>
                         
@@ -654,13 +716,8 @@ $sections_result = $conn->query($sections_sql);
                 <p id="sectionError" class="hidden text-xs text-red-600 mt-1">Please select at least one section.</p>
             </div>
             <div>
-                <div class="flex items-center justify-between mb-1.5">
+                <div class="mb-1.5">
                     <label class="block text-sm font-semibold text-gray-700">Subjects <span class="text-red-500">*</span></label>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="selectAllSubjects()" class="text-xs text-purple-600 hover:text-purple-700 font-medium">Select All</button>
-                        <span class="text-gray-300">|</span>
-                        <button type="button" onclick="clearAllSubjects()" class="text-xs text-gray-600 hover:text-gray-700 font-medium">Clear All</button>
-                    </div>
                 </div>
                 <div class="mb-2">
                     <input type="text" id="subjectSearch" placeholder="Search subjects..." 
@@ -690,6 +747,19 @@ $sections_result = $conn->query($sections_sql);
                 <p class="text-xs text-gray-500 mt-1">Select all subjects this teacher will handle</p>
                 <p id="subjectsError" class="hidden text-xs text-red-600 mt-1">Please select at least one subject.</p>
             </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Schedule Type</label>
+                <div class="mb-4">
+                    <label class="flex items-center mb-2">
+                        <input type="radio" name="schedule_type" value="same" checked class="mr-2" onchange="toggleScheduleType()">
+                        Same time for all days
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="schedule_type" value="different" class="mr-2" onchange="toggleScheduleType()">
+                        Different times for each day
+                    </label>
+                </div>
+            </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Start Time <span class="text-red-500">*</span></label>
@@ -703,17 +773,6 @@ $sections_result = $conn->query($sections_sql);
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Schedule Type</label>
-                <div class="mb-4">
-                    <label class="flex items-center mb-2">
-                        <input type="radio" name="schedule_type" value="same" checked class="mr-2" onchange="toggleScheduleType()">
-                        Same time for all days
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="schedule_type" value="different" class="mr-2" onchange="toggleScheduleType()">
-                        Different times for each day
-                    </label>
-                </div>
 
                 <!-- Same Time Schedule -->
                 <div id="sameTimeSchedule">
@@ -947,6 +1006,10 @@ function showCreateScheduleModal() {
     // Hidden id and basic fields
     const idEl = document.getElementById('scheduleId'); if (idEl) idEl.value = '';
     const nameEl = document.getElementById('sectionName'); if (nameEl) {
+        // Re-enable teacher dropdown for create mode
+        nameEl.disabled = false;
+        nameEl.style.backgroundColor = '';
+        nameEl.style.color = '';
         // Default clear
         nameEl.value = '';
         const hiddenName = document.getElementById('sectionNameHidden'); if (hiddenName) hiddenName.value = '';
@@ -1558,24 +1621,31 @@ function editSchedule(id) {
                 // Populate form with existing data
                 document.getElementById('scheduleId').value = schedule.id;
                 
-                // Check the section checkboxes (schedule_name may contain multiple sections separated by comma)
+                // Show teacher name as text (non-editable in edit mode)
+                const teacherSelect = document.getElementById('sectionName');
                 const hiddenName = document.getElementById('sectionNameHidden');
-                const sectionCheckboxes = document.querySelectorAll('input[name="sections[]"]');
-                if (sectionCheckboxes && schedule.schedule_name) {
-                    const sections = schedule.schedule_name.split(',').map(s => s.trim());
-                    sectionCheckboxes.forEach(checkbox => {
-                        if (sections.includes(checkbox.value)) {
-                            checkbox.checked = true;
-                        }
-                    });
-                    if (hiddenName) hiddenName.value = schedule.schedule_name || '';
+                if (teacherSelect && schedule.teacher_name) {
+                    teacherSelect.value = schedule.teacher_id || '';
+                    teacherSelect.disabled = true;
+                    teacherSelect.style.backgroundColor = '#f3f4f6';
+                    teacherSelect.style.color = '#6b7280';
+                    if (hiddenName) hiddenName.value = schedule.teacher_name;
                 }
                 
-                // Find and select the teacher (stored in assigned_employees)
-                const sectionSel = document.getElementById('sectionName');
-                if (sectionSel && schedule.assigned_employees && schedule.assigned_employees.length > 0) {
-                    const teacherId = schedule.assigned_employees[0].id_number;
-                    sectionSel.value = teacherId;
+                // Pre-check section checkboxes
+                const sectionCheckboxes = document.querySelectorAll('input[name="sections[]"]');
+                if (sectionCheckboxes && schedule.sections) {
+                    sectionCheckboxes.forEach(checkbox => {
+                        checkbox.checked = schedule.sections.includes(checkbox.value);
+                    });
+                }
+                
+                // Pre-check subject checkboxes
+                const subjectCheckboxes = document.querySelectorAll('input[name="subjects[]"]');
+                if (subjectCheckboxes && schedule.subjects) {
+                    subjectCheckboxes.forEach(checkbox => {
+                        checkbox.checked = schedule.subjects.includes(checkbox.value);
+                    });
                 }
                 
                 // Set schedule type based on whether it has day-specific schedules
@@ -1830,30 +1900,7 @@ function filterSections() {
     });
 }
 
-// Select all visible subjects
-function selectAllSubjects() {
-    const container = document.getElementById('subjectsContainer');
-    if (!container) return;
-    
-    const checkboxes = container.querySelectorAll('input[name="subjects[]"]');
-    checkboxes.forEach(checkbox => {
-        // Only check visible checkboxes
-        if (checkbox.closest('label').style.display !== 'none') {
-            checkbox.checked = true;
-        }
-    });
-}
 
-// Clear all subjects
-function clearAllSubjects() {
-    const container = document.getElementById('subjectsContainer');
-    if (!container) return;
-    
-    const checkboxes = container.querySelectorAll('input[name="subjects[]"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = false;
-    });
-}
 </script>
 
 </body>
