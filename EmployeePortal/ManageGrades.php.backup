@@ -1,22 +1,10 @@
 <?php
-// Suppress PHP errors for AJAX requests
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    error_reporting(0);
-    ini_set('display_errors', 0);
-}
-
 session_start();
 include("../StudentLogin/db_conn.php");
-include("../includes/grading_helpers.php");
 
 // Require TEACHER role only
 $role = $_SESSION['role'] ?? '';
 if ($role !== 'teacher') {
-    if ($_SERVER["REQUEST_METHOD"] == "POST") {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-        exit;
-    }
     header("Location: ../StudentLogin/login.php");
     exit;
 }
@@ -25,98 +13,39 @@ $teacher_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_na
 
 // Handle form submission for adding/updating grades
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    try {
-        $id_number = $_POST['student_id'] ?? '';
-        $subject = $_POST['subject'] ?? '';
-        $school_year_term = !empty($_POST['school_year_term']) ? $_POST['school_year_term'] : '2024-2025 2nd Term';
-        $grading_system = $_POST['grading_system'] ?? 'COLLEGE';
-        $teacher_name = $_POST['teacher'] ?? '';
-        
-        // Validate required fields
-        if (empty($id_number) || empty($subject) || empty($school_year_term)) {
-            throw new Exception('Missing required fields: student_id, subject, or school_year_term');
-        }
-        
-        // Check if grade record exists
-        $check_stmt = $conn->prepare("SELECT id FROM grades_record WHERE id_number = ? AND subject = ? AND school_year_term = ?");
-        if (!$check_stmt) {
-            throw new Exception('Database prepare failed: ' . $conn->error);
-        }
-        $check_stmt->bind_param("sss", $id_number, $subject, $school_year_term);
-        $check_stmt->execute();
-        $result = $check_stmt->get_result();
+    $id_number = $_POST['student_id'];
+    $subject = $_POST['subject'];
+    $school_year_term = !empty($_POST['school_year_term']) ? $_POST['school_year_term'] : '2024-2025 2nd Term'; // Use custom term or default
+    $prelim = $_POST['prelim'] ?: null;
+    $midterm = $_POST['midterm'] ?: null;
+    $pre_finals = $_POST['prefinals'] ?: null;
+    $finals = $_POST['finals'] ?: null;
+    $teacher_name = $_POST['teacher'];
     
-    if ($grading_system === 'K12') {
-        // K-12 Grading System (Quarters)
-        $first_quarter = $_POST['first_quarter'] ?: null;
-        $second_quarter = $_POST['second_quarter'] ?: null;
-        $third_quarter = $_POST['third_quarter'] ?: null;
-        $fourth_quarter = $_POST['fourth_quarter'] ?: null;
-        
-        if ($result->num_rows > 0) {
-            // Update existing record
-            $update_stmt = $conn->prepare("UPDATE grades_record SET first_quarter = ?, second_quarter = ?, third_quarter = ?, fourth_quarter = ?, grading_system = ?, teacher_name = ? WHERE id_number = ? AND subject = ? AND school_year_term = ?");
-            if (!$update_stmt) {
-                throw new Exception('Update prepare failed: ' . $conn->error);
-            }
-            $update_stmt->bind_param("ddddsssss", $first_quarter, $second_quarter, $third_quarter, $fourth_quarter, $grading_system, $teacher_name, $id_number, $subject, $school_year_term);
-            if (!$update_stmt->execute()) {
-                throw new Exception('Update execute failed: ' . $update_stmt->error);
-            }
-            $success_msg = "Grade updated successfully!";
-        } else {
-            // Insert new record
-            $insert_stmt = $conn->prepare("INSERT INTO grades_record (id_number, subject, school_year_term, first_quarter, second_quarter, third_quarter, fourth_quarter, grading_system, teacher_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            if (!$insert_stmt) {
-                throw new Exception('Insert prepare failed: ' . $conn->error);
-            }
-            $insert_stmt->bind_param("sssddddss", $id_number, $subject, $school_year_term, $first_quarter, $second_quarter, $third_quarter, $fourth_quarter, $grading_system, $teacher_name);
-            if (!$insert_stmt->execute()) {
-                throw new Exception('Insert execute failed: ' . $insert_stmt->error);
-            }
-            $success_msg = "Grade added successfully!";
-        }
+    // Check if grade record exists
+    $check_stmt = $conn->prepare("SELECT id FROM grades_record WHERE id_number = ? AND subject = ? AND school_year_term = ?");
+    $check_stmt->bind_param("sss", $id_number, $subject, $school_year_term);
+    $check_stmt->execute();
+    $result = $check_stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        // Update existing record
+        $update_stmt = $conn->prepare("UPDATE grades_record SET prelim = ?, midterm = ?, pre_finals = ?, finals = ?, teacher_name = ? WHERE id_number = ? AND subject = ? AND school_year_term = ?");
+        $update_stmt->bind_param("ddddssss", $prelim, $midterm, $pre_finals, $finals, $teacher_name, $id_number, $subject, $school_year_term);
+        $update_stmt->execute();
+        $success_msg = "Grade updated successfully!";
     } else {
-        // College Grading System (Terms)
-        $prelim = $_POST['prelim'] ?: null;
-        $midterm = $_POST['midterm'] ?: null;
-        $pre_finals = $_POST['prefinals'] ?: null;
-        $finals = $_POST['finals'] ?: null;
-        
-        if ($result->num_rows > 0) {
-            // Update existing record
-            $update_stmt = $conn->prepare("UPDATE grades_record SET prelim = ?, midterm = ?, pre_finals = ?, finals = ?, grading_system = ?, teacher_name = ? WHERE id_number = ? AND subject = ? AND school_year_term = ?");
-            if (!$update_stmt) {
-                throw new Exception('Update prepare failed: ' . $conn->error);
-            }
-            $update_stmt->bind_param("ddddsssss", $prelim, $midterm, $pre_finals, $finals, $grading_system, $teacher_name, $id_number, $subject, $school_year_term);
-            if (!$update_stmt->execute()) {
-                throw new Exception('Update execute failed: ' . $update_stmt->error);
-            }
-            $success_msg = "Grade updated successfully!";
-        } else {
-            // Insert new record
-            $insert_stmt = $conn->prepare("INSERT INTO grades_record (id_number, subject, school_year_term, prelim, midterm, pre_finals, finals, grading_system, teacher_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            if (!$insert_stmt) {
-                throw new Exception('Insert prepare failed: ' . $conn->error);
-            }
-            $insert_stmt->bind_param("sssddddss", $id_number, $subject, $school_year_term, $prelim, $midterm, $pre_finals, $finals, $grading_system, $teacher_name);
-            if (!$insert_stmt->execute()) {
-                throw new Exception('Insert execute failed: ' . $insert_stmt->error);
-            }
-            $success_msg = "Grade added successfully!";
-        }
+        // Insert new record
+        $insert_stmt = $conn->prepare("INSERT INTO grades_record (id_number, subject, school_year_term, prelim, midterm, pre_finals, finals, teacher_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $insert_stmt->bind_param("sssdddds", $id_number, $subject, $school_year_term, $prelim, $midterm, $pre_finals, $finals, $teacher_name);
+        $insert_stmt->execute();
+        $success_msg = "Grade added successfully!";
     }
-        
-        // Return JSON response for AJAX
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'message' => $success_msg]);
-        exit;
-    } catch (Exception $e) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
-        exit;
-    }
+    
+    // Return JSON response for AJAX
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'message' => $success_msg]);
+    exit;
 }
 
 // Handle success message from redirect
@@ -175,70 +104,6 @@ $grades_result = $conn->query($grades_query);
         .no-spinner[type=number] {
             -moz-appearance: textfield;
         }
-        
-        /* Enhanced search input with icon */
-        .search-wrapper {
-            position: relative;
-        }
-        .search-icon {
-            position: absolute;
-            left: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9CA3AF;
-            pointer-events: none;
-            z-index: 1;
-        }
-        .search-input-with-icon {
-            padding-left: 48px !important;
-        }
-        
-        /* Hide scrollbar but keep functionality */
-        .custom-scrollbar {
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE and Edge */
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            display: none; /* Chrome, Safari, Opera */
-        }
-        
-        /* Smooth animations */
-        .fade-in {
-            animation: fadeIn 0.3s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* Student card hover effect */
-        .student-card {
-            transition: all 0.2s ease;
-            border-left: 4px solid transparent;
-        }
-        .student-card:hover {
-            border-left-color: #10B981;
-            transform: translateX(4px);
-        }
-        
-        /* Empty state illustration */
-        .empty-state {
-            opacity: 0.6;
-        }
-        
-        /* Loading spinner */
-        .spinner {
-            border: 3px solid #f3f4f6;
-            border-top: 3px solid #10B981;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -273,35 +138,19 @@ $grades_result = $conn->query($grades_query);
 <div class="container mx-auto px-6 py-8">
     <!-- Student Search Section -->
     <div id="student-search-section" class="mb-6">
-        <div class="bg-white rounded-xl card-shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-800">Search Students</h2>
-                    <p class="text-sm text-gray-500 mt-1">Find students to manage their grades</p>
+        <div class="bg-white rounded-xl card-shadow p-4">
+            <h2 class="text-lg font-bold text-gray-800 mb-3">Search Students</h2>
+            <div class="flex gap-3 mb-3">
+                <div class="flex-1">
+                    <input type="text" id="studentSearchInput" placeholder="Search by student name or ID..." 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
                 </div>
-                <div class="bg-green-100 p-3 rounded-lg">
-                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                </div>
+                <button onclick="searchStudents()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium text-sm">
+                    Search
+                </button>
             </div>
-            
-            <div class="search-wrapper mb-4">
-                <svg class="search-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-                <input type="text" id="studentSearchInput" placeholder="Type student name or ID number..." 
-                       class="search-input-with-icon w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all">
-            </div>
-            
-            <div id="student-results" class="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
-                <div class="empty-state text-center py-12">
-                    <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    <p class="text-gray-400 text-sm">Start typing to search for students</p>
-                    <p class="text-gray-300 text-xs mt-1">Search by name or ID number</p>
-                </div>
+            <div id="student-results" class="space-y-2 max-h-60 overflow-y-auto">
+                <p class="text-gray-400 text-center py-3 text-sm">Enter a student name or ID to search...</p>
             </div>
         </div>
     </div>
@@ -312,42 +161,24 @@ $grades_result = $conn->query($grades_query);
         <!-- Student Header -->
         <div class="bg-white rounded-2xl card-shadow p-6 mb-6">
             <!-- Success Message -->
-            <div id="successMessage" class="hidden mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded-lg fade-in flex items-center gap-3">
-                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span id="successText" class="font-medium"></span>
+            <div id="successMessage" class="hidden mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
+                <span id="successText"></span>
             </div>
             
-            <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-                <div class="flex items-center gap-4">
-                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl shadow-lg">
-                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-800" id="student-name-display">Student Grades</h2>
-                        <p class="text-gray-600 text-sm" id="student-id-display">Academic Performance Overview</p>
-                    </div>
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800" id="student-name-display">Student Grades</h2>
+                    <p class="text-gray-600" id="student-id-display">Academic Performance Overview</p>
                 </div>
-                <button id="addGradeBtn" type="button" onclick="showAddGradeModal()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg font-medium inline-flex items-center gap-2 transition-all shadow-md hover:shadow-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                    </svg>
+                <button id="addGradeBtn" type="button" onclick="showAddGradeModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg relative z-10">
                     Add New Grade
                 </button>
             </div>
             
             <!-- Term Selector -->
-            <div class="bg-gray-50 rounded-lg p-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    School Year & Term
-                </label>
-                <select id="termSelector" class="w-full md:w-auto px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all" onchange="loadGradesByTerm()">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">School Year & Term:</label>
+                <select id="termSelector" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="loadGradesByTerm()">
                     <!-- Options will be populated dynamically -->
                 </select>
             </div>
@@ -372,7 +203,6 @@ $grades_result = $conn->query($grades_query);
             </div>
             <form id="addGradeForm" class="space-y-4">
                 <input type="hidden" id="modal-student-id" name="student_id">
-                <input type="hidden" id="modal-grading-system" name="grading_system">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                     <select id="subjectSelect" name="subject" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
@@ -424,49 +254,26 @@ $grades_result = $conn->query($grades_query);
                         <?php endif; ?>
                     </select>
                 </div>
-                
-                <!-- K-12 Grade Fields (shown conditionally) -->
-                <div id="k12-grades" class="hidden">
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">1st Quarter</label>
-                            <input type="number" name="first_quarter" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">2nd Quarter</label>
-                            <input type="number" name="second_quarter" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
-                        </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Prelim</label>
+                        <input type="number" name="prelim" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
                     </div>
-                    <div class="grid grid-cols-2 gap-3 mt-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">3rd Quarter</label>
-                            <input type="number" name="third_quarter" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">4th Quarter</label>
-                            <input type="number" name="fourth_quarter" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
-                        </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Midterm</label>
+                        <input type="number" name="midterm" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
                     </div>
                 </div>
-                
-                <!-- College Grade Fields (shown conditionally) -->
-                <div id="college-grades" class="hidden">
-                    <div class="grid grid-cols-3 gap-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Prelim</label>
-                            <input type="number" name="prelim" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Midterm</label>
-                            <input type="number" name="midterm" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Finals</label>
-                            <input type="number" name="finals" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
-                        </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Pre-Finals</label>
+                        <input type="number" name="prefinals" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Finals</label>
+                        <input type="number" name="finals" min="0" max="100" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 no-spinner">
                     </div>
                 </div>
-                
                 <div class="flex gap-3 pt-4">
                     <button type="button" onclick="hideAddGradeModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
                     <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Save Grade</button>
@@ -500,75 +307,6 @@ $grades_result = $conn->query($grades_query);
 </div>
 
 <script>
-// --------- K-12 vs College Grading System Support ---------
-
-/**
- * Determines if a student is K-12 or College based on grade level
- * @param {string} gradeLevel - The student's grade level
- * @returns {string} - "K12" or "COLLEGE"
- */
-function determineGradingSystem(gradeLevel) {
-    if (!gradeLevel) return "COLLEGE";
-    
-    const level = gradeLevel.toLowerCase().trim();
-    
-    // K-12 patterns
-    if (level.includes('kinder')) return "K12";
-    if (/grade\s*[1-9]/.test(level)) return "K12";
-    if (/grade\s*1[0-2]/.test(level)) return "K12";
-    
-    // College patterns
-    if (/[1-4](st|nd|rd|th)\s*year/.test(level)) return "COLLEGE";
-    
-    return "COLLEGE"; // Default to college if uncertain
-}
-
-/**
- * Calculates the average grade based on grading system
- * @param {object} grade - Grade record object
- * @returns {number|null} - Average grade or null if incomplete
- */
-function calculateAverage(grade) {
-    const gradingSystem = grade.grading_system || determineGradingSystem(currentStudentInfo.gradeLevelText);
-    
-    if (gradingSystem === 'K12') {
-        const quarters = [
-            parseFloat(grade.first_quarter),
-            parseFloat(grade.second_quarter),
-            parseFloat(grade.third_quarter),
-            parseFloat(grade.fourth_quarter)
-        ].filter(g => !isNaN(g) && g !== null);
-        
-        if (quarters.length === 0) return null;
-        return quarters.reduce((sum, g) => sum + g, 0) / quarters.length;
-    } else {
-        // College: Use prelim, midterm, finals (NOT pre_finals)
-        const terms = [
-            parseFloat(grade.prelim),
-            parseFloat(grade.midterm),
-            parseFloat(grade.finals)
-        ].filter(g => !isNaN(g) && g !== null);
-        
-        if (terms.length === 0) return null;
-        return terms.reduce((sum, g) => sum + g, 0) / terms.length;
-    }
-}
-
-/**
- * Determines pass/fail status
- * @param {number} average - The calculated average
- * @returns {object} - Status object with text, color, and bgColor
- */
-function getGradeStatus(average) {
-    if (average === null) {
-        return { text: 'INCOMPLETE', color: 'text-gray-600', bgColor: 'bg-gray-100' };
-    }
-    if (average >= 75) {
-        return { text: 'PASSED', color: 'text-green-600', bgColor: 'bg-green-100' };
-    }
-    return { text: 'FAILED', color: 'text-red-600', bgColor: 'bg-red-100' };
-}
-
 // --------- Dynamic Subject Options (API-driven from Manage Subjects) ---------
 
 // Parse grade text to detect Kinder, Grades, or College Year (encoded 101..104)
@@ -686,18 +424,12 @@ async function populateSubjectOptions(info, preselectSubject=null){
   const termSel = document.getElementById('modalTermSelect');
   const termValue = termSel ? termSel.value : '';
 
-  console.log('Populating subjects for term:', termValue, 'grade:', info?.gradeLevelText, 'program:', info?.program);
+  // Preserve current selection if caller didn't provide one
+  const preserved = preselectSubject ?? sel.value ?? '';
 
-  // Clear current selection first to avoid showing invalid subjects
   sel.innerHTML = '<option value="">-- Select Subject --</option>';
-  sel.value = '';
-
-  // Preserve current selection if caller didn't provide one AND it's valid for the new term
-  const preserved = preselectSubject ?? '';
-
   try{
     const items = await fetchOfferedSubjects(info?.gradeLevelText||'', info?.program||'', termValue);
-    console.log('Fetched subjects:', items.length, 'items for term:', termValue);
     // Deduplicate by name+code
     const norm = (s)=> String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
     const uniq = new Map();
@@ -726,41 +458,20 @@ async function populateSubjectOptions(info, preselectSubject=null){
 let currentStudentId = null;
 let subjectOptionsRequestId = 0;
 
-// Clear all grade input fields
-function clearGradeInputs() {
-  // Clear K-12 quarters
-  const q1 = document.querySelector('input[name="first_quarter"]');
-  const q2 = document.querySelector('input[name="second_quarter"]');
-  const q3 = document.querySelector('input[name="third_quarter"]');
-  const q4 = document.querySelector('input[name="fourth_quarter"]');
-  if (q1) q1.value = '';
-  if (q2) q2.value = '';
-  if (q3) q3.value = '';
-  if (q4) q4.value = '';
-  
-  // Clear College terms
-  const prelimI = document.querySelector('input[name="prelim"]');
-  const midI = document.querySelector('input[name="midterm"]');
-  const finI = document.querySelector('input[name="finals"]');
-  if (prelimI) prelimI.value = '';
-  if (midI) midI.value = '';
-  if (finI) finI.value = '';
-}
-
 // Prefill modal inputs based on current Subject + Term for current student
 async function prefillModalInputsFromExisting(){
   try{
     const subjSel = document.getElementById('subjectSelect');
     const termSel = document.getElementById('modalTermSelect');
-    if (!subjSel || !termSel) return;
-    
+    const prelimI = document.querySelector('input[name="prelim"]');
+    const midI = document.querySelector('input[name="midterm"]');
+    const prefiI = document.querySelector('input[name="prefinals"]');
+    const finI = document.querySelector('input[name="finals"]');
+    if (!subjSel || !termSel || !prelimI || !midI || !prefiI || !finI) return;
     const subj = subjSel.value || '';
     const term = termSel.value || '';
-    if (!subj || !term) return; // Don't prefill if subject or term not selected
-    
     // Try from already loaded grades first
     let match = (allGrades||[]).find(g=> String(g.subject||'')===subj && String(g.school_year_term||'')===term);
-    
     // If not found, fetch grades for the specific term and retry
     if (!match && currentStudentId && term){
       try{
@@ -774,34 +485,13 @@ async function prefillModalInputsFromExisting(){
         }
       }catch(e){ console.warn('Prefill fetch failed', e); }
     }
-    
-    // Determine grading system
-    const gradingSystem = match?.grading_system || determineGradingSystem(currentStudentInfo.gradeLevelText);
-    
-    if (gradingSystem === 'K12') {
-      // Pre-fill K-12 quarters
-      const q1 = document.querySelector('input[name="first_quarter"]');
-      const q2 = document.querySelector('input[name="second_quarter"]');
-      const q3 = document.querySelector('input[name="third_quarter"]');
-      const q4 = document.querySelector('input[name="fourth_quarter"]');
-      if (q1) q1.value = match && match.first_quarter != null ? match.first_quarter : '';
-      if (q2) q2.value = match && match.second_quarter != null ? match.second_quarter : '';
-      if (q3) q3.value = match && match.third_quarter != null ? match.third_quarter : '';
-      if (q4) q4.value = match && match.fourth_quarter != null ? match.fourth_quarter : '';
-    } else {
-      // Pre-fill College terms
-      const prelimI = document.querySelector('input[name="prelim"]');
-      const midI = document.querySelector('input[name="midterm"]');
-      const finI = document.querySelector('input[name="finals"]');
-      if (prelimI) prelimI.value = match && match.prelim != null ? match.prelim : '';
-      if (midI) midI.value = match && match.midterm != null ? match.midterm : '';
-      if (finI) finI.value = match && match.finals != null ? match.finals : '';
-    }
-    
-    // Show a message if grades were found
-    if (match) {
-      console.log('Found existing grades for', subj, '-', term, '- Pre-filled for editing');
-    }
+    const setVals = (g)=>{
+      prelimI.value = g && g.prelim != null ? g.prelim : '';
+      midI.value    = g && g.midterm != null ? g.midterm : '';
+      prefiI.value  = g && g.pre_finals != null ? g.pre_finals : '';
+      finI.value    = g && g.finals != null ? g.finals : '';
+    };
+    setVals(match || null);
   }catch(e){ console.error('prefillModalInputsFromExisting error', e); }
 }
 
@@ -818,38 +508,19 @@ function searchStudents() {
     const query = searchInput.value.trim();
     
     if (query.length < 2) {
-        resultsDiv.innerHTML = `
-            <div class="empty-state text-center py-12">
-                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-                <p class="text-gray-400 text-sm">Please enter at least 2 characters to search</p>
-            </div>
-        `;
+        resultsDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Please enter at least 2 characters to search</p>';
         return;
     }
 
-    // Show loading spinner
-    resultsDiv.innerHTML = `
-        <div class="text-center py-12">
-            <div class="spinner mx-auto mb-4"></div>
-            <p class="text-gray-500 text-sm">Searching for students...</p>
-        </div>
-    `;
+    // Show loading message
+    resultsDiv.innerHTML = '<p class="text-gray-500 text-center py-4">Searching...</p>';
 
     // Make AJAX call to search students in database
     fetch('api/SearchStudent.php?query=' + encodeURIComponent(query))
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                resultsDiv.innerHTML = `
-                    <div class="text-center py-12">
-                        <svg class="w-16 h-16 mx-auto text-red-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <p class="text-red-500 font-medium">Error: ${data.error}</p>
-                    </div>
-                `;
+                resultsDiv.innerHTML = '<p class="text-red-500 text-center py-4">Error: ' + data.error + '</p>';
                 return;
             }
 
@@ -858,21 +529,11 @@ function searchStudents() {
             
             // Show message if teacher has no assigned section
             if (data.message) {
-                resultsDiv.innerHTML = `
-                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg fade-in">
-                        <div class="flex items-center gap-3">
-                            <svg class="w-6 h-6 text-yellow-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                            </svg>
-                            <p class="text-yellow-800 font-medium">${data.message}</p>
-                        </div>
-                    </div>
-                `;
+                resultsDiv.innerHTML = '<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg"><div class="flex items-center gap-3"><svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><p class="text-yellow-800 font-medium">' + data.message + '</p></div></div>';
                 return;
             }
             
             if (students.length > 0) {
-                resultsHTML = `<div class="space-y-2">`;
                 students.forEach(student => {
                     const displayName = student.full_name || `${student.first_name} ${student.last_name}`;
                     const gradeLevel = student.year_section || student.grade_level || 'N/A';
@@ -883,20 +544,13 @@ function searchStudents() {
                     const safeProg = String(program).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
                     
                     resultsHTML += `
-                        <div class="student-card bg-gray-50 hover:bg-green-50 p-4 rounded-lg cursor-pointer fade-in" 
+                        <div class="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg cursor-pointer transition-colors" 
                              onclick="viewStudentGrades('${student.id_number}', '${safeName}', '${safeGL}', '${safeProg}')">
                             <div class="flex justify-between items-center">
-                                <div class="flex items-center gap-3">
-                                    <div class="bg-green-100 p-2 rounded-full">
-                                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-800">${displayName}</h3>
-                                        <p class="text-sm text-gray-600">ID: ${student.id_number} • ${gradeLevel}</p>
-                                        ${program ? `<p class="text-xs text-gray-500 mt-1"><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">${program}</span></p>` : ''}
-                                    </div>
+                                <div>
+                                    <h3 class="font-medium text-gray-800">${displayName}</h3>
+                                    <p class="text-sm text-gray-600">ID: ${student.id_number} • ${gradeLevel}</p>
+                                    ${program ? `<p class="text-xs text-gray-500">${program}</p>` : ''}
                                 </div>
                                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -905,32 +559,15 @@ function searchStudents() {
                         </div>
                     `;
                 });
-                resultsHTML += `</div>`;
             } else {
-                resultsHTML = `
-                    <div class="text-center py-12">
-                        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <p class="text-gray-500 font-medium">No students found</p>
-                        <p class="text-gray-400 text-sm mt-1">Try a different search term</p>
-                    </div>
-                `;
+                resultsHTML = '<p class="text-gray-500 text-center py-4">No students found</p>';
             }
 
             resultsDiv.innerHTML = resultsHTML;
         })
         .catch(error => {
             console.error('Search error:', error);
-            resultsDiv.innerHTML = `
-                <div class="text-center py-12">
-                    <svg class="w-16 h-16 mx-auto text-red-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <p class="text-red-500 font-medium">Search failed</p>
-                    <p class="text-gray-400 text-sm mt-1">Please try again</p>
-                </div>
-            `;
+            resultsDiv.innerHTML = '<p class="text-red-500 text-center py-4">Search failed. Please try again.</p>';
         });
 }
 
@@ -982,40 +619,36 @@ function loadStudentGrades(studentId, selectedTerm = null) {
             
             if (grades.length > 0) {
                 grades.forEach((grade, index) => {
-                    // Determine grading system and calculate average
-                    const gradingSystem = grade.grading_system || determineGradingSystem(currentStudentInfo.gradeLevelText);
-                    const average = calculateAverage(grade);
-                    const status = getGradeStatus(average);
-                    const averageDisplay = average ? average.toFixed(2) : 'N/A';
+                    // Calculate average if all grades are present
+                    let average = null;
+                    let status = 'Incomplete';
                     
-                    let gradeFieldsHTML = '';
+                    if (grade.prelim && grade.midterm && grade.pre_finals && grade.finals) {
+                        average = (parseFloat(grade.prelim) + parseFloat(grade.midterm) + parseFloat(grade.pre_finals) + parseFloat(grade.finals)) / 4;
+                        status = average >= 90 ? 'Excellent' : average >= 75 ? 'Passing' : 'Failing';
+                    }
                     
-                    if (gradingSystem === 'K12') {
-                        // K-12 Quarters Display
-                        gradeFieldsHTML = `
-                            <div class="grid grid-cols-4 gap-2 mb-3">
-                                <div class="text-center">
-                                    <p class="text-xs text-gray-500 uppercase font-medium mb-1">1ST QTR</p>
-                                    <p class="text-lg font-bold text-gray-900">${grade.first_quarter || '-'}</p>
+                    const statusColor = average >= 90 ? 'text-green-600' : average >= 75 ? 'text-emerald-600' : 'text-red-600';
+                    const statusBg = average >= 90 ? 'bg-green-100' : average >= 75 ? 'bg-emerald-100' : 'bg-red-100';
+                    const averageDisplay = average ? average.toFixed(1) : 'N/A';
+                    
+                    gradesHTML += `
+                        <div class="bg-white rounded-2xl card-shadow p-4 hover:shadow-xl transition-shadow">
+                            <div class="mb-3 flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-base font-bold text-gray-800">${grade.subject || 'Unknown Subject'}</h3>
+                                    <p class="text-xs text-gray-600">Teacher: ${grade.teacher_name || 'Not assigned'}</p>
                                 </div>
-                                <div class="text-center">
-                                    <p class="text-xs text-gray-500 uppercase font-medium mb-1">2ND QTR</p>
-                                    <p class="text-lg font-bold text-gray-900">${grade.second_quarter || '-'}</p>
-                                </div>
-                                <div class="text-center">
-                                    <p class="text-xs text-gray-500 uppercase font-medium mb-1">3RD QTR</p>
-                                    <p class="text-lg font-bold text-gray-900">${grade.third_quarter || '-'}</p>
-                                </div>
-                                <div class="text-center">
-                                    <p class="text-xs text-gray-500 uppercase font-medium mb-1">4TH QTR</p>
-                                    <p class="text-lg font-bold text-gray-900">${grade.fourth_quarter || '-'}</p>
+                                <div class="flex gap-2">
+                                    <button onclick="editGrade(${index})" class="text-blue-500 hover:text-blue-700 text-sm font-medium">
+                                        Edit
+                                    </button>
+                                    <button onclick="deleteGrade(${grade.id})" class="text-red-500 hover:text-red-700 text-sm font-medium">
+                                        Delete
+                                    </button>
                                 </div>
                             </div>
-                        `;
-                    } else {
-                        // College Terms Display
-                        gradeFieldsHTML = `
-                            <div class="grid grid-cols-3 gap-2 mb-3">
+                            <div class="grid grid-cols-4 gap-2 mb-3">
                                 <div class="text-center">
                                     <p class="text-xs text-gray-500 uppercase font-medium mb-1">PRELIM</p>
                                     <p class="text-lg font-bold text-gray-900">${grade.prelim || '-'}</p>
@@ -1025,85 +658,29 @@ function loadStudentGrades(studentId, selectedTerm = null) {
                                     <p class="text-lg font-bold text-gray-900">${grade.midterm || '-'}</p>
                                 </div>
                                 <div class="text-center">
+                                    <p class="text-xs text-gray-500 uppercase font-medium mb-1">PRE-FINALS</p>
+                                    <p class="text-lg font-bold text-gray-900">${grade.pre_finals || '-'}</p>
+                                </div>
+                                <div class="text-center">
                                     <p class="text-xs text-gray-500 uppercase font-medium mb-1">FINALS</p>
                                     <p class="text-lg font-bold text-gray-900">${grade.finals || '-'}</p>
                                 </div>
                             </div>
-                        `;
-                    }
-                    
-                    gradesHTML += `
-                        <div class="bg-white rounded-2xl card-shadow p-5 hover:shadow-xl transition-all fade-in border-l-4 ${status.color === 'text-green-600' ? 'border-green-500' : status.color === 'text-red-600' ? 'border-red-500' : 'border-gray-300'}">
-                            <div class="mb-4 flex justify-between items-start">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <div class="bg-blue-100 p-2 rounded-lg">
-                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <h3 class="text-lg font-bold text-gray-800">${grade.subject || 'Unknown Subject'}</h3>
-                                            <p class="text-xs text-gray-500">${gradingSystem === 'K12' ? '📚 K-12 System' : '🎓 College System'}</p>
-                                        </div>
-                                    </div>
-                                    <p class="text-xs text-gray-600 flex items-center gap-1">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                        </svg>
-                                        ${grade.teacher_name || 'Not assigned'}
-                                    </p>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button onclick="editGrade(${index})" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Edit Grade">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                        </svg>
-                                    </button>
-                                    <button onclick="deleteGrade(${grade.id})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete Grade">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
                             
-                            <div class="bg-gray-50 rounded-lg p-3 mb-3">
-                                ${gradeFieldsHTML}
-                            </div>
-                            
-                            <div class="flex justify-between items-center pt-3 border-t border-gray-200">
+                            <div class="mt-3 pt-3 border-t flex justify-between items-center">
                                 <div>
-                                    <p class="text-xs text-gray-500 mb-1">Final Average</p>
-                                    <p class="text-2xl font-bold ${status.color}">${averageDisplay}%</p>
+                                    <p class="text-xs text-gray-500 mb-1">Current Average:</p>
+                                    <p class="text-lg font-bold ${statusColor}">${averageDisplay}%</p>
                                 </div>
                                 <div class="text-right">
-                                    <span class="px-3 py-1.5 rounded-full text-sm font-semibold ${status.bgColor} ${status.color}">${status.text}</span>
+                                    <span class="px-2 py-1 rounded-full text-xs font-medium ${statusBg} ${statusColor}">${status}</span>
                                 </div>
                             </div>
                         </div>
                     `;
                 });
             } else {
-                gradesHTML = `
-                    <div class="col-span-full">
-                        <div class="bg-white rounded-2xl card-shadow p-12 text-center">
-                            <div class="bg-gray-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-700 mb-2">No Grades Yet</h3>
-                            <p class="text-gray-500 mb-6">This student doesn't have any grades for the selected term.</p>
-                            <button onclick="showAddGradeModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2 transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                </svg>
-                                Add First Grade
-                            </button>
-                        </div>
-                    </div>
-                `;
+                gradesHTML = '<div class="text-center py-8"><p class="text-gray-500">No grades found for this student.</p></div>';
             }
             
             document.getElementById('grades-container').innerHTML = gradesHTML;
@@ -1129,27 +706,6 @@ function editGradeModal(grade) {
     // Clear form first
     document.getElementById('addGradeForm').reset();
     
-    // Determine grading system and show appropriate fields
-    const gradingSystem = grade.grading_system || determineGradingSystem(currentStudentInfo.gradeLevelText);
-    document.getElementById('modal-grading-system').value = gradingSystem;
-    
-    if (gradingSystem === 'K12') {
-        document.getElementById('k12-grades').classList.remove('hidden');
-        document.getElementById('college-grades').classList.add('hidden');
-        // Pre-fill K-12 grades
-        document.querySelector('input[name="first_quarter"]').value = grade.first_quarter || '';
-        document.querySelector('input[name="second_quarter"]').value = grade.second_quarter || '';
-        document.querySelector('input[name="third_quarter"]').value = grade.third_quarter || '';
-        document.querySelector('input[name="fourth_quarter"]').value = grade.fourth_quarter || '';
-    } else {
-        document.getElementById('k12-grades').classList.add('hidden');
-        document.getElementById('college-grades').classList.remove('hidden');
-        // Pre-fill College grades
-        document.querySelector('input[name="prelim"]').value = grade.prelim || '';
-        document.querySelector('input[name="midterm"]').value = grade.midterm || '';
-        document.querySelector('input[name="finals"]').value = grade.finals || '';
-    }
-    
     // Populate the modal with grade data
     // Populate subjects based on current student, then select existing subject
     populateSubjectOptions(currentStudentInfo, grade.subject);
@@ -1162,7 +718,20 @@ function editGradeModal(grade) {
         });
         termSelect.setAttribute('data-listener-added', 'true');
     }
-    
+    // Set teacher dropdown selection by name
+    (function(){
+        const sel = document.getElementById('teacherSelect');
+        if (!sel) return;
+        const targetName = (grade.teacher_name || grade.teacher || '').trim();
+        let matched = false;
+        Array.from(sel.options).forEach(opt => {
+            if ((opt.dataset && (opt.dataset.name||'').trim()) === targetName) {
+                sel.value = opt.value;
+                matched = true;
+            }
+        });
+        if (!matched) sel.value = '';
+    })();
     // Set term select for edit
     (function(){
         const sel = document.getElementById('modalTermSelect');
@@ -1176,35 +745,24 @@ function editGradeModal(grade) {
         }
         sel.value = term;
     })();
-    
+    document.querySelector('input[name="prelim"]').value = grade.prelim || '';
+    document.querySelector('input[name="midterm"]').value = grade.midterm || '';
+    document.querySelector('input[name="prefinals"]').value = grade.pre_finals || '';
+    document.querySelector('input[name="finals"]').value = grade.finals || '';
     document.getElementById('modal-student-id').value = currentStudentId;
     
     // Change modal title and button text for editing
     document.querySelector('#addGradeModal h3').textContent = 'Edit Grade';
     document.querySelector('#addGradeModal button[type="submit"]').textContent = 'Update Grade';
-    
-    // Make Subject and School Year & Term readonly in EDIT mode
-    // Use a simpler approach: just make them readonly, not disabled
-    const subjSel = document.getElementById('subjectSelect');
-    const yearSel = document.getElementById('modalSchoolYear');
-    const termOnlySel = document.getElementById('modalTermOnly');
-    
-    if (subjSel) {
-        subjSel.style.backgroundColor = '#f0f0f0';
-        subjSel.style.cursor = 'not-allowed';
-        subjSel.setAttribute('readonly', 'readonly');
-        subjSel.style.pointerEvents = 'none';
-    }
-    if (yearSel) {
-        yearSel.style.backgroundColor = '#f0f0f0';
-        yearSel.style.cursor = 'not-allowed';
-        yearSel.style.pointerEvents = 'none';
-    }
-    if (termOnlySel) {
-        termOnlySel.style.backgroundColor = '#f0f0f0';
-        termOnlySel.style.cursor = 'not-allowed';
-        termOnlySel.style.pointerEvents = 'none';
-    }
+    // Make Subject and School Year & Term view-only in EDIT mode
+    (function(){
+        const subjSel = document.getElementById('subjectSelect');
+        const yearSel = document.getElementById('modalSchoolYear');
+        const termOnlySel = document.getElementById('modalTermOnly');
+        if (subjSel) subjSel.disabled = true;
+        if (yearSel) yearSel.disabled = true;
+        if (termOnlySel) termOnlySel.disabled = true;
+    })();
     
     // Show the modal
     document.getElementById('addGradeModal').classList.remove('hidden');
@@ -1277,19 +835,6 @@ function showAddGradeModal() {
         // Reset form for new grade
         document.getElementById('addGradeForm').reset();
         document.getElementById('modal-student-id').value = currentStudentId;
-        
-        // Determine grading system and show appropriate fields
-        const gradingSystem = determineGradingSystem(currentStudentInfo.gradeLevelText);
-        document.getElementById('modal-grading-system').value = gradingSystem;
-        
-        if (gradingSystem === 'K12') {
-            document.getElementById('k12-grades').classList.remove('hidden');
-            document.getElementById('college-grades').classList.add('hidden');
-        } else {
-            document.getElementById('k12-grades').classList.add('hidden');
-            document.getElementById('college-grades').classList.remove('hidden');
-        }
-        
         // Populate subjects for this student's level/track
         populateSubjectOptions(currentStudentInfo);
         
@@ -1319,28 +864,22 @@ function showAddGradeModal() {
             if (yearSel && !yearSel.hasAttribute('data-sync')){
               yearSel.addEventListener('change', ()=>{
                 combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
-                // Clear grade inputs when term changes
-                clearGradeInputs();
                 populateSubjectOptions(currentStudentInfo);
+                prefillModalInputsFromExisting();
               });
               yearSel.setAttribute('data-sync','1');
             }
             if (termOnlySel && !termOnlySel.hasAttribute('data-sync')){
               termOnlySel.addEventListener('change', ()=>{
                 combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
-                // Clear grade inputs when term changes
-                clearGradeInputs();
                 populateSubjectOptions(currentStudentInfo);
+                prefillModalInputsFromExisting();
               });
               termOnlySel.setAttribute('data-sync','1');
             }
             const subjSel = document.getElementById('subjectSelect');
             if (subjSel && !subjSel.hasAttribute('data-prefill-listener')){
-              subjSel.addEventListener('change', ()=>{
-                // Clear inputs first, then prefill if grades exist
-                clearGradeInputs();
-                prefillModalInputsFromExisting();
-              });
+              subjSel.addEventListener('change', prefillModalInputsFromExisting);
               subjSel.setAttribute('data-prefill-listener','1');
             }
           }catch(e){ console.error('Default to 1st term failed', e); }
@@ -1350,31 +889,11 @@ function showAddGradeModal() {
         document.querySelector('#addGradeModal h3').textContent = 'Add New Grade';
         document.querySelector('#addGradeModal button[type="submit"]').textContent = 'Save Grade';
 
-        // Ensure fields are ENABLED and VISIBLE in ADD mode
+        // Ensure fields are ENABLED in ADD mode
         const subjSel = document.getElementById('subjectSelect');
         const yearSel2 = document.getElementById('modalSchoolYear');
         const termOnlySel2 = document.getElementById('modalTermOnly');
-        
-        // Restore normal state
-        if (subjSel) {
-            subjSel.disabled = false;
-            subjSel.style.backgroundColor = '';
-            subjSel.style.cursor = '';
-            subjSel.style.pointerEvents = 'auto';
-            subjSel.removeAttribute('readonly');
-        }
-        if (yearSel2) {
-            yearSel2.disabled = false;
-            yearSel2.style.backgroundColor = '';
-            yearSel2.style.cursor = '';
-            yearSel2.style.pointerEvents = 'auto';
-        }
-        if (termOnlySel2) {
-            termOnlySel2.disabled = false;
-            termOnlySel2.style.backgroundColor = '';
-            termOnlySel2.style.cursor = '';
-            termOnlySel2.style.pointerEvents = 'auto';
-        }
+        if (subjSel) subjSel.disabled = false;
         if (yearSel2) yearSel2.disabled = false;
         if (termOnlySel2) termOnlySel2.disabled = false;
         
@@ -1399,9 +918,18 @@ function showAddGradeModal() {
             if (!Array.from(sel.options).some(o=>o.value===latest)){
                 const opt = document.createElement('option'); opt.value = latest; opt.textContent = latest; sel.appendChild(opt);
             }
-            // Build list of all terms from database only (don't compute next term)
+            // Build list of all terms
             let terms = Array.from(sel.options).map(o=>o.value).filter(v=>v);
-            
+            // Compute next (advance) term
+            const m = latest.match(/^(\d{4})-(\d{4})\s+(\d)(st|nd|rd|th)\s+Term$/i);
+            if (m){
+                let y1 = parseInt(m[1],10), y2 = parseInt(m[2],10);
+                let nth = parseInt(m[3],10);
+                let next;
+                if (nth === 1){ next = `${y1}-${y2} 2nd Term`; }
+                else { next = `${y1+1}-${y2+1} 1st Term`; }
+                if (!terms.includes(next)) terms.push(next);
+            }
             // Sort: by start year desc, then 2nd before 1st
             terms = Array.from(new Set(terms)).sort((a,b)=>{
                 const pa = a.match(/^(\d{4})-(\d{4})\s+(\d)/); const pb = b.match(/^(\d{4})-(\d{4})\s+(\d)/);
@@ -1411,7 +939,7 @@ function showAddGradeModal() {
                 const ta = parseInt(pa[3],10), tb = parseInt(pb[3],10);
                 return tb - ta; // 2 before 1
             });
-            // Rebuild options from existing terms only
+            // Rebuild options (advance term will naturally be first when latest is 1st Term; if latest is 2nd Term, next year's 1st comes first)
             sel.innerHTML = '';
             terms.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
             // Select latest by default
@@ -1481,11 +1009,6 @@ document.getElementById('addGradeForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
-    
-    // Debug: Log form data
-    console.log('Submitting grade with grading_system:', formData.get('grading_system'));
-    console.log('Student ID:', formData.get('student_id'));
-    console.log('Subject:', formData.get('subject'));
     
     // Submit to backend
     fetch('ManageGrades.php', {
@@ -1637,33 +1160,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function ensureSchoolYearOptions(){
       const ys = document.getElementById('modalSchoolYear');
       if (!ys) return;
-      
-      // Calculate current academic year (starts in August)
       const now = new Date();
-      const month = now.getMonth() + 1; // 1-12
-      const year = now.getFullYear();
-      
-      // If we're in August or later, use current year as start year
-      // Otherwise, use previous year as start year
-      const startYear = (month >= 8) ? year : (year - 1);
-      const label = `${startYear}-${startYear+1}`;
-      
-      // Only add if it doesn't exist
+      const current = now.getFullYear();
+      const label = `${current}-${current+1}`; // e.g., 2026-2027
       const exists = Array.from(ys.options).some(o=>o.value === label);
       if (!exists){
         const opt = document.createElement('option');
-        opt.value = label; 
-        opt.textContent = label;
-        // Add to the end of the list, not the beginning
-        ys.appendChild(opt);
+        opt.value = label; opt.textContent = label;
+        ys.insertBefore(opt, ys.firstChild);
       }
     }
-    
-    // Only call this once when page loads
-    if (!window.schoolYearOptionsEnsured) {
-      ensureSchoolYearOptions();
-      window.schoolYearOptionsEnsured = true;
-    }
+    ensureSchoolYearOptions();
 });
 </script>
 

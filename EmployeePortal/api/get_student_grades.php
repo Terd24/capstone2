@@ -1,67 +1,83 @@
 <?php
 session_start();
-header('Content-Type: application/json');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+include('../../StudentLogin/db_conn.php');
+include('../../includes/grading_helpers.php');
 
-// Allow teacher (and registrar for compatibility)
-$role = $_SESSION['role'] ?? '';
-if ($role !== 'teacher' && !isset($_SESSION['registrar_id'])) {
-  echo json_encode(['success'=>false,'message'=>'Unauthorized']);
-  exit;
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Don't display errors in JSON response
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['student_id'])) {
+    $student_id = $_POST['student_id'];
+    $selected_term = isset($_POST['term']) ? $_POST['term'] : null;
+
+    try {
+        // Get student info
+        $student_query = "SELECT id_number, CONCAT(first_name, ' ', last_name) as name, academic_track as program, grade_level 
+                         FROM student_account 
+                         WHERE id_number = ? OR rfid_uid = ?";
+        $student_stmt = $conn->prepare($student_query);
+        $student_stmt->bind_param("ss", $student_id, $student_id);
+        $student_stmt->execute();
+        $student_result = $student_stmt->get_result();
+        
+        if ($student_result->num_rows === 0) {
+            echo json_encode(['success' => false, 'message' => 'Student not found']);
+            exit();
+        }
+        
+        $student = $student_result->fetch_assoc();
+        $student['grading_system'] = determineGradingSystem($student['grade_level']);
+        
+        // Get available terms for this student
+        $terms_query = "SELECT DISTINCT school_year_term FROM grades_record WHERE id_number = ? ORDER BY school_year_term DESC";
+        $terms_stmt = $conn->prepare($terms_query);
+        $terms_stmt->bind_param("s", $student['id_number']);
+        $terms_stmt->execute();
+        $terms_result = $terms_stmt->get_result();
+        
+        $terms = [];
+        while ($row = $terms_result->fetch_assoc()) {
+            $terms[] = $row['school_year_term'];
+        }
+        
+        // If no term selected, use the latest one
+        if (!$selected_term && count($terms) > 0) {
+            $selected_term = $terms[0];
+        }
+        
+        // Get grades for selected term (include all columns for K-12 and College)
+        $grades_query = "SELECT id, subject, teacher_name, school_year_term, grading_system,
+                                prelim, midterm, pre_finals, finals,
+                                first_quarter, second_quarter, third_quarter, fourth_quarter
+                        FROM grades_record 
+                        WHERE id_number = ? AND school_year_term = ?";
+        $grades_stmt = $conn->prepare($grades_query);
+        $grades_stmt->bind_param("ss", $student['id_number'], $selected_term);
+        $grades_stmt->execute();
+        $grades_result = $grades_stmt->get_result();
+        
+        $grades = [];
+        while ($row = $grades_result->fetch_assoc()) {
+            // Calculate average and status for each grade
+            $row['average'] = calculateAverage($row);
+            $status = getGradeStatus($row['average']);
+            $row['status'] = $status['text'];
+            $grades[] = $row;
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'student' => $student,
+            'grades' => $grades,
+            'terms' => $terms,
+            'selected_term' => $selected_term
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    }
+} else {
+    echo json_encode(['success' => false, 'message' => 'Invalid request']);
 }
-
-require_once("../../StudentLogin/db_conn.php");
-
-define('SAFE_TERM_REGEX','/^(\d{4}-\d{4})\s+(1st|2nd)\s+Term$/');
-
-$student_id = $_POST['student_id'] ?? $_GET['student_id'] ?? '';
-$requested_term = $_POST['term'] ?? $_GET['term'] ?? '';
-$student_id = trim($student_id);
-$requested_term = trim($requested_term);
-
-if ($student_id === ''){
-  echo json_encode(['success'=>false,'message'=>'Missing student_id']);
-  exit;
-}
-
-$terms = [];
-$selected_term = '';
-
-try {
-  // Get distinct terms for this student
-  if ($stmt = $conn->prepare("SELECT DISTINCT school_year_term FROM grades_record WHERE id_number=? AND school_year_term IS NOT NULL AND school_year_term<>'' ORDER BY school_year_term DESC")){
-    $stmt->bind_param('s', $student_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    while($row=$res->fetch_assoc()){ $terms[] = $row['school_year_term']; }
-    $stmt->close();
-  }
-
-  if ($requested_term !== '' && preg_match(SAFE_TERM_REGEX, $requested_term)) {
-    $selected_term = $requested_term;
-  } elseif (!empty($terms)) {
-    $selected_term = $terms[0];
-  }
-
-  // Build grades query
-  $grades = [];
-  if ($selected_term !== ''){
-    $q = $conn->prepare("SELECT id, id_number, subject, teacher_name, prelim, midterm, pre_finals, finals, school_year_term FROM grades_record WHERE id_number=? AND school_year_term=? ORDER BY subject ASC");
-    $q->bind_param('ss', $student_id, $selected_term);
-  } else {
-    $q = $conn->prepare("SELECT id, id_number, subject, teacher_name, prelim, midterm, pre_finals, finals, school_year_term FROM grades_record WHERE id_number=? ORDER BY school_year_term DESC, subject ASC");
-    $q->bind_param('s', $student_id);
-  }
-  if ($q){
-    $q->execute();
-    $r = $q->get_result();
-    while($row=$r->fetch_assoc()){ $grades[]=$row; }
-    $q->close();
-  }
-
-  echo json_encode(['success'=>true,'grades'=>$grades,'terms'=>$terms,'selected_term'=>$selected_term]);
-  exit;
-} catch (Throwable $e){
-  echo json_encode(['success'=>false,'message'=>'Server error','error'=>$e->getMessage()]);
-  exit;
-}
+?>

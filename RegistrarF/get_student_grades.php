@@ -51,8 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['student_id'])) {
             $selected_term = $terms[0];
         }
         
-        // Get grades for selected term
-        $grades_query = "SELECT id, subject, teacher_name, prelim, midterm, pre_finals, finals, school_year_term 
+        // Get grades for selected term (include all columns for K-12 and College)
+        $grades_query = "SELECT id, subject, teacher_name, school_year_term, grading_system,
+                                prelim, midterm, pre_finals, finals,
+                                first_quarter, second_quarter, third_quarter, fourth_quarter
                         FROM grades_record 
                         WHERE id_number = ? AND school_year_term = ?";
         $grades_stmt = $conn->prepare($grades_query);
