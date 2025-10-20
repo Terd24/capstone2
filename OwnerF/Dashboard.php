@@ -872,6 +872,53 @@ $deleted_employees_count = $deleted_employees_result ? $deleted_employees_result
 
 $total_deleted_accounts = $deleted_students_count + $deleted_employees_count;
 
+// Get today's login activity
+$today = date('Y-m-d');
+$today_logins = [];
+
+// Check if login_activity table exists
+$table_check = $conn->query("SHOW TABLES LIKE 'login_activity'");
+if ($table_check && $table_check->num_rows > 0) {
+    try {
+        // Query to get login activity with names from appropriate tables
+        $login_query = "
+            SELECT 
+                la.user_type, 
+                la.id_number, 
+                la.username, 
+                la.role, 
+                la.login_time,
+                la.logout_time,
+                la.session_duration,
+                CASE 
+                    WHEN la.user_type = 'student' THEN CONCAT(s.first_name, ' ', s.last_name)
+                    WHEN la.user_type = 'employee' THEN CONCAT(e.first_name, ' ', e.last_name)
+                    WHEN la.user_type = 'parent' THEN CONCAT('Parent of ', sc.first_name, ' ', sc.last_name)
+                    ELSE la.username
+                END as full_name
+            FROM login_activity la
+            LEFT JOIN student_account s ON la.id_number = s.id_number AND la.user_type = 'student'
+            LEFT JOIN employees e ON la.id_number = e.id_number AND la.user_type = 'employee'
+            LEFT JOIN student_account sc ON la.id_number = sc.id_number AND la.user_type = 'parent'
+            WHERE DATE(la.login_time) = ?
+            ORDER BY la.login_time DESC 
+            LIMIT 50
+        ";
+        
+        if ($stmt = $conn->prepare($login_query)) {
+            $stmt->bind_param('s', $today);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $today_logins[] = $row;
+            }
+            $stmt->close();
+        }
+    } catch (Exception $e) {
+        error_log("Login activity error: " . $e->getMessage());
+    }
+}
+
 // Initial load - get first page of request history (will be replaced by AJAX)
 $history_page = 1;
 $history_filter = 'all';
@@ -1124,6 +1171,343 @@ $history_result = $conn->query($history_query);
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- Today's Logins Section -->
+    <div class="mb-6">
+        <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+            <div class="bg-blue-600 px-6 py-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white/20 p-2 rounded-lg">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Today's Logins</h3>
+                            <p class="text-blue-100 text-sm">Recent system access activity</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openLoginHistory()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Login History
+                        </button>
+                        <button onclick="location.reload()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="flex flex-wrap gap-3 items-end">
+                    <div class="flex items-center gap-2">
+                        <label class="text-white text-sm font-medium whitespace-nowrap">User Type:</label>
+                        <select id="filter-user-type" onchange="updateRoleOptions(); filterLogins();" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                            <option value="all">All</option>
+                            <option value="student">Student</option>
+                            <option value="employee">Employee</option>
+                            <option value="parent">Parent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <label class="text-white text-sm font-medium whitespace-nowrap">Role:</label>
+                        <select id="filter-role" onchange="filterLogins()" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 flex-1 min-w-[250px] max-w-md">
+                        <label class="text-white text-sm font-medium whitespace-nowrap">Search:</label>
+                        <div class="relative flex-1">
+                            <input type="text" id="filter-search" oninput="filterLogins()" placeholder="Search by ID or Name..." class="w-full pl-9 pr-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <button onclick="clearFilters()" class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all shadow-sm whitespace-nowrap">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Login Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="logins-table">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">User Type</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Login Time</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Logout Time</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100" id="logins-tbody">
+                        <?php if (!empty($today_logins)): ?>
+                            <?php foreach ($today_logins as $login): 
+                                $userTypeColors = [
+                                    'employee' => 'bg-purple-100 text-purple-700',
+                                    'student' => 'bg-blue-100 text-blue-700',
+                                    'parent' => 'bg-cyan-100 text-cyan-700'
+                                ];
+                                $userTypeColor = $userTypeColors[$login['user_type']] ?? 'bg-gray-100 text-gray-700';
+                                
+                                $roleColors = [
+                                    'hr' => 'bg-orange-100 text-orange-700',
+                                    'teacher' => 'bg-green-100 text-green-700',
+                                    'registrar' => 'bg-indigo-100 text-indigo-700',
+                                    'cashier' => 'bg-yellow-100 text-yellow-700',
+                                    'guidance' => 'bg-pink-100 text-pink-700',
+                                    'attendance' => 'bg-teal-100 text-teal-700',
+                                    'student' => 'bg-blue-100 text-blue-700',
+                                    'parent' => 'bg-cyan-100 text-cyan-700'
+                                ];
+                                $roleColor = $roleColors[$login['role']] ?? 'bg-gray-100 text-gray-700';
+                            ?>
+                            <tr class="hover:bg-blue-50 transition-colors login-row" data-user-type="<?= strtolower(htmlspecialchars($login['user_type'])) ?>" data-role="<?= strtolower(htmlspecialchars($login['role'])) ?>" data-id="<?= htmlspecialchars($login['id_number']) ?>" data-name="<?= htmlspecialchars($login['full_name'] ?: $login['username']) ?>">
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium <?= $userTypeColor ?>">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <circle cx="10" cy="10" r="3"/>
+                                        </svg>
+                                        <?= ucfirst(htmlspecialchars($login['user_type'])) ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-gray-600"><?= htmlspecialchars($login['id_number']) ?></td>
+                                <td class="px-4 py-3 font-medium text-gray-900"><?= htmlspecialchars($login['full_name'] ?: $login['username']) ?></td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <?= $roleColor ?>">
+                                        <?= ucfirst(htmlspecialchars($login['role'])) ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-gray-600">
+                                    <div class="flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <?= date('M j, Y g:i A', strtotime($login['login_time'])) ?>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-gray-600">
+                                    <?php if (!empty($login['logout_time'])): ?>
+                                        <div class="flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                            </svg>
+                                            <?= date('M j, Y g:i A', strtotime($login['logout_time'])) ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="text-green-600 font-medium flex items-center gap-1">
+                                            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                            Active
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-4 py-3 text-gray-600">
+                                    <?php if (!empty($login['session_duration'])): ?>
+                                        <?php 
+                                            $hours = floor($login['session_duration'] / 3600);
+                                            $minutes = floor(($login['session_duration'] % 3600) / 60);
+                                            if ($hours > 0) {
+                                                echo $hours . 'h ' . $minutes . 'm';
+                                            } else {
+                                                echo $minutes . ' min';
+                                            }
+                                        ?>
+                                    <?php else: ?>
+                                        <span class="text-gray-400">---</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr class="login-row">
+                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                    <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                    </svg>
+                                    No logins recorded today
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination for Today's Logins -->
+            <?php if (!empty($today_logins) && count($today_logins) > 10): ?>
+            <div class="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <div class="text-sm text-gray-600">
+                    Showing <span id="logins-start" class="font-semibold text-gray-900">1</span> to <span id="logins-end" class="font-semibold text-gray-900">10</span> of <span id="logins-total" class="font-semibold text-gray-900"><?= count($today_logins) ?></span> logins
+                </div>
+                <div class="flex gap-2">
+                    <button id="logins-prev" onclick="changeLoginsPage(-1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                        Previous
+                    </button>
+                    <button id="logins-next" onclick="changeLoginsPage(1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        Next
+                        <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Not Logged In Today Sections -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Not Logged In Today (Employees) -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+            <div class="bg-orange-500 px-6 py-4">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="bg-white/20 p-2 rounded-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
+                        <p class="text-orange-100 text-sm">Employees</p>
+                    </div>
+                </div>
+                <!-- Employee Filters -->
+                <div class="flex flex-wrap gap-2">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <input type="text" id="employee-search" oninput="filterEmployees()" placeholder="Search by name or ID..." class="w-full pl-9 pr-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <select id="employee-role-filter" onchange="filterEmployees()" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                        <option value="all">All Roles</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="registrar">Registrar</option>
+                        <option value="hr">HR</option>
+                        <option value="attendance">Attendance</option>
+                        <option value="cashier">Cashier</option>
+                        <option value="guidance">Guidance</option>
+                    </select>
+                    <button onclick="clearEmployeeFilters()" class="px-3 py-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all shadow-sm whitespace-nowrap">
+                        Clear
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="min-h-[280px]">
+                    <ul class="space-y-2" id="employees-list">
+                        <!-- Items will be loaded here -->
+                    </ul>
+                    <div id="employees-loading" class="text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-orange-200 border-t-orange-600"></div>
+                        <p class="text-gray-500 text-sm mt-2">Loading employees...</p>
+                    </div>
+                </div>
+                <!-- Pagination for Employees -->
+                <div id="employees-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
+                    <div class="text-sm text-gray-600">
+                        Showing <span id="employees-start" class="font-semibold text-gray-900">1</span> to <span id="employees-end" class="font-semibold text-gray-900">10</span> of <span id="employees-total" class="font-semibold text-gray-900">0</span> employees
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="employees-prev" onclick="changeEmployeesPage(-1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                            Prev
+                        </button>
+                        <button id="employees-next" onclick="changeEmployeesPage(1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Next
+                            <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Not Logged In Today (Students) -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+            <div class="bg-blue-500 px-6 py-4">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="bg-white/20 p-2 rounded-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                            <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
+                        <p class="text-blue-100 text-sm">Students & Parents</p>
+                    </div>
+                </div>
+                <!-- Student Filters -->
+                <div class="flex flex-wrap gap-2">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <input type="text" id="student-search" oninput="filterStudents()" placeholder="Search by name or ID..." class="w-full pl-9 pr-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <select id="student-type-filter" onchange="filterStudents()" class="px-3 py-2 bg-white text-gray-900 border border-white/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white shadow-sm">
+                        <option value="all">All Types</option>
+                        <option value="student">Students</option>
+                        <option value="parent">Parents</option>
+                    </select>
+                    <button onclick="clearStudentFilters()" class="px-3 py-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-sm font-medium transition-all shadow-sm whitespace-nowrap">
+                        Clear
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="min-h-[280px]">
+                    <ul class="space-y-2" id="students-list">
+                        <!-- Items will be loaded here -->
+                    </ul>
+                    <div id="students-loading" class="text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"></div>
+                        <p class="text-gray-500 text-sm mt-2">Loading students & parents...</p>
+                    </div>
+                </div>
+                <!-- Pagination for Students & Parents -->
+                <div id="students-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
+                    <div class="text-sm text-gray-600">
+                        Showing <span id="students-start" class="font-semibold text-gray-900">1</span> to <span id="students-end" class="font-semibold text-gray-900">10</span> of <span id="students-total" class="font-semibold text-gray-900">0</span> users
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="students-prev" onclick="changeStudentsPage(-1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                            Prev
+                        </button>
+                        <button id="students-next" onclick="changeStudentsPage(1)" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Next
+                            <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -3956,7 +4340,956 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// ===== TODAY'S LOGINS FUNCTIONS =====
+
+// Pagination for Today's Logins
+let loginsPage = 1;
+const loginsPerPage = 10;
+
+function changeLoginsPage(direction) {
+    const rows = document.querySelectorAll('#logins-tbody .login-row');
+    const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+    const totalPages = Math.ceil(visibleRows.length / loginsPerPage);
+    
+    loginsPage += direction;
+    if (loginsPage < 1) loginsPage = 1;
+    if (loginsPage > totalPages) loginsPage = totalPages;
+    
+    updateLoginsDisplay();
+}
+
+function updateLoginsDisplay() {
+    const rows = document.querySelectorAll('#logins-tbody .login-row');
+    const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+    const totalVisible = visibleRows.length;
+    const totalPages = Math.ceil(totalVisible / loginsPerPage);
+    
+    // Hide all rows first
+    visibleRows.forEach(row => row.classList.add('hidden'));
+    
+    // Show only current page rows
+    const start = (loginsPage - 1) * loginsPerPage;
+    const end = start + loginsPerPage;
+    visibleRows.slice(start, end).forEach(row => row.classList.remove('hidden'));
+    
+    // Update pagination info
+    const startNum = totalVisible > 0 ? start + 1 : 0;
+    const endNum = Math.min(end, totalVisible);
+    
+    const startSpan = document.getElementById('logins-start');
+    const endSpan = document.getElementById('logins-end');
+    const totalSpan = document.getElementById('logins-total');
+    
+    if (startSpan) startSpan.textContent = startNum;
+    if (endSpan) endSpan.textContent = endNum;
+    if (totalSpan) totalSpan.textContent = totalVisible;
+    
+    // Update button states
+    const prevBtn = document.getElementById('logins-prev');
+    const nextBtn = document.getElementById('logins-next');
+    
+    if (prevBtn) prevBtn.disabled = loginsPage === 1;
+    if (nextBtn) nextBtn.disabled = loginsPage >= totalPages;
+}
+
+// Filter functions for Today's Logins
+function updateRoleOptions() {
+    const userTypeFilter = document.getElementById('filter-user-type').value.toLowerCase();
+    const roleFilter = document.getElementById('filter-role');
+    
+    // Clear existing options except "All"
+    roleFilter.innerHTML = '<option value="all">All</option>';
+    
+    // Define role options based on user type
+    const roleOptions = {
+        'student': ['Student'],
+        'parent': ['Parent'],
+        'employee': ['HR', 'Teacher', 'Registrar', 'Cashier', 'Guidance', 'Attendance'],
+        'all': ['Student', 'Parent', 'HR', 'Teacher', 'Registrar', 'Cashier', 'Guidance', 'Attendance']
+    };
+    
+    const roles = roleOptions[userTypeFilter] || roleOptions['all'];
+    roles.forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.toLowerCase();
+        option.textContent = role;
+        roleFilter.appendChild(option);
+    });
+}
+
+function filterLogins() {
+    const userTypeFilter = document.getElementById('filter-user-type').value.toLowerCase();
+    const roleFilter = document.getElementById('filter-role').value.toLowerCase();
+    const searchFilter = document.getElementById('filter-search').value.toLowerCase();
+    
+    const rows = document.querySelectorAll('#logins-tbody .login-row');
+    
+    rows.forEach(row => {
+        const userType = row.dataset.userType;
+        const role = row.dataset.role;
+        const id = row.dataset.id.toLowerCase();
+        const name = row.dataset.name.toLowerCase();
+        
+        const userTypeMatch = userTypeFilter === 'all' || userType === userTypeFilter;
+        const roleMatch = roleFilter === 'all' || role === roleFilter;
+        const searchMatch = searchFilter === '' || id.includes(searchFilter) || name.includes(searchFilter);
+        
+        if (userTypeMatch && roleMatch && searchMatch) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Reset to page 1 after filtering
+    loginsPage = 1;
+    updateLoginsDisplay();
+}
+
+function clearFilters() {
+    document.getElementById('filter-user-type').value = 'all';
+    document.getElementById('filter-role').value = 'all';
+    document.getElementById('filter-search').value = '';
+    updateRoleOptions();
+    filterLogins();
+}
+
+// Initialize Today's Logins pagination on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize role options
+    updateRoleOptions();
+    
+    // Initialize Today's Logins pagination only if pagination elements exist
+    const loginsTable = document.getElementById('logins-table');
+    const loginsPagination = document.getElementById('logins-start');
+    
+    if (loginsTable && loginsPagination) {
+        updateLoginsDisplay();
+    }
+});
+
+// ===== LOGIN HISTORY MODAL FUNCTIONS =====
+
+let historyPage = 1;
+const historyPerPage = 10;
+let historyData = [];
+let searchTimeout;
+let isSearching = false;
+
+function updateHistoryRoleOptions() {
+    const userTypeFilter = document.getElementById('history-user-type').value.toLowerCase();
+    const roleSelect = document.getElementById('history-role');
+    
+    const roleOptions = {
+        'all': [
+            { value: 'all', label: 'All' },
+            { value: 'student', label: 'Student' },
+            { value: 'parent', label: 'Parent' },
+            { value: 'teacher', label: 'Teacher' },
+            { value: 'registrar', label: 'Registrar' },
+            { value: 'cashier', label: 'Cashier' },
+            { value: 'guidance', label: 'Guidance' },
+            { value: 'hr', label: 'HR' },
+            { value: 'attendance', label: 'Attendance' }
+        ],
+        'student': [
+            { value: 'all', label: 'All' },
+            { value: 'student', label: 'Student' }
+        ],
+        'parent': [
+            { value: 'all', label: 'All' },
+            { value: 'parent', label: 'Parent' }
+        ],
+        'employee': [
+            { value: 'all', label: 'All' },
+            { value: 'teacher', label: 'Teacher' },
+            { value: 'registrar', label: 'Registrar' },
+            { value: 'cashier', label: 'Cashier' },
+            { value: 'guidance', label: 'Guidance' },
+            { value: 'hr', label: 'HR' },
+            { value: 'attendance', label: 'Attendance' }
+        ]
+    };
+    
+    const currentRole = roleSelect.value;
+    roleSelect.innerHTML = '';
+    
+    const options = roleOptions[userTypeFilter] || roleOptions['all'];
+    options.forEach(option => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+        roleSelect.appendChild(optionElement);
+    });
+    
+    const optionExists = options.some(opt => opt.value === currentRole);
+    if (optionExists) {
+        roleSelect.value = currentRole;
+    } else {
+        roleSelect.value = 'all';
+    }
+}
+
+function openLoginHistory() {
+    document.getElementById('login-history-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    document.getElementById('history-date-to').value = '';
+    document.getElementById('history-date-from').value = '';
+    document.getElementById('history-user-type').value = 'all';
+    document.getElementById('history-search').value = '';
+    historyPage = 1;
+    
+    updateHistoryRoleOptions();
+    searchLoginHistory();
+}
+
+function closeLoginHistory() {
+    document.getElementById('login-history-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function autoSearchHistory() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        historyPage = 1;
+        searchLoginHistory();
+    }, 300);
+}
+
+function debouncedHistorySearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        historyPage = 1;
+        searchLoginHistory();
+    }, 500);
+}
+
+async function searchLoginHistory() {
+    if (isSearching) return;
+    
+    const loading = document.getElementById('login-history-loading');
+    const table = document.getElementById('login-history-table');
+    const noResults = document.getElementById('login-history-no-results');
+    const initialMessage = document.getElementById('login-history-initial-message');
+    const pagination = document.getElementById('login-history-pagination');
+    
+    isSearching = true;
+    let showLoadingTimeout = setTimeout(() => {
+        loading.classList.remove('hidden');
+        table.classList.add('hidden');
+        noResults.classList.add('hidden');
+        initialMessage.classList.add('hidden');
+        pagination.classList.add('hidden');
+    }, 200);
+    
+    try {
+        const dateFrom = document.getElementById('history-date-from').value;
+        const dateTo = document.getElementById('history-date-to').value;
+        const userType = document.getElementById('history-user-type').value;
+        const role = document.getElementById('history-role').value;
+        const search = document.getElementById('history-search').value;
+        
+        const params = new URLSearchParams({
+            date_from: dateFrom,
+            date_to: dateTo,
+            user_type: userType,
+            role: role,
+            search: search,
+            page: historyPage,
+            limit: 10
+        });
+        
+        const response = await fetch(`get_login_history.php?${params}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        historyData = data.records || [];
+        displayHistoryResults(data);
+        
+    } catch (error) {
+        console.error('Error loading history:', error);
+        alert('Error loading login history: ' + error.message);
+    } finally {
+        clearTimeout(showLoadingTimeout);
+        loading.classList.add('hidden');
+        isSearching = false;
+    }
+}
+
+function displayHistoryResults(data) {
+    const table = document.getElementById('login-history-table');
+    const tbody = document.getElementById('login-history-tbody');
+    const noResults = document.getElementById('login-history-no-results');
+    const initialMessage = document.getElementById('login-history-initial-message');
+    const pagination = document.getElementById('login-history-pagination');
+    const dateIndicator = document.getElementById('history-date-indicator');
+    const dateRange = document.getElementById('history-date-range');
+    
+    tbody.innerHTML = '';
+    
+    if (!data.records || data.records.length === 0) {
+        table.classList.add('hidden');
+        noResults.classList.remove('hidden');
+        initialMessage.classList.add('hidden');
+        dateIndicator.classList.add('hidden');
+        pagination.classList.add('hidden');
+        return;
+    }
+    
+    table.classList.remove('hidden');
+    noResults.classList.add('hidden');
+    initialMessage.classList.add('hidden');
+    
+    const dates = data.records.map(r => new Date(r.login_time).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    }));
+    const uniqueDates = [...new Set(dates)];
+    
+    if (uniqueDates.length === 1) {
+        dateRange.textContent = uniqueDates[0];
+    } else if (uniqueDates.length > 1) {
+        const sortedDates = uniqueDates.sort((a, b) => new Date(a) - new Date(b));
+        dateRange.textContent = `${sortedDates[0]} - ${sortedDates[sortedDates.length - 1]}`;
+    }
+    
+    dateIndicator.classList.remove('hidden');
+    
+    data.records.forEach(record => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 transition-colors';
+        
+        const userTypeColors = {
+            'employee': 'bg-purple-100 text-purple-700',
+            'student': 'bg-blue-100 text-blue-700',
+            'parent': 'bg-cyan-100 text-cyan-700'
+        };
+        
+        const roleColors = {
+            'superadmin': 'bg-red-100 text-red-700',
+            'hr': 'bg-orange-100 text-orange-700',
+            'teacher': 'bg-green-100 text-green-700',
+            'registrar': 'bg-indigo-100 text-indigo-700',
+            'cashier': 'bg-yellow-100 text-yellow-700',
+            'guidance': 'bg-pink-100 text-pink-700',
+            'attendance': 'bg-teal-100 text-teal-700',
+            'student': 'bg-blue-100 text-blue-700',
+            'parent': 'bg-cyan-100 text-cyan-700'
+        };
+        
+        const userTypeColor = userTypeColors[record.user_type] || 'bg-gray-100 text-gray-700';
+        const roleColor = roleColors[record.role] || 'bg-gray-100 text-gray-700';
+        
+        const loginDate = new Date(record.login_time);
+        const logoutTime = record.logout_time ? new Date(record.logout_time) : null;
+        
+        let duration = '---';
+        if (record.session_duration) {
+            const hours = Math.floor(record.session_duration / 3600);
+            const minutes = Math.floor((record.session_duration % 3600) / 60);
+            duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+        }
+        
+        row.innerHTML = `
+            <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${userTypeColor}">
+                    ${record.user_type.charAt(0).toUpperCase() + record.user_type.slice(1)}
+                </span>
+            </td>
+            <td class="px-4 py-3 font-mono text-gray-600 text-xs">${record.id_number}</td>
+            <td class="px-4 py-3 font-medium text-gray-900">${record.full_name || record.username}</td>
+            <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${roleColor}">
+                    ${record.role.charAt(0).toUpperCase() + record.role.slice(1)}
+                </span>
+            </td>
+            <td class="px-4 py-3 text-gray-600">${loginDate.toLocaleDateString()}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs">${loginDate.toLocaleTimeString()}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs">
+                ${logoutTime ? logoutTime.toLocaleTimeString() : '<span class="text-green-600 font-medium">Active</span>'}
+            </td>
+            <td class="px-4 py-3 text-gray-600">${duration}</td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    const total = data.total || 0;
+    const start = total > 0 ? ((historyPage - 1) * 10) + 1 : 0;
+    const end = Math.min(historyPage * 10, total);
+    
+    document.getElementById('login-history-start').textContent = start;
+    document.getElementById('login-history-end').textContent = end;
+    document.getElementById('login-history-total').textContent = total;
+    
+    const prevBtn = document.getElementById('login-history-prev');
+    const nextBtn = document.getElementById('login-history-next');
+    
+    prevBtn.disabled = historyPage === 1;
+    nextBtn.disabled = end >= total;
+    
+    pagination.classList.remove('hidden');
+}
+
+function changeHistoryPage(direction) {
+    historyPage += direction;
+    if (historyPage < 1) historyPage = 1;
+    searchLoginHistory();
+}
+
+function clearHistoryFilters() {
+    document.getElementById('history-user-type').value = 'all';
+    document.getElementById('history-role').value = 'all';
+    document.getElementById('history-search').value = '';
+    document.getElementById('history-date-from').value = '';
+    document.getElementById('history-date-to').value = '';
+    updateHistoryRoleOptions();
+    historyPage = 1;
+    searchLoginHistory();
+}
+
+// Validate date range - prevent dates before 2025 and future dates
+function validateDateRange(input) {
+    const selectedDate = new Date(input.value);
+    const minDate = new Date('2025-01-01');
+    const maxDate = new Date();
+    maxDate.setHours(23, 59, 59, 999); // End of today
+    
+    if (selectedDate < minDate) {
+        alert('Please select a date from 2025 onwards.');
+        input.value = '';
+        return false;
+    }
+    
+    if (selectedDate > maxDate) {
+        alert('Future dates are not allowed. Please select today or an earlier date.');
+        input.value = '';
+        return false;
+    }
+    
+    // Validate From Date vs To Date
+    const fromDateInput = document.getElementById('history-date-from');
+    const toDateInput = document.getElementById('history-date-to');
+    
+    if (fromDateInput.value && toDateInput.value) {
+        const fromDate = new Date(fromDateInput.value);
+        const toDate = new Date(toDateInput.value);
+        
+        if (fromDate > toDate) {
+            alert('From Date cannot be later than To Date.');
+            input.value = '';
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Update date range constraints dynamically
+function updateDateConstraints() {
+    const dateFromInput = document.getElementById('history-date-from');
+    const dateToInput = document.getElementById('history-date-to');
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (dateFromInput && dateToInput) {
+        // If From Date is selected, set To Date minimum to From Date
+        if (dateFromInput.value) {
+            dateToInput.setAttribute('min', dateFromInput.value);
+        } else {
+            dateToInput.setAttribute('min', '2025-01-01');
+        }
+        
+        // If To Date is selected, set From Date maximum to To Date
+        if (dateToInput.value) {
+            dateFromInput.setAttribute('max', dateToInput.value);
+        } else {
+            dateFromInput.setAttribute('max', today);
+        }
+    }
+}
+
+// Initialize date constraints on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set min and max dates for date inputs to prevent selecting dates before 2025 and future dates
+    const dateFromInput = document.getElementById('history-date-from');
+    const dateToInput = document.getElementById('history-date-to');
+    
+    if (dateFromInput && dateToInput) {
+        const today = new Date().toISOString().split('T')[0];
+        dateFromInput.setAttribute('min', '2025-01-01');
+        dateFromInput.setAttribute('max', today);
+        dateToInput.setAttribute('min', '2025-01-01');
+        dateToInput.setAttribute('max', today);
+    }
+    
+    // Load Not Logged In Today sections
+    loadNotLoggedIn('employees', 1);
+    loadNotLoggedIn('students', 1);
+});
+
+// ===== NOT LOGGED IN TODAY FUNCTIONS =====
+
+let employeesPage = 1;
+let studentsPage = 1;
+let employeesTotal = 0;
+let studentsTotal = 0;
+let allEmployees = [];
+let allStudents = [];
+const notLoggedInItemsPerPage = 10;
+
+async function loadNotLoggedIn(type, page = 1) {
+    const list = document.getElementById(`${type}-list`);
+    const loading = document.getElementById(`${type}-loading`);
+    const pagination = document.getElementById(`${type}-pagination`);
+    
+    if (!list || !loading) return;
+    
+    loading.classList.remove('hidden');
+    
+    try {
+        const offset = (page - 1) * notLoggedInItemsPerPage;
+        const url = `load_more_users.php?type=${type}&offset=${offset}&limit=${notLoggedInItemsPerPage}`;
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            list.innerHTML = `<li class="text-center py-8"><p class="text-red-500 font-medium">Error: ${data.error}</p></li>`;
+            return;
+        }
+        
+        list.innerHTML = '';
+        
+        if (page === 1) {
+            if (type === 'employees') {
+                allEmployees = data.items || [];
+            } else {
+                allStudents = data.items || [];
+            }
+        }
+        
+        if (data.items.length === 0) {
+            const emptyIcon = type === 'employees' 
+                ? '<svg class="w-12 h-12 mx-auto mb-2 text-orange-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>'
+                : '<svg class="w-12 h-12 mx-auto mb-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>';
+            const message = type === 'employees' ? 'All employees have logged in today!' : 'All students & parents have logged in today!';
+            list.innerHTML = `<li class="text-center py-8">${emptyIcon}<p class="text-gray-500 font-medium">${message}</p><p class="text-gray-400 text-sm mt-1">Great attendance 🎉</p></li>`;
+            pagination.classList.add('hidden');
+        } else {
+            const roleColors = {
+                'teacher': { bg: 'bg-green-500', border: 'border-green-100', hover: 'hover:bg-green-50' },
+                'registrar': { bg: 'bg-indigo-500', border: 'border-indigo-100', hover: 'hover:bg-indigo-50' },
+                'hr': { bg: 'bg-orange-500', border: 'border-orange-100', hover: 'hover:bg-orange-50' },
+                'cashier': { bg: 'bg-yellow-500', border: 'border-yellow-100', hover: 'hover:bg-yellow-50' },
+                'guidance': { bg: 'bg-pink-500', border: 'border-pink-100', hover: 'hover:bg-pink-50' },
+                'attendance': { bg: 'bg-teal-500', border: 'border-teal-100', hover: 'hover:bg-teal-50' },
+                'student': { bg: 'bg-blue-500', border: 'border-blue-100', hover: 'hover:bg-blue-50' },
+                'parent': { bg: 'bg-cyan-500', border: 'border-cyan-100', hover: 'hover:bg-cyan-50' }
+            };
+            
+            data.items.forEach(item => {
+                const li = document.createElement('li');
+                const cleanItem = item.replace(/•\s*/, '').trim();
+                const nameMatch = cleanItem.match(/^([^(]+)/);
+                const name = nameMatch ? nameMatch[1].trim() : '';
+                const roleMatch = cleanItem.match(/-\s*(\w+)\s*$/i);
+                const role = roleMatch ? roleMatch[1].toLowerCase() : (type === 'employees' ? 'teacher' : 'student');
+                const colors = roleColors[role] || (type === 'employees' ? roleColors['teacher'] : roleColors['student']);
+                
+                li.className = `flex items-center gap-3 p-3 rounded-lg border ${colors.border} ${colors.hover} transition-all`;
+                
+                let nameParts;
+                if (name.includes(',')) {
+                    nameParts = name.split(',').map(p => p.trim()).filter(p => p.length > 0);
+                } else {
+                    nameParts = name.split(' ').filter(p => p.length > 0);
+                }
+                
+                let initials = '?';
+                if (nameParts.length >= 2) {
+                    initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+                } else if (nameParts.length === 1 && nameParts[0].length >= 2) {
+                    initials = nameParts[0].substring(0, 2).toUpperCase();
+                }
+                
+                li.innerHTML = `
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 rounded-full ${colors.bg} flex items-center justify-center text-white font-bold text-sm shadow-md">
+                            ${initials}
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">${item.replace(/•\s*/, '')}</p>
+                        <p class="text-xs text-gray-500">Not logged in today</p>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+            
+            const total = data.total || 0;
+            if (type === 'employees') {
+                employeesTotal = total;
+            } else {
+                studentsTotal = total;
+            }
+            
+            updateNotLoggedInPagination(type, page, total);
+            
+            if (total > notLoggedInItemsPerPage) {
+                pagination.classList.remove('hidden');
+            } else {
+                pagination.classList.add('hidden');
+            }
+        }
+        
+    } catch (error) {
+        const errorMessage = error.name === 'AbortError' ? 'Request timed out' : error.message;
+        list.innerHTML = `<li class="text-center py-8">
+            <svg class="w-12 h-12 text-red-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="text-red-500 font-medium">Error loading data</p>
+            <p class="text-gray-500 text-sm mt-1">${errorMessage}</p>
+            <button onclick="loadNotLoggedIn('${type}', ${page})" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                Retry
+            </button>
+        </li>`;
+    } finally {
+        if (loading) {
+            loading.classList.add('hidden');
+        }
+    }
+}
+
+function updateNotLoggedInPagination(type, page, total) {
+    const start = (page - 1) * notLoggedInItemsPerPage + 1;
+    const end = Math.min(page * notLoggedInItemsPerPage, total);
+    
+    document.getElementById(`${type}-start`).textContent = start;
+    document.getElementById(`${type}-end`).textContent = end;
+    document.getElementById(`${type}-total`).textContent = total;
+    
+    const prevBtn = document.getElementById(`${type}-prev`);
+    const nextBtn = document.getElementById(`${type}-next`);
+    
+    prevBtn.disabled = page === 1;
+    nextBtn.disabled = end >= total;
+}
+
+function changeEmployeesPage(direction) {
+    employeesPage += direction;
+    if (employeesPage < 1) employeesPage = 1;
+    loadNotLoggedIn('employees', employeesPage);
+}
+
+function changeStudentsPage(direction) {
+    studentsPage += direction;
+    if (studentsPage < 1) studentsPage = 1;
+    loadNotLoggedIn('students', studentsPage);
+}
+
+function filterEmployees() {
+    const searchTerm = document.getElementById('employee-search').value.toLowerCase();
+    const roleFilter = document.getElementById('employee-role-filter').value.toLowerCase();
+    
+    const filtered = allEmployees.filter(emp => {
+        const matchesSearch = emp.toLowerCase().includes(searchTerm);
+        const matchesRole = roleFilter === 'all' || emp.toLowerCase().includes(roleFilter);
+        return matchesSearch && matchesRole;
+    });
+    
+    displayFilteredEmployees(filtered);
+}
+
+function filterStudents() {
+    const searchTerm = document.getElementById('student-search').value.toLowerCase();
+    const typeFilter = document.getElementById('student-type-filter').value.toLowerCase();
+    
+    const filtered = allStudents.filter(student => {
+        const matchesSearch = student.toLowerCase().includes(searchTerm);
+        const matchesType = typeFilter === 'all' || student.toLowerCase().includes(typeFilter);
+        return matchesSearch && matchesType;
+    });
+    
+    displayFilteredStudents(filtered);
+}
+
+function displayFilteredEmployees(employees) {
+    const list = document.getElementById('employees-list');
+    const pagination = document.getElementById('employees-pagination');
+    
+    list.innerHTML = '';
+    
+    if (employees.length === 0) {
+        list.innerHTML = `<li class="text-center py-8">
+            <svg class="w-12 h-12 mx-auto mb-2 text-orange-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <p class="text-gray-500 font-medium">No employees found</p>
+            <p class="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
+        </li>`;
+        pagination.classList.add('hidden');
+        return;
+    }
+    
+    const roleColors = {
+        'teacher': { bg: 'bg-green-500', border: 'border-green-100', hover: 'hover:bg-green-50' },
+        'registrar': { bg: 'bg-indigo-500', border: 'border-indigo-100', hover: 'hover:bg-indigo-50' },
+        'hr': { bg: 'bg-orange-500', border: 'border-orange-100', hover: 'hover:bg-orange-50' },
+        'cashier': { bg: 'bg-yellow-500', border: 'border-yellow-100', hover: 'hover:bg-yellow-50' },
+        'guidance': { bg: 'bg-pink-500', border: 'border-pink-100', hover: 'hover:bg-pink-50' },
+        'attendance': { bg: 'bg-teal-500', border: 'border-teal-100', hover: 'hover:bg-teal-50' }
+    };
+    
+    employees.forEach(emp => {
+        const li = document.createElement('li');
+        const cleanItem = emp.replace(/•\s*/, '').trim();
+        const roleMatch = cleanItem.match(/-\s*(\w+)\s*$/i);
+        const role = roleMatch ? roleMatch[1].toLowerCase() : 'teacher';
+        const colors = roleColors[role] || roleColors['teacher'];
+        
+        li.className = `flex items-center gap-3 p-3 rounded-lg border ${colors.border} ${colors.hover} transition-all`;
+        li.innerHTML = `
+            <div class="flex-shrink-0">
+                <div class="w-10 h-10 rounded-full ${colors.bg} flex items-center justify-center text-white font-bold text-sm shadow-md">
+                    ${emp.substring(2, 4).toUpperCase()}
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate">${emp.replace(/•\s*/, '')}</p>
+                <p class="text-xs text-gray-500">Not logged in today</p>
+            </div>
+        `;
+        list.appendChild(li);
+    });
+    
+    pagination.classList.add('hidden');
+}
+
+function displayFilteredStudents(students) {
+    const list = document.getElementById('students-list');
+    const pagination = document.getElementById('students-pagination');
+    
+    list.innerHTML = '';
+    
+    if (students.length === 0) {
+        list.innerHTML = `<li class="text-center py-8">
+            <svg class="w-12 h-12 mx-auto mb-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <p class="text-gray-500 font-medium">No students or parents found</p>
+            <p class="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
+        </li>`;
+        pagination.classList.add('hidden');
+        return;
+    }
+    
+    const roleColors = {
+        'student': { bg: 'bg-blue-500', border: 'border-blue-100', hover: 'hover:bg-blue-50' },
+        'parent': { bg: 'bg-cyan-500', border: 'border-cyan-100', hover: 'hover:bg-cyan-50' }
+    };
+    
+    students.forEach(student => {
+        const li = document.createElement('li');
+        const cleanItem = student.replace(/•\s*/, '').trim();
+        const isParent = cleanItem.toLowerCase().includes('parent');
+        const role = isParent ? 'parent' : 'student';
+        const colors = roleColors[role];
+        
+        li.className = `flex items-center gap-3 p-3 rounded-lg border ${colors.border} ${colors.hover} transition-all`;
+        li.innerHTML = `
+            <div class="flex-shrink-0">
+                <div class="w-10 h-10 rounded-full ${colors.bg} flex items-center justify-center text-white font-bold text-sm shadow-md">
+                    ${student.substring(2, 4).toUpperCase()}
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate">${student.replace(/•\s*/, '')}</p>
+                <p class="text-xs text-gray-500">Not logged in today</p>
+            </div>
+        `;
+        list.appendChild(li);
+    });
+    
+    pagination.classList.add('hidden');
+}
+
+function clearEmployeeFilters() {
+    document.getElementById('employee-search').value = '';
+    document.getElementById('employee-role-filter').value = 'all';
+    employeesPage = 1;
+    loadNotLoggedIn('employees', 1);
+}
+
+function clearStudentFilters() {
+    document.getElementById('student-search').value = '';
+    document.getElementById('student-type-filter').value = 'all';
+    studentsPage = 1;
+    loadNotLoggedIn('students', 1);
+}
+
 </script>
+
+<!-- Login History Modal -->
+<div id="login-history-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/20 p-2 rounded-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Login History</h2>
+                        <p class="text-blue-100 text-sm">View and search past login records</p>
+                    </div>
+                </div>
+                <button onclick="closeLoginHistory()" class="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">User Type:</label>
+                    <select id="history-user-type" onchange="updateHistoryRoleOptions(); autoSearchHistory();" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All</option>
+                        <option value="student">Student</option>
+                        <option value="employee">Employee</option>
+                        <option value="parent">Parent</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">Role:</label>
+                    <select id="history-role" onchange="autoSearchHistory()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">Search:</label>
+                    <div class="relative flex-1">
+                        <input type="text" id="history-search" placeholder="Name or ID..." oninput="debouncedHistorySearch()" class="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">From Date:</label>
+                    <input type="date" id="history-date-from" onchange="if(validateDateRange(this)) { updateDateConstraints(); autoSearchHistory(); }" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-gray-700 whitespace-nowrap">To Date:</label>
+                    <input type="date" id="history-date-to" onchange="if(validateDateRange(this)) { updateDateConstraints(); autoSearchHistory(); }" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <button onclick="clearHistoryFilters()" class="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors whitespace-nowrap">
+                    Clear
+                </button>
+            </div>
+        </div>
+        
+        <!-- Date Range Indicator -->
+        <div id="history-date-indicator" class="hidden px-6 py-3 bg-blue-50 border-b border-blue-100">
+            <div class="flex items-center gap-2 text-sm">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-gray-600">Viewing records from:</span>
+                <span id="history-date-range" class="font-semibold text-blue-700"></span>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="flex-1 overflow-auto">
+            <div id="login-history-loading" class="flex items-center justify-center py-12">
+                <div class="text-center">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+                    <p class="text-gray-500">Loading login history...</p>
+                </div>
+            </div>
+            
+            <table id="login-history-table" class="w-full text-sm hidden">
+                <thead class="bg-gray-50 border-b border-gray-200 sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">User Type</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Login Time</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Logout Time</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-700">Duration</th>
+                    </tr>
+                </thead>
+                <tbody id="login-history-tbody" class="divide-y divide-gray-100">
+                </tbody>
+            </table>
+            
+            <div id="login-history-no-results" class="hidden flex items-center justify-center min-h-[400px]">
+                <div class="text-center">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-gray-500 font-medium text-lg">No login records found</p>
+                    <p class="text-gray-400 text-sm mt-2">Try adjusting your filters or select a date range</p>
+                </div>
+            </div>
+            
+            <div id="login-history-initial-message" class="flex items-center justify-center min-h-[400px]">
+                <div class="text-center">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <p class="text-gray-600 font-medium text-lg mb-2">Search Login History</p>
+                    <p class="text-gray-500 text-sm">Select filters and click Search to view login records</p>
+                    <p class="text-gray-400 text-xs mt-2">💡 Tip: Leave dates empty to search all records</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div id="login-history-pagination" class="hidden px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+                Showing <span id="login-history-start">1</span> to <span id="login-history-end">20</span> of <span id="login-history-total">0</span> records
+            </div>
+            <div class="flex gap-2">
+                <button id="login-history-prev" onclick="changeHistoryPage(-1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    Previous
+                </button>
+                <button id="login-history-next" onclick="changeHistoryPage(1)" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    Next
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
