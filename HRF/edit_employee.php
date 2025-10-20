@@ -66,6 +66,21 @@ if (!empty($email)) {
     }
 }
 
+// Validate phone - strip formatting first
+if (!empty($phone)) {
+    // Remove all non-digit characters for validation
+    $phone_digits = preg_replace('/[^0-9]/', '', $phone);
+    
+    // Check if it's a valid Philippine number (should be 12 digits with country code: 63XXXXXXXXXX)
+    if (strlen($phone_digits) !== 12 || !preg_match('/^639/', $phone_digits)) {
+        echo json_encode(['success' => false, 'message' => 'Phone must be a valid Philippine mobile number (+63 9XX-XXX-XXXX).']);
+        exit;
+    }
+    
+    // Store the cleaned phone number for database update
+    $phone = $phone_digits;
+}
+
 // Validate address
 if (strlen($address) < 20) {
     echo json_encode(['success' => false, 'message' => 'Complete address must be at least 20 characters long.']);

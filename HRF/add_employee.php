@@ -133,13 +133,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
-        // Phone validation
+        // Phone validation - strip formatting first
         if (empty($phone) || trim($phone) === '') {
             $validation_errors[] = "Phone number is required.";
-        } elseif (!preg_match('/^[0-9]+$/', $phone)) {
-            $validation_errors[] = "Phone must contain digits only.";
-        } elseif (strlen($phone) !== 11) {
-            $validation_errors[] = "Phone must be exactly 11 digits.";
+        } else {
+            // Remove all non-digit characters for validation
+            $phone_digits = preg_replace('/[^0-9]/', '', $phone);
+            
+            // Check if it's a valid Philippine number (should be 12 digits with country code: 63XXXXXXXXXX)
+            if (strlen($phone_digits) !== 12 || !preg_match('/^639/', $phone_digits)) {
+                $validation_errors[] = "Phone must be a valid Philippine mobile number (+63 9XX-XXX-XXXX).";
+            }
+            
+            // Store the cleaned phone number for database insertion
+            $phone = $phone_digits;
         }
         
         // Address validation

@@ -374,9 +374,22 @@ function normalizeGradeLabel(gl){
 }
 
 async function fetchOfferedSubjects(gradeLevelText, program, termValue){
-  // Normalize to our canonical labels used by offerings
+  // First, get teacher's assigned subjects
+  const teacherSubjectsRes = await fetch('api/get_teacher_subjects.php');
+  const teacherSubjectsData = await teacherSubjectsRes.json();
+  const teacherSubjects = teacherSubjectsData.success ? teacherSubjectsData.subjects : [];
+  
+  // If teacher has assigned subjects, only show those
+  if (teacherSubjects.length > 0) {
+    return teacherSubjects.map(subj => ({
+      id: subj.id,
+      name: subj.subject_name,
+      code: ''
+    }));
+  }
+  
+  // Fallback to offered subjects if no teacher subjects assigned
   const gradeStr = normalizeGradeLabel(gradeLevelText);
-  // For College (1st–4th Year), ignore strand when querying to avoid mismatches with program labels
   const isCollege = /(1st|2nd|3rd|4th)\s+Year$/i.test(gradeStr);
   const strand = isCollege ? '' : mapStrandFromProgram(program);
   const semester = getSemesterFromTermString(termValue);
@@ -384,7 +397,7 @@ async function fetchOfferedSubjects(gradeLevelText, program, termValue){
   const params = new URLSearchParams({action:'list', grade_level: gradeStr, strand, semester, sy});
   const res = await fetch('api/subject_offerings.php?'+params.toString());
   const d = await res.json();
-  if (d && d.success && Array.isArray(d.items)) return d.items; // [{id,name,code}]
+  if (d && d.success && Array.isArray(d.items)) return d.items;
   return [];
 }
 
@@ -497,6 +510,12 @@ function searchStudents() {
 
             const students = data.students || [];
             let resultsHTML = '';
+            
+            // Show message if teacher has no assigned section
+            if (data.message) {
+                resultsDiv.innerHTML = '<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg"><div class="flex items-center gap-3"><svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><p class="text-yellow-800 font-medium">' + data.message + '</p></div></div>';
+                return;
+            }
             
             if (students.length > 0) {
                 students.forEach(student => {

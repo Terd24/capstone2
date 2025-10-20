@@ -93,7 +93,7 @@ if (isset($_SESSION['role'])) {
             header("Location: ../HRF/Dashboard.php");
             exit;
         case 'teacher':
-            header("Location: ../EmployeePortal/AttendanceRecords.php");
+            header("Location: ../EmployeePortal/Dashboard.php");
             exit;
         case 'owner':
         case 'superadmin':

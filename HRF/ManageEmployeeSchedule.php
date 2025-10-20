@@ -69,6 +69,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                 $ins = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
                 $ins->bind_param("sii", $teacher_id, $new_schedule_id, $actorId);
                 $ins->execute();
+                
+                // Create teacher_subjects table if it doesn't exist
+                $conn->query("CREATE TABLE IF NOT EXISTS teacher_subjects (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    teacher_id VARCHAR(20) NOT NULL,
+                    subject_name VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by INT,
+                    FOREIGN KEY (teacher_id) REFERENCES employees(id_number) ON DELETE CASCADE,
+                    UNIQUE KEY unique_teacher_subject (teacher_id, subject_name)
+                )");
+                
+                // Save subjects for this teacher
+                $subjects = isset($_POST['subjects']) ? $_POST['subjects'] : [];
+                if (!empty($subjects)) {
+                    // First, delete existing subjects for this teacher
+                    $del_subj = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?");
+                    $del_subj->bind_param("s", $teacher_id);
+                    $del_subj->execute();
+                    
+                    // Insert new subjects
+                    $subj_stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject_name, created_by) VALUES (?, ?, ?)");
+                    foreach ($subjects as $subject) {
+                        $subject = trim($subject);
+                        if (!empty($subject)) {
+                            $subj_stmt->bind_param("ssi", $teacher_id, $subject, $actorId);
+                            $subj_stmt->execute();
+                        }
+                    }
+                }
+                
                 $response['success'] = true;
                 $response['message'] = "Schedule created and teacher assigned successfully!";
             } else {
@@ -120,6 +151,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                 $ins = $conn->prepare("INSERT INTO employee_schedules (employee_id, schedule_id, assigned_by) VALUES (?, ?, ?)");
                 $ins->bind_param("sii", $teacher_id, $schedule_id, $actorId);
                 $ins->execute();
+                
+                // Create teacher_subjects table if it doesn't exist
+                $conn->query("CREATE TABLE IF NOT EXISTS teacher_subjects (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    teacher_id VARCHAR(20) NOT NULL,
+                    subject_name VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT TIMESTAMP,
+                    created_by INT,
+                    FOREIGN KEY (teacher_id) REFERENCES employees(id_number) ON DELETE CASCADE,
+                    UNIQUE KEY unique_teacher_subject (teacher_id, subject_name)
+                )");
+                
+                // Save subjects for this teacher
+                $subjects = isset($_POST['subjects']) ? $_POST['subjects'] : [];
+                if (!empty($subjects)) {
+                    // First, delete existing subjects for this teacher
+                    $del_subj = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?");
+                    $del_subj->bind_param("s", $teacher_id);
+                    $del_subj->execute();
+                    
+                    // Insert new subjects
+                    $subj_stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject_name, created_by) VALUES (?, ?, ?)");
+                    foreach ($subjects as $subject) {
+                        $subject = trim($subject);
+                        if (!empty($subject)) {
+                            $subj_stmt->bind_param("ssi", $teacher_id, $subject, $actorId);
+                            $subj_stmt->execute();
+                        }
+                    }
+                }
 
                 $response['success'] = true;
                 $response['message'] = "Day-specific schedule created and teacher assigned successfully!";
@@ -288,6 +349,14 @@ $teachers_sql = "SELECT e.id_number,
                  WHERE e.deleted_at IS NULL
                  ORDER BY has_schedule ASC, full_name ASC";
 $teachers_result = $conn->query($teachers_sql);
+
+// Fetch all available subjects from the subjects table
+$subjects_sql = "SELECT id, name, code FROM subjects ORDER BY name ASC";
+$subjects_result = $conn->query($subjects_sql);
+
+// Fetch all available sections from class_schedules (created by Registrar)
+$sections_sql = "SELECT id, section_name FROM class_schedules ORDER BY section_name ASC";
+$sections_result = $conn->query($sections_sql);
 ?>
 
 <!DOCTYPE html>
@@ -509,24 +578,28 @@ $teachers_result = $conn->query($teachers_sql);
     </div>
 
 <!-- Create/Edit Schedule Modal -->
-<div id="createScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-        <div class="flex justify-between items-center mb-4">
-            <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Create New Schedule</h3>
-            <button onclick="hideCreateScheduleModal()" class="text-gray-500 hover:text-gray-700">
+<div id="createScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-[#0B2C62] to-[#1E3A8A] rounded-t-xl">
+            <h3 id="modalTitle" class="text-lg font-bold text-white">Create New Schedule</h3>
+            <button onclick="hideCreateScheduleModal()" class="text-white hover:text-gray-200 transition">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>
         </div>
-        <form id="createScheduleForm" class="space-y-4">
+        
+        <!-- Modal Body (Scrollable) -->
+        <div class="overflow-y-auto flex-1 px-6 py-4">
+            <form id="createScheduleForm" class="space-y-4">
             <input type="hidden" id="scheduleId" name="schedule_id">
             <!-- Hidden field to keep schedule_name (teacher full name) for backend compatibility -->
             <input type="hidden" id="sectionNameHidden" name="section_name">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Teacher Name</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Teacher Name <span class="text-red-500">*</span></label>
                 <select id="sectionName" name="teacher_id" required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        class="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                     <option value="">-- Select Teacher --</option>
                     <?php if ($teachers_result && $teachers_result->num_rows > 0): ?>
                         <?php 
@@ -555,20 +628,82 @@ $teachers_result = $conn->query($teachers_sql);
                     <?php endif; ?>
                 </select>
             </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Sections <span class="text-red-500">*</span></label>
+                <div class="mb-2">
+                    <input type="text" id="sectionSearch" placeholder="Search sections..." 
+                           class="w-full px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                           onkeyup="filterSections()">
+                </div>
+                <div class="border-2 border-gray-200 rounded-lg p-2 max-h-32 overflow-y-auto bg-gray-50">
+                    <div id="sectionsContainer" class="grid grid-cols-2 gap-1.5">
+                        <?php if ($sections_result && $sections_result->num_rows > 0): ?>
+                            <?php while ($section = $sections_result->fetch_assoc()): ?>
+                                <label class="flex items-center gap-1.5 p-1.5 hover:bg-white rounded cursor-pointer transition">
+                                    <input type="checkbox" name="sections[]" value="<?= htmlspecialchars($section['section_name']) ?>" 
+                                           class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                                    <span class="text-xs text-gray-700"><?= htmlspecialchars($section['section_name']) ?></span>
+                                </label>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <p class="text-xs text-gray-500 col-span-2 p-2">No sections available. Please create class schedules in the Registrar portal first.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Select all sections this teacher will handle</p>
+                <p id="sectionError" class="hidden text-xs text-red-600 mt-1">Please select at least one section.</p>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-sm font-semibold text-gray-700">Subjects <span class="text-red-500">*</span></label>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="selectAllSubjects()" class="text-xs text-purple-600 hover:text-purple-700 font-medium">Select All</button>
+                        <span class="text-gray-300">|</span>
+                        <button type="button" onclick="clearAllSubjects()" class="text-xs text-gray-600 hover:text-gray-700 font-medium">Clear All</button>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <input type="text" id="subjectSearch" placeholder="Search subjects..." 
+                           class="w-full px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                           onkeyup="filterSubjects()">
+                </div>
+                <div class="border-2 border-gray-200 rounded-lg p-2 max-h-40 overflow-y-auto bg-gray-50">
+                    <div id="subjectsContainer" class="grid grid-cols-2 gap-1.5">
+                        <?php if ($subjects_result && $subjects_result->num_rows > 0): ?>
+                            <?php while ($subject = $subjects_result->fetch_assoc()): ?>
+                                <label class="flex items-center gap-1.5 p-1.5 hover:bg-white rounded cursor-pointer transition">
+                                    <input type="checkbox" name="subjects[]" value="<?= htmlspecialchars($subject['name']) ?>" 
+                                           class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                                    <span class="text-xs text-gray-700">
+                                        <?= htmlspecialchars($subject['name']) ?>
+                                        <?php if (!empty($subject['code'])): ?>
+                                            <span class="text-xs text-gray-400">(<?= htmlspecialchars($subject['code']) ?>)</span>
+                                        <?php endif; ?>
+                                    </span>
+                                </label>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <p class="text-xs text-gray-500 col-span-2 p-2">No subjects available. Please add subjects in the Registrar portal first.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Select all subjects this teacher will handle</p>
+                <p id="subjectsError" class="hidden text-xs text-red-600 mt-1">Please select at least one subject.</p>
+            </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Start Time <span class="text-red-500">*</span></label>
                     <input type="time" id="startTime" name="start_time" required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                           class="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">End Time <span class="text-red-500">*</span></label>
                     <input type="time" id="endTime" name="end_time" required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                           class="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Type</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Schedule Type</label>
                 <div class="mb-4">
                     <label class="flex items-center mb-2">
                         <input type="radio" name="schedule_type" value="same" checked class="mr-2" onchange="toggleScheduleType()">
@@ -681,13 +816,17 @@ $teachers_result = $conn->query($teachers_sql);
             </div>
             
             <!-- Error Message Display -->
-            <div id="formError" class="hidden p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm"></div>
-            
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="hideCreateScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg">Cancel</button>
-                <button type="submit" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Create Schedule</button>
-            </div>
+            <div id="formError" class="hidden p-2.5 bg-red-50 border border-red-300 text-red-700 rounded-lg text-xs"></div>
         </form>
+        </div>
+        
+        <!-- Modal Footer -->
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+            <div class="flex gap-3">
+                <button type="button" onclick="hideCreateScheduleModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2.5 rounded-lg font-medium transition">Cancel</button>
+                <button type="submit" form="createScheduleForm" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium transition">Create Schedule</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1061,15 +1200,33 @@ document.getElementById('createScheduleForm').addEventListener('submit', functio
             if (err) err.classList.remove('hidden');
         } else { if (err) err.classList.add('hidden'); }
     }
+    // Validate sections
+    const sectionCheckboxes = document.querySelectorAll('input[name="sections[]"]:checked');
+    const sectionError = document.getElementById('sectionError');
+    if (sectionCheckboxes.length === 0) {
+        valid = false;
+        if (sectionError) sectionError.classList.remove('hidden');
+        if (formErrEl){ formErrEl.textContent = 'Please select at least one section.'; formErrEl.classList.remove('hidden'); }
+    } else {
+        if (sectionError) sectionError.classList.add('hidden');
+    }
+    
+    // Validate subjects
+    if (!validateSubjects()) {
+        valid = false;
+        if (formErrEl){ formErrEl.textContent = 'Please select at least one subject.'; formErrEl.classList.remove('hidden'); }
+    }
+    
     if (!valid) { if (formErrEl){ formErrEl.textContent = 'Please fix the highlighted fields.'; formErrEl.classList.remove('hidden'); } return; }
 
-    // Keep hidden section_name in sync with teacher select before submit
+    // Keep hidden section_name in sync with selected section checkboxes before submit
     try {
-        const sel = document.getElementById('sectionName');
+        const sectionCheckboxes = document.querySelectorAll('input[name="sections[]"]:checked');
         const hidden = document.getElementById('sectionNameHidden');
-        if (sel && hidden) {
-            const opt = sel.options[sel.selectedIndex];
-            hidden.value = (opt && (opt.dataset?.name || opt.textContent || ''));
+        if (sectionCheckboxes.length > 0 && hidden) {
+            // Join all selected sections with comma
+            const sections = Array.from(sectionCheckboxes).map(cb => cb.value).join(', ');
+            hidden.value = sections;
         }
     } catch(_) {}
 
@@ -1400,19 +1557,25 @@ function editSchedule(id) {
                 
                 // Populate form with existing data
                 document.getElementById('scheduleId').value = schedule.id;
-                // sectionName is a select of teacher_id; match by data-name (full name stored as schedule_name)
-                const sectionSel = document.getElementById('sectionName');
+                
+                // Check the section checkboxes (schedule_name may contain multiple sections separated by comma)
                 const hiddenName = document.getElementById('sectionNameHidden');
-                if (sectionSel) {
-                    const match = Array.from(sectionSel.options).find(o => (o.dataset && o.dataset.name) === schedule.schedule_name);
-                    if (match) {
-                        sectionSel.value = match.value;
-                        if (hiddenName) hiddenName.value = match.dataset.name || match.textContent;
-                    } else {
-                        // If no matching teacher present, clear selection but keep hidden name for display
-                        sectionSel.value = '';
-                        if (hiddenName) hiddenName.value = schedule.schedule_name;
-                    }
+                const sectionCheckboxes = document.querySelectorAll('input[name="sections[]"]');
+                if (sectionCheckboxes && schedule.schedule_name) {
+                    const sections = schedule.schedule_name.split(',').map(s => s.trim());
+                    sectionCheckboxes.forEach(checkbox => {
+                        if (sections.includes(checkbox.value)) {
+                            checkbox.checked = true;
+                        }
+                    });
+                    if (hiddenName) hiddenName.value = schedule.schedule_name || '';
+                }
+                
+                // Find and select the teacher (stored in assigned_employees)
+                const sectionSel = document.getElementById('sectionName');
+                if (sectionSel && schedule.assigned_employees && schedule.assigned_employees.length > 0) {
+                    const teacherId = schedule.assigned_employees[0].id_number;
+                    sectionSel.value = teacherId;
                 }
                 
                 // Set schedule type based on whether it has day-specific schedules
@@ -1612,6 +1775,85 @@ function formatTime(t){ try{ const d = new Date(`1970-01-01T${t}`); return d.toL
   // Initial render
   renderPage();
 })();
+
+// Subject validation
+function validateSubjects() {
+    const checkboxes = document.querySelectorAll('input[name="subjects[]"]:checked');
+    const errorEl = document.getElementById('subjectsError');
+    
+    if (checkboxes.length === 0) {
+        if (errorEl) errorEl.classList.remove('hidden');
+        return false;
+    }
+    
+    if (errorEl) errorEl.classList.add('hidden');
+    return true;
+}
+
+// Filter subjects by search input
+function filterSubjects() {
+    const searchInput = document.getElementById('subjectSearch');
+    const container = document.getElementById('subjectsContainer');
+    
+    if (!searchInput || !container) return;
+    
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const labels = container.querySelectorAll('label');
+    
+    labels.forEach(label => {
+        const text = label.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            label.style.display = 'flex';
+        } else {
+            label.style.display = 'none';
+        }
+    });
+}
+
+// Filter sections by search input
+function filterSections() {
+    const searchInput = document.getElementById('sectionSearch');
+    const container = document.getElementById('sectionsContainer');
+    
+    if (!searchInput || !container) return;
+    
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const labels = container.querySelectorAll('label');
+    
+    labels.forEach(label => {
+        const text = label.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            label.style.display = 'flex';
+        } else {
+            label.style.display = 'none';
+        }
+    });
+}
+
+// Select all visible subjects
+function selectAllSubjects() {
+    const container = document.getElementById('subjectsContainer');
+    if (!container) return;
+    
+    const checkboxes = container.querySelectorAll('input[name="subjects[]"]');
+    checkboxes.forEach(checkbox => {
+        // Only check visible checkboxes
+        if (checkbox.closest('label').style.display !== 'none') {
+            checkbox.checked = true;
+        }
+    });
+}
+
+// Clear all subjects
+function clearAllSubjects() {
+    const container = document.getElementById('subjectsContainer');
+    if (!container) return;
+    
+    const checkboxes = container.querySelectorAll('input[name="subjects[]"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
 </script>
 
 </body>
