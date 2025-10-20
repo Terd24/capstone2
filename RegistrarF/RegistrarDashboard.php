@@ -90,6 +90,7 @@ function timeAgo($time) {
   .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
   .mirror-video video { transform: scaleX(-1); -webkit-transform: scaleX(-1); }
 </style>
+<script src="../js/logout-confirm.js"></script>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 <!-- RFID Form -->
@@ -121,7 +122,7 @@ function timeAgo($time) {
             </svg>
           </button>
           <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
-            <a href="logout.php" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
+            <a href="javascript:void(0);" onclick="showLogoutConfirmation('logout.php');" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
               <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
               </svg>

@@ -152,6 +152,7 @@ if ($ws) {
       });
     }
   </script>
+  <script src="../js/logout-confirm.js"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
   <header class="bg-[#0B2C62] text-white shadow-lg">
@@ -175,7 +176,7 @@ if ($ws) {
             </svg>
           </button>
           <div id="empDropdown" class="hidden absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
-            <a href="../StudentLogin/logout.php" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
+            <a href="javascript:void(0);" onclick="showLogoutConfirmation('../StudentLogin/logout.php');" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
               <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>

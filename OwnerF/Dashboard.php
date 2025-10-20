@@ -969,6 +969,7 @@ $history_result = $conn->query($history_query);
             transition: all 0.3s ease-out;
         }
     </style>
+    <script src="../js/logout-confirm.js"></script>
 </head>
 <body class="min-h-screen bg-gray-50 flex">
 
@@ -1058,7 +1059,7 @@ $history_result = $conn->query($history_query);
         
         <!-- Logout - Pinned to bottom -->
         <div class="border-t border-white/10 p-4 flex-shrink-0">
-            <a href="../StudentLogin/logout.php" class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 rounded-lg transition">
+            <a href="javascript:void(0);" onclick="showLogoutConfirmation('../StudentLogin/logout.php');" class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 rounded-lg transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                 </svg>
