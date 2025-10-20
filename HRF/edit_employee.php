@@ -1,6 +1,7 @@
 <?php
 session_start();
 include("../StudentLogin/db_conn.php");
+include("../includes/log_system_notification.php");
 
 // Require HR login or Super Admin access
 if (!isset($_SESSION['role']) || ($_SESSION['role'] !== 'hr' && $_SESSION['role'] !== 'superadmin')) {
@@ -123,6 +124,38 @@ if ($stmt->execute()) {
     $check_result = $check_stmt->get_result();
     
     if ($check_result->num_rows > 0) {
+        // Log system notification for Owner
+        try {
+            $employee_name = $first_name . ' ' . $last_name;
+            $hr_name = $_SESSION['hr_name'] ?? 'HR Admin';
+            $notif_title = "Employee Account Edited";
+            $notif_message = formatActionMessage('employee_edited', $employee_name, $employee_id);
+            
+            $new_data = [
+                'name' => $employee_name,
+                'position' => $position,
+                'department' => $department,
+                'email' => $email
+            ];
+            
+            logSystemNotification(
+                $conn,
+                $notif_title,
+                $notif_message,
+                'info',
+                'HR',
+                $hr_name,
+                'HR',
+                'employee_edited',
+                'employees',
+                $employee_id,
+                null,
+                $new_data
+            );
+        } catch (Exception $notif_error) {
+            error_log("Error logging notification: " . $notif_error->getMessage());
+        }
+        
         echo json_encode(['success' => true, 'message' => 'Employee updated successfully', 'reload' => true]);
     } else {
         echo json_encode(['success' => false, 'message' => 'No employee found with ID: ' . $employee_id]);

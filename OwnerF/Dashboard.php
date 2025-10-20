@@ -848,8 +848,8 @@ $pending_result = $conn->query($pending_query);
 $recent_query = "SELECT * FROM owner_approval_requests WHERE status IN ('approved', 'rejected') ORDER BY reviewed_at DESC LIMIT 5";
 $recent_result = $conn->query($recent_query);
 
-// Get system notifications (unread first)
-$notifications_query = "SELECT * FROM system_notifications ORDER BY is_read ASC, created_at DESC LIMIT 20";
+// Get system notifications (unread first) - Initial load of 5
+$notifications_query = "SELECT * FROM system_notifications ORDER BY is_read ASC, created_at DESC LIMIT 5";
 $notifications_result = $conn->query($notifications_query);
 
 // Get notification statistics
@@ -1145,7 +1145,7 @@ $history_result = $conn->query($history_query);
                         </div>
                     </div>
 
-                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                    <div id="notifications-container" class="space-y-4 max-h-[600px] overflow-y-auto">
                         <?php if ($notifications_result && $notifications_result->num_rows > 0): ?>
                             <?php while ($notification = $notifications_result->fetch_assoc()): ?>
                                 <div class="border rounded-lg p-4 <?= $notification['is_read'] ? 'bg-gray-50' : 'bg-white border-l-4 border-blue-500' ?> cursor-pointer hover:shadow-md transition-all duration-200" onclick="toggleNotificationDetails(<?= $notification['id'] ?>)">
@@ -3829,6 +3829,131 @@ function saveDocumentFee(event) {
         console.error('Error saving document fee:', error);
         showNotification('Error saving document fee', 'error');
     });
+}
+
+// ==================== INFINITE SCROLL FOR NOTIFICATIONS ====================
+let notificationsOffset = 5; // Start from 5 since we loaded 5 initially
+let isLoadingNotifications = false;
+let hasMoreNotifications = true;
+
+const notificationsContainer = document.getElementById('notifications-container');
+
+if (notificationsContainer) {
+    notificationsContainer.addEventListener('scroll', function() {
+        // Check if scrolled to bottom (with 50px threshold)
+        if (notificationsContainer.scrollTop + notificationsContainer.clientHeight >= notificationsContainer.scrollHeight - 50) {
+            if (!isLoadingNotifications && hasMoreNotifications) {
+                loadMoreNotifications();
+            }
+        }
+    });
+}
+
+function loadMoreNotifications() {
+    isLoadingNotifications = true;
+    
+    // Show loading indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'notifications-loading';
+    loadingDiv.className = 'text-center py-4';
+    loadingDiv.innerHTML = '<div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>';
+    notificationsContainer.appendChild(loadingDiv);
+    
+    fetch(`load_more_notifications.php?offset=${notificationsOffset}`)
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading indicator
+            const loading = document.getElementById('notifications-loading');
+            if (loading) loading.remove();
+            
+            if (data.success && data.notifications.length > 0) {
+                data.notifications.forEach(notification => {
+                    const notifElement = createNotificationElement(notification);
+                    notificationsContainer.appendChild(notifElement);
+                });
+                
+                notificationsOffset += data.notifications.length;
+                hasMoreNotifications = data.has_more;
+                
+                // Show "No more notifications" message if we've reached the end
+                if (!data.has_more) {
+                    const endDiv = document.createElement('div');
+                    endDiv.className = 'text-center py-4 text-gray-500 text-sm';
+                    endDiv.innerHTML = '— End of notifications —';
+                    notificationsContainer.appendChild(endDiv);
+                }
+            } else {
+                hasMoreNotifications = false;
+            }
+            
+            isLoadingNotifications = false;
+        })
+        .catch(error => {
+            console.error('Error loading notifications:', error);
+            const loading = document.getElementById('notifications-loading');
+            if (loading) loading.remove();
+            isLoadingNotifications = false;
+        });
+}
+
+function createNotificationElement(notification) {
+    const div = document.createElement('div');
+    const isUnread = !notification.is_read;
+    
+    // Determine badge color based on type
+    let badgeClass = 'bg-blue-100 text-blue-800';
+    if (notification.type === 'critical' || notification.type === 'error') {
+        badgeClass = 'bg-red-100 text-red-800';
+    } else if (notification.type === 'warning') {
+        badgeClass = 'bg-yellow-100 text-yellow-800';
+    } else if (notification.type === 'success') {
+        badgeClass = 'bg-green-100 text-green-800';
+    }
+    
+    div.className = `border rounded-lg p-4 ${isUnread ? 'bg-white border-l-4 border-blue-500' : 'bg-gray-50'} cursor-pointer hover:shadow-md transition-all duration-200`;
+    div.onclick = () => toggleNotificationDetails(notification.id);
+    
+    // Format date
+    const date = new Date(notification.created_at);
+    const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + 
+                          date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    
+    div.innerHTML = `
+        <div class="flex justify-between items-start mb-3">
+            <div class="flex-1">
+                <div class="flex items-center gap-2 mb-2">
+                    <h3 class="font-semibold text-gray-900">${escapeHtml(notification.title)}</h3>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium ${badgeClass}">
+                        ${notification.type.toUpperCase()}
+                    </span>
+                    ${isUnread ? '<span class="w-2 h-2 bg-blue-500 rounded-full"></span>' : ''}
+                </div>
+                <p class="text-sm text-gray-600 mb-2">
+                    <strong>From:</strong> ${escapeHtml(notification.performed_by)} 
+                    (${notification.user_role.charAt(0).toUpperCase() + notification.user_role.slice(1)}) • 
+                    <strong>Module:</strong> ${escapeHtml(notification.module)}
+                </p>
+                <p class="text-sm text-gray-700 mb-3">${escapeHtml(notification.message)}</p>
+                <p class="text-xs text-gray-500">${formattedDate}</p>
+            </div>
+            ${isUnread ? `
+                <form method="POST" class="ml-4" onclick="event.stopPropagation()">
+                    <input type="hidden" name="notification_id" value="${notification.id}">
+                    <button type="submit" name="mark_read" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                        Mark Read
+                    </button>
+                </form>
+            ` : ''}
+        </div>
+    `;
+    
+    return div;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 </script>

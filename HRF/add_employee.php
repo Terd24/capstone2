@@ -5,6 +5,7 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 include '../StudentLogin/db_conn.php';
+include '../includes/log_system_notification.php';
 
 // Note: generateNextEmployeeId() function is defined in Dashboard.php
 
@@ -214,6 +215,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Commit transaction
         $conn->commit();
+
+        // Log system notification for Owner
+        try {
+            $employee_name = $first_name . ' ' . $last_name;
+            $hr_name = $_SESSION['hr_name'] ?? 'HR Admin';
+            $notif_title = "New Employee Added";
+            $notif_message = formatActionMessage('employee_added', $employee_name, $id_number);
+            
+            $new_data = [
+                'name' => $employee_name,
+                'id_number' => $id_number,
+                'position' => $position,
+                'department' => $department,
+                'has_account' => $create_account ? 'Yes' : 'No'
+            ];
+            
+            logSystemNotification(
+                $conn,
+                $notif_title,
+                $notif_message,
+                'success',
+                'HR',
+                $hr_name,
+                'HR',
+                'employee_added',
+                'employees',
+                $id_number,
+                null,
+                $new_data
+            );
+        } catch (Exception $notif_error) {
+            error_log("Error logging notification: " . $notif_error->getMessage());
+        }
 
         $success_message = "Employee added successfully";
         if ($create_account) {

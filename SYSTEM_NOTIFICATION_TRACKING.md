@@ -12,10 +12,15 @@ The Owner Dashboard now tracks and displays all actions performed by HR Admin, R
 - **Student Edited**: When student information is updated
 - **Student Deleted**: When a student account is soft-deleted
 
-#### HR Admin / Super Admin Actions:
-- **Employee Added**: When a new HR employee is created
-- **Employee Edited**: When employee information is updated
-- **Employee Deleted**: When an employee account is soft-deleted
+#### HR Actions:
+- **Employee Added**: When HR creates a new employee
+- **Employee Edited**: When HR updates employee information
+- **Employee Deleted**: When HR soft-deletes an employee account
+
+#### Super Admin Actions:
+- **Employee Added**: When Super Admin creates a new HR employee
+- **Employee Edited**: When Super Admin updates HR employee information
+- **Employee Deleted**: When Super Admin soft-deletes an HR employee account
 
 ### Notification Format
 
@@ -70,15 +75,25 @@ Time: Oct 20, 2025 4:00 PM
    - Logs notification when student is edited
    - Logs notification when student is deleted
 
-#### HR Admin Module:
-3. **AdminF/add_hr_employee.php**
-   - Logs notification when new HR employee is added
+#### HR Module:
+3. **HRF/add_employee.php**
+   - Logs notification when HR adds new employee
 
-4. **AdminF/edit_hr_employee.php**
-   - Logs notification when HR employee is edited
+4. **HRF/edit_employee.php**
+   - Logs notification when HR edits employee
 
-5. **AdminF/delete_hr_employee.php**
-   - Logs notification when HR employee is deleted
+5. **HRF/delete_employee.php**
+   - Logs notification when HR deletes employee
+
+#### Super Admin Module:
+6. **AdminF/add_hr_employee.php**
+   - Logs notification when Super Admin adds new HR employee
+
+7. **AdminF/edit_hr_employee.php**
+   - Logs notification when Super Admin edits HR employee
+
+8. **AdminF/delete_hr_employee.php**
+   - Logs notification when Super Admin deletes HR employee
 
 ## Database Structure
 
