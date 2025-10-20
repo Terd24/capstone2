@@ -1922,11 +1922,11 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                     <!-- Row: Email, Phone, Hire Date -->
                                     <div>
                                         <label class="block text-sm font-semibold mb-1">Email</label>
-                                        <input type="email" id="email_${employee.id_number}" value="${employee.email || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field">
+                                        <input type="email" id="email_${employee.id_number}" value="${employee.email || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$" title="Please enter a valid email address">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-semibold mb-1">Phone</label>
-                                        <input type="text" id="phone_${employee.id_number}" value="${employee.phone || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field">
+                                        <input type="tel" id="phone_${employee.id_number}" value="${employee.phone || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 hr-employee-field" placeholder="+63 9XX-XXX-XXXX" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-semibold mb-1">Hire Date</label>
@@ -2057,6 +2057,11 @@ if ($check_pending && $check_pending->num_rows > 0) {
                         field.classList.add('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
                         // Clear any previous error styling
                         field.classList.remove('border-red-500');
+                        
+                        // Add phone formatting for tel fields
+                        if (field.type === 'tel') {
+                            field.oninput = function() { formatPhilippinePhone(this); };
+                        }
                     }
                 });
             } else {
@@ -2510,7 +2515,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
-                                        <input type="tel" name="phone" id="phoneField" required placeholder="+63 9XX-XXX-XXXX" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)" oninput="formatPhilippinePhone(this)">
+                                        <input type="tel" name="phone" id="phoneField" required placeholder="+63 9XX-XXX-XXXX" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)" onfocus="if(this.value === '') this.value = '+63 ';" oninput="formatPhilippinePhone(this)">
                                     </div>
                                 </div>
                                 
@@ -2638,48 +2643,42 @@ if ($check_pending && $check_pending->num_rows > 0) {
         }
 
         function formatPhilippinePhone(input) {
-            // Remove all non-numeric characters except +
-            let value = input.value.replace(/[^\d+]/g, '');
+            // Get current value and cursor position
+            let cursorPosition = input.selectionStart;
+            let value = input.value;
             
-            // Remove + if it's not at the start
-            if (value.indexOf('+') > 0) {
-                value = value.replace(/\+/g, '');
+            // Extract only digits
+            let digits = value.replace(/\D/g, '');
+            
+            // Handle Philippine country code
+            if (digits.startsWith('63')) {
+                digits = digits.substring(2); // Remove 63 prefix
+            } else if (digits.startsWith('0')) {
+                digits = digits.substring(1); // Remove leading 0
             }
             
-            // If starts with 0, convert to +63
-            if (value.startsWith('0')) {
-                value = '+63' + value.slice(1);
-            }
-            
-            // If doesn't start with +63, add it
-            if (!value.startsWith('+63') && !value.startsWith('+')) {
-                value = '+63' + value;
-            }
-            
-            // Ensure it starts with +63
-            if (value.startsWith('+') && !value.startsWith('+63')) {
-                value = '+63' + value.slice(1);
-            }
-            
-            // Remove +63 prefix for processing
-            let digits = value.replace('+63', '');
-            
-            // Limit to 10 digits (after +63)
-            digits = digits.slice(0, 10);
+            // Limit to 10 digits (Philippine mobile number after +63)
+            digits = digits.substring(0, 10);
             
             // Format as +63 9XX-XXX-XXXX
             let formatted = '+63';
             if (digits.length > 0) {
-                formatted += ' ' + digits.slice(0, 3);
+                formatted += ' ' + digits.substring(0, 3);
             }
             if (digits.length > 3) {
-                formatted += '-' + digits.slice(3, 6);
+                formatted += '-' + digits.substring(3, 6);
             }
             if (digits.length > 6) {
-                formatted += '-' + digits.slice(6, 10);
+                formatted += '-' + digits.substring(6, 10);
             }
             
+            // Update value
             input.value = formatted;
+            
+            // Restore cursor position (approximate)
+            if (cursorPosition <= 4) {
+                input.setSelectionRange(4, 4); // After "+63 "
+            }
         }
 
         function togglePasswordVisibility(fieldId, iconId) {

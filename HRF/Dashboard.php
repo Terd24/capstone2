@@ -940,11 +940,11 @@ function showEmployeeDetailsModal(employee) {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Email</label>
-                            <input type="email" id="email_${employee.id_number}" value="${employee.email || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field">
+                            <input type="email" id="email_${employee.id_number}" value="${employee.email || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$" title="Please enter a valid email address">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">Phone</label>
-                            <input type="tel" id="phone_${employee.id_number}" value="${employee.phone || ''}" readonly pattern="[0-9]{11}" minlength="11" maxlength="11" title="Please enter exactly 11 digits" inputmode="numeric" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field phone-input">
+                            <input type="tel" id="phone_${employee.id_number}" value="${employee.phone || ''}" readonly class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field" placeholder="+63 9XX-XXX-XXXX" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)">
                         </div>
                         
                         <!-- Complete Address (full width) -->
@@ -1035,6 +1035,12 @@ function showEmployeeDetailsModal(employee) {
     setTimeout(() => {
         setupInputRestrictions();
         setupUsernameAutoUpdate(employee.id_number);
+        
+        // Format phone number on load
+        const phoneField = document.getElementById(`phone_${employee.id_number}`);
+        if (phoneField && phoneField.value) {
+            formatPhilippinePhone(phoneField);
+        }
     }, 100);
 }
 
@@ -1156,6 +1162,11 @@ function toggleEditMode() {
             field.classList.remove('bg-gray-50');
             field.classList.add('bg-white');
             field.classList.add('focus:ring-2', 'focus:ring-[#0B2C62]', 'focus:border-[#0B2C62]');
+            
+            // Add phone formatting for tel fields
+            if (field.type === 'tel') {
+                field.oninput = function() { formatPhilippinePhone(this); };
+            }
         } else if (['radio', 'checkbox'].includes(field.type) || field.tagName === 'SELECT') {
             field.disabled = false;
             field.classList.remove('bg-gray-50');

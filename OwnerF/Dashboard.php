@@ -983,6 +983,19 @@ $history_result = $conn->query($history_query);
             </div>
         </div>
         
+        <!-- User Profile Section -->
+        <div class="border-b border-white/10 p-4 flex-shrink-0">
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-sm font-semibold"><?= substr($_SESSION['owner_name'] ?? 'OW', 0, 2) ?></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['owner_name'] ?? 'School Owner') ?></div>
+                    <div class="text-xs text-blue-200">Owner</div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Navigation - Flex grow to fill space -->
         <nav class="flex-1 px-4 py-6">
             <div class="space-y-1">
@@ -1043,17 +1056,8 @@ $history_result = $conn->query($history_query);
             </div>
         </nav>
         
-        <!-- User Info & Logout - Pinned to bottom -->
+        <!-- Logout - Pinned to bottom -->
         <div class="border-t border-white/10 p-4 flex-shrink-0">
-            <div class="flex items-center gap-3 px-2 mb-3">
-                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span class="text-sm font-semibold"><?= substr($_SESSION['owner_name'] ?? 'OW', 0, 2) ?></span>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['owner_name'] ?? 'School Owner') ?></div>
-                    <div class="text-xs text-blue-200">Owner</div>
-                </div>
-            </div>
             <a href="../StudentLogin/logout.php" class="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 rounded-lg transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
@@ -1121,56 +1125,6 @@ $history_result = $conn->query($history_query);
                     <span class="font-medium text-gray-800">🟢 Online</span>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Recent Activity & Quick Stats -->
-        <div class="space-y-6">
-            <!-- Quick Actions -->
-            <div class="bg-white rounded-xl card-shadow p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">🚀 Quick Actions</h3>
-                <div class="space-y-3">
-                    <a href="SystemLogs.php" class="block w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-center font-medium transition">
-                        📋 View System Logs
-                    </a>
-                    <button onclick="window.location.reload()" class="block w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-center font-medium transition">
-                        🔄 Refresh Dashboard
-                    </button>
-                </div>
-            </div>
-
-            <!-- Recent Activity -->
-            <div class="bg-white rounded-xl card-shadow p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">📈 Recent Activity</h3>
-                
-                <div class="space-y-3">
-                    <?php if ($recent_result && $recent_result->num_rows > 0): ?>
-                        <?php while ($activity = $recent_result->fetch_assoc()): ?>
-                            <div class="border-l-4 <?= $activity['status'] === 'approved' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50' ?> pl-4 py-2 rounded-r">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-gray-900 text-sm"><?= htmlspecialchars($activity['request_title']) ?></h4>
-                                        <p class="text-xs text-gray-600">
-                                            <?= $activity['status'] === 'approved' ? '✅ Approved' : '❌ Rejected' ?> • 
-                                            <?= date('M j, g:i A', strtotime($activity['reviewed_at'])) ?>
-                                        </p>
-                                        <?php if ($activity['owner_comments']): ?>
-                                            <p class="text-xs text-gray-700 mt-1 italic">"<?= htmlspecialchars($activity['owner_comments']) ?>"</p>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <div class="text-center py-6">
-                            <p class="text-gray-500 text-sm">No recent activity</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
         </div>
     </div>
 
