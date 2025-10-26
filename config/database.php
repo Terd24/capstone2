@@ -3,9 +3,9 @@
 // IMPORTANT: Update these values with your Hostinger database credentials
 
 define('DB_HOST', 'localhost');  // Change to your Hostinger DB host
-define('DB_USER', 'root');       // Change to your Hostinger DB username
-define('DB_PASS', '');           // Change to your Hostinger DB password
-define('DB_NAME', 'onecci_db');  // Change to your Hostinger DB name
+define('DB_USER', 'u502476186_gesterd');       // Change to your Hostinger DB username
+define('DB_PASS', 'Springthief044?');           // Change to your Hostinger DB password
+define('DB_NAME', 'onecci_db1');  // Change to your Hostinger DB name
 
 // Create connection
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);

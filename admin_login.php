@@ -107,7 +107,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
-        // If SuperAdmin login failed, try Owner login
+        // If SuperAdmin login failed, try HR login
+        if (!$login_success) {
+            $hr_stmt = $conn->prepare("SELECT ea.*, e.first_name, e.last_name FROM employee_accounts ea 
+                                       JOIN employees e ON ea.employee_id = e.id_number 
+                                       WHERE ea.username = ? AND ea.role = 'hr'");
+            $hr_stmt->bind_param("s", $username);
+            $hr_stmt->execute();
+            $hr_result = $hr_stmt->get_result();
+            
+            if ($hr_result->num_rows === 1) {
+                $hr = $hr_result->fetch_assoc();
+                
+                if (password_verify($password, $hr['password'])) {
+                    // Set HR session
+                    $_SESSION['hr_id'] = $hr['id'];
+                    $_SESSION['hr_name'] = $hr['first_name'] . ' ' . $hr['last_name'];
+                    $_SESSION['username'] = $hr['username'];
+                    $_SESSION['first_name'] = $hr['first_name'];
+                    $_SESSION['last_name'] = $hr['last_name'];
+                    $_SESSION['role'] = 'hr';
+                    $_SESSION['id_number'] = $hr['employee_id'];
+                    
+                    // Log HR login
+                    log_login($conn, 'employee', $hr['employee_id'], $hr['username'], 'hr');
+                    
+                    $login_success = true;
+                    $redirect_url = "HRF/Dashboard.php";
+                }
+            }
+        }
+        
+        // If SuperAdmin and HR login failed, try Owner login
         if (!$login_success) {
             // Check if owner_accounts table exists, if not create it
             $conn->query("CREATE TABLE IF NOT EXISTS owner_accounts (
@@ -177,6 +208,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin/Owner Login - Cornerstone College Inc.</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="images/LogoCCI.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0B2C62">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="OneCCI">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(console.error);
+            });
+        }
+    </script>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4" onload="clearFormOnLoad()">
 
@@ -185,8 +229,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="text-center mb-8">
         <img src="images/LogoCCI.png" alt="Cornerstone College Inc." class="w-20 h-20 mx-auto mb-4">
         <h1 class="text-2xl font-bold text-gray-800 mb-2">Cornerstone College Inc.</h1>
-        <p class="text-gray-600 text-sm">Admin/Owner Portal</p>
-        <p class="text-sm text-gray-600 mt-1">SuperAdmin & Owner Access</p>
+        <p class="text-gray-600 text-sm">Admin/Owner/HR Portal</p>
+        <p class="text-sm text-gray-600 mt-1">SuperAdmin, Owner & HR Access</p>
     </div>
 
     <!-- Login Card -->

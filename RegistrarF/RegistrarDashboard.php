@@ -96,6 +96,7 @@ function timeAgo($time) {
 <!-- RFID Form -->
 <form id="rfidForm" method="get" action="ViewStudentInfo.php">
     <input type="hidden" id="rfid_input" name="student_id" autocomplete="off">
+    <input type="hidden" name="type" value="requested">
 </form>
 
 <!-- Header with School Branding -->
@@ -138,6 +139,23 @@ function timeAgo($time) {
 <!-- Search Bar -->
 <div class="bg-white shadow-sm border-b">
   <div class="container mx-auto px-6 py-4">
+    <?php if (isset($_SESSION['error_message'])): ?>
+      <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span><?= htmlspecialchars($_SESSION['error_message']) ?></span>
+        </div>
+        <button onclick="this.parentElement.remove()" class="text-red-700 hover:text-red-900">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <?php unset($_SESSION['error_message']); ?>
+    <?php endif; ?>
+    
     <div class="flex gap-4 items-center">
       <div class="relative flex-1 max-w-md">
         <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -551,8 +569,26 @@ document.addEventListener('keydown', (e) => {
 
     if (e.key === 'Enter') {
         if (rfidBuffer.length >= 5) {
-            rfidInput.value = rfidBuffer.trim();
-            rfidForm.submit();
+            const scannedRfid = rfidBuffer.trim();
+            
+            // Check if this is an employee RFID (async check)
+            fetch(`../api/check_employee_rfid.php?rfid=${encodeURIComponent(scannedRfid)}`)
+                .then(res => res.json())
+                .then(empData => {
+                    if (empData && empData.is_employee) {
+                        alert('This is an employee RFID. Please scan a student RFID only.');
+                        return;
+                    }
+                    // If not an employee, submit the form
+                    rfidInput.value = scannedRfid;
+                    rfidForm.submit();
+                })
+                .catch(err => {
+                    console.error('Error checking RFID:', err);
+                    // On error, still try to submit (fail-safe)
+                    rfidInput.value = scannedRfid;
+                    rfidForm.submit();
+                });
         }
         rfidBuffer = "";
         e.preventDefault();
@@ -1154,6 +1190,15 @@ async function startQRScannerWithCamera(cameraId) {
           const data = await res.json();
           const students = (data && data.students) ? data.students : [];
 
+          // Check if this is an employee RFID first
+          const empRes = await fetch(`../api/check_employee_rfid.php?rfid=${encodeURIComponent(text)}`);
+          const empData = await empRes.json();
+          
+          if (empData && empData.is_employee) {
+            setQRInlineError('This is an employee RFID. Please scan a student RFID only.');
+            return;
+          }
+
           // RFID-only: require exact rfid_uid match to scanned text
           const match = students.find(s => (s.rfid_uid || '').toString() === text);
 
@@ -1346,6 +1391,245 @@ function showToast(message){
 // ===== PREVENT BACK BUTTON AFTER LOGOUT =====
 window.addEventListener("pageshow", function(event) {
   if (event.persisted || (performance.navigation.type === 2)) window.location.reload();
+});
+
+// ===== REAL-TIME REQUEST POLLING =====
+let lastCheckTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+let pollingInterval = null;
+
+function startRequestPolling() {
+    // Poll every 5 seconds
+    pollingInterval = setInterval(checkForNewRequests, 5000);
+}
+
+function stopRequestPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
+async function checkForNewRequests() {
+    try {
+        const response = await fetch(`check_new_requests.php?last_check=${encodeURIComponent(lastCheckTime)}`);
+        const data = await response.json();
+
+        if (!data.success) {
+            console.error('Failed to check for new requests:', data.error);
+            return;
+        }
+
+        // Update last check time
+        lastCheckTime = data.current_time;
+
+        // If there are new requests, update the UI
+        if (data.new_requests && data.new_requests.length > 0) {
+            console.log(`Found ${data.new_requests.length} new request(s)`);
+            
+            // Update recent requests section
+            updateRecentRequests(data.new_requests);
+            
+            // Update all requests table
+            updateAllRequestsTable(data.new_requests);
+            
+            // Update status counts
+            updateStatusCounts(data.counts);
+            
+            // Update unread badge
+            updateUnreadBadge(data.unread_count);
+        }
+    } catch (error) {
+        console.error('Error checking for new requests:', error);
+    }
+}
+
+function updateRecentRequests(newRequests) {
+    const recentContent = document.getElementById('recentContent');
+    if (!recentContent) return;
+
+    // Add new requests to the top of recent requests
+    newRequests.forEach(request => {
+        // Check if request already exists
+        const existingRequest = document.getElementById(`req-${request.id}`);
+        if (existingRequest) return;
+
+        // Create new request element
+        const requestHTML = `
+            <div class="group border border-gray-200 rounded-xl p-4 bg-white hover:shadow-md transition flex items-start justify-between animate-pulse-once" 
+                 id="req-${request.id}"
+                 data-timestamp="${request.timestamp}"
+                 data-date="${request.date_requested}">
+                <div class="flex flex-col gap-1">
+                    <p class="text-[11px] text-gray-400 uppercase tracking-wide time-ago" data-time="${request.timestamp}">Just now</p>
+                    <p class="text-base font-semibold text-[#0B2C62] leading-5">${escapeHtml(request.document_type)}</p>
+                    <p class="text-xs text-gray-500">By: ${escapeHtml(request.student_name)} (${escapeHtml(request.student_id)})</p>
+                    <p class="text-xs text-gray-400 line-clamp-1">
+                        ${escapeHtml(request.purpose || 'Document request.')}
+                    </p>
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                    <span id="badge-${request.id}" class="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">NEW</span>
+                    <a href="ViewStudentInfo.php?student_id=${encodeURIComponent(request.student_id)}&type=requested"
+                       data-id="${request.id}"
+                       class="view-link inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
+                        View
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        `;
+
+        // Insert at the beginning
+        recentContent.insertAdjacentHTML('afterbegin', requestHTML);
+    });
+
+    // Update recent requests array and re-render pagination
+    recentRequests = Array.from(document.querySelectorAll('#recentContent > div'));
+    renderRecentPage();
+    
+    // Update time ago for all elements
+    updateTimeAgo();
+}
+
+function updateAllRequestsTable(newRequests) {
+    const tableBody = document.getElementById('allRequestsTableBody');
+    if (!tableBody) return;
+
+    // Add new requests to the table
+    newRequests.forEach(request => {
+        // Check if request already exists
+        const existingRows = tableBody.querySelectorAll(`tr[onclick*="${request.student_id}"][onclick*="${request.document_type}"]`);
+        if (existingRows.length > 0) return;
+
+        // Get current row count
+        const currentRows = tableBody.querySelectorAll('tr').length;
+        const rowNumber = currentRows + 1;
+
+        // Determine status badge
+        let statusBadge = '';
+        if (request.status === 'Pending') {
+            statusBadge = '<span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>';
+        } else if (request.status === 'Approved') {
+            statusBadge = '<span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Approved</span>';
+        } else if (request.status === 'Ready to Claim' || request.status === 'Ready for Claiming') {
+            statusBadge = '<span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ready to Claim</span>';
+        } else if (request.status === 'Claimed') {
+            statusBadge = '<span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Claimed</span>';
+        } else if (request.status === 'Decline' || request.status === 'Declined') {
+            statusBadge = '<span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700">Declined</span>';
+        } else {
+            statusBadge = `<span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">${escapeHtml(request.status)}</span>`;
+        }
+
+        // Format dates
+        const dateRequested = new Date(request.date_requested);
+        const formattedDateRequested = dateRequested.toLocaleDateString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric', 
+            hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true 
+        });
+
+        const dateClaimed = request.date_claimed ? 
+            new Date(request.date_claimed).toLocaleDateString('en-US', { 
+                month: 'short', day: 'numeric', year: 'numeric', 
+                hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true 
+            }) : '---';
+
+        // Create new row with animation
+        const rowHTML = `
+            <tr class="all-request-row bg-white hover:bg-[#FBB917]/20 transition cursor-pointer animate-pulse-once" 
+                data-status="${escapeHtml(request.status)}"
+                data-date-requested="${escapeHtml(request.date_requested)}"
+                data-document-type="${escapeHtml(request.document_type)}"
+                data-row-number="${rowNumber}"
+                onclick="viewRequest('${escapeHtml(request.student_id)}', '${escapeHtml(request.document_type)}', '${escapeHtml(request.status)}')">
+                <td class="px-4 py-4 text-gray-500 font-medium text-center">${rowNumber}</td>
+                <td class="px-6 py-4 font-medium">${escapeHtml(request.student_id)}</td>
+                <td class="px-6 py-4">${escapeHtml(request.document_type)}</td>
+                <td class="px-6 py-4 text-gray-600">${formattedDateRequested}</td>
+                <td class="px-6 py-4 text-gray-600">${dateClaimed}</td>
+                <td class="px-6 py-4">${statusBadge}</td>
+            </tr>
+        `;
+
+        // Insert at the beginning of the table
+        tableBody.insertAdjacentHTML('afterbegin', rowHTML);
+    });
+
+    // Update all requests array and re-render pagination
+    initializeAllRequests();
+}
+
+function updateStatusCounts(counts) {
+    // Update quick filter button badges
+    const updateBadge = (btnId, count) => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            const badge = btn.querySelector('span');
+            if (badge) {
+                badge.textContent = count || 0;
+            }
+        }
+    };
+
+    updateBadge('quickFilter-all', counts.all);
+    updateBadge('quickFilter-pending', counts.pending);
+    updateBadge('quickFilter-approved', counts.approved);
+    updateBadge('quickFilter-ready', counts.ready);
+    updateBadge('quickFilter-claimed', counts.claimed);
+    updateBadge('quickFilter-declined', counts.declined);
+}
+
+function updateUnreadBadge(unreadCount) {
+    const badge = document.getElementById('notifBadge');
+    
+    if (unreadCount > 0) {
+        if (badge) {
+            badge.textContent = unreadCount;
+        } else {
+            // Create badge if it doesn't exist
+            const recentToggle = document.getElementById('recentToggle');
+            if (recentToggle) {
+                const h2 = recentToggle.querySelector('h2');
+                if (h2) {
+                    h2.insertAdjacentHTML('beforeend', `<span id="notifBadge" class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">${unreadCount}</span>`);
+                }
+            }
+        }
+    } else {
+        if (badge) {
+            badge.remove();
+        }
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Add CSS for pulse animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes pulse-once {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    .animate-pulse-once {
+        animation: pulse-once 1s ease-in-out 2;
+    }
+`;
+document.head.appendChild(style);
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Starting real-time request polling...');
+    startRequestPolling();
+});
+
+// Stop polling when page unloads
+window.addEventListener('beforeunload', function() {
+    stopRequestPolling();
 });
 </script>
 </body>

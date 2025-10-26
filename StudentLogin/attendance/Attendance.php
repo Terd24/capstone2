@@ -134,79 +134,120 @@ $result = $stmt->get_result();
 
   <!-- Header with School Branding -->
   <header class="bg-[#0B2C62] text-white shadow-lg">
-    <div class="container mx-auto px-6 py-4">
+    <div class="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
       <div class="flex justify-between items-center">
-        <div class="flex items-center space-x-4">
-          <button onclick="window.location.replace('../studentdashboard.php')" 
-                  class="bg-white bg-opacity-20 hover:bg-opacity-30 p-3 rounded-xl transition-all duration-200 text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-center space-x-3 sm:space-x-4">
+          <button onclick="window.location.href='../studentDashboard.php'"
+                  class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 sm:p-3 rounded-lg transition-all duration-200">
+            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
           <div class="text-left">
-            <p class="text-sm text-blue-200">Student Portal</p>
-            <p class="font-semibold">Attendance Records</p>
+            <p class="text-xs sm:text-sm text-blue-200">Student Portal</p>
+            <p class="font-semibold text-sm sm:text-base">Attendance Records</p>
           </div>
         </div>
-        
-        <div class="flex items-center space-x-4">
-          <img src="../../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-          <div class="text-right">
-            <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-            <p class="text-blue-200 text-sm">Student Portal</p>
+
+        <div class="flex items-center space-x-3 sm:space-x-4">
+          <img src="../../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1">
+          <div class="hidden sm:block text-right">
+            <h1 class="text-lg sm:text-xl font-bold">Cornerstone College Inc.</h1>
+            <p class="text-blue-200 text-xs sm:text-sm">Student Portal</p>
+          </div>
+          <a href="../studentDashboard.php" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition" title="Home">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+          </a>
+          <div class="relative">
+            <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
+              <a href="javascript:void(0);" onclick="showLogoutConfirmation('../logout.php');" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
+                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+                Logout
+              </a>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </header>
+  <script src="../../js/logout-confirm.js"></script>
+  <script>
+  const menuBtn = document.getElementById("menuBtn");
+  const dropdownMenu = document.getElementById("dropdownMenu");
+  if (menuBtn && dropdownMenu) {
+    menuBtn.addEventListener("click", () => dropdownMenu.classList.toggle("hidden"));
+    document.addEventListener("click", (e) => {
+      if (!menuBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+        dropdownMenu.classList.add("hidden");
+      }
+    });
+  }
+  </script>
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
     <!-- Today's Schedule Card -->
     <?php if ($has_class_today): ?>
-    <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
-      <div class="flex items-center mb-6">
-        <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>
-        <h2 class="text-xl font-bold text-gray-800">Today's Schedule</h2>
+    <div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
+      <div class="flex items-center mb-4 sm:mb-6">
+        <div class="w-1 h-6 sm:h-8 bg-[#0B2C62] rounded-full mr-3 sm:mr-4"></div>
+        <h2 class="text-lg sm:text-xl font-bold text-gray-800">Today's Schedule</h2>
       </div>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p class="text-sm text-gray-600 mb-1">Date</p>
-          <p class="text-lg font-bold text-gray-800"><?= date('F j, Y') ?></p>
+
+      <!-- Mobile: Single column, Desktop: Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+          <p class="text-xs sm:text-sm text-gray-600 mb-1">Date</p>
+          <p class="text-base sm:text-lg font-bold text-gray-800 break-words">
+            <?= date('M j, Y') ?>
+          </p>
         </div>
-        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p class="text-sm text-gray-600 mb-1">Day</p>
-          <p class="text-lg font-bold text-gray-800"><?= $current_day ?></p>
+        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+          <p class="text-xs sm:text-sm text-gray-600 mb-1">Day</p>
+          <p class="text-base sm:text-lg font-bold text-gray-800 break-words">
+            <?= $current_day ?>
+          </p>
         </div>
-        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p class="text-sm text-gray-600 mb-1">Class Schedule</p>
-          <p class="text-lg font-bold text-gray-800">
+        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+          <p class="text-xs sm:text-sm text-gray-600 mb-1">Class Schedule</p>
+          <p class="text-sm sm:text-base font-bold text-gray-800 break-words">
             <?= date('g:i A', strtotime($effective_start_time)) ?> - <?= date('g:i A', strtotime($effective_end_time)) ?>
           </p>
         </div>
-        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p class="text-sm text-gray-600 mb-1">Section</p>
-          <p class="text-lg font-bold text-gray-800"><?= htmlspecialchars($schedule_info['section_name'] ?? 'N/A') ?></p>
+        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+          <p class="text-xs sm:text-sm text-gray-600 mb-1">Section</p>
+          <p class="text-sm sm:text-base font-bold text-gray-800 break-words">
+            <?= htmlspecialchars($schedule_info['section_name'] ?? 'N/A') ?>
+          </p>
         </div>
       </div>
-      
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p class="text-sm text-gray-600 mb-1">Time In</p>
-          <p class="text-xl font-bold text-gray-800">
+
+      <!-- Attendance Status Cards - Mobile: Single column, Desktop: 3 columns -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-6">
+        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+          <p class="text-xs sm:text-sm text-gray-600 mb-1">Time In</p>
+          <p class="text-lg sm:text-xl font-bold text-gray-800 break-words">
             <?= $today_attendance && $today_attendance['time_in'] ? date('g:i A', strtotime($today_attendance['time_in'])) : '--' ?>
           </p>
         </div>
-        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p class="text-sm text-gray-600 mb-1">Time Out</p>
-          <p class="text-xl font-bold text-gray-800">
+        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+          <p class="text-xs sm:text-sm text-gray-600 mb-1">Time Out</p>
+          <p class="text-lg sm:text-xl font-bold text-gray-800 break-words">
             <?= $today_attendance && $today_attendance['time_out'] ? date('g:i A', strtotime($today_attendance['time_out'])) : '--' ?>
           </p>
         </div>
-        <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p class="text-sm text-gray-600 mb-1">Status</p>
-          <p class="text-xl font-bold <?php 
+        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+          <p class="text-xs sm:text-sm text-gray-600 mb-1">Status</p>
+          <p class="text-lg sm:text-xl font-bold <?php
             if ($today_attendance) {
                 $status = $today_attendance['status'];
                 if ($status === 'Present') {
@@ -220,8 +261,8 @@ $result = $stmt->get_result();
             } else {
                 echo 'text-gray-500';
             }
-            ?>">
-            <?php 
+            ?> break-words">
+            <?php
             if ($today_attendance) {
                 // Always use the database status, don't calculate it
                 $status = $today_attendance['status'];
@@ -235,47 +276,51 @@ $result = $stmt->get_result();
       </div>
     </div>
     <?php else: ?>
-    <div class="bg-white rounded-2xl shadow-lg p-8 mb-8 text-center">
-      <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="bg-white rounded-2xl shadow-lg p-6 sm:p-8 mb-6 sm:mb-8 text-center">
+      <div class="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+        <svg class="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z"></path>
         </svg>
       </div>
-      <h2 class="text-xl font-bold text-gray-600 mb-2">No Class Today</h2>
-      <p class="text-gray-500"><?= date('F j, Y') ?> - <?= $current_day ?></p>
+      <h2 class="text-lg sm:text-xl font-bold text-gray-600 mb-2">No Class Today</h2>
+      <p class="text-gray-500 text-sm sm:text-base">
+        <?= date('F j, Y') ?> - <?= $current_day ?>
+      </p>
     </div>
     <?php endif; ?>
-    
+
 
 
     <!-- Attendance Records -->
     <div class="bg-white rounded-2xl shadow-lg">
-      <div class="p-6 border-b border-gray-100">
-        <div class="flex items-center mb-6">
-          <div class="w-1 h-8 bg-[#0B2C62] rounded-full mr-4"></div>
-          <h2 class="text-xl font-bold text-gray-800">Attendance Records</h2>
+      <div class="p-4 sm:p-6 border-b border-gray-100">
+        <div class="flex items-center mb-4 sm:mb-6">
+          <div class="w-1 h-6 sm:h-8 bg-[#0B2C62] rounded-full mr-3 sm:mr-4"></div>
+          <h2 class="text-lg sm:text-xl font-bold text-gray-800">Attendance Records</h2>
         </div>
-        
-        <form method="get" class="flex flex-col md:flex-row gap-4 items-end">
+
+        <!-- Date Filter Form - Mobile: Stacked, Desktop: Horizontal -->
+        <form method="get" class="space-y-3 sm:space-y-0 sm:flex sm:items-end sm:gap-4">
           <div class="flex-1">
-            <label for="start-date" class="text-sm font-medium text-gray-700 block mb-2">Start Date</label>
-            <input type="date" id="start-date" name="start_date" value="<?= htmlspecialchars($startDate) ?>" 
-                   class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
+            <label for="start-date" class="text-xs sm:text-sm font-medium text-gray-700 block mb-1 sm:mb-2">Start Date</label>
+            <input type="date" id="start-date" name="start_date" value="<?= htmlspecialchars($startDate) ?>"
+                   class="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
           </div>
           <div class="flex-1">
-            <label for="end-date" class="text-sm font-medium text-gray-700 block mb-2">End Date</label>
-            <input type="date" id="end-date" name="end_date" value="<?= htmlspecialchars($endDate) ?>" 
-                   class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
+            <label for="end-date" class="text-xs sm:text-sm font-medium text-gray-700 block mb-1 sm:mb-2">End Date</label>
+            <input type="date" id="end-date" name="end_date" value="<?= htmlspecialchars($endDate) ?>"
+                   class="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent transition-all duration-200">
           </div>
-          <div>
-            <button type="submit" class="bg-[#0B2C62] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-all duration-200 font-medium">
+          <div class="sm:flex-shrink-0">
+            <button type="submit" class="w-full sm:w-auto bg-[#0B2C62] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-blue-900 transition-all duration-200 font-medium text-sm sm:text-base">
               Generate Report
             </button>
           </div>
         </form>
       </div>
 
-      <div class="overflow-x-auto">
+      <!-- Desktop Table View (hidden on mobile) -->
+      <div class="hidden lg:block overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="bg-[#0B2C62] text-white">
             <tr>
@@ -291,35 +336,39 @@ $result = $stmt->get_result();
             <?php if ($result->num_rows > 0): ?>
               <?php while($row = $result->fetch_assoc()): ?>
                 <tr class="bg-blue-50 hover:bg-blue-100 transition-colors duration-150">
-                  <td class="px-6 py-4 font-medium text-gray-900"><?= htmlspecialchars(date('F j, Y', strtotime($row['date']))) ?></td>
-                  <td class="px-6 py-4 text-gray-700"><?= htmlspecialchars($row['day']) ?></td>
-                  <td class="px-6 py-4 text-gray-700">
-                    <?php 
+                  <td class="px-6 py-4 font-medium text-gray-900 text-sm">
+                    <?= htmlspecialchars(date('M j, Y', strtotime($row['date']))) ?>
+                  </td>
+                  <td class="px-6 py-4 text-gray-700 text-sm">
+                    <?= htmlspecialchars($row['day']) ?>
+                  </td>
+                  <td class="px-6 py-4 text-gray-700 text-sm">
+                    <?php
                     // Check if student has class on this day
                     $record_day = $row['day'];
                     $has_class_on_day = false;
                     $display_start_time = $row['start_time'];
                     $display_end_time = $row['end_time'];
-                    
+
                     if ($row['days']) {
                         $class_days = explode(',', $row['days']);
                         $has_class_on_day = in_array($record_day, array_map('trim', $class_days));
                     }
-                    
+
                     // Check for day-specific schedule times
                     if ($has_class_on_day && $row['schedule_id']) {
                         $day_schedule_query = $conn->prepare("SELECT start_time, end_time FROM day_schedules WHERE schedule_id = ? AND day_name = ?");
                         $day_schedule_query->bind_param("is", $row['schedule_id'], $record_day);
                         $day_schedule_query->execute();
                         $day_schedule_result = $day_schedule_query->get_result();
-                        
+
                         if ($day_schedule_result->num_rows > 0) {
                             $day_schedule = $day_schedule_result->fetch_assoc();
                             $display_start_time = $day_schedule['start_time'];
                             $display_end_time = $day_schedule['end_time'];
                         }
                     }
-                    
+
                     if ($has_class_on_day && $display_start_time && $display_end_time) {
                         echo date('g:i A', strtotime($display_start_time)) . ' - ' . date('g:i A', strtotime($display_end_time));
                     } else {
@@ -327,14 +376,14 @@ $result = $stmt->get_result();
                     }
                     ?>
                   </td>
-                  <td class="px-6 py-4 text-gray-700">
-                    <?= $row['time_in'] ? date("h:i A", strtotime($row['time_in'])) : '--' ?>
+                  <td class="px-6 py-4 text-gray-700 text-sm">
+                    <?= $row['time_in'] ? date("g:i A", strtotime($row['time_in'])) : '--' ?>
                   </td>
-                  <td class="px-6 py-4 text-gray-700">
-                    <?= $row['time_out'] ? date("h:i A", strtotime($row['time_out'])) : '--' ?>
+                  <td class="px-6 py-4 text-gray-700 text-sm">
+                    <?= $row['time_out'] ? date("g:i A", strtotime($row['time_out'])) : '--' ?>
                   </td>
-                  <td class="px-6 py-4 text-gray-700">
-                    <?php 
+                  <td class="px-6 py-4 text-gray-700 text-sm">
+                    <?php
                     // Show status with color coding
                     if (!$has_class_on_day) {
                         echo '<span class="text-gray-600">No Schedule</span>';
@@ -362,14 +411,129 @@ $result = $stmt->get_result();
                     <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
-                    <p class="text-gray-500 font-medium">No attendance records found</p>
-                    <p class="text-gray-400 text-sm mt-1">Try adjusting your date range</p>
+                    <p class="text-gray-500 font-medium text-sm">No attendance records found</p>
+                    <p class="text-gray-400 text-xs sm:text-sm mt-1">Try adjusting your date range</p>
                   </div>
                 </td>
               </tr>
             <?php endif; ?>
           </tbody>
         </table>
+      </div>
+
+      <!-- Mobile Card View (hidden on desktop) -->
+      <div class="lg:hidden">
+        <?php if ($result->num_rows > 0): ?>
+          <?php
+          $result->data_seek(0); // Reset pointer
+          while($row = $result->fetch_assoc()): ?>
+            <div class="p-4 border-b border-gray-100 last:border-b-0">
+              <div class="space-y-3">
+                <!-- Date and Day -->
+                <div class="flex justify-between items-center">
+                  <div>
+                    <p class="text-xs text-gray-500">Date</p>
+                    <p class="font-semibold text-gray-800 text-sm">
+                      <?= htmlspecialchars(date('M j, Y', strtotime($row['date']))) ?>
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs text-gray-500">Day</p>
+                    <p class="font-semibold text-gray-800 text-sm">
+                      <?= htmlspecialchars($row['day']) ?>
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Class Schedule -->
+                <div>
+                  <p class="text-xs text-gray-500 mb-1">Class Schedule</p>
+                  <?php
+                  // Check if student has class on this day
+                  $record_day = $row['day'];
+                  $has_class_on_day = false;
+                  $display_start_time = $row['start_time'];
+                  $display_end_time = $row['end_time'];
+
+                  if ($row['days']) {
+                      $class_days = explode(',', $row['days']);
+                      $has_class_on_day = in_array($record_day, array_map('trim', $class_days));
+                  }
+
+                  // Check for day-specific schedule times
+                  if ($has_class_on_day && $row['schedule_id']) {
+                      $day_schedule_query = $conn->prepare("SELECT start_time, end_time FROM day_schedules WHERE schedule_id = ? AND day_name = ?");
+                      $day_schedule_query->bind_param("is", $row['schedule_id'], $record_day);
+                      $day_schedule_query->execute();
+                      $day_schedule_result = $day_schedule_query->get_result();
+
+                      if ($day_schedule_result->num_rows > 0) {
+                          $day_schedule = $day_schedule_result->fetch_assoc();
+                          $display_start_time = $day_schedule['start_time'];
+                          $display_end_time = $day_schedule['end_time'];
+                      }
+                  }
+
+                  if ($has_class_on_day && $display_start_time && $display_end_time) {
+                      echo '<p class="font-medium text-gray-800 text-sm">' .
+                           date('g:i A', strtotime($display_start_time)) . ' - ' .
+                           date('g:i A', strtotime($display_end_time)) .
+                           '</p>';
+                  } else {
+                      echo '<p class="font-medium text-gray-500 text-sm">No Class Schedule</p>';
+                  }
+                  ?>
+                </div>
+
+                <!-- Time In/Out and Status -->
+                <div class="grid grid-cols-3 gap-3">
+                  <div>
+                    <p class="text-xs text-gray-500 mb-1">Time In</p>
+                    <p class="font-medium text-gray-800 text-sm">
+                      <?= $row['time_in'] ? date("g:i A", strtotime($row['time_in'])) : '--' ?>
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-500 mb-1">Time Out</p>
+                    <p class="font-medium text-gray-800 text-sm">
+                      <?= $row['time_out'] ? date("g:i A", strtotime($row['time_out'])) : '--' ?>
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-500 mb-1">Status</p>
+                    <?php
+                    // Show status with color coding
+                    if (!$has_class_on_day) {
+                        echo '<p class="font-medium text-gray-600 text-sm">No Schedule</p>';
+                    } else {
+                        // Always use the database status, don't calculate it
+                        $status = $row['status'];
+                        if ($status === 'Present') {
+                            echo '<p class="font-medium text-green-600 text-sm">Present</p>';
+                        // Removed Time In Only status
+                        } elseif ($status === 'Absent') {
+                            echo '<p class="font-medium text-red-600 text-sm">Absent</p>';
+                        } else {
+                            // Fallback for any other status
+                            echo '<p class="font-medium text-gray-600 text-sm">' . htmlspecialchars($status) . '</p>';
+                        }
+                    }
+                    ?>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <?php endwhile; ?>
+        <?php else: ?>
+          <!-- Mobile Empty State -->
+          <div class="p-8 text-center">
+            <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="text-gray-500 font-medium text-sm mb-1">No attendance records found</p>
+            <p class="text-gray-400 text-xs">Try adjusting your date range</p>
+          </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>

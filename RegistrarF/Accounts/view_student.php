@@ -98,7 +98,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_student'])) {
         }
         
         $_SESSION['success_msg'] = "Student account deleted successfully!";
-        header("Location: /onecci/RegistrarF/AccountList.php");
+        header("Location: /RegistrarF/AccountList.php");
         exit;
     } else {
         $error_msg = "Error deleting student account.";
@@ -429,7 +429,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         );
         
         $_SESSION['success_msg'] = "Student information updated successfully!";
-        header("Location: /onecci/RegistrarF/AccountList.php?type=student");
+        header("Location: /RegistrarF/AccountList.php?type=student");
         exit;
     } else {
         $error_msg = "Error updating student information.";
@@ -438,7 +438,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
 }
 
 if (!$student_data) {
-    header("Location: /onecci/RegistrarF/AccountList.php?type=student");
+    header("Location: /RegistrarF/AccountList.php?type=student");
     exit;
 }
 
@@ -1005,7 +1005,7 @@ input[type=number] { -moz-appearance: textfield; }
 
             <!-- Footer Buttons (no Save here; Save moved to header) -->
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
-                <a href="/onecci/RegistrarF/AccountList.php?type=student" onclick="return closeModalEmbedAware(event);" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition inline-flex items-center justify-center">Back to List</a>
+                <a href="/RegistrarF/AccountList.php?type=student" onclick="return closeModalEmbedAware(event);" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition inline-flex items-center justify-center">Back to List</a>
             </div>
         </form>
     </div>
@@ -1590,7 +1590,7 @@ function closeModal() {
         if (overlay) overlay.remove();
     } else {
         // Standalone page: navigate back to account list (absolute path)
-        window.location.href = '/onecci/RegistrarF/AccountList.php?type=student';
+        window.location.href = '/RegistrarF/AccountList.php?type=student';
     }
 }
 

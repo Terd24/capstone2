@@ -691,10 +691,28 @@ header("Expires: 0");
 
   // ===== RFID input listener =====
   let buffer = '', timer;
-  window.addEventListener('keydown', e => {
+  window.addEventListener('keydown', async e => {
     if (timer) clearTimeout(timer);
     if (e.key === 'Enter') {
-      if (buffer) loadStudentData(buffer.trim());
+      if (buffer) {
+        const scannedRfid = buffer.trim();
+        
+        // Check if this is an employee RFID
+        try {
+          const empRes = await fetch(`../api/check_employee_rfid.php?rfid=${encodeURIComponent(scannedRfid)}`);
+          const empData = await empRes.json();
+          
+          if (empData && empData.is_employee) {
+            showError('This is an employee RFID. Please scan a student RFID only.');
+            buffer = '';
+            return;
+          }
+        } catch (err) {
+          console.error('Error checking RFID:', err);
+        }
+        
+        loadStudentData(scannedRfid);
+      }
       buffer = '';
     } else if (/[\w\d]/.test(e.key)) buffer += e.key;
     timer = setTimeout(() => buffer = '', 500);
@@ -818,6 +836,19 @@ header("Expires: 0");
         async (decodedText) => {
           const text = (decodedText || '').trim();
           if (!text) return;
+          // Check if this is an employee RFID first
+          try {
+            const empRes = await fetch(`../api/check_employee_rfid.php?rfid=${encodeURIComponent(text)}`);
+            const empData = await empRes.json();
+            
+            if (empData && empData.is_employee) {
+              setQRInlineError('This is an employee RFID. Please scan a student RFID only.');
+              return;
+            }
+          } catch (err) {
+            console.error('Error checking RFID:', err);
+          }
+
           // RFID-only: validate via Guidance GetRecord first
           try {
             const res = await fetch(`GetRecord.php?rfid_uid=${encodeURIComponent(text)}`);

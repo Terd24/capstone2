@@ -71,7 +71,7 @@ header("Expires: 0");
         <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
         <div class="text-right">
           <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-          <p class="text-blue-200 text-sm">Registrar Portal</p>
+          <p class="text-blue-200 text-sm">Cashier Portal</p>
         </div>
           <div class="relative">
             <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
@@ -748,23 +748,12 @@ const items = slice.map(s => {
   const prog = s.program || '';
   const sec = s.year_section || '';
   const rfid = s.rfid_uid || '';
-  const note = rfid ? '' : '<span class="text-xs text-red-600 ml-2">(no RFID on file)</span>';
 
-  if (!rfid) {
-    // show non-clickable card if no RFID
-    return `
-      <div class="flex justify-between items-center border rounded px-3 py-2 bg-white opacity-50 cursor-not-allowed">
-        <div class="text-sm">
-          <div class="font-medium">${name}</div>
-          <div class="text-gray-600">ID: ${id} • ${prog} • ${sec} ${note}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  // ✅ clickable card if has RFID
+  // ✅ All students are now clickable - use RFID if available, otherwise use ID number
+  const identifier = rfid || id;
+  
   return `
-    <div onclick="handleRFID('${rfid.replace(/'/g, "\\'")}'); document.getElementById('searchResults').innerHTML='';"
+    <div onclick="handleRFID('${identifier.replace(/'/g, "\\'")}'); document.getElementById('searchResults').innerHTML='';"
          class="flex justify-between items-center border rounded px-3 py-2 bg-white hover:bg-gray-100 cursor-pointer transition">
       <div class="text-sm">
         <div class="font-medium">${name}</div>
@@ -1152,9 +1141,13 @@ const items = slice.map(s => {
     })
     .then(data => {
       console.log('GetBalance response data:', data);
-      // Guard: show error and stop if RFID is not registered/invalid
+      // Guard: show error and stop if RFID is not registered/invalid or is an employee
       if (!data || data.error || !data.id_number || !data.full_name) {
-        showRFIDError('RFID not found or not registered. Please scan a valid student QR/RFID.');
+        if (data && data.error && data.error.includes('employee')) {
+          showRFIDError('This is an employee RFID. Please scan a student RFID only.');
+        } else {
+          showRFIDError('RFID not found or not registered. Please scan a valid student QR/RFID.');
+        }
         clearRFIDAndFocus();
         return;
       }

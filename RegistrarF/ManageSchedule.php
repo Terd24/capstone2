@@ -1,6 +1,27 @@
 <?php
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Don't display errors to user
+ini_set('log_errors', 1);
+
 session_start();
+
+// Check if db_conn.php exists
+if (!file_exists("../StudentLogin/db_conn.php")) {
+    die("Error: db_conn.php not found");
+}
+
 include("../StudentLogin/db_conn.php");
+
+// Check database connection
+if (!isset($conn)) {
+    die("Error: Database connection variable not set");
+}
+
+if ($conn->connect_error) {
+    error_log("Database connection failed in ManageSchedule.php: " . $conn->connect_error);
+    die("Database connection error: " . $conn->connect_error);
+}
 
 // Require registrar login
 if (!isset($_SESSION['registrar_id'])) {
@@ -9,38 +30,122 @@ if (!isset($_SESSION['registrar_id'])) {
 }
 
 // Create sections table if it doesn't exist
-$conn->query("CREATE TABLE IF NOT EXISTS sections (
+$create_sections_table = "CREATE TABLE IF NOT EXISTS sections (
     id INT AUTO_INCREMENT PRIMARY KEY,
     section_name VARCHAR(100) UNIQUE NOT NULL,
     description VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by INT,
     INDEX idx_section_name (section_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+if (!$conn->query($create_sections_table)) {
+    error_log("Failed to create sections table: " . $conn->error);
+}
+
+// Create class_schedules table first (must exist before day_schedules due to foreign key)
+$create_class_schedules = "CREATE TABLE IF NOT EXISTS class_schedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    section_name VARCHAR(100) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    days VARCHAR(255),
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_section (section_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+$class_schedules_result = $conn->query($create_class_schedules);
+if (!$class_schedules_result) {
+    error_log("Failed to create class_schedules table: " . $conn->error);
+}
+
+// Create day_schedules table (depends on class_schedules)
+// Only create if class_schedules was created successfully
+if ($class_schedules_result) {
+    $create_day_schedules = "CREATE TABLE IF NOT EXISTS day_schedules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        schedule_id INT NOT NULL,
+        day_name VARCHAR(20) NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        INDEX idx_schedule_day (schedule_id, day_name),
+        INDEX idx_schedule_id (schedule_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+    if (!$conn->query($create_day_schedules)) {
+        error_log("Failed to create day_schedules table: " . $conn->error);
+    }
+    
+    // Check if foreign key constraint exists before adding it
+    $check_fk = $conn->query("SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS 
+                              WHERE TABLE_SCHEMA = DATABASE() 
+                              AND TABLE_NAME = 'day_schedules' 
+                              AND CONSTRAINT_NAME = 'fk_day_schedule'");
+    
+    if ($check_fk && $check_fk->num_rows == 0) {
+        // Foreign key doesn't exist, add it
+        $add_fk = $conn->query("ALTER TABLE day_schedules ADD CONSTRAINT fk_day_schedule 
+                                FOREIGN KEY (schedule_id) REFERENCES class_schedules(id) ON DELETE CASCADE");
+        if (!$add_fk) {
+            error_log("Failed to add foreign key constraint: " . $conn->error);
+        }
+    }
+}
 
 // Handle form submission for creating/editing schedules and sections
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     // Section management actions
     if ($_POST['action'] == 'create_section') {
-        $section_name = trim($_POST['section_name'] ?? '');
-        $description = trim($_POST['description'] ?? '');
-        
-        if (empty($section_name)) {
-            echo json_encode(['success' => false, 'message' => 'Section name is required']);
-            exit;
-        }
-        
-        $stmt = $conn->prepare("INSERT INTO sections (section_name, description, created_by) VALUES (?, ?, ?)");
-        $stmt->bind_param('ssi', $section_name, $description, $_SESSION['registrar_id']);
-        
-        if ($stmt->execute()) {
-            echo json_encode(['success' => true, 'message' => 'Section created successfully']);
-        } else {
-            if ($conn->errno === 1062) {
-                echo json_encode(['success' => false, 'message' => 'Section name already exists']);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Error creating section']);
+        try {
+            $section_name = trim($_POST['section_name'] ?? '');
+            $description = trim($_POST['description'] ?? '');
+            
+            if (empty($section_name)) {
+                echo json_encode(['success' => false, 'message' => 'Section name is required']);
+                exit;
             }
+            
+            // Ensure sections table exists before inserting
+            $table_check = $conn->query("SHOW TABLES LIKE 'sections'");
+            if (!$table_check || $table_check->num_rows == 0) {
+                $create_table = "CREATE TABLE IF NOT EXISTS sections (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    section_name VARCHAR(100) UNIQUE NOT NULL,
+                    description VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by INT,
+                    INDEX idx_section_name (section_name)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+                
+                if (!$conn->query($create_table)) {
+                    echo json_encode(['success' => false, 'message' => 'Failed to create table: ' . $conn->error]);
+                    exit;
+                }
+            }
+            
+            $stmt = $conn->prepare("INSERT INTO sections (section_name, description, created_by) VALUES (?, ?, ?)");
+            if (!$stmt) {
+                echo json_encode(['success' => false, 'message' => 'Prepare failed: ' . $conn->error]);
+                exit;
+            }
+            
+            $registrar_id = $_SESSION['registrar_id'] ?? 0;
+            $stmt->bind_param('ssi', $section_name, $description, $registrar_id);
+            
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'Section created successfully']);
+            } else {
+                if ($conn->errno === 1062) {
+                    echo json_encode(['success' => false, 'message' => 'Section name already exists']);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Error creating section: ' . $stmt->error]);
+                }
+            }
+            $stmt->close();
+        } catch (Exception $e) {
+            error_log("Error in create_section: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
         }
         exit;
     }
@@ -96,17 +201,46 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     }
     
     if ($_POST['action'] == 'get_sections') {
-        $sections_query = "SELECT s.*, 
-                          (SELECT COUNT(*) FROM class_schedules cs WHERE cs.section_name = s.section_name) as usage_count
-                          FROM sections s 
-                          ORDER BY s.section_name ASC";
-        $sections_result = $conn->query($sections_query);
-        $sections = [];
-        while ($row = $sections_result->fetch_assoc()) {
-            $sections[] = $row;
+        header('Content-Type: application/json');
+        try {
+            // Simple direct query - table already exists in database
+            $sections_query = "SELECT id, section_name, description, created_at, created_by 
+                              FROM sections 
+                              ORDER BY section_name ASC";
+            $sections_result = $conn->query($sections_query);
+            
+            if (!$sections_result) {
+                echo json_encode(['success' => false, 'message' => 'Query error: ' . $conn->error]);
+                exit;
+            }
+            
+            $sections = [];
+            while ($row = $sections_result->fetch_assoc()) {
+                // Get usage count separately
+                $usage_count = 0;
+                $usage_query = $conn->prepare("SELECT COUNT(*) as count FROM class_schedules WHERE section_name = ?");
+                if ($usage_query) {
+                    $usage_query->bind_param("s", $row['section_name']);
+                    $usage_query->execute();
+                    $usage_result = $usage_query->get_result();
+                    if ($usage_result) {
+                        $usage_row = $usage_result->fetch_assoc();
+                        $usage_count = $usage_row['count'] ?? 0;
+                    }
+                    $usage_query->close();
+                }
+                $row['usage_count'] = $usage_count;
+                
+                $sections[] = $row;
+            }
+            
+            echo json_encode(['success' => true, 'sections' => $sections]);
+            exit;
+        } catch (Exception $e) {
+            error_log("Error in get_sections: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+            exit;
         }
-        echo json_encode(['success' => true, 'sections' => $sections]);
-        exit;
     }
     
     if ($_POST['action'] == 'create_schedule') {
@@ -447,17 +581,53 @@ $schedules_result = $conn->query($schedules_query);
                 </button>
                 <span class="text-lg md:text-xl font-bold">Schedule Management</span>
             </div>
-            <!-- Right: school logo + name -->
+            <!-- Right: school logo + name + home + menu -->
             <div class="flex items-center space-x-3">
                 <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-10 w-10 md:h-12 md:w-12 rounded-full bg-white p-1">
                 <div class="text-right leading-tight">
                     <div class="text-sm md:text-base font-bold">Cornerstone College Inc.</div>
-                    <div class="text-[11px] md:text-sm text-blue-200">Schedule Management System</div>
+                    <div class="text-[11px] md:text-sm text-blue-200">Registrar Portal</div>
+                </div>
+                <a href="RegistrarDashboard.php" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition" title="Home">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                  </svg>
+                </a>
+                <div class="relative">
+                  <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                  </button>
+                  <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
+                    <a href="javascript:void(0);" onclick="showLogoutConfirmation('logout.php');" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
+                      <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                      </svg>
+                      Logout
+                    </a>
+                  </div>
                 </div>
             </div>
         </div>
     </div>
 </header>
+<script src="../js/logout-confirm.js"></script>
+<script>
+// Menu dropdown toggle
+const menuBtn = document.getElementById("menuBtn");
+const dropdownMenu = document.getElementById("dropdownMenu");
+if (menuBtn && dropdownMenu) {
+  menuBtn.addEventListener("click", () => {
+    dropdownMenu.classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    if (!menuBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+      dropdownMenu.classList.add("hidden");
+    }
+  });
+}
+</script>
 
 <!-- Main Content -->
 <div class="container mx-auto px-6 py-8">
@@ -1626,11 +1796,14 @@ function loadSections() {
             if (data.success) {
                 displaySections(data.sections);
             } else {
-                document.getElementById('sectionsListContainer').innerHTML = '<p class="text-red-500 text-center py-4">Error loading sections</p>';
+                const errorMsg = data.message || 'Error loading sections';
+                document.getElementById('sectionsListContainer').innerHTML = `<p class="text-red-500 text-center py-4">${errorMsg}</p>`;
+                console.error('Section load error:', data);
             }
         })
-        .catch(() => {
-            document.getElementById('sectionsListContainer').innerHTML = '<p class="text-red-500 text-center py-4">Error loading sections</p>';
+        .catch(err => {
+            document.getElementById('sectionsListContainer').innerHTML = '<p class="text-red-500 text-center py-4">Error loading sections. Please refresh the page.</p>';
+            console.error('Fetch error:', err);
         });
 }
 

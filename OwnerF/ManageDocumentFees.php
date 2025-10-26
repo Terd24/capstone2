@@ -13,10 +13,10 @@ include("../StudentLogin/db_conn.php");
 
 // Convert to PDO for consistency
 try {
-    $pdo = new PDO("mysql:host=localhost;dbname=onecci_db", "root", "");
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch(PDOException $e) {
-    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+    echo json_encode(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]);
     exit;
 }
 

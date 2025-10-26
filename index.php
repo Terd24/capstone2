@@ -1,3 +1,9 @@
+<?php
+// Clear any existing sessions when visiting the homepage
+session_start();
+session_destroy();
+session_start();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>

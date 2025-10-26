@@ -1,6 +1,21 @@
 <?php
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
+
+// Check if db_conn.php exists and include it
+if (!file_exists("../StudentLogin/db_conn.php")) {
+    die("Database connection file not found");
+}
+
 include("../StudentLogin/db_conn.php");
+
+// Check database connection
+if (!isset($conn) || $conn->connect_error) {
+    die("Database connection failed: " . ($conn->connect_error ?? "Connection object not found"));
+}
 
 // Require HR login
 if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSION['hr_name']))) {
@@ -9,6 +24,49 @@ if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSIO
 }
 // Actor id for audit fields
 $actorId = $_SESSION['id_number'] ?? 0;
+
+// Create necessary tables if they don't exist
+$create_employee_work_schedules = "CREATE TABLE IF NOT EXISTS employee_work_schedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    schedule_name VARCHAR(100) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    days VARCHAR(255),
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_schedule_name (schedule_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+$create_employee_schedules = "CREATE TABLE IF NOT EXISTS employee_schedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id VARCHAR(20) NOT NULL,
+    schedule_id INT NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (schedule_id) REFERENCES employee_work_schedules(id) ON DELETE CASCADE,
+    INDEX idx_employee_id (employee_id),
+    INDEX idx_schedule_id (schedule_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+$create_day_schedules = "CREATE TABLE IF NOT EXISTS employee_day_schedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    schedule_id INT NOT NULL,
+    day_name VARCHAR(20) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    FOREIGN KEY (schedule_id) REFERENCES employee_work_schedules(id) ON DELETE CASCADE,
+    INDEX idx_schedule_day (schedule_id, day_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+// Execute table creation
+if (!$conn->query($create_employee_work_schedules)) {
+    error_log("Failed to create employee_work_schedules table: " . $conn->error);
+}
+if (!$conn->query($create_employee_schedules)) {
+    error_log("Failed to create employee_schedules table: " . $conn->error);
+}
+if (!$conn->query($create_day_schedules)) {
+    error_log("Failed to create employee_day_schedules table: " . $conn->error);
+}
 
 // Handle form submission for creating/editing schedules
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -390,7 +448,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     }
 }
 
-// Fetch all schedules with teacher name and sections
+// Fetch all schedules with teacher name and sections (with error handling)
 $schedules_query = "SELECT cs.*, 
                            COUNT(es.id) as employee_count,
                            CONCAT(e.first_name, ' ', e.last_name) as teacher_name,
@@ -401,7 +459,11 @@ $schedules_query = "SELECT cs.*,
                    LEFT JOIN teacher_sections ts ON e.id_number = ts.teacher_id
                    GROUP BY cs.id 
                    ORDER BY teacher_name";
-$schedules_result = $conn->query($schedules_query);
+$schedules_result = @$conn->query($schedules_query);
+if (!$schedules_result) {
+    error_log("Failed to fetch schedules: " . $conn->error);
+    $schedules_result = null;
+}
 
 $teachers_sql = "SELECT e.id_number, 
                         CONCAT(e.first_name, ' ', e.last_name) AS full_name,
@@ -411,15 +473,27 @@ $teachers_sql = "SELECT e.id_number,
                  LEFT JOIN employee_schedules es ON es.employee_id = e.id_number
                  WHERE e.deleted_at IS NULL
                  ORDER BY has_schedule ASC, full_name ASC";
-$teachers_result = $conn->query($teachers_sql);
+$teachers_result = @$conn->query($teachers_sql);
+if (!$teachers_result) {
+    error_log("Failed to fetch teachers: " . $conn->error);
+    $teachers_result = null;
+}
 
 // Fetch all available subjects from the subjects table
 $subjects_sql = "SELECT id, name, code FROM subjects ORDER BY name ASC";
-$subjects_result = $conn->query($subjects_sql);
+$subjects_result = @$conn->query($subjects_sql);
+if (!$subjects_result) {
+    error_log("Failed to fetch subjects: " . $conn->error);
+    $subjects_result = null;
+}
 
 // Fetch all available sections from class_schedules (created by Registrar)
 $sections_sql = "SELECT id, section_name FROM class_schedules ORDER BY section_name ASC";
-$sections_result = $conn->query($sections_sql);
+$sections_result = @$conn->query($sections_sql);
+if (!$sections_result) {
+    error_log("Failed to fetch sections: " . $conn->error);
+    $sections_result = null;
+}
 ?>
 
 <!DOCTYPE html>

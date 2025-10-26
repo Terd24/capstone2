@@ -135,7 +135,7 @@ if ($ws) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Teacher Dashboard - CCI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="manifest" href="/onecci/manifest.webmanifest">
+  <link rel="manifest" href="/manifest.webmanifest">
   <style>
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
@@ -148,7 +148,7 @@ if ($ws) {
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/onecci/sw.js').catch(console.error);
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
       });
     }
   </script>

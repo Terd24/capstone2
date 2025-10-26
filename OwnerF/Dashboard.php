@@ -360,7 +360,62 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                                     $archive_id = $conn->insert_id;
                                     error_log("Successfully inserted into archived_students with ID: $archive_id");
                                     
-                                    // Delete from main table
+                                    // Archive parent accounts linked to this student (silently, not shown in UI)
+                                    // Create archived_parent_accounts table if it doesn't exist
+                                    $conn->query("CREATE TABLE IF NOT EXISTS archived_parent_accounts (
+                                        archive_id INT AUTO_INCREMENT PRIMARY KEY,
+                                        original_parent_id INT,
+                                        username VARCHAR(100),
+                                        password VARCHAR(255),
+                                        child_id VARCHAR(50),
+                                        must_change_password TINYINT(1) DEFAULT 0,
+                                        archived_at DATETIME,
+                                        archived_by VARCHAR(100),
+                                        archive_reason TEXT,
+                                        INDEX idx_child_id (child_id),
+                                        INDEX idx_archived_at (archived_at)
+                                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                                    
+                                    // Find and archive all parent accounts for this student
+                                    $parent_check_stmt = $conn->prepare("SELECT parent_id, username, password, child_id, must_change_password FROM parent_account WHERE child_id = ?");
+                                    $parent_check_stmt->bind_param('s', $target_id);
+                                    $parent_check_stmt->execute();
+                                    $parent_result = $parent_check_stmt->get_result();
+                                    
+                                    $parent_count = 0;
+                                    while ($parent = $parent_result->fetch_assoc()) {
+                                        // Archive parent account
+                                        $parent_archive_stmt = $conn->prepare("INSERT INTO archived_parent_accounts (
+                                            original_parent_id, username, password, child_id, must_change_password,
+                                            archived_at, archived_by, archive_reason
+                                        ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)");
+                                        
+                                        $parent_archive_reason = "Auto-archived: Student $target_id was archived";
+                                        $parent_archive_stmt->bind_param("isssiss", 
+                                            $parent['parent_id'],
+                                            $parent['username'],
+                                            $parent['password'],
+                                            $parent['child_id'],
+                                            $parent['must_change_password'],
+                                            $archived_by,
+                                            $parent_archive_reason
+                                        );
+                                        
+                                        if ($parent_archive_stmt->execute()) {
+                                            // Delete parent account from main table
+                                            $parent_delete_stmt = $conn->prepare("DELETE FROM parent_account WHERE parent_id = ?");
+                                            $parent_delete_stmt->bind_param('i', $parent['parent_id']);
+                                            $parent_delete_stmt->execute();
+                                            $parent_count++;
+                                            error_log("Archived and deleted parent account (ID: {$parent['parent_id']}, Username: {$parent['username']}) for student $target_id");
+                                        }
+                                    }
+                                    
+                                    if ($parent_count > 0) {
+                                        error_log("Total parent accounts archived for student $target_id: $parent_count");
+                                    }
+                                    
+                                    // Delete student from main table
                                     $delete_stmt = $conn->prepare("DELETE FROM student_account WHERE id_number = ?");
                                     $delete_stmt->bind_param('s', $target_id);
                                     if ($delete_stmt->execute()) {

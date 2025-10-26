@@ -1407,7 +1407,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                     </h3>
                     <div class="grid grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Student RFID Number <span class="text-gray-500 text-xs">(Optional)</span></label>
+                            <label class="block text-sm font-semibold mb-1">Student RFID Number</span></label>
                             <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($old_rfid ?? '') ?>" pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border px-3 py-2 rounded-lg focus:ring-2 <?= !empty($error_rfid) ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-[#2F8D46]' ?> digits-only" data-maxlen="10" inputmode="numeric">
                             <p class="text-xs text-gray-500 mt-1">
                                 <span class="font-medium">For student use:</span> Attendance tracking, cashier transactions, and other school modules

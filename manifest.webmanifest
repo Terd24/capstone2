@@ -1,22 +1,109 @@
 {
-  "name": "OneCCI",
-  "short_name": "OneCCI",
-  "description": "Cornerstone College Inc. portal (Registrar, HR, Student)",
-  "start_url": "/onecci/StudentLogin/login.php",
-  "scope": "/onecci/",
+  "name": "Cornerstone College Inc. Student Portal",
+  "short_name": "CCI",
+  "description": "Access your grades, documents, attendance, and academic records - Cornerstone College Inc. Student Portal for mobile and desktop",
+  "start_url": "/StudentLogin/login.php",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0B2C62",
   "theme_color": "#0B2C62",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
+  "lang": "en",
   "icons": [
     {
-      "src": "/onecci/images/LogoCCI.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/images/LogoCCI.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/onecci/images/LogoCCI.png",
+      "src": "/images/LogoCCI.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/LogoCCI.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/LogoCCI.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/LogoCCI.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/LogoCCI.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/LogoCCI.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/LogoCCI.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/LogoCCI.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Student Dashboard",
+      "short_name": "Dashboard",
+      "description": "View your student dashboard",
+      "url": "/StudentLogin/studentDashboard.php",
+      "icons": [
+        {
+          "src": "/images/LogoCCI.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Grades",
+      "short_name": "Grades",
+      "description": "Check your academic grades",
+      "url": "/StudentLogin/Grades.php",
+      "icons": [
+        {
+          "src": "/images/LogoCCI.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "short_name": "Documents",
+      "description": "Access your documents",
+      "url": "/StudentLogin/documents.php",
+      "icons": [
+        {
+          "src": "/images/LogoCCI.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ]
 }

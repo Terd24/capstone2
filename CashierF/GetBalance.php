@@ -3,11 +3,11 @@ include '../StudentLogin/db_conn.php';
 header('Content-Type: application/json');
 
 if (!isset($_GET['rfid_uid'])) {
-    echo json_encode(["error" => "No RFID provided"]);
+    echo json_encode(["error" => "No RFID or ID provided"]);
     exit;
 }
 
-$rfid_uid = strtoupper(trim($_GET['rfid_uid']));
+$identifier = strtoupper(trim($_GET['rfid_uid']));
 $selected_term = isset($_GET['term']) ? trim($_GET['term']) : null;
 
 // Optional history filters and pagination
@@ -16,13 +16,25 @@ $offset = isset($_GET['offset']) ? max(0, intval($_GET['offset'])) : 0;
 $start_date = isset($_GET['start_date']) && $_GET['start_date'] !== '' ? $_GET['start_date'] : null; // format: YYYY-MM-DD
 $end_date = isset($_GET['end_date']) && $_GET['end_date'] !== '' ? $_GET['end_date'] : null;       // format: YYYY-MM-DD
 
-// Get student basic info
-$stmt = $conn->prepare("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track as program, grade_level as year_section FROM student_account WHERE UPPER(rfid_uid) = ?");
-$stmt->bind_param("s", $rfid_uid);
+// Check if this is an employee RFID first (reject employees)
+$emp_check = $conn->prepare("SELECT id_number FROM employees WHERE UPPER(rfid_uid) = ?");
+$emp_check->bind_param("s", $identifier);
+$emp_check->execute();
+$emp_res = $emp_check->get_result();
+if ($emp_res->num_rows > 0) {
+    echo json_encode(["error" => "This is an employee RFID. Students only."]);
+    $emp_check->close();
+    exit;
+}
+$emp_check->close();
+
+// Get student basic info - try RFID first, then ID number
+$stmt = $conn->prepare("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, academic_track as program, grade_level as year_section FROM student_account WHERE UPPER(rfid_uid) = ? OR UPPER(id_number) = ?");
+$stmt->bind_param("ss", $identifier, $identifier);
 $stmt->execute();
 $res = $stmt->get_result();
 if ($res->num_rows === 0) {
-    echo json_encode(["error" => "RFID not found"]);
+    echo json_encode(["error" => "Student not found"]);
     exit;
 }
 $student = $res->fetch_assoc();

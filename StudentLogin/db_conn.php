@@ -24,9 +24,9 @@ if ($isLocalhost) {
 } else {
     // 🌐 HOSTINGER CONFIGURATION (Live Server)
     define('DB_HOST', 'localhost');
-    define('DB_USER', 'u502476186_onecci_user');
-    define('DB_PASS', 'OneCciMuzon2004');
-    define('DB_NAME', 'u502476186_onecci_db');
+    define('DB_USER', 'u502476186_gesterd');
+    define('DB_PASS', 'Springthief044?');
+    define('DB_NAME', 'u502476186_onecci_db1');
 }
 
 // Set timezone to Philippine Time (applies to all PHP date/time functions)
@@ -41,8 +41,31 @@ if ($conn->connect_error) {
     die("Connection failed. Please contact administrator.");
 }
 
-$conn->set_charset("utf8mb4");
-
 // Set MySQL timezone to Philippine Time (applies to database NOW(), CURDATE(), etc.)
 $conn->query("SET time_zone = '+08:00'");
+
+$conn->set_charset("utf8mb4");
+
+// Handle test notifications for demo
+if (isset($_POST['test_notification']) && $_POST['test_notification'] === '1') {
+    $student_id = $_POST['student_id'] ?? '';
+    $message = $_POST['message'] ?? '';
+
+    if ($student_id && $message) {
+        // Insert test notification
+        $stmt = $conn->prepare("INSERT INTO notifications (student_id, message, date_sent, is_read) VALUES (?, ?, NOW(), 0)");
+        $stmt->bind_param("ss", $student_id, $message);
+
+        if ($stmt->execute()) {
+            echo "Notification inserted successfully. Student will see it within 10 seconds.";
+        } else {
+            echo "Error inserting notification: " . $conn->error;
+        }
+
+        $stmt->close();
+    } else {
+        echo "Missing student_id or message.";
+    }
+    exit;
+}
 ?>

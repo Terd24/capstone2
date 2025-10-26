@@ -19,30 +19,30 @@ $result = $stmt->get_result();
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Requested Documents - Cornerstone College Inc.</title>
+  <title>Submitted Documents - Cornerstone College Inc.</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
   
 <header class="bg-[#0B2C62] text-white shadow-lg">
-    <div class="container mx-auto px-6 py-4">
+    <div class="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
       <div class="flex justify-between items-center">
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-3 sm:space-x-4">
           <button onclick="window.location.href='studentDashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
           <div>
-            <h1 class="text-xl font-bold">Requested Documents</h1>
+            <h1 class="text-lg sm:text-xl font-bold">Submitted Documents</h1>
           </div>
         </div>
-        <div class="flex items-center space-x-4">
-          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-          <div class="text-right">
-            <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-            <p class="text-blue-200 text-sm">Student Portal</p>
+        <div class="flex items-center space-x-3 sm:space-x-4">
+          <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1">
+          <div class="hidden sm:block text-right">
+            <h1 class="text-lg sm:text-xl font-bold">Cornerstone College Inc.</h1>
+            <p class="text-blue-200 text-xs sm:text-sm">Student Portal</p>
           </div>
         </div>
       </div>
@@ -79,9 +79,11 @@ $result = $stmt->get_result();
                   <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                     <i class="fas fa-file-alt text-blue-600 text-sm"></i>
                   </div>
-                  <span class="font-medium text-gray-800"><?= htmlspecialchars($row['document_name']) ?></span>
+                  <span class="font-medium text-gray-800 text-sm sm:text-base">
+                    <?= htmlspecialchars($row['document_name']) ?>
+                  </span>
                 </div>
-                
+
                 <!-- Date Submitted -->
                 <div class="text-gray-600 text-sm text-center">
                   <?php if ($row['date_submitted']): ?>
@@ -90,7 +92,7 @@ $result = $stmt->get_result();
                     <span class="text-gray-400">---</span>
                   <?php endif; ?>
                 </div>
-                
+
                 <!-- Remarks -->
                 <div class="text-gray-600 text-sm text-right">
                   <?php if (!empty($row['remarks'])): ?>

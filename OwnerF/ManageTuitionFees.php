@@ -31,19 +31,30 @@ if ($action === 'get_fees') {
 
 // Update tuition fee
 if ($action === 'update_fee') {
-    $id = intval($_POST['id']);
-    $tuition_fee = floatval($_POST['tuition_fee']);
-    $other_fees = floatval($_POST['other_fees']);
-    $term = trim($_POST['term'] ?? '1st Semester');
-    $total_fee = $tuition_fee + $other_fees;
-    
-    $stmt = $conn->prepare("UPDATE tuition_fee_structure SET tuition_fee = ?, other_fees = ?, total_fee = ?, term = ?, updated_at = NOW() WHERE id = ?");
-    $stmt->bind_param("dddsi", $tuition_fee, $other_fees, $total_fee, $term, $id);
-    
-    if ($stmt->execute()) {
-        echo json_encode(['success' => true, 'message' => 'Tuition fee updated successfully']);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to update tuition fee']);
+    try {
+        $id = intval($_POST['id']);
+        $tuition_fee = floatval($_POST['tuition_fee']);
+        $other_fees = floatval($_POST['other_fees']);
+        $total_fee = $tuition_fee + $other_fees;
+        
+        // Only update the fee amounts, not the term or other identifying fields
+        // to avoid unique constraint violations
+        $stmt = $conn->prepare("UPDATE tuition_fee_structure SET tuition_fee = ?, other_fees = ?, total_fee = ?, updated_at = NOW() WHERE id = ?");
+        if (!$stmt) {
+            echo json_encode(['success' => false, 'message' => 'Prepare failed: ' . $conn->error]);
+            exit;
+        }
+        
+        $stmt->bind_param("dddi", $tuition_fee, $other_fees, $total_fee, $id);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Tuition fee updated successfully']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to update tuition fee: ' . $stmt->error]);
+        }
+        $stmt->close();
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
     }
     exit;
 }

@@ -71,11 +71,15 @@ $all_stmt->close();
   <title>Student Portal - Cornerstone College Inc.</title>
   <link rel="icon" type="image/png" href="../images/LogoCCI.png">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="manifest" href="/onecci/manifest.webmanifest">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0B2C62">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CCI">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/onecci/sw.js').catch(console.error);
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
       });
     }
   </script>
@@ -176,6 +180,27 @@ $all_stmt->close();
     }
   </style>
   <script src="../js/logout-confirm.js"></script>
+
+  <!-- Offline Detection -->
+  <div id="offlineBanner" class="fixed top-0 left-0 right-0 bg-yellow-500 text-black text-center py-2 px-4 text-sm font-medium hidden z-50">
+    ⚠️ You're currently offline. Some features may not work properly.
+  </div>
+
+  <script>
+    // Offline detection
+    function updateOnlineStatus() {
+      const banner = document.getElementById('offlineBanner');
+      if (navigator.onLine) {
+        banner.classList.add('hidden');
+      } else {
+        banner.classList.remove('hidden');
+      }
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus(); // Initial check
+  </script>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
@@ -285,13 +310,13 @@ $all_stmt->close();
             </div>
           </div>
           
-          <div class="relative">
+          <div class="relative z-[10001]">
             <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
               </svg>
             </button>
-            <div id="menuDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
+            <div id="menuDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-[10000] text-gray-800">
               <a href="javascript:void(0);" onclick="showLogoutConfirmation('logout.php');" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
                 <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -459,244 +484,320 @@ $all_stmt->close();
   </div>
 
   <script>
-    const menuBtn = document.getElementById('menuBtn');
-    const menuDropdown = document.getElementById('menuDropdown');
-
-    menuBtn.addEventListener('click', () => {
-      menuDropdown.classList.toggle('hidden');
-    });
-
-    window.addEventListener('click', (e) => {
-      if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
-        menuDropdown.classList.add('hidden');
+    // Prevent Back button from showing cached dashboard
+    window.addEventListener("pageshow", function (event) {
+      if (event.persisted) {
+        window.location.reload();
       }
     });
 
-  </script>
-<script>
-  // Prevent Back button from showing cached dashboard
-  window.addEventListener("pageshow", function (event) {
-    if (event.persisted) {
-      window.location.reload();
-    }
-  });
-</script>
-<script>
-  // Logout function
-  function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-      window.location.href = 'logout.php';
-    }
-  }
-  
-  // Notifications functions
-  function toggleNotifications() {
-    const dropdown = document.getElementById('notificationsDropdown');
-    const button = document.getElementById('notificationBtn');
-    
-    if (dropdown.classList.contains('hidden')) {
-      // Get button position relative to viewport
-      const rect = button.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const dropdownWidth = 320;
-      
-      // Position dropdown using fixed positioning
-      dropdown.style.top = (rect.bottom + 8) + 'px';
-      
-      // Calculate horizontal position - align dropdown right edge with button right edge
-      let rightPos = viewportWidth - rect.right;
-      
-      // Ensure dropdown doesn't go off-screen on the left
-      if (rect.right - dropdownWidth < 10) {
-        rightPos = 10;
-      }
-      
-      // Use right positioning for better alignment
-      dropdown.style.right = rightPos + 'px';
-      dropdown.style.left = 'auto';
-      
-      // Adjust width for very small screens
-      if (viewportWidth < 350) {
-        dropdown.style.width = (viewportWidth - 20) + 'px';
-        dropdown.style.right = '10px';
+    // Store all notifications data
+    const allNotifications = <?= json_encode($all_notifications_array) ?>;
+    let currentlyShowing = 5;
+    let lastNotificationCheck = 0;
+    let notificationPollingInterval = null;
+
+    // Helper functions for notification management
+    function decrementBadge(el) {
+      if (!el) return;
+      const txt = (el.textContent || '').trim();
+      let num = 0;
+      if (txt === '') return;
+      if (txt.includes('+')) {
+        num = parseInt(txt) || 9;
       } else {
-        dropdown.style.width = dropdownWidth + 'px';
+        num = parseInt(txt) || 0;
+      }
+      if (num <= 1) {
+        el.remove();
+      } else {
+        el.textContent = String(num - 1);
       }
     }
-    
-    dropdown.classList.toggle('hidden');
-    console.log('Dropdown positioned at right:', dropdown.style.right, 'top:', dropdown.style.top);
-  }
-  
-  function markAllAsRead() {
-    fetch('mark_notifications_read.php', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+
+    // Route notifications to appropriate pages
+    function routeFromMessage(message) {
+      if (!message) { window.location.href = 'requested_document.php'; return; }
+      const msg = message.toLowerCase();
+      if (msg.includes('successfully submitted')) return window.location.href = 'documents.php';
+      if (msg.includes('document request') || msg.includes("status has been updated") || msg.includes('ready to claim') || msg.includes('pending')) return window.location.href = 'requested_document.php';
+      if (msg.includes('grade')) return window.location.href = 'Grades.php';
+      if (msg.includes('balance') || msg.includes('payment')) return window.location.href = 'Balances.php';
+      if (msg.includes('attendance')) return window.location.href = 'attendance/Attendance.php';
+      if (msg.includes('guidance')) return window.location.href = 'GuidanceRecord.php';
+      if (msg.includes('document')) return window.location.href = 'requested_document.php';
+      window.location.href = 'requested_document.php';
+    }
+
+    // Logout function
+    function logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        window.location.href = 'logout.php';
       }
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        location.reload();
+    }
+
+    // Notifications functions
+    function toggleNotifications() {
+      const dropdown = document.getElementById('notificationsDropdown');
+      const button = document.getElementById('notificationBtn');
+
+      if (dropdown.classList.contains('hidden')) {
+        const rect = button.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const dropdownHeight = 400;
+
+        if (rect.bottom + dropdownHeight > viewportHeight) {
+          dropdown.style.bottom = (viewportHeight - rect.top + 8) + 'px';
+          dropdown.style.top = 'auto';
+        } else {
+          dropdown.style.top = (rect.bottom + 8) + 'px';
+          dropdown.style.bottom = 'auto';
+        }
+
+        const viewportWidth = window.innerWidth;
+        const dropdownWidth = 320;
+        let rightPos = viewportWidth - rect.right;
+
+        if (rightPos < 10) {
+          rightPos = 10;
+        }
+
+        dropdown.style.right = rightPos + 'px';
+        dropdown.style.left = 'auto';
+
+        if (viewportWidth < 350) {
+          dropdown.style.width = (viewportWidth - 20) + 'px';
+          dropdown.style.right = '10px';
+          dropdown.style.left = '10px';
+        } else {
+          dropdown.style.width = dropdownWidth + 'px';
+        }
       }
-    })
-    .catch(error => console.error('Error:', error));
-  }
-  
-  // Store all notifications data
-  const allNotifications = <?= json_encode($all_notifications_array) ?>;
-  let currentlyShowing = 5;
-  
-  function loadMoreNotifications() {
-    const notificationsList = document.getElementById('notificationsList');
-    const viewMoreBtn = document.getElementById('viewMoreBtn');
-    
-    // Show more notifications (next 5)
-    const nextBatch = allNotifications.slice(currentlyShowing, currentlyShowing + 5);
-    
-    nextBatch.forEach(notification => {
-      const notificationHTML = `
-        <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${notification.is_read == '0' ? 'bg-blue-25' : 'opacity-75'}" data-message="${notification.message.replace(/\"/g, '&quot;')}" data-id="${Number(notification.id)}" data-read="${notification.is_read}">
-          <div class="flex items-start space-x-3">
-            <div class="flex-shrink-0">
-              ${notification.is_read == '0' ? 
-                '<div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>' : 
-                '<div class="w-2 h-2 bg-gray-300 rounded-full mt-2"></div>'
-              }
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-gray-800 ${notification.is_read == '0' ? 'font-semibold' : ''}">
-                ${notification.message}
-              </p>
-              <p class="text-xs text-gray-500 mt-1">
-                ${new Date(notification.date_sent).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                })}
-              </p>
+
+      dropdown.classList.toggle('hidden');
+    }
+
+    function markAllAsRead() {
+      fetch('mark_notifications_read.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          location.reload();
+        }
+      })
+      .catch(error => console.error('Error:', error));
+    }
+
+    function loadMoreNotifications() {
+      const notificationsList = document.getElementById('notificationsList');
+      const viewMoreBtn = document.getElementById('viewMoreBtn');
+
+      const nextBatch = allNotifications.slice(currentlyShowing, currentlyShowing + 5);
+
+      nextBatch.forEach(notification => {
+        const notificationHTML = `
+          <div class="notification-item p-4 border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${notification.is_read == '0' ? 'bg-blue-25' : 'opacity-75'}" data-message="${notification.message.replace(/\"/g, '&quot;')}" data-id="${Number(notification.id)}" data-read="${notification.is_read}">
+            <div class="flex items-start space-x-3">
+              <div class="flex-shrink-0">
+                ${notification.is_read == '0' ? 
+                  '<div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>' : 
+                  '<div class="w-2 h-2 bg-gray-300 rounded-full mt-2"></div>'
+                }
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-800 ${notification.is_read == '0' ? 'font-semibold' : ''}">
+                  ${notification.message}
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                  ${new Date(notification.date_sent).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      `;
-      notificationsList.insertAdjacentHTML('beforeend', notificationHTML);
+        `;
+        notificationsList.insertAdjacentHTML('beforeend', notificationHTML);
+      });
+
+      currentlyShowing += 5;
+
+      if (currentlyShowing >= allNotifications.length) {
+        viewMoreBtn.style.display = 'none';
+      }
+
+      const dropdown = document.getElementById('notificationsDropdown');
+      dropdown.style.maxHeight = '90vh';
+    }
+
+    function startNotificationPolling() {
+      notificationPollingInterval = setInterval(checkForNewNotifications, 10000);
+    }
+
+    function stopNotificationPolling() {
+      if (notificationPollingInterval) {
+        clearInterval(notificationPollingInterval);
+        notificationPollingInterval = null;
+      }
+    }
+
+    async function checkForNewNotifications() {
+      try {
+        const response = await fetch('check_new_notifications.php');
+        const data = await response.json();
+
+        if (data.error) {
+          console.error('Notification check error:', data.error);
+          return;
+        }
+
+        updateNotificationBadge(data.unread_count);
+
+        const dropdown = document.getElementById('notificationsDropdown');
+        if (dropdown && !dropdown.classList.contains('hidden')) {
+          const now = Math.floor(Date.now() / 1000);
+          if (now - lastNotificationCheck > 30) {
+            loadMoreNotifications();
+            lastNotificationCheck = now;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking notifications:', error);
+      }
+    }
+
+    function updateNotificationBadge(unreadCount) {
+      const bellCount = document.getElementById('notifBellCount');
+      const headerCount = document.getElementById('notifHeaderCount');
+
+      if (unreadCount > 0) {
+        if (bellCount) {
+          bellCount.textContent = unreadCount > 9 ? '9+' : unreadCount;
+          bellCount.style.display = 'flex';
+        }
+        if (headerCount) {
+          headerCount.textContent = unreadCount;
+          headerCount.style.display = 'inline-flex';
+        }
+      } else {
+        if (bellCount) bellCount.style.display = 'none';
+        if (headerCount) headerCount.style.display = 'none';
+      }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const menuBtn = document.getElementById('menuBtn');
+      const menuDropdown = document.getElementById('menuDropdown');
+      const notificationBtn = document.getElementById('notificationBtn');
+      const dropdown = document.getElementById('notificationsDropdown');
+      const notificationsList = document.getElementById('notificationsList');
+
+      // Menu button handler
+      if (menuBtn && menuDropdown) {
+        menuBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          menuDropdown.classList.toggle('hidden');
+          // Close notification dropdown if open
+          if (dropdown && !dropdown.classList.contains('hidden')) {
+            dropdown.classList.add('hidden');
+          }
+        });
+
+        // Close menu dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+          if (!menuBtn.contains(event.target) && !menuDropdown.contains(event.target)) {
+            menuDropdown.classList.add('hidden');
+          }
+        });
+
+        // Close menu dropdown when clicking any link inside it
+        menuDropdown.addEventListener('click', function(e) {
+          if (e.target.tagName === 'A' || e.target.closest('a')) {
+            menuDropdown.classList.add('hidden');
+          }
+        });
+      }
+
+      // Notification button handler
+      if (notificationBtn && dropdown) {
+        notificationBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          // Close menu dropdown if open
+          if (menuDropdown && !menuDropdown.classList.contains('hidden')) {
+            menuDropdown.classList.add('hidden');
+          }
+          toggleNotifications();
+        });
+
+        // Close notifications dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+          if (!notificationBtn.contains(event.target) && !dropdown.contains(event.target)) {
+            dropdown.classList.add('hidden');
+          }
+        });
+
+        // Close dropdown when pressing Escape key
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape' && !dropdown.classList.contains('hidden')) {
+            dropdown.classList.add('hidden');
+          }
+        });
+
+        // Handle notification clicks
+        if (notificationsList) {
+          notificationsList.addEventListener('click', function(e) {
+            const item = e.target.closest('.notification-item');
+            if (item) {
+              const message = item.getAttribute('data-message') || '';
+              const wasRead = item.getAttribute('data-read') === '1';
+              const id = parseInt(item.getAttribute('data-id') || '0');
+
+              if (!wasRead) {
+                item.classList.remove('bg-blue-25');
+                item.classList.add('opacity-75');
+                const dot = item.querySelector('.w-2.h-2');
+                if (dot) { dot.classList.remove('bg-blue-500'); dot.classList.add('bg-gray-300'); }
+                const title = item.querySelector('p.text-sm');
+                if (title) { title.classList.remove('font-semibold'); }
+                item.setAttribute('data-read', '1');
+                decrementBadge(document.getElementById('notifHeaderCount'));
+                decrementBadge(document.getElementById('notifBellCount'));
+              }
+
+              if (id > 0 && !wasRead) {
+                fetch('mark_notification_read.php', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id })
+                }).catch(()=>{});
+              }
+
+              routeFromMessage(message);
+            }
+          });
+        }
+      }
+
+      // Start notification polling
+      startNotificationPolling();
     });
-    
-    currentlyShowing += 5;
-    
-    // Hide "View More" button if all notifications are shown
-    if (currentlyShowing >= allNotifications.length) {
-      viewMoreBtn.style.display = 'none';
-    }
-    
-    // Update dropdown height if needed
-    const dropdown = document.getElementById('notificationsDropdown');
-    dropdown.style.maxHeight = '90vh';
-  }
-  
-  // Add click event listener to notification button
-  document.addEventListener('DOMContentLoaded', function() {
-    const notificationBtn = document.getElementById('notificationBtn');
-    const dropdown = document.getElementById('notificationsDropdown');
-    const notificationsList = document.getElementById('notificationsList');
-    
-    console.log('DOM loaded, notification button:', notificationBtn);
-    console.log('Dropdown element:', dropdown);
-    
-    if (notificationBtn && dropdown) {
-      notificationBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('Notification button clicked');
-        toggleNotifications();
-      });
-      
-      // Close notifications dropdown when clicking outside
-      document.addEventListener('click', function(event) {
-        if (!notificationBtn.contains(event.target) && !dropdown.contains(event.target)) {
-          dropdown.classList.add('hidden');
-        }
-      });
 
-      // Helpers to decrement badges safely
-      function decrementBadge(el) {
-        if (!el) return;
-        const txt = (el.textContent || '').trim();
-        let num = 0;
-        if (txt === '' ) return;
-        if (txt.includes('+')) {
-          // treat 9+ as at least 9
-          num = parseInt(txt) || 9;
-        } else {
-          num = parseInt(txt) || 0;
-        }
-        if (num <= 1) {
-          el.remove();
-        } else {
-          el.textContent = String(num - 1);
-        }
-      }
-
-      // Delegated click handler for notifications
-      function routeFromMessage(message) {
-        if (!message) { window.location.href = 'requested_document.php'; return; }
-        const msg = message.toLowerCase();
-        // Specific document-related routing first
-        if (msg.includes('successfully submitted')) return window.location.href = 'documents.php';
-        if (msg.includes('document request') || msg.includes("status has been updated") || msg.includes('ready to claim') || msg.includes('pending')) return window.location.href = 'requested_document.php';
-        // Other modules
-        if (msg.includes('grade')) return window.location.href = 'Grades.php';
-        if (msg.includes('balance') || msg.includes('payment')) return window.location.href = 'Balances.php';
-        if (msg.includes('attendance')) return window.location.href = 'attendance/Attendance.php';
-        if (msg.includes('guidance')) return window.location.href = 'GuidanceRecord.php';
-        if (msg.includes('document')) return window.location.href = 'requested_document.php';
-        // default
-        window.location.href = 'requested_document.php';
-      }
-
-      notificationsList.addEventListener('click', function(e) {
-        const item = e.target.closest('.notification-item');
-        if (item) {
-          const message = item.getAttribute('data-message') || '';
-          const wasRead = item.getAttribute('data-read') === '1';
-          const id = parseInt(item.getAttribute('data-id') || '0');
-
-          // Optimistic UI update if it was unread
-          if (!wasRead) {
-            // Remove blue highlight and dot, dim text
-            item.classList.remove('bg-blue-25');
-            item.classList.add('opacity-75');
-            const dot = item.querySelector('.w-2.h-2');
-            if (dot) { dot.classList.remove('bg-blue-500'); dot.classList.add('bg-gray-300'); }
-            const title = item.querySelector('p.text-sm');
-            if (title) { title.classList.remove('font-semibold'); }
-            item.setAttribute('data-read', '1');
-            // Decrement badges
-            decrementBadge(document.getElementById('notifHeaderCount'));
-            decrementBadge(document.getElementById('notifBellCount'));
-          }
-
-          // Mark as read in backend (fire and forget)
-          if (id > 0 && !wasRead) {
-            fetch('mark_notification_read.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id })
-            }).catch(()=>{});
-          }
-
-          // Navigate
-          routeFromMessage(message);
-        }
-      });
-    } else {
-      console.error('Notification elements not found');
-    }
-  });
-</script>
+    // Stop polling when page unloads
+    window.addEventListener('beforeunload', function() {
+      stopNotificationPolling();
+    });
+  </script>
 </body>
 </html>

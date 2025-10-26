@@ -130,7 +130,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_submitted'])) 
 // ✅ Get student info from session
 $student_id = $_SESSION['view_student_id'] ?? '';
 if (!$student_id) { 
-    echo "No student selected."; 
+    // Redirect back to dashboard with error
+    $_SESSION['error_message'] = 'No student selected.';
+    header("Location: RegistrarDashboard.php");
     exit; 
 }
 
@@ -144,7 +146,9 @@ $stmt->execute();
 $student = $stmt->get_result()->fetch_assoc();
 
 if (!$student) { 
-    echo "Student not found."; 
+    // Redirect back to dashboard with error
+    $_SESSION['error_message'] = 'Student not found. Please check the RFID or ID number.';
+    header("Location: RegistrarDashboard.php");
     exit; 
 }
 
@@ -414,10 +418,46 @@ if ($docType === 'submitted') {
           <h2 class="text-lg font-bold">Cornerstone College Inc.</h2>
           <p class="text-blue-200 text-sm">Registrar Portal</p>
         </div>
+        <a href="RegistrarDashboard.php" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition" title="Home">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+        </a>
+        <div class="relative">
+          <button id="menuBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 text-gray-800">
+            <a href="javascript:void(0);" onclick="showLogoutConfirmation('logout.php');" class="block px-4 py-3 hover:bg-gray-100 rounded-lg">
+              <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+              </svg>
+              Logout
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </header>
+<script src="../js/logout-confirm.js"></script>
+<script>
+// Menu dropdown toggle
+const menuBtn = document.getElementById("menuBtn");
+const dropdownMenu = document.getElementById("dropdownMenu");
+if (menuBtn && dropdownMenu) {
+  menuBtn.addEventListener("click", () => {
+    dropdownMenu.classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    if (!menuBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+      dropdownMenu.classList.add("hidden");
+    }
+  });
+}
+</script>
 
 <div class="max-w-6xl mx-auto px-6 py-8">
     <!-- Student Info Card -->

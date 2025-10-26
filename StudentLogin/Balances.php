@@ -48,8 +48,21 @@ $pay_result = $pay_stmt->get_result();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Balance - Cornerstone College Inc.</title>
+  <title>Student Balances - Cornerstone College Inc.</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" type="image/png" href="../images/LogoCCI.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0B2C62">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CCI">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
+      });
+    }
+  </script>
   <style>
     .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
     .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
@@ -57,47 +70,89 @@ $pay_result = $pay_stmt->get_result();
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
 
+  <!-- Offline Detection -->
+  <div id="offlineBanner" class="fixed top-0 left-0 right-0 bg-yellow-500 text-black text-center py-2 px-4 text-sm font-medium hidden z-50">
+    ⚠️ You're currently offline. Balance information may be cached data.
+  </div>
+
+  <script>
+    // Offline detection
+    function updateOnlineStatus() {
+      const banner = document.getElementById('offlineBanner');
+      if (navigator.onLine) {
+        banner.classList.add('hidden');
+      } else {
+        banner.classList.remove('hidden');
+      }
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus(); // Initial check
+  </script>
+
 <!-- Header -->
 <header class="bg-[#0B2C62] text-white shadow-lg">
-  <div class="container mx-auto px-6 py-4">
+  <div class="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
     <div class="flex justify-between items-center">
-      <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-3 sm:space-x-4">
         <button onclick="window.location.href='studentDashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
           </svg>
         </button>
         <div class="text-left">
-          <p class="text-sm text-blue-200">Welcome,</p>
-          <p class="font-semibold"><?= $_SESSION['student_name'] ?></p>
+          <p class="text-xs sm:text-sm text-blue-200">Welcome back,</p>
+          <p class="font-semibold text-sm sm:text-base text-white truncate max-w-[120px] sm:max-w-none">
+            <?= htmlspecialchars($_SESSION['student_name'] ?? 'Student') ?>
+          </p>
         </div>
       </div>
-      <div class="flex items-center space-x-4">
-        <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-12 w-12 rounded-full bg-white p-1">
-        <div class="text-right">
-          <h1 class="text-xl font-bold">Cornerstone College Inc.</h1>
-          <p class="text-blue-200 text-sm">Account Balance</p>
+      <div class="flex items-center space-x-3 sm:space-x-4">
+        <div class="hidden sm:block text-right">
+          <h1 class="text-lg sm:text-xl font-bold text-white leading-tight">Cornerstone College Inc.</h1>
+          <p class="text-blue-100 text-xs sm:text-sm">Account Balance</p>
         </div>
+
+        <!-- Mobile title (compact) -->
+        <div class="sm:hidden text-center">
+
+        </div>
+
+        <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1">
       </div>
     </div>
   </div>
 </header>
 
+<style>
+  .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+</style>
+
 <!-- Main Content -->
 <div class="max-w-4xl mx-auto px-6 py-8">
   <!-- Term Selection -->
-  <div class="bg-white rounded-2xl card-shadow p-6 mb-8">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-800">Academic Term</h2>
-      <form method="GET" class="flex items-center space-x-3">
-        <select name="term" onchange="this.form.submit()" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-          <?php while ($term_row = $term_result->fetch_assoc()): ?>
-            <option value="<?= htmlspecialchars($term_row['school_year_term']) ?>" 
-                    <?= $term_row['school_year_term'] === $selected_term ? 'selected' : '' ?>>
-              <?= htmlspecialchars($term_row['school_year_term']) ?>
-            </option>
-          <?php endwhile; ?>
-        </select>
+  <div class="bg-white rounded-2xl card-shadow p-4 sm:p-6 mb-6 sm:mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <h2 class="text-base sm:text-lg font-semibold text-gray-800">Academic Term</h2>
+      <form method="GET" class="w-full sm:w-auto">
+        <div class="relative">
+          <select name="term" onchange="this.form.submit()"
+                  class="w-full sm:w-auto appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-10 text-sm sm:text-base font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-h-[48px]">
+            <?php while ($term_row = $term_result->fetch_assoc()): ?>
+              <option value="<?= htmlspecialchars($term_row['school_year_term']) ?>"
+                      <?= $term_row['school_year_term'] === $selected_term ? 'selected' : '' ?>
+                      class="py-2">
+                <?= htmlspecialchars($term_row['school_year_term']) ?>
+              </option>
+            <?php endwhile; ?>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </div>
+        </div>
       </form>
     </div>
   </div>

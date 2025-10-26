@@ -134,10 +134,18 @@ function log_login($conn, $userType, $idNumber, $username, $role) {
 // 🔑 Handle login submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     header('Content-Type: application/json');
+
+    // Debug logging
+    error_log("Login attempt received at " . date('Y-m-d H:i:s'));
+
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
+    error_log("Username received: '" . $username . "'");
+    error_log("Password length: " . strlen($password));
+
     if (empty($username) || empty($password)) {
+        error_log("Empty username or password");
         echo json_encode(['status'=>'error','message'=>'Please enter both username and password.']);
         exit;
     }
@@ -247,14 +255,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
                     break;
                 case 'teacher':
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
                     break;
                 default:
                     // Fallback: treat any unexpected role as a generic teacher portal access
                     // Log for later clean-up
                     error_log('Unknown employee role: ' . print_r($row['role'], true) . ' for username ' . $row['username']);
                     $_SESSION['role'] = 'teacher';
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/AttendanceRecords.php']);
+                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
             }
             exit;
         }
@@ -286,8 +294,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Final decision
     if ($usernameFound) {
+        error_log("Username found but password incorrect for: " . $username);
         echo json_encode(['status'=>'error','message'=>'Incorrect password.']);
     } else {
+        error_log("Username not found in any table: " . $username);
         echo json_encode(['status'=>'error','message'=>'Username not found.']);
     }
     exit;
@@ -298,14 +308,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login - Cornerstone College Inc.</title>
+  <title>Student Login - Cornerstone College Inc.</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" type="image/png" href="../images/LogoCCI.png">
-  <link rel="manifest" href="/onecci/manifest.webmanifest">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0B2C62">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CCI">
+  <meta name="description" content="Cornerstone College Inc. Student Portal - Access grades, documents, and academic records">
+  <meta name="keywords" content="student, grades, academic, cornerstone college, portal">
+  <meta name="author" content="Cornerstone College Inc.">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/onecci/sw.js').catch(console.error);
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
       });
     }
   </script>
@@ -313,7 +330,156 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
     .card-shadow { box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
     .logo-glow { filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3)); }
+
+    /* PWA Install Prompt Enhancement */
+    .pwa-install-banner {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0B2C62;
+      color: white;
+      padding: 15px 25px;
+      border-radius: 25px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: none;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+
+    .pwa-install-banner button {
+      background: white;
+      color: #0B2C62;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      margin-left: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pwa-install-banner button:hover {
+      background: #f3f4f6;
+      transform: scale(1.05);
+    }
   </style>
+
+  <!-- JavaScript Functions (moved before body) -->
+  <script>
+    // Clear form when page loads (prevents back button from showing cached data)
+    function clearFormOnLoad() {
+        document.getElementById("usernameInput").value = "";
+        document.getElementById("passwordInput").value = "";
+    }
+
+    // Prevent form caching
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            clearFormOnLoad();
+        }
+    });
+
+    // Toggle password visibility
+    function togglePassword() {
+      const passwordInput = document.getElementById("passwordInput");
+      const eyeIcon = document.getElementById("eyeIcon");
+
+      if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+        // Add diagonal line through eye
+        eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path><line x1="4" y1="4" x2="20" y2="20" stroke-linecap="round"></line>';
+      } else {
+        passwordInput.type = "password";
+        // Eye without line
+        eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>';
+      }
+    }
+
+    // PWA Install Prompt
+    let deferredPrompt;
+    const installBanner = document.getElementById('pwaInstallBanner');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installBanner) {
+        installBanner.style.display = 'flex';
+      }
+    });
+
+    async function installPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted' && installBanner) {
+          installBanner.style.display = 'none';
+        }
+        deferredPrompt = null;
+      }
+    }
+
+    // Hide banner if PWA is already installed
+    window.addEventListener('appinstalled', () => {
+      if (installBanner) {
+        installBanner.style.display = 'none';
+      }
+    });
+
+    // Wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById("loginForm").addEventListener("submit", function(e) {
+        e.preventDefault();
+        const username = document.getElementById("usernameInput").value;
+        const password = document.getElementById("passwordInput").value;
+
+        // Show loading state
+        const submitBtn = document.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Signing In...';
+        submitBtn.disabled = true;
+
+        fetch('login.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+        })
+        .then(res => {
+          console.log('Response status:', res.status);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          return res.json();
+        })
+        .then(data => {
+          console.log('Login response:', data);
+          if (data.status === 'success') {
+            window.location.href = data.redirect;
+          } else {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = data.message;
+            errorDiv.classList.remove('hidden');
+          }
+        })
+        .catch(error => {
+          console.error('Login error:', error);
+          const errorDiv = document.getElementById('errorMessage');
+          errorDiv.textContent = 'Connection error. Please check if server is running and try again.';
+          errorDiv.classList.remove('hidden');
+        })
+        .finally(() => {
+          // Restore button
+          submitBtn.textContent = originalText;
+          submitBtn.disabled = false;
+        });
+      });
+    });
+  </script>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4" onload="clearFormOnLoad()">
 
@@ -366,57 +532,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
   </div>
 
-  <script>
-    // Toggle password visibility
-    function togglePassword() {
-      const passwordInput = document.getElementById("passwordInput");
-      const eyeIcon = document.getElementById("eyeIcon");
-      
-      if (passwordInput.type === "password") {
-        passwordInput.type = "text";
-        // Add diagonal line through eye
-        eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path><line x1="4" y1="4" x2="20" y2="20" stroke-linecap="round"></line>';
-      } else {
-        passwordInput.type = "password";
-        // Eye without line
-        eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>';
-      }
-    }
+  <!-- PWA Install Banner -->
+  <div id="pwaInstallBanner" class="pwa-install-banner">
+    <div>
+      <strong>📱 Install CCI</strong><br>
+      <small>Add to home screen for quick access</small>
+    </div>
+    <button onclick="installPWA()">Install</button>
+  </div>
 
-    // Clear form when page loads (prevents back button from showing cached data)
-    function clearFormOnLoad() {
-        document.getElementById("usernameInput").value = "";
-        document.getElementById("passwordInput").value = "";
-    }
-
-    // Prevent form caching
-    window.addEventListener('pageshow', function(event) {
-        if (event.persisted) {
-            clearFormOnLoad();
-        }
-    });
-
-    document.getElementById("loginForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-      const username = document.getElementById("usernameInput").value;
-      const password = document.getElementById("passwordInput").value;
-
-      fetch('login.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === 'success') {
-          window.location.href = data.redirect;
-        } else {
-          const errorDiv = document.getElementById('errorMessage');
-          errorDiv.textContent = data.message;
-          errorDiv.classList.remove('hidden');
-        }
-      });
-    });
-  </script>
 </body>
 </html>

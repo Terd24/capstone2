@@ -42,10 +42,44 @@ while ($row = $result->fetch_assoc()) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Grades</title>
+  <title>Student Grades - Cornerstone College Inc.</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" type="image/png" href="../images/LogoCCI.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0B2C62">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CCI">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
+      });
+    }
+  </script>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen font-sans">
+
+  <!-- Offline Detection -->
+  <div id="offlineBanner" class="fixed top-0 left-0 right-0 bg-yellow-500 text-black text-center py-2 px-4 text-sm font-medium hidden z-50">
+    ⚠️ You're currently offline. Grades shown may be cached data.
+  </div>
+
+  <script>
+    // Offline detection
+    function updateOnlineStatus() {
+      const banner = document.getElementById('offlineBanner');
+      if (navigator.onLine) {
+        banner.classList.add('hidden');
+      } else {
+        banner.classList.remove('hidden');
+      }
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus(); // Initial check
+  </script>
 
   <!-- Header -->
   <header class="bg-[#0B2C62] text-white shadow-lg">

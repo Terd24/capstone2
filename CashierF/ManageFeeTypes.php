@@ -8,16 +8,12 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'cashier') {
     exit;
 }
 
-// Database connection - use same database as other files
-$conn = new mysqli("localhost", "root", "", "onecci_db");
-if ($conn->connect_error) {
-    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
-    exit;
-}
+// Use centralized database connection
+require_once '../StudentLogin/db_conn.php';
 
 // Convert to PDO for consistency with existing code
 try {
-    $pdo = new PDO("mysql:host=localhost;dbname=onecci_db", "root", "");
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch(PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database connection failed']);
