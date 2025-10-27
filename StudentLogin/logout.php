@@ -44,9 +44,12 @@ header("Pragma: no-cache");
 header("Expires: 0");
 
 // Redirect based on role
-if ($role === 'superadmin' || $role === 'owner') {
+// All employees (superadmin, owner, hr, registrar, cashier, guidance, attendance, teacher) go to admin_login.php
+// Students and parents go to StudentLogin/login.php
+if (in_array($role, ['superadmin', 'owner', 'hr', 'registrar', 'cashier', 'guidance', 'attendance', 'teacher'])) {
     header("Location: ../admin_login.php");
 } else {
+    // Students and parents
     header("Location: login.php");
 }
 exit;

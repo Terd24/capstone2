@@ -98,6 +98,10 @@ if ($check_pending && $check_pending->num_rows > 0) {
         .section.active {
             display: block !important;
         }
+        /* Pagination hidden class - used to hide rows on other pages */
+        .pagination-hidden {
+            display: none !important;
+        }
     </style>
     <script>
         // Restore section state IMMEDIATELY before any rendering
@@ -927,7 +931,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 <?php
-                                // Get ALL HR employees (no pending delete check needed anymore)
+                                // Get ALL HR employees with pending deletion status
                                 $hr_query = "
                                     SELECT 
                                         e.id_number,
@@ -936,7 +940,11 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                         e.middle_name,
                                         e.position,
                                         e.department,
-                                        e.hire_date
+                                        e.hire_date,
+                                        (SELECT COUNT(*) FROM owner_approval_requests 
+                                         WHERE target_id = e.id_number 
+                                         AND request_type IN ('hr_employee_deletion', 'delete_hr_employee')
+                                         AND status = 'pending') as has_pending_deletion
                                     FROM employees e
                                     WHERE e.department = 'Human Resources' AND e.deleted_at IS NULL
                                     ORDER BY e.last_name, e.first_name
@@ -947,10 +955,22 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                 if ($hr_result && $hr_result->num_rows > 0):
                                     while ($hr = $hr_result->fetch_assoc()):
                                         $full_name = trim($hr['first_name'] . ' ' . ($hr['middle_name'] ? $hr['middle_name'] . ' ' : '') . $hr['last_name']);
+                                        $has_pending = $hr['has_pending_deletion'] > 0;
+                                        $row_class = $has_pending ? 'bg-orange-50 border-l-4 border-orange-500' : '';
                                 ?>
-                                <tr class="hover:bg-[#0B2C62]/5 cursor-pointer transition-colors" onclick="viewHRAccount('<?= htmlspecialchars($hr['id_number']) ?>')">
+                                <tr class="hover:bg-[#0B2C62]/5 cursor-pointer transition-colors <?= $row_class ?>" onclick="viewHRAccount('<?= htmlspecialchars($hr['id_number']) ?>')">
                                     <td class="px-4 py-3 text-sm text-gray-900">
-                                        <?= htmlspecialchars($hr['id_number']) ?>
+                                        <div class="flex items-center gap-2">
+                                            <?= htmlspecialchars($hr['id_number']) ?>
+                                            <?php if ($has_pending): ?>
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    Pending Deletion
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($full_name) ?></td>
                                     <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($hr['position'] ?: 'HR Staff') ?></td>
@@ -1212,9 +1232,32 @@ if ($check_pending && $check_pending->num_rows > 0) {
                 <!-- Deleted Students Table -->
                 <div class="bg-white rounded-2xl shadow-lg mb-6">
                     <div class="px-6 py-4 border-b border-gray-200">
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                            <h3 class="text-lg font-bold text-gray-900">Deleted Students (<span id="deleted-students-table-count"><?= count($deleted_students) ?></span>)</h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <h3 class="text-lg font-bold text-gray-900">Deleted Students (<span id="deleted-students-table-count"><?= count($deleted_students) ?></span>)</h3>
+                            </div>
+                        </div>
+                        
+                        <!-- Search -->
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                    <input type="text" id="deleted-student-search" placeholder="Search by name or ID..." 
+                                           onkeyup="filterDeletedStudents()"
+                                           class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                                </div>
+                            </div>
+                            <button onclick="clearDeletedStudentSearch()" 
+                                    class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition font-medium flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                Clear
+                            </button>
                         </div>
                     </div>
                     
@@ -1322,9 +1365,47 @@ if ($check_pending && $check_pending->num_rows > 0) {
                 <!-- Deleted Employees Table -->
                 <div class="bg-white rounded-2xl shadow-lg" id="deleted-employees-section">
                     <div class="px-6 py-4 border-b border-gray-200">
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                            <h3 class="text-lg font-bold text-gray-900">Deleted Employees (<span id="deleted-employees-table-count"><?= count($deleted_employees) ?></span>)</h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+                                <h3 class="text-lg font-bold text-gray-900">Deleted Employees (<span id="deleted-employees-table-count"><?= count($deleted_employees) ?></span>)</h3>
+                            </div>
+                        </div>
+                        
+                        <!-- Search and Filter -->
+                        <div class="flex flex-wrap gap-3">
+                            <div class="flex-1 min-w-[250px]">
+                                <div class="relative">
+                                    <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                    <input type="text" id="deleted-employee-search" placeholder="Search by name or ID..." 
+                                           onkeyup="filterDeletedEmployees()"
+                                           class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                                </div>
+                            </div>
+                            <div class="relative">
+                                <select id="deleted-employee-role-filter" onchange="filterDeletedEmployees()"
+                                        class="appearance-none px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer transition">
+                                    <option value="all">All Roles</option>
+                                    <option value="registrar">Registrar</option>
+                                    <option value="cashier">Cashier</option>
+                                    <option value="guidance">Guidance</option>
+                                    <option value="attendance">Attendance</option>
+                                    <option value="hr">HR</option>
+                                    <option value="teacher">Teacher</option>
+                                </select>
+                                <svg class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                            <button onclick="clearDeletedEmployeeFilters()" 
+                                    class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition font-medium flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                Clear
+                            </button>
                         </div>
                     </div>
                     
@@ -1341,7 +1422,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <?php if (count($deleted_employees) > 0): ?>
                                     <?php foreach ($deleted_employees as $employee): ?>
-                                    <tr class="hover:bg-gray-50" data-employee-id="<?= $employee['id'] ?>" data-employee-id-number="<?= htmlspecialchars($employee['id_number']) ?>">
+                                    <tr class="hover:bg-gray-50" data-employee-id="<?= $employee['id'] ?>" data-employee-id-number="<?= htmlspecialchars($employee['id_number']) ?>" data-employee-role="<?= htmlspecialchars(strtolower($employee['role'] ?? '')) ?>">
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -1360,6 +1441,11 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="text-sm text-gray-900"><?= htmlspecialchars($employee['position'] ?: 'N/A') ?></div>
                                             <div class="text-sm text-gray-500"><?= htmlspecialchars($employee['department'] ?: 'N/A') ?></div>
+                                            <?php if (!empty($employee['role'])): ?>
+                                                <span class="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                                    Role: <?= htmlspecialchars(ucfirst($employee['role'])) ?>
+                                                </span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="px-6 py-4">
                                             <div class="text-sm text-gray-900">
@@ -1419,10 +1505,10 @@ if ($check_pending && $check_pending->num_rows > 0) {
                             Showing <span id="employees-start">1</span> to <span id="employees-end">5</span> of <span id="employees-total"><?= count($deleted_employees) ?></span> employees
                         </div>
                         <div class="flex gap-2">
-                            <button id="employees-prev" onclick="changeEmployeesPage(-1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button id="deleted-employees-prev" onclick="changeDeletedEmployeesPage(-1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                                 Previous
                             </button>
-                            <button id="employees-next" onclick="changeEmployeesPage(1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button id="deleted-employees-next" onclick="changeDeletedEmployeesPage(1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                                 Next
                             </button>
                         </div>
@@ -1829,6 +1915,14 @@ if ($check_pending && $check_pending->num_rows > 0) {
             };
             
             document.getElementById('page-title').textContent = titles[sectionName] || 'Dashboard';
+            
+            // Update counts when showing deleted items section
+            if (sectionName === 'deleted-items') {
+                // Use setTimeout to ensure DOM is ready
+                setTimeout(() => {
+                    updateDeletedCounts();
+                }, 100);
+            }
         }
         
         // Function to refresh current section without full page reload
@@ -1861,18 +1955,37 @@ if ($check_pending && $check_pending->num_rows > 0) {
         function showHREmployeeDetailsModal(employee) {
             currentHREmployeeId = employee.id_number;
             
+            // Check if there's a pending deletion request
+            const hasPendingDeletion = employee.has_pending_deletion > 0;
+            
             // Create modal for viewing HR employee details
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            
+            // Different buttons based on pending status
+            const actionButtons = hasPendingDeletion ? `
+                <button id="cancelRequestBtn" onclick="cancelDeletionRequest('${employee.id_number}')" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Cancel Deletion Request
+                </button>
+            ` : `
+                <button id="saveHRChangesBtn" onclick="showSaveConfirmation()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Save Changes</button>
+                <button id="editHREmployeeBtn" onclick="toggleHREditMode()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
+                <button id="deleteHREmployeeBtn" onclick="showDeleteHREmployeeConfirmation('${employee.id_number}')" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete Employee</button>
+            `;
+            
             modal.innerHTML = `
                 <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
                     <!-- Header -->
                     <div class="bg-[#0B2C62] text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                        <h3 class="text-xl font-semibold">Employee Information</h3>
                         <div class="flex items-center gap-3">
-                            <button id="saveHRChangesBtn" onclick="showSaveConfirmation()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Save Changes</button>
-                            <button id="editHREmployeeBtn" onclick="toggleHREditMode()" class="px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition">Edit</button>
-                            <button id="deleteHREmployeeBtn" onclick="showDeleteHREmployeeConfirmation('${employee.id_number}')" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Delete Employee</button>
+                            <h3 class="text-xl font-semibold">Employee Information</h3>
+                            ${hasPendingDeletion ? '<span class="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium">Pending Deletion</span>' : ''}
+                        </div>
+                        <div class="flex items-center gap-3">
+                            ${actionButtons}
                             <button onclick="closeHRModal()" class="text-white hover:text-gray-200 p-1">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -2327,9 +2440,9 @@ if ($check_pending && $check_pending->num_rows > 0) {
             });
         }
 
-        // Delete HR Employee (entire record) handlers
+        // Delete HR Employee (entire record) - Request approval from Owner
         function showDeleteHREmployeeConfirmation(employeeId) {
-            // Create modern delete confirmation modal
+            // Create modern delete confirmation modal with reason input
             const modal = document.createElement('div');
             modal.id = 'deleteConfirmModal';
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
@@ -2337,19 +2450,27 @@ if ($check_pending && $check_pending->num_rows > 0) {
             const modalContent = document.createElement('div');
             modalContent.className = 'bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-in';
             modalContent.innerHTML = `
-                <div class="p-8 text-center">
-                    <div class="mx-auto w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
-                        <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="p-8">
+                    <div class="mx-auto w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                         </svg>
                     </div>
-                    <h3 class="text-2xl font-bold text-gray-900 mb-3">Delete Employee</h3>
-                    <p class="text-gray-600 mb-2 leading-relaxed">
-                        Are you sure you want to delete this employee record?
+                    <h3 class="text-2xl font-bold text-gray-900 mb-3 text-center">Request Employee Deletion</h3>
+                    <p class="text-gray-600 mb-4 text-center leading-relaxed">
+                        This action requires Owner approval. Please provide a reason for deletion.
                     </p>
-                    <p class="text-sm text-gray-500 mb-6">
-                        This will also remove their system accounts and cannot be undone.
-                    </p>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Deletion Reason *</label>
+                        <textarea 
+                            id="deletionReasonInput"
+                            rows="4"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                            placeholder="Enter reason for deleting this employee..."
+                            required
+                        ></textarea>
+                        <p class="text-xs text-gray-500 mt-1">This will be sent to the Owner for approval</p>
+                    </div>
                 </div>
                 <div class="px-8 pb-8 flex gap-3">
                     <button 
@@ -2360,9 +2481,9 @@ if ($check_pending && $check_pending->num_rows > 0) {
                     </button>
                     <button 
                         id="confirmDeleteBtn"
-                        class="flex-1 px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all duration-200"
+                        class="flex-1 px-6 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition-all duration-200"
                     >
-                        Delete
+                        Send Request
                     </button>
                 </div>
             `;
@@ -2387,12 +2508,12 @@ if ($check_pending && $check_pending->num_rows > 0) {
             // Event listeners
             document.getElementById('cancelDeleteBtn').onclick = () => modal.remove();
             document.getElementById('confirmDeleteBtn').onclick = async () => {
-                // Get employee details from the modal
-                const firstName = document.getElementById(`first_name_${employeeId}`)?.value || '';
-                const lastName = document.getElementById(`last_name_${employeeId}`)?.value || '';
-                const position = document.getElementById(`position_${employeeId}`)?.value || '';
-                const department = document.getElementById(`department_${employeeId}`)?.value || '';
-                const employeeName = `${firstName} ${lastName}`.trim();
+                const deletionReason = document.getElementById('deletionReasonInput').value.trim();
+                
+                if (!deletionReason) {
+                    showToast('Please provide a reason for deletion', 'error');
+                    return;
+                }
                 
                 // Disable button and show loading
                 const confirmBtn = document.getElementById('confirmDeleteBtn');
@@ -2401,14 +2522,11 @@ if ($check_pending && $check_pending->num_rows > 0) {
                 
                 try {
                     const formData = new FormData();
-                    formData.append('action', 'delete_hr_employee');
+                    formData.append('action', 'request_hr_deletion');
                     formData.append('employee_id', employeeId);
-                    formData.append('employee_name', employeeName);
-                    formData.append('position', position);
-                    formData.append('department', department);
-                    formData.append('deletion_reason', 'Deleted by Super Admin');
+                    formData.append('deletion_reason', deletionReason);
                     
-                    const response = await fetch('delete_hr_employee.php', {
+                    const response = await fetch('request_hr_employee_deletion.php', {
                         method: 'POST',
                         body: formData
                     });
@@ -2417,21 +2535,21 @@ if ($check_pending && $check_pending->num_rows > 0) {
                     
                     if (data.success) {
                         modal.remove();
-                        showToast('✅ Employee deleted successfully and moved to Deleted Items', 'success');
+                        showToast('✅ Deletion request sent to Owner for approval', 'success');
                         closeHRModal();
                         
-                        // Remove the row from the table dynamically
-                        removeHRAccountRow(employeeId);
+                        // Update the row to show pending status without refresh
+                        updateRowPendingStatus(employeeId, true);
                     } else {
                         showToast('Error: ' + data.message, 'error');
                         confirmBtn.disabled = false;
-                        confirmBtn.textContent = 'Delete';
+                        confirmBtn.innerHTML = 'Send Request';
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    showToast('An error occurred while deleting the employee', 'error');
+                    showToast('An error occurred while sending the request', 'error');
                     confirmBtn.disabled = false;
-                    confirmBtn.textContent = 'Delete';
+                    confirmBtn.innerHTML = 'Send Request';
                 }
             };
         }
@@ -2440,6 +2558,115 @@ if ($check_pending && $check_pending->num_rows > 0) {
             if (confirm('Are you sure you want to delete this HR employee?\n\nThis action requires School Owner approval and cannot be undone.')) {
                 alert('Delete HR Employee request submitted.\n\nThe School Owner will be notified for approval.');
             }
+        }
+
+        // Cancel deletion request
+        function cancelDeletionRequest(employeeId) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                    <div class="text-center mb-6">
+                        <div class="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+                            <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">Cancel Deletion Request?</h3>
+                        <p class="text-gray-600">Are you sure you want to cancel the pending deletion request for this employee?</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition">
+                            No, Keep Request
+                        </button>
+                        <button onclick="confirmCancelRequest('${employeeId}')" class="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition">
+                            Yes, Cancel Request
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        async function confirmCancelRequest(employeeId) {
+            try {
+                const formData = new FormData();
+                formData.append('action', 'cancel_deletion_request');
+                formData.append('employee_id', employeeId);
+                
+                const response = await fetch('cancel_hr_deletion_request.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Close all modals
+                    document.querySelectorAll('.fixed.inset-0').forEach(m => m.remove());
+                    showToast('✅ Deletion request cancelled successfully', 'success');
+                    
+                    // Update the row to remove pending status without refresh
+                    updateRowPendingStatus(employeeId, false);
+                } else {
+                    showToast('Error: ' + data.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('An error occurred while cancelling the request', 'error');
+            }
+        }
+
+        // Update row pending status dynamically
+        function updateRowPendingStatus(employeeId, isPending) {
+            const hrSection = document.getElementById('hr-accounts-section');
+            if (!hrSection) return;
+            
+            // Find the row with this employee ID
+            const rows = hrSection.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const idCell = row.querySelector('td:first-child');
+                if (!idCell) return;
+                
+                const idText = idCell.textContent.trim();
+                if (idText.includes(employeeId)) {
+                    if (isPending) {
+                        // Add pending status
+                        row.classList.add('bg-orange-50', 'border-l-4', 'border-orange-500');
+                        
+                        // Add badge if not exists
+                        if (!idCell.querySelector('.bg-orange-100')) {
+                            const badge = document.createElement('span');
+                            badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 ml-2';
+                            badge.innerHTML = `
+                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                </svg>
+                                Pending Deletion
+                            `;
+                            
+                            // Wrap ID in a div if not already wrapped
+                            const idDiv = idCell.querySelector('div') || document.createElement('div');
+                            if (!idCell.querySelector('div')) {
+                                idDiv.className = 'flex items-center gap-2';
+                                idDiv.textContent = employeeId;
+                                idCell.textContent = '';
+                                idCell.appendChild(idDiv);
+                            }
+                            idDiv.appendChild(badge);
+                        }
+                    } else {
+                        // Remove pending status
+                        row.classList.remove('bg-orange-50', 'border-l-4', 'border-orange-500');
+                        
+                        // Remove badge
+                        const badge = idCell.querySelector('.bg-orange-100');
+                        if (badge) {
+                            badge.remove();
+                        }
+                    }
+                }
+            });
         }
 
         function addHRAccount() {
@@ -3093,16 +3320,27 @@ if ($check_pending && $check_pending->num_rows > 0) {
         }
 
         function addHRAccountRow(employee) {
+            console.log('addHRAccountRow called with employee:', employee);
+            
             // Find the HR accounts table tbody
             const hrSection = document.getElementById('hr-accounts-section');
-            if (!hrSection) return;
+            if (!hrSection) {
+                console.warn('HR accounts section not found');
+                return;
+            }
             
             const tbody = hrSection.querySelector('tbody');
-            if (!tbody) return;
+            if (!tbody) {
+                console.warn('HR accounts tbody not found');
+                return;
+            }
+            
+            console.log('Found tbody, adding employee row');
             
             // Remove "no employees found" message if it exists
             const noDataRow = tbody.querySelector('td[colspan="5"]');
             if (noDataRow) {
+                console.log('Removing "no employees found" message');
                 noDataRow.parentElement.remove();
             }
             
@@ -3110,6 +3348,8 @@ if ($check_pending && $check_pending->num_rows > 0) {
             const fullName = [employee.first_name, employee.middle_name, employee.last_name]
                 .filter(n => n && n.trim())
                 .join(' ');
+            
+            console.log('Formatted name:', fullName);
             
             // Format hire date
             const hireDate = new Date(employee.hire_date);
@@ -4265,70 +4505,155 @@ function deletePermanently(recordId, recordType) {
         }
 
         function updateStudentsPagination() {
-            const rows = document.querySelectorAll('tr[data-student-id]');
-            const totalItems = rows.length;
+            const allRows = document.querySelectorAll('tr[data-student-id-number]');
+            
+            // Get only visible rows (not filtered out)
+            const visibleRows = Array.from(allRows).filter(row => {
+                return row.style.display !== 'none';
+            });
+            
+            const totalItems = visibleRows.length;
             const totalPages = Math.ceil(totalItems / itemsPerPage);
             
-            // Hide all rows first
-            rows.forEach(row => row.style.display = 'none');
+            // Ensure current page is within bounds
+            if (studentsCurrentPage > totalPages && totalPages > 0) {
+                studentsCurrentPage = totalPages;
+            }
+            if (studentsCurrentPage < 1) {
+                studentsCurrentPage = 1;
+            }
+            
+            // Hide all visible rows first, then show only current page
+            visibleRows.forEach(row => row.classList.add('pagination-hidden'));
             
             // Show only current page rows
             const start = (studentsCurrentPage - 1) * itemsPerPage;
             const end = start + itemsPerPage;
             for (let i = start; i < end && i < totalItems; i++) {
-                rows[i].style.display = '';
+                visibleRows[i].classList.remove('pagination-hidden');
             }
             
             // Update pagination info
-            document.getElementById('students-start').textContent = totalItems > 0 ? start + 1 : 0;
-            document.getElementById('students-end').textContent = Math.min(end, totalItems);
-            document.getElementById('students-total').textContent = totalItems;
+            const studentsStart = document.getElementById('students-start');
+            const studentsEnd = document.getElementById('students-end');
+            const studentsTotal = document.getElementById('students-total');
+            
+            if (studentsStart) studentsStart.textContent = totalItems > 0 ? start + 1 : 0;
+            if (studentsEnd) studentsEnd.textContent = Math.min(end, totalItems);
+            if (studentsTotal) studentsTotal.textContent = totalItems;
             
             // Update button states
-            document.getElementById('students-prev').disabled = studentsCurrentPage === 1;
-            document.getElementById('students-next').disabled = studentsCurrentPage >= totalPages || totalItems === 0;
+            const prevBtn = document.getElementById('students-prev');
+            const nextBtn = document.getElementById('students-next');
             
-            // Hide pagination if no items
+            if (prevBtn) {
+                prevBtn.disabled = studentsCurrentPage === 1 || totalItems === 0;
+                prevBtn.classList.toggle('opacity-50', prevBtn.disabled);
+                prevBtn.classList.toggle('cursor-not-allowed', prevBtn.disabled);
+            }
+            
+            if (nextBtn) {
+                nextBtn.disabled = studentsCurrentPage >= totalPages || totalItems === 0;
+                nextBtn.classList.toggle('opacity-50', nextBtn.disabled);
+                nextBtn.classList.toggle('cursor-not-allowed', nextBtn.disabled);
+            }
+            
+            // Hide pagination if no items or only one page
             const pagination = document.getElementById('students-pagination');
             if (pagination) {
-                pagination.style.display = totalItems === 0 ? 'none' : 'flex';
+                pagination.style.display = (totalItems === 0 || totalPages <= 1) ? 'none' : 'flex';
             }
         }
 
         function updateEmployeesPagination() {
-            const rows = document.querySelectorAll('tr[data-employee-id]');
-            const totalItems = rows.length;
-            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            console.log('=== UPDATE EMPLOYEES PAGINATION ===');
+            const allRows = document.querySelectorAll('tr[data-employee-id-number]');
+            console.log('All employee rows:', allRows.length);
             
-            // Hide all rows first
-            rows.forEach(row => row.style.display = 'none');
+            // Get only visible rows (not filtered out)
+            const visibleRows = Array.from(allRows).filter(row => {
+                return row.style.display !== 'none';
+            });
+            
+            const totalItems = visibleRows.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            console.log('Visible rows:', totalItems, 'Total pages:', totalPages);
+            
+            // Ensure current page is within bounds
+            if (employeesCurrentPage > totalPages && totalPages > 0) {
+                employeesCurrentPage = totalPages;
+            }
+            if (employeesCurrentPage < 1) {
+                employeesCurrentPage = 1;
+            }
+            
+            // Hide all visible rows first, then show only current page
+            visibleRows.forEach(row => row.classList.add('pagination-hidden'));
             
             // Show only current page rows
             const start = (employeesCurrentPage - 1) * itemsPerPage;
             const end = start + itemsPerPage;
             for (let i = start; i < end && i < totalItems; i++) {
-                rows[i].style.display = '';
+                visibleRows[i].classList.remove('pagination-hidden');
             }
+            
+            console.log('Pagination: start=' + (start + 1) + ', end=' + Math.min(end, totalItems) + ', total=' + totalItems);
             
             // Update pagination info
-            document.getElementById('employees-start').textContent = totalItems > 0 ? start + 1 : 0;
-            document.getElementById('employees-end').textContent = Math.min(end, totalItems);
-            document.getElementById('employees-total').textContent = totalItems;
+            const employeesStart = document.getElementById('employees-start');
+            const employeesEnd = document.getElementById('employees-end');
+            const employeesTotal = document.getElementById('employees-total');
+            
+            if (employeesStart) {
+                employeesStart.textContent = totalItems > 0 ? start + 1 : 0;
+                console.log('Updated employees-start to:', employeesStart.textContent);
+            } else {
+                console.warn('employees-start element not found');
+            }
+            
+            if (employeesEnd) {
+                employeesEnd.textContent = Math.min(end, totalItems);
+                console.log('Updated employees-end to:', employeesEnd.textContent);
+            } else {
+                console.warn('employees-end element not found');
+            }
+            
+            if (employeesTotal) {
+                employeesTotal.textContent = totalItems;
+                console.log('Updated employees-total to:', employeesTotal.textContent);
+            } else {
+                console.warn('employees-total element not found');
+            }
             
             // Update button states
-            document.getElementById('employees-prev').disabled = employeesCurrentPage === 1;
-            document.getElementById('employees-next').disabled = employeesCurrentPage >= totalPages || totalItems === 0;
+            const prevBtn = document.getElementById('employees-prev');
+            const nextBtn = document.getElementById('employees-next');
             
-            // Hide pagination if no items
+            if (prevBtn) {
+                prevBtn.disabled = employeesCurrentPage === 1 || totalItems === 0;
+                prevBtn.classList.toggle('opacity-50', prevBtn.disabled);
+                prevBtn.classList.toggle('cursor-not-allowed', prevBtn.disabled);
+            }
+            
+            if (nextBtn) {
+                nextBtn.disabled = employeesCurrentPage >= totalPages || totalItems === 0;
+                nextBtn.classList.toggle('opacity-50', nextBtn.disabled);
+                nextBtn.classList.toggle('cursor-not-allowed', nextBtn.disabled);
+            }
+            
+            // Hide pagination if no items or only one page
             const pagination = document.getElementById('employees-pagination');
             if (pagination) {
-                pagination.style.display = totalItems === 0 ? 'none' : 'flex';
+                pagination.style.display = (totalItems === 0 || totalPages <= 1) ? 'none' : 'flex';
             }
+            
+            console.log('=== END EMPLOYEES PAGINATION ===');
         }
 
         function changeStudentsPage(direction) {
-            const rows = document.querySelectorAll('tr[data-student-id]');
-            const totalPages = Math.ceil(rows.length / itemsPerPage);
+            const allRows = document.querySelectorAll('tr[data-student-id-number]');
+            const visibleRows = Array.from(allRows).filter(row => row.style.display !== 'none');
+            const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
             
             studentsCurrentPage += direction;
             studentsCurrentPage = Math.max(1, Math.min(studentsCurrentPage, totalPages));
@@ -4337,13 +4662,101 @@ function deletePermanently(recordId, recordType) {
         }
 
         function changeEmployeesPage(direction) {
-            const rows = document.querySelectorAll('tr[data-employee-id]');
-            const totalPages = Math.ceil(rows.length / itemsPerPage);
+            const allRows = document.querySelectorAll('tr[data-employee-id-number]');
+            const visibleRows = Array.from(allRows).filter(row => row.style.display !== 'none');
+            const totalPages = Math.ceil(visibleRows.length / itemsPerPage);
             
             employeesCurrentPage += direction;
             employeesCurrentPage = Math.max(1, Math.min(employeesCurrentPage, totalPages));
             
             updateEmployeesPagination();
+        }
+
+        // Filter deleted employees by search and role
+        function filterDeletedEmployees() {
+            const searchTerm = document.getElementById('deleted-employee-search')?.value.toLowerCase() || '';
+            const roleFilter = document.getElementById('deleted-employee-role-filter')?.value.toLowerCase() || 'all';
+            
+            const rows = document.querySelectorAll('#deleted-employees-table tbody tr[data-employee-id]');
+            let visibleCount = 0;
+            
+            rows.forEach((row) => {
+                const nameCell = row.querySelector('td:first-child');
+                const employeeRole = (row.getAttribute('data-employee-role') || '').toLowerCase().trim();
+                
+                if (!nameCell) return;
+                
+                const name = nameCell.textContent.toLowerCase();
+                const idNumber = (row.getAttribute('data-employee-id-number') || '').toLowerCase();
+                
+                const matchesSearch = searchTerm === '' || name.includes(searchTerm) || idNumber.includes(searchTerm);
+                const matchesRole = roleFilter === 'all' || employeeRole === roleFilter;
+                
+                if (matchesSearch && matchesRole) {
+                    row.style.display = '';
+                    row.classList.remove('pagination-hidden');
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            // Reset to page 1 when filter changes
+            employeesCurrentPage = 1;
+            
+            // Update pagination based on filtered results
+            updateEmployeesPagination();
+            
+            // Update count in header
+            const countElement = document.getElementById('deleted-employees-table-count');
+            if (countElement) {
+                countElement.textContent = visibleCount;
+            }
+        }
+
+        function clearDeletedEmployeeFilters() {
+            document.getElementById('deleted-employee-search').value = '';
+            document.getElementById('deleted-employee-role-filter').value = 'all';
+            filterDeletedEmployees();
+        }
+
+        // Filter deleted students by search
+        function filterDeletedStudents() {
+            const searchTerm = document.getElementById('deleted-student-search').value.toLowerCase();
+            
+            const rows = document.querySelectorAll('tr[data-student-id]');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const nameCell = row.querySelector('td:first-child');
+                
+                if (!nameCell) return;
+                
+                const name = nameCell.textContent.toLowerCase();
+                const matchesSearch = name.includes(searchTerm);
+                
+                if (matchesSearch) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            // Reset to page 1 and update pagination
+            studentsCurrentPage = 1;
+            updateStudentsPagination();
+            
+            // Update count
+            const countElement = document.getElementById('deleted-students-table-count');
+            if (countElement) {
+                countElement.textContent = visibleCount;
+            }
+        }
+
+        function clearDeletedStudentSearch() {
+            document.getElementById('deleted-student-search').value = '';
+            filterDeletedStudents();
         }
 
         function createAccountForEmployee(employeeId) {
@@ -4500,6 +4913,17 @@ function deletePermanently(recordId, recordType) {
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Highlight for newly added deleted items */
+        .new-deletion-row {
+            background-color: #fef3c7 !important;
+            animation: pulseHighlight 2s ease-in-out;
+        }
+        
+        @keyframes pulseHighlight {
+            0%, 100% { background-color: #fef3c7; }
+            50% { background-color: #fde68a; }
         }
     </style>
     <script>
@@ -5186,67 +5610,58 @@ function deletePermanently(recordId, recordType) {
 
         async function updateDeletedCounts() {
             try {
-                // Count deleted students in the table
-                const studentRows = document.querySelectorAll('tr[data-student-id]');
+                console.log('=== UPDATE DELETED COUNTS ===');
+                
+                // Count deleted students in the table (use correct attribute)
+                const studentRows = document.querySelectorAll('tr[data-student-id-number]');
                 const studentCount = studentRows.length;
+                console.log('Student rows found:', studentCount);
                 
                 // Update deleted students count in card
                 const deletedStudentsCount = document.getElementById('deleted-students-count');
                 if (deletedStudentsCount) {
                     deletedStudentsCount.textContent = studentCount;
+                    console.log('Updated student card count to:', studentCount);
+                } else {
+                    console.warn('deleted-students-count element not found');
                 }
                 
                 // Update deleted students count in table header
                 const deletedStudentsTableCount = document.getElementById('deleted-students-table-count');
                 if (deletedStudentsTableCount) {
                     deletedStudentsTableCount.textContent = studentCount;
+                    console.log('Updated student table header count to:', studentCount);
                 }
                 
-                // Update students pagination text
-                const studentsPagination = document.getElementById('students-pagination');
-                if (studentsPagination) {
-                    const paginationText = studentsPagination.querySelector('.text-sm.text-gray-700');
-                    if (paginationText) {
-                        if (studentCount === 0) {
-                            paginationText.textContent = 'Showing 0 to 0 of 0 students';
-                        } else {
-                            const start = 1;
-                            const end = Math.min(5, studentCount);
-                            paginationText.textContent = `Showing ${start} to ${end} of ${studentCount} students`;
-                        }
-                    }
-                }
-                
-                // Count deleted employees in the table
-                const employeeRows = document.querySelectorAll('tr[data-employee-id]');
+                // Count deleted employees in the table (use correct attribute)
+                const employeeRows = document.querySelectorAll('tr[data-employee-id-number]');
                 const employeeCount = employeeRows.length;
+                console.log('Employee rows found:', employeeCount);
                 
                 // Update deleted employees count in card
                 const deletedEmployeesCount = document.getElementById('deleted-employees-count');
                 if (deletedEmployeesCount) {
                     deletedEmployeesCount.textContent = employeeCount;
+                    console.log('Updated employee card count to:', employeeCount);
+                } else {
+                    console.warn('deleted-employees-count element not found');
                 }
                 
                 // Update deleted employees count in table header
                 const deletedEmployeesTableCount = document.getElementById('deleted-employees-table-count');
                 if (deletedEmployeesTableCount) {
                     deletedEmployeesTableCount.textContent = employeeCount;
+                    console.log('Updated employee table header count to:', employeeCount);
+                } else {
+                    console.warn('deleted-employees-table-count element not found');
                 }
                 
-                // Update employees pagination text
-                const employeesPagination = document.getElementById('employees-pagination');
-                if (employeesPagination) {
-                    const paginationText = employeesPagination.querySelector('.text-sm.text-gray-700');
-                    if (paginationText) {
-                        if (employeeCount === 0) {
-                            paginationText.textContent = 'Showing 0 to 0 of 0 employees';
-                        } else {
-                            const start = 1;
-                            const end = Math.min(5, employeeCount);
-                            paginationText.textContent = `Showing ${start} to ${end} of ${employeeCount} employees`;
-                        }
-                    }
-                }
+                // Update pagination displays
+                updateStudentsPagination();
+                updateEmployeesPagination();
+                
+                console.log('=== END UPDATE COUNTS ===');
+                
             } catch (error) {
                 console.error('Error updating deleted counts:', error);
             }
@@ -6000,19 +6415,102 @@ function deletePermanently(recordId, recordType) {
     // Track last check time for deletions
     let lastDeletionCheckTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
     let deletionCheckInterval;
+    let lastHRDeletionCheck = '<?= date('Y-m-d H:i:s') ?>';
+    let lastRestoredArchivedCheck = '<?= date('Y-m-d H:i:s') ?>';
+    let lastRestoredEmployeesCheck = '<?= date('Y-m-d H:i:s') ?>';
+    
+    // Check for HR deletion approvals/rejections
+    async function checkHRDeletionApprovals() {
+        try {
+            const response = await fetch(`check_approvals.php?last_check=${encodeURIComponent(lastHRDeletionCheck)}`);
+            const data = await response.json();
+            
+            if (data.success && data.approvals && data.approvals.length > 0) {
+                data.approvals.forEach(approval => {
+                    // Only process HR employee deletion approvals/rejections
+                    if (approval.type === 'hr_employee_deletion' || approval.type === 'delete_hr_employee') {
+                        const requestDetails = approval.requestDetails ? JSON.parse(approval.requestDetails) : {};
+                        const targetData = approval.requestDetails ? JSON.parse(approval.requestDetails) : {};
+                        
+                        if (approval.status === 'approved') {
+                            // Start fading out the row immediately (notification will show at the same time)
+                            setTimeout(() => {
+                                removeHREmployeeRow(targetData.employee_id || approval.target_id);
+                            }, 100); // Small delay to ensure notification appears first
+                        } else if (approval.status === 'rejected') {
+                            // Remove pending status from the row
+                            updateRowPendingStatus(targetData.employee_id || approval.target_id, false);
+                        }
+                    }
+                });
+                
+                // Update last check time
+                lastHRDeletionCheck = data.current_time;
+            }
+        } catch (error) {
+            console.error('Error checking HR deletion approvals:', error);
+        }
+    }
+    
+    // Remove HR employee row from table
+    function removeHREmployeeRow(employeeId) {
+        const hrSection = document.getElementById('hr-accounts-section');
+        if (!hrSection) return;
+        
+        const rows = hrSection.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const idCell = row.querySelector('td:first-child');
+            if (!idCell) return;
+            
+            const idText = idCell.textContent.trim();
+            if (idText.includes(employeeId)) {
+                // Smooth fade out animation (like Owner dashboard)
+                row.style.transition = 'opacity 1.3s ease-out, transform 1.3s ease-out';
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(-20px)';
+                
+                // Remove after animation completes
+                setTimeout(() => {
+                    row.remove();
+                    
+                    // Update total count
+                    const totalBadge = hrSection.querySelector('.bg-\\[\\#0B2C62\\]');
+                    if (totalBadge) {
+                        const currentCount = parseInt(totalBadge.textContent.match(/\d+/)[0]);
+                        totalBadge.textContent = `Total: ${currentCount - 1}`;
+                    }
+                }, 1300);
+            }
+        });
+    }
     
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Starting notification polling...');
+        
+        // Update deleted counts on page load
+        setTimeout(() => {
+            updateDeletedCounts();
+        }, 500);
+        
         // Check immediately on load
         checkForNewApprovals();
         checkForNewDeletions();
         checkArchiveRequestStatus();
+        checkHRDeletionApprovals();
+        checkRestoredArchived();
+        checkForRestoredEmployees();
         // Then check for new approvals every 1 second for instant updates
         notificationCheckInterval = setInterval(checkForNewApprovals, 1000);
         // Check for new deletions every 2 seconds
         deletionCheckInterval = setInterval(checkForNewDeletions, 2000);
         // Check archive request status every 2 seconds
         setInterval(checkArchiveRequestStatus, 2000);
+        // Check HR deletion approvals every 2 seconds
+        setInterval(checkHRDeletionApprovals, 2000);
+        // Check for restored/archived items every 2 seconds
+        setInterval(checkRestoredArchived, 2000);
+        // Check for restored employees every 2 seconds
+        setInterval(checkForRestoredEmployees, 2000);
         
         // Date validation for archive forms
         const loginStartDate = document.getElementById('loginStartDate');
@@ -6440,6 +6938,7 @@ function deletePermanently(recordId, recordType) {
         // Create new row
         const row = document.createElement('tr');
         row.setAttribute('data-employee-id-number', employee.id_number);
+        row.setAttribute('data-employee-role', (employee.role || '').toLowerCase());
         row.className = 'hover:bg-gray-50 transition-colors new-deletion-row';
         row.style.opacity = '0';
         row.style.transform = 'translateY(-10px)';
@@ -6450,21 +6949,58 @@ function deletePermanently(recordId, recordType) {
         const formattedDate = deletedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + 
                              deletedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         
+        // Determine if there are pending requests
+        const hasPendingRequest = employee.pending_restore || employee.pending_archive;
+        
+        // Build role badge HTML
+        const roleBadge = employee.role ? `<span class="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Role: ${employee.role.charAt(0).toUpperCase() + employee.role.slice(1)}</span>` : '';
+        
+        // Build action buttons HTML
+        let actionButtonsHTML = '';
+        if (hasPendingRequest) {
+            actionButtonsHTML = `
+                <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded text-sm font-medium inline-flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Request Pending
+                </div>
+            `;
+        } else {
+            actionButtonsHTML = `
+                <div class="flex gap-2">
+                    <button onclick="restoreEmployee('${employee.id_number}')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Restore
+                    </button>
+                    <button onclick="archiveEmployee('${employee.id_number}')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                        </svg>
+                        Archive
+                    </button>
+                </div>
+            `;
+        }
+        
         row.innerHTML = `
-            <td class="px-6 py-4">
+            <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
-                    <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                    <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
                         <span class="text-orange-600 font-medium text-sm">${initials}</span>
                     </div>
-                    <div>
+                    <div class="ml-4">
                         <div class="text-sm font-medium text-gray-900">${fullName}</div>
                         <div class="text-sm text-gray-500">ID: ${employee.id_number}</div>
                     </div>
                 </div>
             </td>
-            <td class="px-6 py-4">
+            <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm text-gray-900">${employee.position || 'N/A'}</div>
                 <div class="text-sm text-gray-500">${employee.department || 'N/A'}</div>
+                ${roleBadge}
             </td>
             <td class="px-6 py-4">
                 <div class="text-sm text-gray-900">
@@ -6475,20 +7011,7 @@ function deletePermanently(recordId, recordType) {
             </td>
             <td class="px-6 py-4 text-sm font-medium">
                 <div class="action-buttons-container" data-employee-id="${employee.id_number}">
-                    <div class="flex gap-2">
-                        <button onclick="restoreEmployee('${employee.id_number}')" class="restore-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                            </svg>
-                            Restore
-                        </button>
-                        <button onclick="archiveEmployee('${employee.id_number}')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-                            </svg>
-                            Archive
-                        </button>
-                    </div>
+                    ${actionButtonsHTML}
                 </div>
             </td>
         `;
@@ -6507,8 +7030,160 @@ function deletePermanently(recordId, recordType) {
             row.classList.remove('new-deletion-row');
         }, 5000);
         
-        // Update counts
+        // Update counts and pagination
         updateDeletedCounts();
+        filterDeletedEmployees(); // Re-apply current filters
+    }
+    
+    // Function to check for restored/archived items and remove them from deleted items list
+    async function checkRestoredArchived() {
+        try {
+            const response = await fetch(`check_restored_archived.php?last_check=${encodeURIComponent(lastRestoredArchivedCheck)}`);
+            
+            if (!response.ok) {
+                console.error('Failed to check restored/archived items:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (data.has_changes) {
+                console.log('Found restored/archived items:', data);
+                
+                // Remove restored students from table
+                if (data.restored_students && data.restored_students.length > 0) {
+                    data.restored_students.forEach(student => {
+                        removeDeletedItemFromTable(student.id_number, 'student', 'restored');
+                    });
+                }
+                
+                // Remove restored employees from table
+                if (data.restored_employees && data.restored_employees.length > 0) {
+                    data.restored_employees.forEach(employee => {
+                        removeDeletedItemFromTable(employee.id_number, 'employee', 'restored');
+                    });
+                }
+                
+                // Remove archived students from table
+                if (data.archived_students && data.archived_students.length > 0) {
+                    data.archived_students.forEach(student => {
+                        removeDeletedItemFromTable(student.id_number, 'student', 'archived');
+                    });
+                }
+                
+                // Remove archived employees from table
+                if (data.archived_employees && data.archived_employees.length > 0) {
+                    data.archived_employees.forEach(employee => {
+                        removeDeletedItemFromTable(employee.id_number, 'employee', 'archived');
+                    });
+                }
+                
+                // Update last check time
+                lastRestoredArchivedCheck = data.current_time;
+            }
+        } catch (error) {
+            console.error('Error checking for restored/archived items:', error);
+        }
+    }
+    
+    // Function to check for restored employees and add them to HR Accounts
+    async function checkForRestoredEmployees() {
+        try {
+            // Get current employee IDs from the HR Accounts table
+            const hrSection = document.getElementById('hr-accounts-section');
+            let currentIds = [];
+            
+            if (hrSection) {
+                const rows = hrSection.querySelectorAll('tr[data-employee-id]');
+                currentIds = Array.from(rows).map(row => row.getAttribute('data-employee-id'));
+            }
+            
+            console.log('Checking for restored employees since:', lastRestoredEmployeesCheck);
+            console.log('Current employee IDs in table:', currentIds);
+            
+            const params = new URLSearchParams({
+                last_check: lastRestoredEmployeesCheck,
+                current_ids: currentIds.join(',')
+            });
+            
+            const response = await fetch(`check_restored_employees.php?${params}`);
+            
+            if (!response.ok) {
+                console.error('Failed to check restored employees:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            console.log('Restored employees check response:', data);
+            
+            if (data.has_new_restorations && data.restored_employees.length > 0) {
+                console.log('Found', data.restored_employees.length, 'restored employees:', data.restored_employees);
+                
+                data.restored_employees.forEach(employee => {
+                    console.log('Adding restored employee to HR Accounts:', employee.id_number, employee.first_name, employee.last_name);
+                    
+                    // Check if employee already exists in the table
+                    if (hrSection) {
+                        const existingRow = hrSection.querySelector(`tr[data-employee-id="${employee.id_number}"]`);
+                        if (existingRow) {
+                            console.log('Employee already in HR Accounts table:', employee.id_number);
+                            return;
+                        }
+                    }
+                    
+                    // Add the restored employee to HR Accounts table
+                    addHRAccountRow(employee);
+                    
+                    // Show toast notification
+                    showToast(`Employee ${employee.first_name} ${employee.last_name} has been restored`, 'success');
+                });
+                
+                // Update last check time
+                lastRestoredEmployeesCheck = data.current_time;
+                console.log('Updated lastRestoredEmployeesCheck to:', lastRestoredEmployeesCheck);
+            }
+        } catch (error) {
+            console.error('Error checking for restored employees:', error);
+        }
+    }
+    
+    // Function to remove a deleted item from the table with animation
+    function removeDeletedItemFromTable(idNumber, type, action) {
+        const selector = type === 'student' 
+            ? `tr[data-student-id-number="${idNumber}"]`
+            : `tr[data-employee-id-number="${idNumber}"]`;
+        
+        const row = document.querySelector(selector);
+        
+        if (row) {
+            console.log(`Removing ${action} ${type}:`, idNumber);
+            
+            // Add fade-out animation
+            row.style.transition = 'all 0.5s ease-out';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(20px)';
+            row.style.backgroundColor = action === 'restored' ? '#d1fae5' : '#e0e7ff';
+            
+            // Remove from DOM after animation
+            setTimeout(() => {
+                row.remove();
+                
+                // Update counts and pagination
+                updateDeletedCounts();
+                
+                // Re-apply filters to update pagination
+                if (type === 'student') {
+                    filterDeletedStudents();
+                } else {
+                    filterDeletedEmployees();
+                }
+                
+                // Show toast notification
+                const actionText = action === 'restored' ? 'restored' : 'archived';
+                const typeText = type === 'student' ? 'Student' : 'Employee';
+                showToast(`${typeText} ${idNumber} has been ${actionText}`, 'success');
+            }, 500);
+        }
     }
     
     // Function to remove approved record from table
@@ -6678,7 +7353,7 @@ function deletePermanently(recordId, recordType) {
                                             </svg>
                                             Restore
                                         </button>
-                                        <button onclick="archiveEmployee('${employeeId}')" class="archive-btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                        <button onclick="archiveEmployee('${employeeId}')" class="archive-btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-2">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                                             </svg>

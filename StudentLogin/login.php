@@ -70,36 +70,22 @@ if (is_maintenance_mode($conn)) {
 
 // 🚫 If already logged in, redirect directly to dashboard
 if (isset($_SESSION['role'])) {
-    switch (strtolower($_SESSION['role'])) {
+    $role = strtolower($_SESSION['role']);
+    
+    // All employees should use admin_login.php
+    if (in_array($role, ['superadmin', 'owner', 'hr', 'registrar', 'cashier', 'guidance', 'attendance', 'teacher'])) {
+        session_destroy();
+        header("Location: ../admin_login.php");
+        exit;
+    }
+    
+    // Students and parents
+    switch ($role) {
         case 'student':
             header("Location: studentDashboard.php");
             exit;
-        case 'guidance':
-            header("Location: ../GuidanceF/GuidanceDashboard.php");
-            exit;
-        case 'cashier':
-            header("Location: ../CashierF/Dashboard.php");
-            exit;
-        case 'registrar':
-            header("Location: ../RegistrarF/RegistrarDashboard.php");
-            exit;
-        case 'attendance':
-            header("Location: ../AttendanceF/Dashboard.php");
-            exit;
         case 'parent':
             header("Location: ../ParentLogin/ParentDashboard.php");
-            exit;
-        case 'hr':
-            header("Location: ../HRF/Dashboard.php");
-            exit;
-        case 'teacher':
-            header("Location: ../EmployeePortal/Dashboard.php");
-            exit;
-        case 'owner':
-        case 'superadmin':
-            // SuperAdmin and Owner should only login through admin_login.php
-            session_destroy();
-            header("Location: ../admin_login.php");
             exit;
     }
 }
@@ -192,83 +178,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // 2️⃣ SuperAdmin and Owner accounts are now handled in admin_login.php only
 
-    // 3️⃣ Try employee_accounts (registrar, cashier, guidance, attendance, hr, teacher)
-    $stmt = $conn->prepare("SELECT ea.*, e.first_name, e.last_name, e.id_number FROM employee_accounts ea 
-                           JOIN employees e ON ea.employee_id = e.id_number 
-                           WHERE ea.username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $usernameFound = true;
-        $row = $result->fetch_assoc();
-        if (password_verify($password, $row['password'])) {
-            $role = strtolower(trim((string)$row['role']));
-            $full_name = $row['first_name'] . ' ' . $row['last_name'];
-
-            // Set common session variables
-            $_SESSION['employee_id'] = $row['id'];
-            $_SESSION['id_number'] = $row['id_number'];
-            $_SESSION['username'] = $row['username'];
-            $_SESSION['first_name'] = $row['first_name'];
-            $_SESSION['last_name'] = $row['last_name'];
-            $_SESSION['role'] = $role;
-            
-            // Check if employee must change password (first-time login)
-            $must_change = $row['must_change_password'] ?? 0;
-
-            // Log employee/superadmin login
-            log_login($conn, 'employee', $row['id_number'], $row['username'], $role);
-            
-            // If must change password, redirect to employee password change page
-            if ($must_change == 1) {
-                $_SESSION['must_change_password'] = true;
-                echo json_encode(['status'=>'success','redirect'=>'../EmployeePortal/change_password.php']);
-                exit;
-            }
-
-            // Role routing
-            switch($role) {
-                case 'registrar':
-                    $_SESSION['registrar_id'] = $row['id'];
-                    $_SESSION['registrar_name'] = $full_name;
-                    echo json_encode(['status'=>'success','redirect'=>'../RegistrarF/RegistrarDashboard.php']);
-                    break;
-                case 'cashier':
-                    $_SESSION['cashier_id'] = $row['id'];
-                    $_SESSION['cashier_name'] = $full_name;
-                    echo json_encode(['status'=>'success','redirect'=>'../CashierF/Dashboard.php']);
-                    break;
-                case 'guidance':
-                    $_SESSION['guidance_id'] = $row['id'];
-                    $_SESSION['guidance_name'] = $full_name;
-                    echo json_encode(['status' => 'success','redirect' => '../GuidanceF/GuidanceDashboard.php']);
-                    break;
-                case 'attendance':
-                    $_SESSION['attendance_id'] = $row['id'];
-                    $_SESSION['attendance_name'] = $full_name;
-                    echo json_encode(['status' => 'success','redirect' => '../AttendanceF/Dashboard.php']);
-                    break;
-                case 'hr':
-                    $_SESSION['hr_id'] = $row['id'];
-                    $_SESSION['hr_name'] = $full_name;
-                    echo json_encode(['status' => 'success','redirect' => '../HRF/Dashboard.php']);
-                    break;
-                case 'teacher':
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
-                    break;
-                default:
-                    // Fallback: treat any unexpected role as a generic teacher portal access
-                    // Log for later clean-up
-                    error_log('Unknown employee role: ' . print_r($row['role'], true) . ' for username ' . $row['username']);
-                    $_SESSION['role'] = 'teacher';
-                    echo json_encode(['status' => 'success','redirect' => '../EmployeePortal/Dashboard.php']);
-            }
-            exit;
-        }
-    }
-
-    // 3️⃣ Try parent
+    // 2️⃣ Try parent
     $stmt = $conn->prepare("SELECT * FROM parent_account WHERE username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
@@ -484,11 +394,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4" onload="clearFormOnLoad()">
 
   <div class="w-full max-w-md">
+    <!-- Back to Home Button -->
+    <div class="mb-6">
+      <a href="../index.php" class="inline-flex items-center px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-lg transition-all group backdrop-blur-sm">
+        <svg class="w-4 h-4 mr-2 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span class="text-sm font-medium">Back to Home</span>
+      </a>
+    </div>
+
     <!-- Header -->
     <div class="text-center mb-8">
       <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="w-20 h-20 mx-auto mb-4">
       <h1 class="text-2xl font-bold text-gray-800">Cornerstone College Inc.</h1>
-      <p class="text-gray-600 text-sm">Student & Staff Portal</p>
+      <p class="text-gray-600 text-sm">Student & Parent Portal</p>
     </div>
 
     <!-- Login Card -->

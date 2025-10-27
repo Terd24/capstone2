@@ -877,19 +877,64 @@ function viewEmployee(employeeId) {
 
 // Show employee details modal
 let currentEmployeeId = null;
-function showEmployeeDetailsModal(employee) {
+async function showEmployeeDetailsModal(employee) {
     currentEmployeeId = employee.id_number;
     const content = document.getElementById('employeeDetailsContent');
     
-    // Ensure top Delete (entire employee) button is visible
+    // Check if this employee has a pending deletion request
+    let hasPendingDeletion = false;
+    try {
+        const response = await fetch('../AdminF/check_pending_requests.php');
+        const data = await response.json();
+        if (data.success && data.pending_requests) {
+            hasPendingDeletion = data.pending_requests.some(request => {
+                if (request.request_type === 'hr_employee_deletion' || request.request_type === 'delete_hr_employee') {
+                    const targetData = request.target_data ? JSON.parse(request.target_data) : {};
+                    const employeeId = targetData.employee_id || request.target_id;
+                    return employeeId === employee.id_number;
+                }
+                return false;
+            });
+        }
+    } catch (error) {
+        console.error('Error checking pending requests:', error);
+    }
+    
+    // Update the delete button based on pending status
     const deleteBtn = document.getElementById('deleteEmployeeBtn');
-    if (deleteBtn) deleteBtn.classList.remove('hidden');
+    if (deleteBtn) {
+        if (hasPendingDeletion) {
+            // Show Cancel Deletion Request button
+            deleteBtn.textContent = 'Cancel Deletion Request';
+            deleteBtn.className = 'px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition flex items-center gap-2';
+            deleteBtn.onclick = () => cancelDeletionRequest(employee.id_number);
+            deleteBtn.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Cancel Deletion Request
+            `;
+        } else {
+            // Show normal Delete Employee button
+            deleteBtn.textContent = 'Delete Employee';
+            deleteBtn.className = 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition';
+            deleteBtn.onclick = () => showDeleteEmployeeConfirmation(employee.id_number);
+        }
+        deleteBtn.classList.remove('hidden');
+    }
     
     // Update edit button text based on mode
     const editBtn = document.getElementById('editEmployeeBtn');
     if (editBtn) {
-        editBtn.textContent = 'Edit';
-        editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
+        if (hasPendingDeletion) {
+            // Hide Edit button when there's a pending deletion
+            editBtn.classList.add('hidden');
+        } else {
+            // Show Edit button normally
+            editBtn.classList.remove('hidden');
+            editBtn.textContent = 'Edit';
+            editBtn.className = 'px-4 py-2 bg-[#2F8D46] text-white rounded-lg hover:bg-[#256f37] transition';
+        }
     }
     
     content.innerHTML = `
@@ -1503,48 +1548,275 @@ function closeDeleteConfirmation() {
     document.getElementById('deleteConfirmationModal').classList.add('hidden');
 }
 
-// Delete Employee (entire record) handlers
+// Delete Employee (entire record) - Request approval from Owner
 function showDeleteEmployeeConfirmation(employeeId) {
-    const modal = document.getElementById('deleteEmployeeModal');
-    modal.classList.remove('hidden');
-    const btn = document.getElementById('confirmDeleteEmployeeBtn');
-    btn.onclick = function(){ removeEmployee(employeeId); };
+    // Don't close the view modal - keep it in the background
+    
+    // Create modern delete confirmation modal with reason input
+    const modal = document.createElement('div');
+    modal.id = 'deleteConfirmModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
+    modal.style.pointerEvents = 'auto';
+    
+    const modalContent = document.createElement('div');
+    modalContent.className = 'bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-in';
+    modalContent.style.pointerEvents = 'auto';
+    modalContent.style.position = 'relative';
+    modalContent.style.zIndex = '10000';
+    // Store employeeId in a global variable for the inline handlers
+    window._deleteEmployeeId = employeeId;
+    window._deleteModal = modal;
+    
+    modalContent.innerHTML = `
+        <div class="p-8">
+            <div class="mx-auto w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-3 text-center">Request Employee Deletion</h3>
+            <p class="text-gray-600 mb-4 text-center leading-relaxed">
+                This action requires Owner approval. Please provide a reason for deletion.
+            </p>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Deletion Reason *</label>
+                <textarea 
+                    id="deletionReasonInput"
+                    rows="4"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                    placeholder="Enter reason for deleting this employee..."
+                    required
+                ></textarea>
+                <p class="text-xs text-gray-500 mt-1">This will be sent to the Owner for approval</p>
+            </div>
+        </div>
+        <div class="px-8 pb-8 flex gap-3">
+            <button 
+                onclick="window._deleteModal.remove(); return false;"
+                class="flex-1 px-6 py-3.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all duration-200"
+                type="button"
+            >
+                Cancel
+            </button>
+            <button 
+                onclick="handleDeleteConfirm(); return false;"
+                class="flex-1 px-6 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition-all duration-200"
+                type="button"
+                id="confirmDeleteBtn"
+            >
+                Send Request
+            </button>
+        </div>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Add animation style if not present
+    if (!document.getElementById('modal-animations')) {
+        const style = document.createElement('style');
+        style.id = 'modal-animations';
+        style.textContent = `
+            @keyframes scale-in {
+                from { opacity: 0; transform: scale(0.9); }
+                to { opacity: 1; transform: scale(1); }
+            }
+            .animate-scale-in { animation: scale-in 0.2s ease-out; }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Handle delete confirmation (called from inline onclick)
+async function handleDeleteConfirm() {
+    const employeeId = window._deleteEmployeeId;
+    const modal = window._deleteModal;
+    const deletionReason = document.getElementById('deletionReasonInput').value.trim();
+    
+    if (!deletionReason) {
+        showToast('Please provide a reason for deletion', 'error');
+        return;
+    }
+    
+    // Disable button and show loading
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<svg class="animate-spin h-5 w-5 mx-auto" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'request_hr_deletion');
+        formData.append('employee_id', employeeId);
+        formData.append('deletion_reason', deletionReason);
+        
+        const response = await fetch('../AdminF/request_hr_employee_deletion.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            modal.remove();
+            showToast('✅ Deletion request sent to Owner for approval', 'success');
+            
+            // Update the row to show pending status without refresh
+            updateRowPendingStatus(employeeId, true);
+            
+            // Update the modal buttons to show "Cancel Deletion Request" instead of "Delete Employee"
+            const deleteBtn = document.getElementById('deleteEmployeeBtn');
+            const editBtn = document.getElementById('editEmployeeBtn');
+            
+            if (deleteBtn) {
+                deleteBtn.textContent = 'Cancel Deletion Request';
+                deleteBtn.className = 'px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition flex items-center gap-2';
+                deleteBtn.onclick = () => cancelDeletionRequest(employeeId);
+                deleteBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Cancel Deletion Request
+                `;
+            }
+            
+            // Hide the Edit button
+            if (editBtn) {
+                editBtn.classList.add('hidden');
+            }
+        } else {
+            showToast('Error: ' + data.message, 'error');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Send Request';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('An error occurred while sending the request', 'error');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Send Request';
+    }
 }
 
 function closeDeleteEmployeeConfirmation() {
-    document.getElementById('deleteEmployeeModal').classList.add('hidden');
+    const modal = document.getElementById('deleteEmployeeModal');
+    if (modal) modal.classList.add('hidden');
 }
 
-function removeEmployee(employeeId) {
-    console.log('Deleting employee:', employeeId);
-    fetch('delete_employee.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `employee_id=${encodeURIComponent(employeeId)}`
-    })
-    .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data=>{
-        console.log('Response data:', data);
-        if(data.success){
-            closeDeleteEmployeeConfirmation();
-            closeViewModal();
-            showToast('Employee deleted successfully', 'success');
-            setTimeout(()=> location.reload(), 800);
+// Cancel deletion request
+function cancelDeletionRequest(employeeId) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div class="text-center mb-6">
+                <div class="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Cancel Deletion Request?</h3>
+                <p class="text-gray-600">Are you sure you want to cancel the pending deletion request for this employee?</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition">
+                    No, Keep Request
+                </button>
+                <button onclick="confirmCancelRequest('${employeeId}')" class="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition">
+                    Yes, Cancel Request
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function confirmCancelRequest(employeeId) {
+    try {
+        const formData = new FormData();
+        formData.append('action', 'cancel_deletion_request');
+        formData.append('employee_id', employeeId);
+        
+        const response = await fetch('../AdminF/cancel_hr_deletion_request.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Close only the confirmation modal (not the view modal)
+            document.querySelectorAll('.fixed.inset-0').forEach(m => {
+                if (m.id !== 'viewEmployeeModal') {
+                    m.remove();
+                }
+            });
+            
+            showToast('✅ Deletion request cancelled successfully', 'success');
+            
+            // Remove pending status from the row
+            updateRowPendingStatus(employeeId, false);
+            
+            // Update the modal buttons back to normal
+            const deleteBtn = document.getElementById('deleteEmployeeBtn');
+            const editBtn = document.getElementById('editEmployeeBtn');
+            
+            if (deleteBtn) {
+                deleteBtn.textContent = 'Delete Employee';
+                deleteBtn.className = 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition';
+                deleteBtn.onclick = () => showDeleteEmployeeConfirmation(employeeId);
+            }
+            
+            // Show the Edit button again
+            if (editBtn) {
+                editBtn.classList.remove('hidden');
+            }
         } else {
-            closeDeleteEmployeeConfirmation();
-            showToast(data.message || 'Error deleting employee', 'error');
+            showToast('Error: ' + data.message, 'error');
         }
-    })
-    .catch(error=>{
-        console.error('Delete error:', error);
-        closeDeleteEmployeeConfirmation();
-        showToast('Network error while deleting employee: ' + error.message, 'error');
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('An error occurred while cancelling the request', 'error');
+    }
+}
+
+// Update row pending status dynamically
+function updateRowPendingStatus(employeeId, isPending) {
+    const table = document.querySelector('table tbody');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+        const idCell = row.querySelector('td:first-child');
+        if (!idCell) return;
+        
+        const idText = idCell.textContent.trim();
+        if (idText.includes(employeeId)) {
+            if (isPending) {
+                // Add pending status
+                row.classList.add('bg-orange-50', 'border-l-4', 'border-orange-500');
+                
+                // Add badge if not exists
+                if (!idCell.querySelector('.bg-orange-100')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 ml-2';
+                    badge.innerHTML = `
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                        </svg>
+                        Pending Deletion
+                    `;
+                    idCell.appendChild(badge);
+                }
+            } else {
+                // Remove pending status
+                row.classList.remove('bg-orange-50', 'border-l-4', 'border-orange-500');
+                
+                // Remove badge
+                const badge = idCell.querySelector('.bg-orange-100');
+                if (badge) {
+                    badge.remove();
+                }
+            }
+        }
     });
 }
 
@@ -2192,6 +2464,117 @@ function proceedWithCreation() {
         f.submit();
     }
 }
+
+// Check for HR deletion approvals/rejections
+let lastHRDeletionCheck = new Date().toISOString();
+
+async function checkHRDeletionApprovals() {
+    try {
+        const response = await fetch(`../AdminF/check_approvals.php?last_check=${encodeURIComponent(lastHRDeletionCheck)}`);
+        const data = await response.json();
+        
+        if (data.success && data.approvals && data.approvals.length > 0) {
+            data.approvals.forEach(approval => {
+                // Only process HR employee deletion approvals/rejections
+                if (approval.type === 'hr_employee_deletion' || approval.type === 'delete_hr_employee') {
+                    const requestDetails = approval.requestDetails ? JSON.parse(approval.requestDetails) : {};
+                    const targetData = approval.targetData ? JSON.parse(approval.targetData) : {};
+                    
+                    if (approval.status === 'approved') {
+                        // Start fading out the row immediately
+                        setTimeout(() => {
+                            removeEmployeeRow(targetData.employee_id || approval.target_id);
+                        }, 100);
+                    } else if (approval.status === 'rejected') {
+                        // Remove pending status from the row
+                        updateRowPendingStatus(targetData.employee_id || approval.target_id, false);
+                    }
+                }
+            });
+            
+            // Update last check time
+            lastHRDeletionCheck = data.current_time;
+        }
+    } catch (error) {
+        console.error('Error checking HR deletion approvals:', error);
+    }
+}
+
+// Remove employee row from table
+function removeEmployeeRow(employeeId) {
+    const table = document.querySelector('table tbody');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+        const idCell = row.querySelector('td:first-child');
+        if (!idCell) return;
+        
+        const idText = idCell.textContent.trim();
+        if (idText.includes(employeeId)) {
+            // Smooth fade out animation
+            row.style.transition = 'opacity 1.3s ease-out, transform 1.3s ease-out';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            
+            // Remove after animation completes
+            setTimeout(() => {
+                row.remove();
+                
+                // Update total count
+                const totalBadge = document.querySelector('.bg-\\[\\#0B2C62\\]');
+                if (totalBadge) {
+                    const match = totalBadge.textContent.match(/\d+/);
+                    if (match) {
+                        const currentCount = parseInt(match[0]);
+                        totalBadge.textContent = `Total: ${currentCount - 1}`;
+                    }
+                }
+            }, 1300);
+        }
+    });
+}
+
+// Check for pending deletion requests on page load
+async function checkPendingDeletionRequests() {
+    try {
+        const response = await fetch('../AdminF/check_pending_requests.php');
+        const data = await response.json();
+        
+        if (data.success && data.pending_requests) {
+            data.pending_requests.forEach(request => {
+                if (request.request_type === 'hr_employee_deletion' || request.request_type === 'delete_hr_employee') {
+                    const targetData = request.target_data ? JSON.parse(request.target_data) : {};
+                    const employeeId = targetData.employee_id || request.target_id;
+                    if (employeeId) {
+                        updateRowPendingStatus(employeeId, true);
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error checking pending requests:', error);
+    }
+}
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Starting HR deletion approval polling...');
+    
+    // Wait a bit for the table to fully render, then check for pending requests
+    setTimeout(() => {
+        checkPendingDeletionRequests();
+    }, 500);
+    
+    // Check immediately on load
+    checkHRDeletionApprovals();
+    
+    // Check for HR deletion approvals every 2 seconds
+    setInterval(checkHRDeletionApprovals, 2000);
+    
+    // Also check for pending requests every 5 seconds to ensure consistency
+    setInterval(checkPendingDeletionRequests, 5000);
+});
 
 </script>
 <!-- Toast Notification -->

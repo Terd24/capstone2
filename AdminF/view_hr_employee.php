@@ -20,8 +20,12 @@ if (empty($employee_id)) {
 }
 
 try {
-    // Get employee details
-    $query = "SELECT e.*, ea.username, ea.role 
+    // Get employee details with pending deletion status
+    $query = "SELECT e.*, ea.username, ea.role,
+              (SELECT COUNT(*) FROM owner_approval_requests 
+               WHERE target_id = e.id_number 
+               AND request_type IN ('hr_employee_deletion', 'delete_hr_employee')
+               AND status = 'pending') as has_pending_deletion
               FROM employees e
               LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id
               WHERE e.id_number = ? AND e.deleted_at IS NULL";

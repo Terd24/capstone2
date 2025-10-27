@@ -55,6 +55,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
     target_table VARCHAR(50),
     target_id VARCHAR(50),
     target_data JSON,
+    request_details JSON,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     owner_comments TEXT,
     requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -62,8 +63,14 @@ $conn->query("CREATE TABLE IF NOT EXISTS owner_approval_requests (
     reviewed_by VARCHAR(100)
 )");
 
+// Add request_details column if it doesn't exist (compatible with older MySQL)
+$check_column = $conn->query("SHOW COLUMNS FROM owner_approval_requests LIKE 'request_details'");
+if ($check_column->num_rows == 0) {
+    $conn->query("ALTER TABLE owner_approval_requests ADD COLUMN request_details JSON AFTER target_data");
+}
+
 // Alter existing table to add new enum values if they don't exist
-$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'database_backup', 'maintenance_mode_toggle', 'other') NOT NULL");
+$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'hr_employee_deletion', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'database_backup', 'maintenance_mode_toggle', 'other') NOT NULL");
 
 // Handle approval/rejection actions
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -149,11 +156,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                             break;
                             
                         case 'delete_hr_employee':
+                        case 'hr_employee_deletion':
                             // Soft delete HR employee and their account
                             $conn->begin_transaction();
                             
-                            // Get deletion reason from target_data
-                            $deletion_reason = $target_data['deletion_reason'] ?? 'Approved by Owner';
+                            // Get deletion reason from request_details or target_data
+                            $request_details = json_decode($request_data['request_details'], true);
+                            $deletion_reason = $request_details['deletion_reason'] ?? $target_data['deletion_reason'] ?? 'Approved by Owner';
                             $deleted_by = $_SESSION['owner_name'] ?? 'Owner';
                             
                             // Soft delete employee account first
@@ -1730,10 +1739,25 @@ $history_result = $conn->query($history_query);
                                             $description = $request['request_description'];
                                             $reason = '';
                                             
+                                            // Check if reason is in description (old format)
                                             if (strpos($description, 'Reason:') !== false) {
                                                 $parts = explode('Reason:', $description);
                                                 $description = trim($parts[0]); // Description without reason
                                                 $reason = trim($parts[1]); // Just the reason
+                                            }
+                                            
+                                            // Check if reason is in request_details JSON (new format for deletion/restore/archive)
+                                            if (empty($reason) && !empty($request['request_details'])) {
+                                                $request_details = json_decode($request['request_details'], true);
+                                                if (isset($request_details['deletion_reason'])) {
+                                                    $reason = $request_details['deletion_reason'];
+                                                } elseif (isset($request_details['restore_reason'])) {
+                                                    $reason = $request_details['restore_reason'];
+                                                } elseif (isset($request_details['archive_reason'])) {
+                                                    $reason = $request_details['archive_reason'];
+                                                } elseif (isset($request_details['reason'])) {
+                                                    $reason = $request_details['reason'];
+                                                }
                                             }
                                             ?>
                                             
@@ -1787,8 +1811,34 @@ $history_result = $conn->query($history_query);
                                             <!-- Student/Employee Details -->
                                             <?php 
                                             $isArchiveRequest = (strpos($request['request_type'], 'archive') !== false);
-                                            if ($request['target_data'] && !$isArchiveRequest): 
+                                            // Show details for all request types including archive
+                                            if ($request['target_data']): 
                                                 $target_data = json_decode($request['target_data'], true);
+                                                
+                                                // If target_data is missing detailed info, fetch from database
+                                                if (isset($target_data['id_number']) && !isset($target_data['position'])) {
+                                                    $id_number = $target_data['id_number'];
+                                                    $isStudent = (strpos($request['request_type'], 'student') !== false);
+                                                    
+                                                    if (!$isStudent) {
+                                                        // Fetch full employee details from database
+                                                        $emp_stmt = $conn->prepare("SELECT id_number, first_name, last_name, middle_name, position, department, 
+                                                                                           email, address, hire_date 
+                                                                                    FROM employees WHERE id_number = ?");
+                                                        if ($emp_stmt) {
+                                                            $emp_stmt->bind_param('s', $id_number);
+                                                            $emp_stmt->execute();
+                                                            $emp_result = $emp_stmt->get_result();
+                                                            if ($emp_result && $emp_result->num_rows > 0) {
+                                                                $emp_data = $emp_result->fetch_assoc();
+                                                                // Merge with existing target_data
+                                                                $target_data = array_merge($target_data, $emp_data);
+                                                            }
+                                                            $emp_stmt->close();
+                                                        }
+                                                    }
+                                                }
+                                                
                                                 // Only show if we have actual person data (id_number, first_name, or last_name)
                                                 $hasPersonData = isset($target_data['id_number']) || isset($target_data['first_name']) || isset($target_data['last_name']);
                                                 if ($hasPersonData):
@@ -1852,11 +1902,30 @@ $history_result = $conn->query($history_query);
                                                                     <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['department']) ?></span>
                                                                 </div>
                                                             <?php endif; ?>
+
+                                                            <?php if (isset($target_data['email'])): ?>
+                                                                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                    <span class="text-gray-600 font-medium block mb-1.5">Email</span>
+                                                                    <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['email']) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <?php if (isset($target_data['address'])): ?>
+                                                                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                    <span class="text-gray-600 font-medium block mb-1.5">Address</span>
+                                                                    <span class="font-semibold text-gray-900"><?= htmlspecialchars($target_data['address']) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <?php if (isset($target_data['hire_date'])): ?>
+                                                                <div class="text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                                    <span class="text-gray-600 font-medium block mb-1.5">Hire Date</span>
+                                                                    <span class="font-semibold text-gray-900"><?= htmlspecialchars(date('F j, Y', strtotime($target_data['hire_date']))) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
                                                         <?php endif; ?>
                                                         <?php 
-                                                        // Only show deletion reason for delete/archive requests, not restore requests
-                                                        $isRestoreRequest = strpos($request['request_type'], 'restore') !== false;
-                                                        if (isset($target_data['deletion_reason']) && !$isRestoreRequest): 
+                                                        // Only show deletion reason for delete requests (not restore or archive)
+                                                        $isDeleteRequest = strpos($request['request_type'], 'deletion') !== false || strpos($request['request_type'], 'delete') !== false;
+                                                        if (isset($target_data['deletion_reason']) && $isDeleteRequest): 
                                                         ?>
                                                             <div class="p-3 bg-red-50 rounded-lg border-2 border-red-200">
                                                                 <div class="flex items-center gap-2 mb-2">
@@ -1872,7 +1941,7 @@ $history_result = $conn->query($history_query);
                                                 </div>
                                             <?php 
                                                 endif; // End of hasPersonData check
-                                            endif; // End of target_data && !isArchiveRequest check 
+                                            endif; // End of target_data check 
                                             ?>
                                         </div>
                                         
@@ -2799,10 +2868,33 @@ function addRequestToList(request) {
     // Parse description and reason
     let description = request.description || '';
     let reason = '';
+    
+    // Check if reason is in description (old format)
     if (description.includes('Reason:')) {
         const parts = description.split('Reason:');
         description = parts[0].trim();
         reason = parts[1].trim();
+    }
+    
+    // Check if reason is in request_details JSON (new format for deletion/restore/archive)
+    if (!reason && request.request_details) {
+        try {
+            const requestDetails = typeof request.request_details === 'string' 
+                ? JSON.parse(request.request_details) 
+                : request.request_details;
+            
+            if (requestDetails.deletion_reason) {
+                reason = requestDetails.deletion_reason;
+            } else if (requestDetails.restore_reason) {
+                reason = requestDetails.restore_reason;
+            } else if (requestDetails.archive_reason) {
+                reason = requestDetails.archive_reason;
+            } else if (requestDetails.reason) {
+                reason = requestDetails.reason;
+            }
+        } catch (e) {
+            console.error('Error parsing request_details:', e);
+        }
     }
     
     // Parse target data

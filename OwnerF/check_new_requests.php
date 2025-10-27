@@ -39,6 +39,7 @@ while ($row = $result->fetch_assoc()) {
         'requester_module' => $row['requester_module'],
         'target_id' => $row['target_id'],
         'target_data' => $row['target_data'],
+        'request_details' => $row['request_details'],
         'requestedAt' => date('M d, Y h:i A', strtotime($row['requested_at'])),
         'timestamp' => $row['requested_at']
     ];

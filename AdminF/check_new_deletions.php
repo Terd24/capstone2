@@ -30,6 +30,25 @@ $students_result = $stmt->get_result();
 
 $new_deleted_students = [];
 while ($row = $students_result->fetch_assoc()) {
+    // Check for pending requests
+    $pending_restore = false;
+    $pending_archive = false;
+    
+    $check_stmt = $conn->prepare("SELECT request_type FROM owner_approval_requests WHERE target_id = ? AND request_type IN ('restore_student', 'archive_student') AND status = 'pending' LIMIT 1");
+    if ($check_stmt) {
+        $check_stmt->bind_param("s", $row['id_number']);
+        $check_stmt->execute();
+        $check_res = $check_stmt->get_result();
+        if ($check_row = $check_res->fetch_assoc()) {
+            if ($check_row['request_type'] === 'restore_student') {
+                $pending_restore = true;
+            } else if ($check_row['request_type'] === 'archive_student') {
+                $pending_archive = true;
+            }
+        }
+        $check_stmt->close();
+    }
+    
     $new_deleted_students[] = [
         'id_number' => $row['id_number'],
         'first_name' => $row['first_name'],
@@ -40,17 +59,20 @@ while ($row = $students_result->fetch_assoc()) {
         'deleted_at' => $row['deleted_at'],
         'deleted_by' => $row['deleted_by'],
         'deleted_reason' => $row['deleted_reason'],
+        'pending_restore' => $pending_restore,
+        'pending_archive' => $pending_archive,
         'type' => 'student'
     ];
 }
 
 // Check for newly deleted employees since last check
-$employees_query = "SELECT id_number, first_name, last_name, middle_name, position, department,
-                           deleted_at, deleted_by, deletion_reason as deleted_reason 
-                    FROM employees 
-                    WHERE deleted_at IS NOT NULL 
-                    AND deleted_at > ? 
-                    ORDER BY deleted_at DESC";
+$employees_query = "SELECT e.id_number, e.first_name, e.last_name, e.middle_name, e.position, e.department,
+                           e.deleted_at, e.deleted_by, e.deletion_reason as deleted_reason, ea.role 
+                    FROM employees e
+                    LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id
+                    WHERE e.deleted_at IS NOT NULL 
+                    AND e.deleted_at > ? 
+                    ORDER BY e.deleted_at DESC";
 
 $stmt2 = $conn->prepare($employees_query);
 $stmt2->bind_param("s", $last_check);
@@ -59,6 +81,25 @@ $employees_result = $stmt2->get_result();
 
 $new_deleted_employees = [];
 while ($row = $employees_result->fetch_assoc()) {
+    // Check for pending requests
+    $pending_restore = false;
+    $pending_archive = false;
+    
+    $check_stmt = $conn->prepare("SELECT request_type FROM owner_approval_requests WHERE target_id = ? AND request_type IN ('restore_employee', 'archive_employee') AND status = 'pending' LIMIT 1");
+    if ($check_stmt) {
+        $check_stmt->bind_param("s", $row['id_number']);
+        $check_stmt->execute();
+        $check_res = $check_stmt->get_result();
+        if ($check_row = $check_res->fetch_assoc()) {
+            if ($check_row['request_type'] === 'restore_employee') {
+                $pending_restore = true;
+            } else if ($check_row['request_type'] === 'archive_employee') {
+                $pending_archive = true;
+            }
+        }
+        $check_stmt->close();
+    }
+    
     $new_deleted_employees[] = [
         'id_number' => $row['id_number'],
         'first_name' => $row['first_name'],
@@ -69,6 +110,9 @@ while ($row = $employees_result->fetch_assoc()) {
         'deleted_at' => $row['deleted_at'],
         'deleted_by' => $row['deleted_by'],
         'deleted_reason' => $row['deleted_reason'],
+        'role' => $row['role'],
+        'pending_restore' => $pending_restore,
+        'pending_archive' => $pending_archive,
         'type' => 'employee'
     ];
 }

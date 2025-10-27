@@ -298,10 +298,14 @@ if (table_exists($conn, 'student_account')) {
     }
 }
 
-// Get deleted employees
+// Get deleted employees with their roles
 if (table_exists($conn, 'employees')) {
     try {
-        $stmt = $conn->prepare("SELECT id, id_number, first_name, last_name, middle_name, position, department, deleted_at, deleted_by, deleted_reason FROM employees WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 100");
+        $stmt = $conn->prepare("SELECT e.id, e.id_number, e.first_name, e.last_name, e.middle_name, e.position, e.department, e.deleted_at, e.deleted_by, e.deletion_reason as deleted_reason, ea.role 
+                               FROM employees e 
+                               LEFT JOIN employee_accounts ea ON e.id_number = ea.employee_id 
+                               WHERE e.deleted_at IS NOT NULL 
+                               ORDER BY e.deleted_at DESC LIMIT 100");
         if ($stmt) {
             $stmt->execute();
             $res = $stmt->get_result();

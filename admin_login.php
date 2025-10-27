@@ -5,6 +5,44 @@ require_once 'StudentLogin/db_conn.php';
 $error_msg = '';
 $success_msg = '';
 
+// 🚫 If already logged in as employee, redirect to appropriate dashboard
+if (isset($_SESSION['role'])) {
+    $role = strtolower($_SESSION['role']);
+    
+    switch ($role) {
+        case 'superadmin':
+            header("Location: AdminF/SuperAdminDashboard.php");
+            exit;
+        case 'owner':
+            header("Location: OwnerF/Dashboard.php");
+            exit;
+        case 'hr':
+            header("Location: HRF/Dashboard.php");
+            exit;
+        case 'registrar':
+            header("Location: RegistrarF/RegistrarDashboard.php");
+            exit;
+        case 'cashier':
+            header("Location: CashierF/Dashboard.php");
+            exit;
+        case 'guidance':
+            header("Location: GuidanceF/GuidanceDashboard.php");
+            exit;
+        case 'attendance':
+            header("Location: AttendanceF/Dashboard.php");
+            exit;
+        case 'teacher':
+            header("Location: EmployeePortal/Dashboard.php");
+            exit;
+        case 'student':
+        case 'parent':
+            // Students and parents should use StudentLogin
+            session_destroy();
+            header("Location: StudentLogin/login.php");
+            exit;
+    }
+}
+
 // Helper: log successful logins for reporting (Super Admin dashboard)
 function log_login($conn, $userType, $idNumber, $username, $role) {
     // Create table if not exists (idempotent)
@@ -89,7 +127,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $superadmin = $superadmin_result->fetch_assoc();
                 
                 if (password_verify($password, $superadmin['password'])) {
-                    // Set SuperAdmin session
+                    // Set SuperAdmin session (employee_id is the actual ID number from employees table)
                     $_SESSION['superadmin_id'] = $superadmin['id'];
                     $_SESSION['superadmin_name'] = $superadmin['first_name'] . ' ' . $superadmin['last_name'];
                     $_SESSION['username'] = $superadmin['username'];
@@ -120,7 +158,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $hr = $hr_result->fetch_assoc();
                 
                 if (password_verify($password, $hr['password'])) {
-                    // Set HR session
+                    // Set HR session (employee_id is the actual ID number from employees table)
                     $_SESSION['hr_id'] = $hr['id'];
                     $_SESSION['hr_name'] = $hr['first_name'] . ' ' . $hr['last_name'];
                     $_SESSION['username'] = $hr['username'];
@@ -138,7 +176,80 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
-        // If SuperAdmin and HR login failed, try Owner login
+        // If SuperAdmin and HR login failed, try other employee roles (registrar, cashier, guidance, attendance, teacher)
+        if (!$login_success) {
+            $employee_stmt = $conn->prepare("SELECT ea.*, e.first_name, e.last_name FROM employee_accounts ea 
+                                           JOIN employees e ON ea.employee_id = e.id_number 
+                                           WHERE ea.username = ?");
+            $employee_stmt->bind_param("s", $username);
+            $employee_stmt->execute();
+            $employee_result = $employee_stmt->get_result();
+            
+            if ($employee_result->num_rows === 1) {
+                $employee = $employee_result->fetch_assoc();
+                
+                if (password_verify($password, $employee['password'])) {
+                    $role = strtolower(trim((string)$employee['role']));
+                    $full_name = $employee['first_name'] . ' ' . $employee['last_name'];
+
+                    // Set common session variables (employee_id is the actual ID number from employees table)
+                    $_SESSION['employee_id'] = $employee['id'];
+                    $_SESSION['id_number'] = $employee['employee_id'];
+                    $_SESSION['username'] = $employee['username'];
+                    $_SESSION['first_name'] = $employee['first_name'];
+                    $_SESSION['last_name'] = $employee['last_name'];
+                    $_SESSION['role'] = $role;
+                    
+                    // Check if employee must change password (first-time login)
+                    $must_change = $employee['must_change_password'] ?? 0;
+
+                    // Log employee login
+                    log_login($conn, 'employee', $employee['employee_id'], $employee['username'], $role);
+                    
+                    // If must change password, redirect to employee password change page
+                    if ($must_change == 1) {
+                        $_SESSION['must_change_password'] = true;
+                        $login_success = true;
+                        $redirect_url = "EmployeePortal/change_password.php";
+                    } else {
+                        // Role routing
+                        switch($role) {
+                            case 'registrar':
+                                $_SESSION['registrar_id'] = $employee['id'];
+                                $_SESSION['registrar_name'] = $full_name;
+                                $redirect_url = "RegistrarF/RegistrarDashboard.php";
+                                break;
+                            case 'cashier':
+                                $_SESSION['cashier_id'] = $employee['id'];
+                                $_SESSION['cashier_name'] = $full_name;
+                                $redirect_url = "CashierF/Dashboard.php";
+                                break;
+                            case 'guidance':
+                                $_SESSION['guidance_id'] = $employee['id'];
+                                $_SESSION['guidance_name'] = $full_name;
+                                $redirect_url = "GuidanceF/GuidanceDashboard.php";
+                                break;
+                            case 'attendance':
+                                $_SESSION['attendance_id'] = $employee['id'];
+                                $_SESSION['attendance_name'] = $full_name;
+                                $redirect_url = "AttendanceF/Dashboard.php";
+                                break;
+                            case 'teacher':
+                                $redirect_url = "EmployeePortal/Dashboard.php";
+                                break;
+                            default:
+                                // Fallback: treat any unexpected role as a generic teacher portal access
+                                error_log('Unknown employee role: ' . $employee['role'] . ' for username ' . $employee['username']);
+                                $_SESSION['role'] = 'teacher';
+                                $redirect_url = "EmployeePortal/Dashboard.php";
+                        }
+                        $login_success = true;
+                    }
+                }
+            }
+        }
+        
+        // If all employee logins failed, try Owner login
         if (!$login_success) {
             // Check if owner_accounts table exists, if not create it
             $conn->query("CREATE TABLE IF NOT EXISTS owner_accounts (
@@ -222,15 +333,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     </script>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4" onload="clearFormOnLoad()">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
 
 <div class="w-full max-w-md">
+    <!-- Back to Home Button -->
+    <div class="mb-6">
+        <a href="index.php" class="inline-flex items-center px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-lg transition-all group backdrop-blur-sm">
+            <svg class="w-4 h-4 mr-2 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            <span class="text-sm font-medium">Back to Home</span>
+        </a>
+    </div>
+
     <!-- Header (Logo Outside) -->
     <div class="text-center mb-8">
         <img src="images/LogoCCI.png" alt="Cornerstone College Inc." class="w-20 h-20 mx-auto mb-4">
         <h1 class="text-2xl font-bold text-gray-800 mb-2">Cornerstone College Inc.</h1>
-        <p class="text-gray-600 text-sm">Admin/Owner/HR Portal</p>
-        <p class="text-sm text-gray-600 mt-1">SuperAdmin, Owner & HR Access</p>
+        <p class="text-gray-600 text-sm">Admin & Staff Portal</p>
+        <p class="text-sm text-gray-600 mt-1">For School Administrators & Employees</p>
     </div>
 
     <!-- Login Card -->
@@ -298,16 +419,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
-    // Clear form when page loads (prevents back button from showing cached data)
-    function clearFormOnLoad() {
-        document.getElementById("usernameInput").value = "";
+    // Clear only password when page loads (preserve username on error)
+    function clearPasswordOnLoad() {
         document.getElementById("passwordInput").value = "";
     }
 
-    // Prevent form caching
+    // Clear password on page load
+    window.addEventListener('load', clearPasswordOnLoad);
+
+    // Prevent form caching - only clear password
     window.addEventListener('pageshow', function(event) {
         if (event.persisted) {
-            clearFormOnLoad();
+            clearPasswordOnLoad();
         }
     });
 </script>

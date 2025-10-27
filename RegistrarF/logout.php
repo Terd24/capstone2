@@ -43,11 +43,7 @@ header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 header("Expires: 0");
 
-// Redirect based on role
-if ($role === 'superadmin' || $role === 'owner') {
-    header("Location: ../admin_login.php");
-} else {
-    header("Location: ../StudentLogin/login.php");
-}
+// All employees now use admin_login.php
+header("Location: ../admin_login.php");
 exit;
 ?>

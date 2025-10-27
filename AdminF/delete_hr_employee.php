@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         // Soft delete the employee
         $deleted_by = $_SESSION['superadmin_name'] ?? 'Super Admin';
-        $update_stmt = $conn->prepare("UPDATE employees SET deleted_at = NOW(), deleted_by = ?, deleted_reason = ? WHERE id_number = ?");
+        $update_stmt = $conn->prepare("UPDATE employees SET deleted_at = NOW(), deleted_by = ?, deletion_reason = ? WHERE id_number = ?");
         $update_stmt->bind_param('sss', $deleted_by, $deletionReason, $employeeId);
         
         if ($update_stmt->execute()) {
