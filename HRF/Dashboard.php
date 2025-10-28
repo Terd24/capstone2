@@ -420,14 +420,23 @@ button[id^="resetPasswordBtn_"][disabled] {
                             </select>
                         </div>
                         
-                        <!-- Row 3: Hire Date, Email, Phone -->
+                        <!-- Row 3: Hire Date and Phone -->
                         <div>
                             <label class="block text-sm font-semibold mb-1">Hire Date *</label>
                             <input type="date" name="hire_date" max="<?= date('Y-m-d') ?>" required value="<?= htmlspecialchars($form_data['hire_date'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Email * <span class="text-xs text-gray-500">(Gmail only - verification required)</span></label>
+                            <label class="block text-sm font-semibold mb-1">Phone *</label>
+                            <input type="tel" name="phone" id="phoneField" required placeholder="+63 9XX-XXX-XXXX" value="<?= htmlspecialchars($form_data['phone'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)" oninput="formatPhilippinePhone(this)">
+                            <p class="field-error-message text-red-600 text-sm mt-1 font-medium hidden"></p>
+                        </div>
+                        
+                        <div class="col-span-1"></div>
+                        
+                        <!-- Row 4: Email (full width with verify button) -->
+                        <div class="col-span-3">
+                            <label class="block text-sm font-semibold mb-1">Email *</label>
                             <div class="flex gap-2">
                                 <input type="email" name="email" id="employeeEmail" autocomplete="off" required value="<?= htmlspecialchars($form_data['email'] ?? '') ?>" class="flex-1 border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" pattern="[a-zA-Z0-9._%+-]+@gmail\.com$" title="Please enter a valid Gmail address">
                                 <button type="button" id="verifyEmailBtn" onclick="sendVerificationCode()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap">
@@ -435,11 +444,6 @@ button[id^="resetPasswordBtn_"][disabled] {
                                 </button>
                             </div>
                             <p id="emailVerificationStatus" class="text-sm mt-1 font-medium hidden"></p>
-                            <p class="field-error-message text-red-600 text-sm mt-1 font-medium hidden"></p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Phone *</label>
-                            <input type="tel" name="phone" id="phoneField" required placeholder="+63 9XX-XXX-XXXX" value="<?= htmlspecialchars($form_data['phone'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" title="Please enter Philippine mobile number (e.g., +63 912-345-6789)" oninput="formatPhilippinePhone(this)">
                             <p class="field-error-message text-red-600 text-sm mt-1 font-medium hidden"></p>
                         </div>
                         

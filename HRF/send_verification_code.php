@@ -80,7 +80,7 @@ try {
                 </div>
                 <div class='content'>
                     <p>Hello,</p>
-                    <p>You have requested to verify your email address for Cornerstone College Inc. HR Portal.</p>
+                    <p>You have requested to verify your email address for Cornerstone College Inc.</p>
                     <p>Your verification code is:</p>
                     <div class='code'>$verification_code</div>
                     <p><strong>This code will expire in 5 minutes.</strong></p>
