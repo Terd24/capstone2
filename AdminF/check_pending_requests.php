@@ -22,6 +22,22 @@ if ($user_role === 'superadmin') {
     $requester_name = $_SESSION['registrar_name'] ?? $_SESSION['username'] ?? 'Registrar';
 }
 
+// Debug logging
+error_log("check_pending_requests - Role: " . $user_role);
+error_log("check_pending_requests - hr_name: " . ($_SESSION['hr_name'] ?? 'NOT SET'));
+error_log("check_pending_requests - username: " . ($_SESSION['username'] ?? 'NOT SET'));
+error_log("check_pending_requests - Requester name: " . $requester_name);
+
+// Debug: Check what's actually in the database
+$debug_query = "SELECT id, request_type, requester_name, target_id, status FROM owner_approval_requests WHERE request_type IN ('hr_employee_deletion', 'delete_hr_employee') ORDER BY id DESC LIMIT 5";
+$debug_result = $conn->query($debug_query);
+if ($debug_result) {
+    error_log("Recent HR deletion requests in database:");
+    while ($debug_row = $debug_result->fetch_assoc()) {
+        error_log("  ID: " . $debug_row['id'] . ", Type: " . $debug_row['request_type'] . ", Requester: " . $debug_row['requester_name'] . ", Target: " . $debug_row['target_id'] . ", Status: " . $debug_row['status']);
+    }
+}
+
 // Get all pending requests for this user
 $query = "SELECT * FROM owner_approval_requests 
     WHERE status = 'pending' 
@@ -37,10 +53,10 @@ $pending_requests = [];
 while ($row = $result->fetch_assoc()) {
     // For student deletion requests, verify the student still exists
     $target_data = $row['target_data'] ? json_decode($row['target_data'], true) : [];
-    $is_student_deletion = $row['request_type'] === 'student_deletion' || 
-                          isset($target_data['student_id']) || 
-                          isset($target_data['id_number']) || 
-                          isset($target_data['student_name']);
+    // Only check request_type to determine if it's a student deletion
+    $is_student_deletion = $row['request_type'] === 'student_deletion';
+    
+    error_log("Processing request ID: " . $row['id'] . ", Type: " . $row['request_type'] . ", is_student_deletion: " . ($is_student_deletion ? 'true' : 'false'));
     
     if ($is_student_deletion) {
         // Check if student still exists in student_account table
