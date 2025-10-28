@@ -427,8 +427,14 @@ button[id^="resetPasswordBtn_"][disabled] {
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Email *</label>
-                            <input type="email" name="email" autocomplete="off" required value="<?= htmlspecialchars($form_data['email'] ?? '') ?>" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]">
+                            <label class="block text-sm font-semibold mb-1">Email * <span class="text-xs text-gray-500">(Gmail only - verification required)</span></label>
+                            <div class="flex gap-2">
+                                <input type="email" name="email" id="employeeEmail" autocomplete="off" required value="<?= htmlspecialchars($form_data['email'] ?? '') ?>" class="flex-1 border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62]" pattern="[a-zA-Z0-9._%+-]+@gmail\.com$" title="Please enter a valid Gmail address">
+                                <button type="button" id="verifyEmailBtn" onclick="sendVerificationCode()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap">
+                                    Verify Email
+                                </button>
+                            </div>
+                            <p id="emailVerificationStatus" class="text-sm mt-1 font-medium hidden"></p>
                             <p class="field-error-message text-red-600 text-sm mt-1 font-medium hidden"></p>
                         </div>
                         <div>
@@ -2797,6 +2803,198 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   </script>
 </div>
+
+<!-- Email Verification Modal -->
+<div id="emailVerificationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[99999] flex items-center justify-center">
+    <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+        <div class="flex flex-col items-center text-center">
+            <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Verify Email Address</h3>
+            <p class="text-gray-600 mb-4">Enter the 6-digit code sent to <span id="verificationEmailDisplay" class="font-semibold"></span></p>
+            <input type="text" id="verificationCodeInput" maxlength="6" pattern="[0-9]{6}" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2" placeholder="000000">
+            <p id="verificationError" class="text-red-600 text-sm mb-4 hidden"></p>
+            <p class="text-xs text-gray-500 mb-4">Code expires in <span id="verificationTimer">5:00</span></p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeVerificationModal()" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition">
+                Cancel
+            </button>
+            <button onclick="verifyEmailCode()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition">
+                Verify
+            </button>
+        </div>
+        <button onclick="resendVerificationCode()" class="w-full mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
+            Resend Code
+        </button>
+    </div>
+</div>
+
+<script>
+let verificationTimer;
+let emailVerified = false;
+
+function sendVerificationCode() {
+    const emailInput = document.getElementById('employeeEmail');
+    const email = emailInput.value.trim();
+    
+    // Validate email
+    if (!email) {
+        showToast('Please enter an email address', 'error');
+        return;
+    }
+    
+    if (!email.match(/@gmail\.com$/i)) {
+        showToast('Only Gmail addresses are supported', 'error');
+        return;
+    }
+    
+    // Show loading
+    const btn = document.getElementById('verifyEmailBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    
+    // Send verification code
+    fetch('send_verification_code.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `email=${encodeURIComponent(email)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Verify Email';
+        
+        if (data.success) {
+            // Show verification modal
+            document.getElementById('verificationEmailDisplay').textContent = email;
+            document.getElementById('emailVerificationModal').classList.remove('hidden');
+            document.getElementById('verificationCodeInput').value = '';
+            document.getElementById('verificationError').classList.add('hidden');
+            
+            // Start timer
+            startVerificationTimer();
+            
+            // For testing - show code in console
+            if (data.debug_code) {
+                console.log('Verification code:', data.debug_code);
+                showToast('Code sent! Check console for testing', 'success');
+            } else {
+                showToast('Verification code sent to ' + email, 'success');
+            }
+        } else {
+            showToast(data.message || 'Failed to send verification code', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        btn.disabled = false;
+        btn.textContent = 'Verify Email';
+        showToast('An error occurred while sending verification code', 'error');
+    });
+}
+
+function resendVerificationCode() {
+    clearInterval(verificationTimer);
+    sendVerificationCode();
+}
+
+function startVerificationTimer() {
+    let timeLeft = 300; // 5 minutes
+    const timerDisplay = document.getElementById('verificationTimer');
+    
+    clearInterval(verificationTimer);
+    
+    verificationTimer = setInterval(() => {
+        timeLeft--;
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (timeLeft <= 0) {
+            clearInterval(verificationTimer);
+            timerDisplay.textContent = 'Expired';
+            showToast('Verification code expired. Please request a new one.', 'error');
+        }
+    }, 1000);
+}
+
+function verifyEmailCode() {
+    const email = document.getElementById('employeeEmail').value.trim();
+    const code = document.getElementById('verificationCodeInput').value.trim();
+    const errorDisplay = document.getElementById('verificationError');
+    
+    if (!code || code.length !== 6) {
+        errorDisplay.textContent = 'Please enter a 6-digit code';
+        errorDisplay.classList.remove('hidden');
+        return;
+    }
+    
+    // Verify code
+    fetch('verify_email_code.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            emailVerified = true;
+            clearInterval(verificationTimer);
+            closeVerificationModal();
+            
+            // Update UI
+            const statusDisplay = document.getElementById('emailVerificationStatus');
+            statusDisplay.textContent = '✓ Email verified';
+            statusDisplay.className = 'text-sm mt-1 font-medium text-green-600';
+            
+            const verifyBtn = document.getElementById('verifyEmailBtn');
+            verifyBtn.textContent = 'Verified ✓';
+            verifyBtn.disabled = true;
+            verifyBtn.className = 'px-4 py-2 bg-green-600 text-white rounded-lg cursor-not-allowed whitespace-nowrap';
+            
+            showToast('Email verified successfully!', 'success');
+        } else {
+            errorDisplay.textContent = data.message || 'Invalid verification code';
+            errorDisplay.classList.remove('hidden');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        errorDisplay.textContent = 'An error occurred while verifying code';
+        errorDisplay.classList.remove('hidden');
+    });
+}
+
+function closeVerificationModal() {
+    document.getElementById('emailVerificationModal').classList.add('hidden');
+    clearInterval(verificationTimer);
+}
+
+// Update form validation to check email verification
+const originalConfirmAddEmployee = window.confirmAddEmployee;
+window.confirmAddEmployee = function() {
+    const email = document.getElementById('employeeEmail').value.trim();
+    
+    if (email.match(/@gmail\.com$/i) && !emailVerified) {
+        showToast('Please verify your Gmail address before submitting', 'error');
+        return;
+    }
+    
+    // Call original function
+    if (originalConfirmAddEmployee) {
+        originalConfirmAddEmployee();
+    }
+};
+</script>
+
 </body>
 </html>
 
