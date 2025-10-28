@@ -17,8 +17,8 @@ if (!isset($conn) || $conn->connect_error) {
     die("Database connection failed: " . ($conn->connect_error ?? "Connection object not found"));
 }
 
-// Require HR login
-if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSION['hr_name']))) {
+// Require Department Head login
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'department_head') {
     header("Location: ../StudentLogin/login.php");
     exit;
 }
@@ -368,7 +368,55 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             $schedule_text = $section_name . " (Variable Times)";
         }
         
-        // No employee-side mirrors required here
+        // Get teacher_id from schedule
+        $teacher_id = null;
+        $teacher_stmt = $conn->prepare("SELECT employee_id FROM employee_schedules WHERE schedule_id = ? LIMIT 1");
+        $teacher_stmt->bind_param("i", $schedule_id);
+        $teacher_stmt->execute();
+        $teacher_res = $teacher_stmt->get_result();
+        if ($teacher_res->num_rows > 0) {
+            $teacher_row = $teacher_res->fetch_assoc();
+            $teacher_id = $teacher_row['employee_id'];
+        }
+        
+        // Update subjects for this teacher
+        if ($teacher_id) {
+            // Delete all existing subjects for this teacher
+            $del_subj = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?");
+            $del_subj->bind_param("s", $teacher_id);
+            $del_subj->execute();
+            
+            // Insert new subjects (only checked ones)
+            $subjects = isset($_POST['subjects']) ? $_POST['subjects'] : [];
+            if (!empty($subjects)) {
+                $subj_stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject_name, created_by) VALUES (?, ?, ?)");
+                foreach ($subjects as $subject) {
+                    $subject = trim($subject);
+                    if (!empty($subject)) {
+                        $subj_stmt->bind_param("ssi", $teacher_id, $subject, $actorId);
+                        $subj_stmt->execute();
+                    }
+                }
+            }
+            
+            // Delete all existing sections for this teacher
+            $del_sect = $conn->prepare("DELETE FROM teacher_sections WHERE teacher_id = ?");
+            $del_sect->bind_param("s", $teacher_id);
+            $del_sect->execute();
+            
+            // Insert new sections (only checked ones)
+            $sections = isset($_POST['sections']) ? $_POST['sections'] : [];
+            if (!empty($sections)) {
+                $sect_stmt = $conn->prepare("INSERT INTO teacher_sections (teacher_id, section_name, created_by) VALUES (?, ?, ?)");
+                foreach ($sections as $section) {
+                    $section = trim($section);
+                    if (!empty($section)) {
+                        $sect_stmt->bind_param("ssi", $teacher_id, $section, $actorId);
+                        $sect_stmt->execute();
+                    }
+                }
+            }
+        }
         
         $response = ['success' => true, 'message' => 'Schedule updated successfully!'];
         
@@ -501,7 +549,7 @@ if (!$sections_result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Schedule Management - Cornerstone College Inc.</title>
+    <title>Teacher Schedule Management - Cornerstone College Inc.</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .school-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%); }
@@ -529,14 +577,14 @@ if (!$sections_result) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                 </button>
-                <span class="text-lg md:text-xl font-bold">Schedule Management</span>
+                <span class="text-lg md:text-xl font-bold">Teacher Schedule Management</span>
             </div>
             <!-- Right: school logo + name -->
             <div class="flex items-center space-x-3">
                 <img src="../images/LogoCCI.png" alt="Cornerstone College Inc." class="h-10 w-10 md:h-12 md:w-12 rounded-full bg-white p-1">
                 <div class="text-right leading-tight">
                     <div class="text-sm md:text-base font-bold">Cornerstone College Inc.</div>
-                    <div class="text-[11px] md:text-sm text-blue-200">Schedule Management System</div>
+                    <div class="text-[11px] md:text-sm text-blue-200">Department Head Portal</div>
                 </div>
             </div>
         </div>
@@ -1375,7 +1423,7 @@ document.getElementById('createScheduleForm').addEventListener('submit', functio
         formData.append('schedule_id', currentScheduleId);
     }
     
-    fetch('ManageEmployeeSchedule.php', {
+    fetch('ManageTeacherSchedule.php', {
         method: 'POST',
         body: formData
     })
@@ -1553,7 +1601,7 @@ function proceedAssign(scheduleId){
     formData.append('action', 'assign_schedule');
     formData.append('schedule_id', scheduleId);
     selectedStudents.forEach(studentId => formData.append('employee_ids[]', studentId));
-    fetch('ManageEmployeeSchedule.php', { method: 'POST', body: formData })
+    fetch('ManageTeacherSchedule.php', { method: 'POST', body: formData })
       .then(r=>r.json())
       .then(d=>{
         if(d.success){ sessionStorage.setItem('schedule_notice', JSON.stringify({ type: 'success', message: d.message })); hideAssignScheduleModal(); location.reload(); }
@@ -1797,7 +1845,7 @@ function confirmDelete() {
         formData.append('action', 'delete_schedule');
         formData.append('schedule_id', scheduleToDelete);
         
-        fetch('ManageEmployeeSchedule.php', {
+        fetch('ManageTeacherSchedule.php', {
             method: 'POST',
             body: formData
         })

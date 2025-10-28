@@ -2,8 +2,8 @@
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// HR only
-if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSION['hr_name']))) {
+// Department Head only
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'department_head') {
     header("Location: ../StudentLogin/login.php");
     exit;
 }
@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'end_date' => trim($_POST['end_date'] ?? ''),
         'filter_section' => trim($_POST['filter_section'] ?? '')
     ];
-    header("Location: EmployeeAttendance.php");
+    header("Location: TeacherAttendance.php");
     exit;
 }
 
@@ -33,7 +33,7 @@ $filter_section = $filters['filter_section'] ?? '';
 // Clear session filters if explicitly requested
 if (isset($_GET['clear'])) {
     unset($_SESSION['employee_attendance_filters']);
-    header("Location: EmployeeAttendance.php");
+    header("Location: TeacherAttendance.php");
     exit;
 }
 
@@ -108,7 +108,7 @@ $records = $stmt->get_result();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Employee Attendance - HR</title>
+  <title>Teacher Attendance - Department Head</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -119,13 +119,13 @@ $records = $stmt->get_result();
           <button onclick="window.location.href='Dashboard.php'" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
           </button>
-          <span class="text-lg font-bold">Employee Attendance</span>
+          <span class="text-lg font-bold">Teacher Attendance</span>
         </div>
         <div class="flex items-center space-x-3">
           <img src="../images/LogoCCI.png" class="h-10 w-10 rounded-full bg-white p-1" alt="Logo">
           <div class="text-right leading-tight">
             <div class="text-sm font-bold">Cornerstone College Inc.</div>
-            <div class="text-[11px] text-blue-200">HR Portal</div>
+            <div class="text-[11px] text-blue-200">Department Head Portal</div>
           </div>
           <a href="Dashboard.php" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition" title="Home">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,8 +170,8 @@ $records = $stmt->get_result();
       <h2 class="text-xl font-bold text-gray-800 mb-4">Filter</h2>
       <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         <div>
-          <label class="text-sm font-medium text-gray-700 mb-2 block">Search Employee</label>
-          <input type="text" name="search_name" value="<?= htmlspecialchars($search_name) ?>" placeholder="Enter employee name..."
+          <label class="text-sm font-medium text-gray-700 mb-2 block">Search Teacher</label>
+          <input type="text" name="search_name" value="<?= htmlspecialchars($search_name) ?>" placeholder="Enter teacher name..."
                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#0B2C62] focus:border-transparent">
         </div>
         <div>

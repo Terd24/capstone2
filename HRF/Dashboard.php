@@ -240,12 +240,6 @@ button[id^="resetPasswordBtn_"][disabled] {
                 </svg>
                 Add Employee
             </button>
-            <button onclick="window.location.href='../HRF/ManageEmployeeSchedule.php'" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium whitespace-nowrap">
-                Manage Teacher Schedule
-            </button>
-            <button onclick="window.location.href='../HRF/EmployeeAttendance.php'" class="px-4 py-2 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium whitespace-nowrap">
-                Teacher Attendance
-            </button>
         </div>
     </div>
 
@@ -494,6 +488,7 @@ button[id^="resetPasswordBtn_"][disabled] {
                                     <option value="guidance">Guidance</option>
                                     <option value="attendance">Attendance</option>
                                     <option value="teacher">Teacher</option>
+                                    <option value="department_head">Department Head</option>
                                 </select>
                             </div>
                         </div>
@@ -1954,6 +1949,7 @@ function showEditAccountModal(employee) {
                 <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
                 <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
                 <option value="teacher" ${employee.account_role === 'teacher' ? 'selected' : ''}>Teacher</option>
+                <option value="department_head" ${employee.account_role === 'department_head' ? 'selected' : ''}>Department Head</option>
             </select>
         </div>
     `;
@@ -1984,6 +1980,7 @@ function showCreateAccountModal(employee) {
                 <option value="guidance">Guidance</option>
                 <option value="attendance">Attendance</option>
                 <option value="teacher">Teacher</option>
+                <option value="department_head">Department Head</option>
             </select>
         </div>
         <div id="ca_rfid_container" class="mb-4 hidden">

@@ -73,7 +73,7 @@ if (isset($_SESSION['role'])) {
     $role = strtolower($_SESSION['role']);
     
     // All employees should use admin_login.php
-    if (in_array($role, ['superadmin', 'owner', 'hr', 'registrar', 'cashier', 'guidance', 'attendance', 'teacher'])) {
+    if (in_array($role, ['superadmin', 'owner', 'hr', 'registrar', 'cashier', 'guidance', 'attendance', 'teacher', 'department_head'])) {
         session_destroy();
         header("Location: ../admin_login.php");
         exit;

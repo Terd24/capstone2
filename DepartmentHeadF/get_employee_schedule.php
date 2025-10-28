@@ -3,8 +3,8 @@ header('Content-Type: application/json');
 session_start();
 include("../StudentLogin/db_conn.php");
 
-// Allow only HR users
-if (!((isset($_SESSION['role']) && $_SESSION['role'] === 'hr') || isset($_SESSION['hr_name']))) {
+// Allow HR and Department Head users
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['hr', 'department_head'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }

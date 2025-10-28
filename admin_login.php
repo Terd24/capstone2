@@ -34,6 +34,9 @@ if (isset($_SESSION['role'])) {
         case 'teacher':
             header("Location: EmployeePortal/Dashboard.php");
             exit;
+        case 'department_head':
+            header("Location: DepartmentHeadF/Dashboard.php");
+            exit;
         case 'student':
         case 'parent':
             // Students and parents should use StudentLogin
@@ -236,6 +239,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 break;
                             case 'teacher':
                                 $redirect_url = "EmployeePortal/Dashboard.php";
+                                break;
+                            case 'department_head':
+                                $_SESSION['dept_head_id'] = $employee['id'];
+                                $_SESSION['dept_head_name'] = $full_name;
+                                $redirect_url = "DepartmentHeadF/Dashboard.php";
                                 break;
                             default:
                                 // Fallback: treat any unexpected role as a generic teacher portal access

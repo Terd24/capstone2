@@ -1,0 +1,94 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║          DEPARTMENT HEAD MODULE - QUICK START GUIDE                  ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+✅ MODULE SUCCESSFULLY CREATED!
+
+📁 Location: /onecci/DepartmentHeadF/
+
+🎯 WHAT WAS DONE:
+   ✓ Created new Department Head module
+   ✓ Moved "Manage Teacher Schedule" from HR to Department Head
+   ✓ Moved "Teacher Attendance" from HR to Department Head
+   ✓ Updated authentication system
+   ✓ Removed buttons from HR Dashboard
+
+🚀 TO GET STARTED:
+
+   STEP 1: Create Department Head Account
+   ────────────────────────────────────────
+   1. Open phpMyAdmin: http://localhost/phpmyadmin
+   2. Select your database (onecci_db)
+   3. Go to SQL tab
+   4. Run this command:
+
+      INSERT INTO employees (id_number, first_name, last_name, position, 
+                            department, hire_date, phone, email, address)
+      VALUES ('CCI2025-DH1', 'John', 'Doe', 'Department Head', 
+              'Academic Affairs', '2025-01-01', '+63 912-345-6789', 
+              'depthead@gmail.com', 'Sample Address');
+
+      INSERT INTO employee_accounts (employee_id, username, password, role)
+      VALUES ('CCI2025-DH1', 'depthead', 
+              '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 
+              'department_head');
+
+   STEP 2: Login
+   ──────────────
+   1. Go to: http://localhost/onecci/admin_login.php
+   2. Username: depthead
+   3. Password: DeptHead123
+
+   STEP 3: Access Features
+   ────────────────────────
+   From the dashboard, click:
+   • "Manage Teacher Schedule" - Create/edit teacher schedules
+   • "Teacher Attendance" - View attendance records
+
+📋 FEATURES AVAILABLE:
+
+   Manage Teacher Schedule:
+   • Create schedules (same time or different per day)
+   • Assign teachers to schedules
+   • Assign subjects and sections
+   • View all schedules
+
+   Teacher Attendance:
+   • View real-time attendance
+   • Filter by date and teacher
+   • See tardiness/overtime calculations
+   • Generate reports
+
+🔐 DEFAULT CREDENTIALS:
+   Username: depthead
+   Password: DeptHead123
+   (Change after first login!)
+
+📚 DOCUMENTATION:
+   • README.md - Module overview
+   • SETUP_GUIDE.md - Detailed setup instructions
+   • CHANGES_SUMMARY.md - Complete list of changes
+   • setup_department_head.sql - SQL script
+
+⚠️  IMPORTANT NOTES:
+   • HR Dashboard no longer has teacher schedule/attendance buttons
+   • Those features are now ONLY in Department Head module
+   • Original files still exist in HRF folder (as backup)
+   • No database changes needed (tables auto-create)
+
+🆘 TROUBLESHOOTING:
+   Login fails? 
+   → Check employee_accounts table has role='department_head'
+   
+   Page not found?
+   → Verify DepartmentHeadF folder exists in /onecci/
+   
+   Access denied?
+   → Clear browser cache and try again
+
+✨ YOU'RE ALL SET!
+
+   The Department Head module is ready to use. Just create an account
+   and login to start managing teacher schedules and attendance.
+
+═══════════════════════════════════════════════════════════════════════

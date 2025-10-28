@@ -197,17 +197,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     employee_id VARCHAR(20) NOT NULL,
                     username VARCHAR(50) UNIQUE NOT NULL,
                     password VARCHAR(255) NOT NULL,
-                    role ENUM('registrar','cashier','guidance','attendance','hr','teacher') NOT NULL,
+                    role ENUM('registrar','cashier','guidance','attendance','hr','teacher','department_head') NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (employee_id) REFERENCES employees(id_number) ON DELETE CASCADE
                 )";
                 $conn->query($create_accounts_table);
             }
-            // Ensure ENUM includes teacher and hr
+            // Ensure ENUM includes all roles including department_head
             $roleColumn = $conn->query("SHOW COLUMNS FROM employee_accounts LIKE 'role'")->fetch_assoc();
             if ($roleColumn && isset($roleColumn['Type'])) {
-                if (strpos($roleColumn['Type'], "'teacher'") === false || strpos($roleColumn['Type'], "'hr'") === false) {
-                    $conn->query("ALTER TABLE employee_accounts MODIFY role ENUM('registrar','cashier','guidance','attendance','hr','teacher') NOT NULL");
+                if (strpos($roleColumn['Type'], "'department_head'") === false) {
+                    $conn->query("ALTER TABLE employee_accounts MODIFY role ENUM('registrar','cashier','guidance','attendance','hr','teacher','department_head') NOT NULL");
                 }
             }
 
