@@ -1,5 +1,11 @@
 <?php
 session_start();
+
+// Prevent caching
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 include("../StudentLogin/db_conn.php");
 
 // Require registrar login
@@ -274,6 +280,55 @@ input[type=number] { -moz-appearance: textfield; }
 </head>
 <body class="bg-gradient-to-br from-[#f3f6fb] to-[#e6ecf7] font-sans min-h-screen text-gray-900">
 
+<!-- Toast Notification -->
+<div id="toast" class="fixed top-5 right-5 z-[9999] hidden">
+  <div id="toastInner" class="px-4 py-3 rounded shadow-lg text-white"></div>
+</div>
+
+<!-- Approval/Rejection Notification -->
+<div id="approvalNotification" class="fixed top-5 right-5 z-[9999] hidden">
+  <div class="bg-white rounded-lg shadow-2xl p-6 max-w-md border-l-4 border-green-500">
+    <div class="flex items-start">
+      <div class="flex-shrink-0">
+        <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+      </div>
+      <div class="ml-3 flex-1">
+        <h3 class="text-sm font-semibold text-gray-900" id="approvalTitle">Request Approved!</h3>
+        <div class="mt-2 text-sm text-gray-600" id="approvalMessage"></div>
+      </div>
+      <button onclick="document.getElementById('approvalNotification').classList.add('hidden')" class="ml-4 text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Approval/Rejection Notification -->
+<div id="approvalNotification" class="fixed top-5 right-5 z-[9999] hidden">
+  <div class="bg-white rounded-lg shadow-2xl p-6 max-w-md border-l-4 border-green-500">
+    <div class="flex items-start">
+      <div class="flex-shrink-0">
+        <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+      </div>
+      <div class="ml-3 flex-1">
+        <h3 class="text-sm font-semibold text-gray-900" id="approvalTitle">Request Approved!</h3>
+        <div class="mt-2 text-sm text-gray-600" id="approvalMessage"></div>
+      </div>
+      <button onclick="document.getElementById('approvalNotification').classList.add('hidden')" class="ml-4 text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
 <header class="bg-[#0B2C62] text-white shadow-lg">
     <div class="container mx-auto px-6 py-4">
         <div class="flex justify-between items-center">
@@ -443,7 +498,7 @@ if (menuBtn && dropdownMenu) {
             <tbody id="accountTable" class="divide-y divide-gray-200">
                 <?php if (!empty($rows)): ?>
                     <?php foreach ($rows as $r): ?>
-                        <tr class="hover:bg-[#FBB917]/20 transition cursor-pointer" data-track="<?= htmlspecialchars($r['academic_track']) ?>" data-grade="<?= htmlspecialchars($r['grade_level']) ?>" onclick="viewStudent('<?= htmlspecialchars($r['id_number']) ?>')">
+                        <tr class="hover:bg-[#FBB917]/20 transition cursor-pointer" data-student-id="<?= htmlspecialchars($r['id_number']) ?>" data-track="<?= htmlspecialchars($r['academic_track']) ?>" data-grade="<?= htmlspecialchars($r['grade_level']) ?>" onclick="viewStudent('<?= htmlspecialchars($r['id_number']) ?>')">
                             <td class="px-4 py-3 serial"></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($r['id_number']) ?></td>
                             <td class="px-4 py-3"><?= htmlspecialchars($r['full_name']) ?></td>
@@ -488,8 +543,71 @@ if (menuBtn && dropdownMenu) {
 <?php include("Accounts/add_account.php"); ?>
 
 <script>
+// Show cancel deletion request modal
+function showCancelRequestModal(studentId) {
+    const modal = document.createElement('div');
+    modal.id = 'cancelRequestModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999]';
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-3">
+                    <svg class="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Cancel Deletion Request?</h3>
+                <p class="text-gray-600">Are you sure you want to cancel the pending deletion request for this student?</p>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="document.getElementById('cancelRequestModal').remove()" class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition">
+                    No, Keep Request
+                </button>
+                <button onclick="confirmCancelStudentRequest('${studentId}')" class="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition">
+                    Yes, Cancel Request
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// Confirm cancel deletion request
+async function confirmCancelStudentRequest(studentId) {
+    try {
+        const response = await fetch('../AdminF/cancel_hr_deletion_request.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `target_id=${encodeURIComponent(studentId)}&request_type=student_deletion`
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Deletion request cancelled successfully', 'success');
+            
+            // Remove the modal
+            const modal = document.getElementById('cancelRequestModal');
+            if (modal) modal.remove();
+            
+            // Close the student view modal
+            closeStudentModal();
+            
+            // Remove pending status from the row
+            updateRowPendingStatus(studentId, false);
+        } else {
+            showToast(data.message || 'Failed to cancel request', 'error');
+        }
+    } catch (error) {
+        console.error('Error cancelling request:', error);
+        showToast('An error occurred while cancelling the request', 'error');
+    }
+}
+
 // Wire up the embedded Student View (no inline script execution needed)
-function setupStudentModalHandlers(studentId) {
+async function setupStudentModalHandlers(studentId) {
     const overlay = document.getElementById('studentViewOverlay');
     const container = document.getElementById('studentViewInner');
     if (!container) return;
@@ -503,6 +621,47 @@ function setupStudentModalHandlers(studentId) {
     const form = root.querySelector('#studentForm');
     const gradeLevel = root.querySelector('#gradeLevel');
     const academicTrack = root.querySelector('select[name="academic_track"]');
+    
+    // Check if this student has a pending deletion request
+    let hasPendingDeletion = false;
+    try {
+        const response = await fetch('../AdminF/check_pending_requests.php');
+        const data = await response.json();
+        if (data.success && data.pending_requests) {
+            hasPendingDeletion = data.pending_requests.some(request => {
+                if (request.request_type === 'student_deletion') {
+                    const targetData = request.target_data ? JSON.parse(request.target_data) : {};
+                    return (targetData.id_number === studentId || request.target_id === studentId);
+                }
+                return false;
+            });
+        }
+    } catch (error) {
+        console.error('Error checking pending requests:', error);
+    }
+    
+    // Modify buttons based on pending deletion status
+    if (deleteBtn) {
+        if (hasPendingDeletion) {
+            // Show Cancel Deletion Request button
+            deleteBtn.textContent = 'Cancel Deletion Request';
+            deleteBtn.className = 'px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition';
+            deleteBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showCancelRequestModal(studentId);
+            };
+        }
+    }
+    
+    if (editBtn) {
+        if (hasPendingDeletion) {
+            // Hide Edit button when there's a pending deletion
+            editBtn.classList.add('hidden');
+        } else {
+            editBtn.classList.remove('hidden');
+        }
+    }
 
     // Ensure form posts to the server endpoint that handles updates/deletes
     if (form) {
@@ -680,33 +839,66 @@ function setupStudentModalHandlers(studentId) {
         editBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); toggleEditLocal(); };
     }
 
-    if (deleteBtn) {
+    if (deleteBtn && !hasPendingDeletion) {
         deleteBtn.onclick = (e) => {
             e.preventDefault(); e.stopPropagation();
-            // Build simple confirm overlay
+            
+            const idInput = root.querySelector('input[name="id_number"]');
+            const idVal = idInput ? idInput.value : '';
+            
+            // Store student ID for the inline handlers
+            window._deleteStudentId = idVal;
+            
+            // Build deletion request modal with reason input
             const c = document.createElement('div');
-            c.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[2147483647]';
+            c.id = 'deleteConfirmModal';
+            c.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999]';
+            c.style.pointerEvents = 'auto';
             c.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
-                    <h3 class="text-lg font-semibold mb-2">Delete Student Account</h3>
-                    <p class="text-gray-600 mb-6">Are you sure you want to delete this student account? This action cannot be undone.</p>
-                    <div class="flex justify-end gap-2">
-                        <button id="cCancel" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded">Cancel</button>
-                        <button id="cDelete" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+                    <div class="p-8">
+                        <div class="mx-auto w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-6">
+                            <svg class="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-3 text-center">Request Student Deletion</h3>
+                        <p class="text-gray-600 mb-4 text-center leading-relaxed">
+                            This action requires Owner approval. Please provide a reason for deletion.
+                        </p>
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Deletion Reason *</label>
+                            <textarea 
+                                id="deletionReasonInput"
+                                rows="4"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                                placeholder="Enter reason for deleting this student..."
+                                required
+                            ></textarea>
+                            <p class="text-xs text-gray-500 mt-1">This will be sent to the Owner for approval</p>
+                        </div>
                     </div>
-                </div>`;
+                    <div class="px-8 pb-8 flex gap-3">
+                        <button 
+                            onclick="document.getElementById('deleteConfirmModal').remove(); return false;"
+                            class="flex-1 px-6 py-3.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold transition-all duration-200"
+                            type="button"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onclick="handleStudentDeleteConfirm(); return false;"
+                            class="flex-1 px-6 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition-all duration-200"
+                            type="button"
+                            id="confirmDeleteBtn"
+                        >
+                            Send Request
+                        </button>
+                    </div>
+                </div>
+            `;
             document.body.appendChild(c);
-            c.querySelector('#cCancel').onclick = () => c.remove();
-            c.querySelector('#cDelete').onclick = () => {
-                const idInput = root.querySelector('input[name="id_number"]');
-                const idVal = idInput ? idInput.value : '';
-                const f = document.createElement('form');
-                f.method = 'POST';
-                f.action = `Accounts/view_student.php?id=${encodeURIComponent(studentId)}`;
-                f.innerHTML = `<input type="hidden" name="delete_student" value="1"><input type="hidden" name="id_number" value="${idVal}">`;
-                document.body.appendChild(f);
-                f.submit();
-            };
+            window._deleteModal = c;
         };
     }
 
@@ -1740,6 +1932,446 @@ function printQRCode() {
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
 }
+
+// Handle student delete confirmation (called from inline onclick)
+async function handleStudentDeleteConfirm() {
+    const studentId = window._deleteStudentId;
+    const modal = window._deleteModal;
+    const deletionReasonInput = document.getElementById('deletionReasonInput');
+    const deletionReason = deletionReasonInput.value.trim();
+    
+    if (!deletionReason) {
+        // Show error styling on the textarea
+        deletionReasonInput.classList.add('border-red-500', 'bg-red-50');
+        deletionReasonInput.focus();
+        
+        // Show error message below textarea
+        let errorMsg = deletionReasonInput.parentElement.querySelector('.error-message');
+        if (!errorMsg) {
+            errorMsg = document.createElement('p');
+            errorMsg.className = 'error-message text-red-600 text-sm mt-1 font-medium';
+            errorMsg.textContent = 'Please provide a reason for deletion';
+            deletionReasonInput.parentElement.appendChild(errorMsg);
+        }
+        
+        // Remove error styling when user starts typing
+        deletionReasonInput.addEventListener('input', function() {
+            this.classList.remove('border-red-500', 'bg-red-50');
+            const err = this.parentElement.querySelector('.error-message');
+            if (err) err.remove();
+        }, { once: true });
+        
+        return;
+    }
+    
+    // Disable button and show loading
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<svg class="animate-spin h-5 w-5 mx-auto" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'request_student_deletion');
+        formData.append('student_id', studentId);
+        formData.append('deletion_reason', deletionReason);
+        
+        const response = await fetch('request_student_deletion.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            modal.remove();
+            showToast('✅ Deletion request sent to Owner for approval', 'success');
+            
+            // Close the student information modal
+            closeStudentModal();
+            
+            // Update the row to show pending status without refresh
+            updateRowPendingStatus(studentId, true);
+        } else {
+            showToast('Error: ' + data.message, 'error');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Send Request';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('An error occurred while sending the request', 'error');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Send Request';
+    }
+}
+
+// Toast notification function
+function showToast(message, type='success'){
+    const t = document.getElementById('toast');
+    const ti = document.getElementById('toastInner');
+    if (!t || !ti) {
+        console.error('Toast elements not found');
+        return;
+    }
+    ti.className = 'px-4 py-3 rounded shadow-lg text-white ' + (type==='success'?'bg-green-600':'bg-red-600');
+    ti.textContent = message;
+    t.classList.remove('hidden');
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(()=>{ t.classList.add('hidden'); }, 3000);
+}
+
+// Show approval notification
+function showApprovalNotification(studentName, studentId, approval) {
+    const notif = document.getElementById('approvalNotification');
+    const title = document.getElementById('approvalTitle');
+    const message = document.getElementById('approvalMessage');
+    
+    if (!notif || !title || !message) return;
+    
+    // Update border color for approval (green)
+    notif.querySelector('div').className = 'bg-white rounded-lg shadow-2xl p-6 max-w-md border-l-4 border-green-500';
+    notif.querySelector('svg').className = 'w-6 h-6 text-green-500';
+    
+    title.textContent = '✓ Request Approved!';
+    message.innerHTML = `
+        <div class="space-y-1">
+            <p><strong>Your request has been processed</strong></p>
+            <p><strong>Request:</strong> Delete Student: ${studentName}</p>
+            <p><strong>Student ID:</strong> ${studentId}</p>
+            <p><strong>Approved by:</strong> ${approval.reviewedBy || 'School Owner'}</p>
+            <p><strong>Time:</strong> ${approval.reviewedAt || 'Just now'}</p>
+            ${approval.ownerComments ? `<p><strong>Comments:</strong> ${approval.ownerComments}</p>` : ''}
+        </div>
+    `;
+    
+    notif.classList.remove('hidden');
+    
+    // Auto-hide after 8 seconds
+    clearTimeout(window.__approvalTimer);
+    window.__approvalTimer = setTimeout(() => {
+        notif.classList.add('hidden');
+    }, 8000);
+}
+
+// Show rejection notification
+function showRejectionNotification(studentName, studentId, approval) {
+    const notif = document.getElementById('approvalNotification');
+    const title = document.getElementById('approvalTitle');
+    const message = document.getElementById('approvalMessage');
+    
+    if (!notif || !title || !message) return;
+    
+    // Update border color for rejection (red)
+    notif.querySelector('div').className = 'bg-white rounded-lg shadow-2xl p-6 max-w-md border-l-4 border-red-500';
+    notif.querySelector('svg').className = 'w-6 h-6 text-red-500';
+    notif.querySelector('svg').innerHTML = '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>';
+    
+    title.textContent = '✗ Request Rejected';
+    message.innerHTML = `
+        <div class="space-y-1">
+            <p><strong>Your request has been rejected</strong></p>
+            <p><strong>Request:</strong> Delete Student: ${studentName}</p>
+            <p><strong>Student ID:</strong> ${studentId}</p>
+            <p><strong>Rejected by:</strong> ${approval.reviewedBy || 'School Owner'}</p>
+            <p><strong>Time:</strong> ${approval.reviewedAt || 'Just now'}</p>
+            ${approval.ownerComments ? `<p><strong>Reason:</strong> ${approval.ownerComments}</p>` : ''}
+        </div>
+    `;
+    
+    notif.classList.remove('hidden');
+    
+    // Auto-hide after 8 seconds
+    clearTimeout(window.__approvalTimer);
+    window.__approvalTimer = setTimeout(() => {
+        notif.classList.add('hidden');
+    }, 8000);
+}
+
+// Update row pending status dynamically
+function updateRowPendingStatus(studentId, isPending) {
+    console.log('updateRowPendingStatus called:', studentId, isPending);
+    const table = document.getElementById('accountTable');
+    if (!table) {
+        console.error('Table not found');
+        return;
+    }
+    
+    const rows = table.querySelectorAll('tr');
+    console.log('Total rows found:', rows.length);
+    let found = false;
+    
+    rows.forEach(row => {
+        const idCell = row.querySelector('td:nth-child(2)'); // Student ID column
+        if (!idCell) return;
+        
+        const idText = idCell.textContent.trim();
+        console.log('Checking row with ID:', idText);
+        
+        if (idText.includes(studentId)) {
+            found = true;
+            console.log('Match found for student:', studentId);
+            
+            if (isPending) {
+                // Add pending status
+                row.classList.add('bg-orange-50', 'border-l-4', 'border-orange-500');
+                
+                // Add badge if not exists
+                if (!idCell.querySelector('.bg-orange-100')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 ml-2';
+                    badge.innerHTML = `
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                        </svg>
+                        Pending Deletion
+                    `;
+                    idCell.appendChild(badge);
+                    console.log('Badge added to student:', studentId);
+                }
+            } else {
+                // Remove pending status
+                row.classList.remove('bg-orange-50', 'border-l-4', 'border-orange-500');
+                
+                // Remove badge
+                const badge = idCell.querySelector('.bg-orange-100');
+                if (badge) {
+                    badge.remove();
+                    console.log('Badge removed from student:', studentId);
+                }
+            }
+        }
+    });
+    
+    if (!found) {
+        console.warn('No matching row found for student:', studentId);
+    }
+}
+
+// Remove student row from table
+function removeStudentRow(studentId) {
+    const table = document.getElementById('accountTable');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tr[data-student-id]');
+    rows.forEach(row => {
+        const rowStudentId = row.getAttribute('data-student-id');
+        if (rowStudentId === studentId) {
+            // Smooth fade out animation
+            row.style.transition = 'opacity 1.3s ease-out, transform 1.3s ease-out';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            
+            // Remove after animation completes
+            setTimeout(() => {
+                row.remove();
+                
+                // Update total count
+                const totalBadge = document.querySelector('.bg-\\[\\#0B2C62\\]');
+                if (totalBadge) {
+                    const match = totalBadge.textContent.match(/\d+/);
+                    if (match) {
+                        const currentCount = parseInt(match[0]);
+                        totalBadge.textContent = `Total: ${currentCount - 1}`;
+                    }
+                }
+                
+                // Re-render pagination
+                renderPage();
+            }, 1300);
+        }
+    });
+}
+
+// Check for pending deletion requests
+async function checkPendingDeletionRequests() {
+    console.log('checkPendingDeletionRequests called');
+    try {
+        const response = await fetch('../AdminF/check_pending_requests.php');
+        const data = await response.json();
+        console.log('Pending requests response:', data);
+        
+        if (data.success && data.pending_requests) {
+            console.log('Found pending requests:', data.pending_requests.length);
+            data.pending_requests.forEach(request => {
+                console.log('Processing request:', request);
+                // Check if it's a student deletion request (either by request_type or by checking if target_data has student fields)
+                const targetData = request.target_data ? JSON.parse(request.target_data) : {};
+                const isStudentDeletion = request.request_type === 'student_deletion' || 
+                                         (targetData.student_id || targetData.id_number || targetData.student_name);
+                
+                if (isStudentDeletion) {
+                    const studentId = targetData.id_number || targetData.student_id || request.target_id;
+                    console.log('Student deletion request for ID:', studentId);
+                    if (studentId) {
+                        updateRowPendingStatus(studentId, true);
+                    }
+                }
+            });
+        } else {
+            console.log('No pending requests found or request failed');
+        }
+    } catch (error) {
+        console.error('Error checking pending requests:', error);
+    }
+}
+
+// Show approval notification
+function showApprovalNotification(studentName, studentId, approval) {
+    const notif = document.getElementById('approvalNotification');
+    const title = document.getElementById('approvalTitle');
+    const message = document.getElementById('approvalMessage');
+    
+    if (!notif || !title || !message) return;
+    
+    // Update border color for approval (green)
+    notif.querySelector('div').className = 'bg-white rounded-lg shadow-2xl p-6 max-w-md border-l-4 border-green-500';
+    notif.querySelector('svg').className = 'w-6 h-6 text-green-500';
+    notif.querySelector('svg').innerHTML = '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>';
+    
+    title.textContent = '✓ Request Approved!';
+    message.innerHTML = `
+        <div class="space-y-1">
+            <p><strong>Your request has been processed</strong></p>
+            <p><strong>Request:</strong> Delete Student: ${studentName}</p>
+            <p><strong>Student ID:</strong> ${studentId}</p>
+            <p><strong>Approved by:</strong> ${approval.reviewedBy || 'School Owner'}</p>
+            <p><strong>Time:</strong> ${approval.reviewedAt || 'Just now'}</p>
+            ${approval.ownerComments ? `<p><strong>Comments:</strong> ${approval.ownerComments}</p>` : ''}
+        </div>
+    `;
+    
+    notif.classList.remove('hidden');
+    
+    // Auto-hide after 8 seconds
+    clearTimeout(window.__approvalTimer);
+    window.__approvalTimer = setTimeout(() => {
+        notif.classList.add('hidden');
+    }, 8000);
+}
+
+// Show rejection notification
+function showRejectionNotification(studentName, studentId, approval) {
+    const notif = document.getElementById('approvalNotification');
+    const title = document.getElementById('approvalTitle');
+    const message = document.getElementById('approvalMessage');
+    
+    if (!notif || !title || !message) return;
+    
+    // Update border color for rejection (red)
+    notif.querySelector('div').className = 'bg-white rounded-lg shadow-2xl p-6 max-w-md border-l-4 border-red-500';
+    notif.querySelector('svg').className = 'w-6 h-6 text-red-500';
+    notif.querySelector('svg').innerHTML = '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>';
+    
+    title.textContent = '✗ Request Rejected';
+    message.innerHTML = `
+        <div class="space-y-1">
+            <p><strong>Your request has been rejected</strong></p>
+            <p><strong>Request:</strong> Delete Student: ${studentName}</p>
+            <p><strong>Student ID:</strong> ${studentId}</p>
+            <p><strong>Rejected by:</strong> ${approval.reviewedBy || 'School Owner'}</p>
+            <p><strong>Time:</strong> ${approval.reviewedAt || 'Just now'}</p>
+            ${approval.ownerComments ? `<p><strong>Reason:</strong> ${approval.ownerComments}</p>` : ''}
+        </div>
+    `;
+    
+    notif.classList.remove('hidden');
+    
+    // Auto-hide after 8 seconds
+    clearTimeout(window.__approvalTimer);
+    window.__approvalTimer = setTimeout(() => {
+        notif.classList.add('hidden');
+    }, 8000);
+}
+
+// Check for student deletion approvals/rejections
+// Initialize to current server time to avoid processing old approvals
+let lastStudentDeletionCheck = null;
+let isInitialized = false;
+
+async function checkStudentDeletionApprovals() {
+    try {
+        // On first call, get current server time and don't process any approvals
+        if (!isInitialized) {
+            const response = await fetch(`../AdminF/check_approvals.php?last_check=${encodeURIComponent(new Date().toISOString())}`);
+            const data = await response.json();
+            if (data.success) {
+                lastStudentDeletionCheck = data.current_time;
+                isInitialized = true;
+                console.log('Initialized approval checking. Will check for approvals after:', lastStudentDeletionCheck);
+            }
+            return;
+        }
+        
+        const response = await fetch(`../AdminF/check_approvals.php?last_check=${encodeURIComponent(lastStudentDeletionCheck)}`);
+        const data = await response.json();
+        
+        console.log('Checking approvals since:', lastStudentDeletionCheck);
+        
+        if (data.success && data.approvals && data.approvals.length > 0) {
+            console.log('Found NEW approvals:', data.approvals.length);
+            data.approvals.forEach(approval => {
+                console.log('Processing approval:', approval);
+                
+                // Check if it's a student deletion by type OR by checking title/targetData
+                const targetData = approval.targetData ? JSON.parse(approval.targetData) : {};
+                const isStudentDeletion = approval.type === 'student_deletion' || 
+                                         approval.title?.includes('Delete Student:') ||
+                                         (targetData.student_id || targetData.id_number || targetData.student_name);
+                
+                if (isStudentDeletion) {
+                    const studentId = targetData.id_number || targetData.student_id || approval.target_id;
+                    const studentName = targetData.student_name || (targetData.first_name + ' ' + targetData.last_name) || 'Student';
+                    
+                    console.log('Student deletion approval for:', studentId, 'Status:', approval.status);
+                    
+                    if (approval.status === 'approved') {
+                        console.log('Removing row for approved student:', studentId);
+                        
+                        // Show approval notification
+                        showApprovalNotification(studentName, studentId, approval);
+                        
+                        // Start fading out the row immediately
+                        setTimeout(() => {
+                            removeStudentRow(studentId);
+                        }, 100);
+                    } else if (approval.status === 'rejected') {
+                        console.log('Removing pending status for rejected student:', studentId);
+                        
+                        // Show rejection notification
+                        showRejectionNotification(studentName, studentId, approval);
+                        
+                        // Remove pending status from the row
+                        updateRowPendingStatus(studentId, false);
+                    }
+                }
+            });
+            
+            // Update last check time
+            lastStudentDeletionCheck = data.current_time;
+            console.log('Updated last check time to:', lastStudentDeletionCheck);
+        }
+    } catch (error) {
+        console.error('Error checking student deletion approvals:', error);
+    }
+}
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Starting student deletion approval polling...');
+    
+    // Wait a bit for the table to fully render, then check for pending requests
+    setTimeout(() => {
+        checkPendingDeletionRequests();
+    }, 500);
+    
+    // Check immediately on load
+    checkStudentDeletionApprovals();
+    
+    // Check for student deletion approvals every 1 second for faster response
+    setInterval(checkStudentDeletionApprovals, 1000);
+    
+    // Also check for pending requests every 3 seconds to ensure consistency
+    setInterval(checkPendingDeletionRequests, 3000);
+});
 </script>
 </body>
 </html>

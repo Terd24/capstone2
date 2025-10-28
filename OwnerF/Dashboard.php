@@ -70,7 +70,7 @@ if ($check_column->num_rows == 0) {
 }
 
 // Alter existing table to add new enum values if they don't exist
-$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'hr_employee_deletion', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'database_backup', 'maintenance_mode_toggle', 'other') NOT NULL");
+$conn->query("ALTER TABLE owner_approval_requests MODIFY request_type ENUM('delete_account', 'restore_account', 'system_maintenance', 'data_modification', 'user_management', 'add_hr_employee', 'delete_hr_employee', 'hr_employee_deletion', 'student_deletion', 'restore_student', 'restore_employee', 'archive_student', 'archive_employee', 'archive_login_logs', 'archive_attendance', 'database_backup', 'maintenance_mode_toggle', 'other') NOT NULL");
 
 // Handle approval/rejection actions
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
@@ -189,6 +189,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                             }
                             
                             $conn->commit();
+                            break;
+                            
+                        case 'student_deletion':
+                            // Soft delete student
+                            error_log("Owner approving student deletion: $target_id");
+                            $conn->begin_transaction();
+                            
+                            // Get deletion reason from request_details
+                            $request_details = json_decode($request_data['request_details'], true);
+                            $deletion_reason = $request_details['deletion_reason'] ?? 'Approved by Owner';
+                            $deleted_by = $request_data['requester_name'] ?? 'Registrar';
+                            
+                            // Soft delete student
+                            $del_stmt = $conn->prepare("UPDATE student_account SET deleted_at = NOW(), deleted_by = ?, deleted_reason = ? WHERE id_number = ?");
+                            if ($del_stmt) {
+                                $del_stmt->bind_param('sss', $deleted_by, $deletion_reason, $target_id);
+                                if ($del_stmt->execute()) {
+                                    $affected = $del_stmt->affected_rows;
+                                    error_log("Soft deleted student $target_id - Affected rows: $affected");
+                                    if ($affected === 0) {
+                                        error_log("WARNING: No student found with id_number: $target_id");
+                                    }
+                                } else {
+                                    error_log("Failed to soft delete student: " . $del_stmt->error);
+                                    throw new Exception("Failed to delete student");
+                                }
+                                $del_stmt->close();
+                            }
+                            
+                            $conn->commit();
+                            error_log("Student deletion completed successfully");
                             break;
                             
                         case 'restore_student':

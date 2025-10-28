@@ -1,8 +1,8 @@
 <?php
 session_start();
 
-// Check if user is logged in as superadmin or HR
-if (!isset($_SESSION['role']) || !in_array(strtolower($_SESSION['role']), ['superadmin', 'hr'])) {
+// Check if user is logged in as superadmin, HR, or Registrar
+if (!isset($_SESSION['role']) || !in_array(strtolower($_SESSION['role']), ['superadmin', 'hr', 'registrar'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;
@@ -19,8 +19,10 @@ $last_check = isset($_GET['last_check']) ? $_GET['last_check'] : date('Y-m-d H:i
 $user_role = strtolower($_SESSION['role']);
 if ($user_role === 'superadmin') {
     $requester_name = $_SESSION['superadmin_name'] ?? $_SESSION['username'] ?? 'Super Admin';
-} else {
+} elseif ($user_role === 'hr') {
     $requester_name = $_SESSION['hr_name'] ?? $_SESSION['username'] ?? 'HR Staff';
+} else {
+    $requester_name = $_SESSION['registrar_name'] ?? $_SESSION['username'] ?? 'Registrar';
 }
 
 // Check for newly approved OR rejected requests since last check
