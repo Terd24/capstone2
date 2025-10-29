@@ -138,11 +138,11 @@ if ($check_pending && $check_pending->num_rows > 0) {
         <div class="border-b border-white/10 p-4 flex-shrink-0">
             <div class="flex items-center gap-3 px-2">
                 <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span class="text-sm font-semibold"><?= substr($_SESSION['superadmin_name'] ?? 'IT', 0, 2) ?></span>
+                    <span class="text-sm font-semibold"><?= substr(($_SESSION['first_name'] ?? 'I'), 0, 1) . substr(($_SESSION['last_name'] ?? 'T'), 0, 1) ?></span>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium truncate"><?= htmlspecialchars($_SESSION['superadmin_name'] ?? 'IT Personnel') ?></div>
-                    <div class="text-xs text-blue-200">Super Administrator</div>
+                    <div class="text-sm font-medium truncate"><?= htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?></div>
+                    <div class="text-xs text-blue-200">IT Personnel</div>
                 </div>
             </div>
         </div>
@@ -180,9 +180,9 @@ if ($check_pending && $check_pending->num_rows > 0) {
                 
                 <a href="#deleted-items" onclick="showSection('deleted-items', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <span>Deleted Items</span>
+                    <span>Inactive Records</span>
                 </a>
                 
                 <a href="#view-archives" onclick="showSection('view-archives', event)" class="nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/10 transition">
@@ -459,7 +459,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                         <div class="space-y-4">
                             <!-- Database Size -->
                             <div class="group p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                                <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
                                             <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -469,11 +469,6 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                         <span class="text-sm font-medium text-gray-700">Database Size</span>
                                     </div>
                                     <span class="text-lg font-bold text-gray-900"><?= number_format($db_size ?? 1.44, 2) ?> MB</span>
-                                </div>
-                                <div class="ml-10">
-                                    <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-blue-500 rounded-full" style="width: <?= min(100, (($db_size ?? 1.44) / 10) * 100) ?>%"></div>
-                                    </div>
                                 </div>
                             </div>
 
@@ -1007,8 +1002,8 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
                                 </svg>
                             </div>
-                            <div>
-                                <div class="text-[#1e3a8a] text-sm font-medium">Database Size</div>
+                            <div class="flex-1">
+                                <div class="text-[#1e3a8a] text-sm font-medium mb-1">Database Usage</div>
                                 <div class="text-3xl font-bold text-gray-900"><?= number_format($db_size ?? 1.44, 2) ?> MB</div>
                             </div>
                         </div>
@@ -1193,7 +1188,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                 </div>
             </div>
 
-            <!-- Deleted Items Section -->
+            <!-- Inactive Records Section -->
             <div id="deleted-items-section" class="section hidden">
                 <!-- Summary Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1207,7 +1202,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                 </svg>
                             </div>
                             <div>
-                                <div class="text-white/80 text-sm font-medium">Deleted Students</div>
+                                <div class="text-white/80 text-sm font-medium">Inactive Students</div>
                                 <div class="text-4xl font-bold text-white" id="deleted-students-count"><?= count($deleted_students) ?></div>
                             </div>
                         </div>
@@ -1222,20 +1217,20 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                 </svg>
                             </div>
                             <div>
-                                <div class="text-white/80 text-sm font-medium">Deleted Employees</div>
+                                <div class="text-white/80 text-sm font-medium">Inactive Employees</div>
                                 <div class="text-4xl font-bold text-white" id="deleted-employees-count"><?= count($deleted_employees) ?></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Deleted Students Table -->
+                <!-- Inactive Students Table -->
                 <div class="bg-white rounded-2xl shadow-lg mb-6">
                     <div class="px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-2">
                                 <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                                <h3 class="text-lg font-bold text-gray-900">Deleted Students (<span id="deleted-students-table-count"><?= count($deleted_students) ?></span>)</h3>
+                                <h3 class="text-lg font-bold text-gray-900">Inactive Students (<span id="deleted-students-table-count"><?= count($deleted_students) ?></span>)</h3>
                             </div>
                         </div>
                         
@@ -1338,7 +1333,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                             <svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
                                             </svg>
-                                            No deleted students found
+                                            No inactive students found
                                         </td>
                                     </tr>
                                 <?php endif; ?>
@@ -1362,13 +1357,13 @@ if ($check_pending && $check_pending->num_rows > 0) {
                     </div>
                 </div>
 
-                <!-- Deleted Employees Table -->
+                <!-- Inactive Employees Table -->
                 <div class="bg-white rounded-2xl shadow-lg" id="deleted-employees-section">
                     <div class="px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-2">
                                 <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                                <h3 class="text-lg font-bold text-gray-900">Deleted Employees (<span id="deleted-employees-table-count"><?= count($deleted_employees) ?></span>)</h3>
+                                <h3 class="text-lg font-bold text-gray-900">Inactive Employees (<span id="deleted-employees-table-count"><?= count($deleted_employees) ?></span>)</h3>
                             </div>
                         </div>
                         
@@ -1491,7 +1486,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                             <svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                             </svg>
-                                            No deleted employees found
+                                            No inactive employees found
                                         </td>
                                     </tr>
                                 <?php endif; ?>
@@ -1910,7 +1905,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                 'dashboard': 'Dashboard',
                 'hr-accounts': 'HR Accounts Management',
                 'system-maintenance': 'System Maintenance',
-                'deleted-items': 'Deleted Items Management',
+                'deleted-items': 'Inactive Records',
                 'view-archives': 'View Archives'
             };
             
@@ -4845,7 +4840,7 @@ function deletePermanently(recordId, recordType) {
 
             // Show confirmation dialog
             const accountTypeText = accountType === 'student' ? 'Student' : 'Employee';
-            const confirmMessage = `Export ${accountTypeText} Account to File\n\nAccount ID: ${accountId}\n\nThis will:\n• Create a comprehensive backup file with all account data\n• Include related records (grades, payments, attendance, etc.)\n• Save the file to your computer\n• Keep the record in the deleted items list\n\nDo you want to proceed with the export?`;
+            const confirmMessage = `Export ${accountTypeText} Account to File\n\nAccount ID: ${accountId}\n\nThis will:\n• Create a comprehensive backup file with all account data\n• Include related records (grades, payments, attendance, etc.)\n• Save the file to your computer\n• Keep the record in the inactive records list\n\nDo you want to proceed with the export?`;
             
             if (confirm(confirmMessage)) {
                 // Show loading state
@@ -4877,7 +4872,7 @@ function deletePermanently(recordId, recordType) {
                     button.classList.remove('opacity-50');
                     
                     // Show success message
-                    alert(`${accountTypeText} account data has been exported successfully!\n\nThe file has been downloaded to your computer and contains:\n• Complete account information\n• All related records and history\n• Export timestamp and metadata\n\nThe account remains in the deleted items list for potential restoration.`);
+                    alert(`${accountTypeText} account data has been exported successfully!\n\nThe file has been downloaded to your computer and contains:\n• Complete account information\n• All related records and history\n• Export timestamp and metadata\n\nThe account remains in the inactive records list for potential restoration.`);
                 }, 1000);
             }
         }
@@ -7043,7 +7038,7 @@ function deletePermanently(recordId, recordType) {
         filterDeletedEmployees(); // Re-apply current filters
     }
     
-    // Function to check for restored/archived items and remove them from deleted items list
+    // Function to check for restored/archived items and remove them from inactive records list
     async function checkRestoredArchived() {
         try {
             const response = await fetch(`check_restored_archived.php?last_check=${encodeURIComponent(lastRestoredArchivedCheck)}`);

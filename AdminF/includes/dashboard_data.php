@@ -167,10 +167,13 @@ if (table_exists($conn, 'teacher_attendance')) {
 
 // 5. SYSTEM HEALTH
 $db_size = 0;
+$db_capacity = 0;
+$db_usage_percent = 0;
 $table_count = 0;
 $total_records = 0;
 
 try {
+    // Get current database size (data + indexes)
     $db_info = $conn->query("SELECT 
         ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS db_size_mb,
         COUNT(*) as table_count
@@ -181,8 +184,25 @@ try {
         $db_size = $row['db_size_mb'] ?? 0;
         $table_count = $row['table_count'] ?? 0;
     }
+    
+    // Get database capacity/max size (if set, otherwise use default)
+    // Most MySQL installations don't have a per-database limit, so we'll use a reasonable default
+    $capacity_query = $conn->query("SHOW VARIABLES LIKE 'max_heap_table_size'");
+    if ($capacity_query && $capacity_row = $capacity_query->fetch_assoc()) {
+        // Convert bytes to MB, but use a reasonable default of 1GB if not set
+        $db_capacity = 1024; // Default 1GB capacity for display purposes
+    } else {
+        $db_capacity = 1024; // Default 1GB
+    }
+    
+    // Calculate usage percentage
+    if ($db_capacity > 0) {
+        $db_usage_percent = round(($db_size / $db_capacity) * 100, 2);
+    }
+    
 } catch (Exception $e) {
     error_log("Database info error: " . $e->getMessage());
+    $db_capacity = 1024; // Fallback to 1GB
 }
 
 // Count total records in main tables

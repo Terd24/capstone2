@@ -156,6 +156,25 @@ if ($entries_limit) {
     $grades_query .= " LIMIT " . $entries_limit;
 }
 $grades_result = $conn->query($grades_query);
+
+// Get teacher ID from session
+$teacher_id = $_SESSION['id_number'] ?? '';
+
+// Fetch sections that this teacher is assigned to via teacher_sections table
+// Join with class_schedules and student_schedules to get accurate student counts
+$my_sections_query = "SELECT DISTINCT
+                      ts.section_name,
+                      COUNT(DISTINCT ss.student_id) as student_count
+                      FROM teacher_sections ts
+                      LEFT JOIN class_schedules cs ON ts.section_name = cs.section_name
+                      LEFT JOIN student_schedules ss ON cs.id = ss.schedule_id
+                      WHERE ts.teacher_id = ?
+                      GROUP BY ts.section_name
+                      ORDER BY ts.section_name ASC";
+$my_sections_stmt = $conn->prepare($my_sections_query);
+$my_sections_stmt->bind_param("s", $teacher_id);
+$my_sections_stmt->execute();
+$my_sections_result = $my_sections_stmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -272,6 +291,57 @@ $grades_result = $conn->query($grades_query);
 
 <!-- Main Content -->
 <div class="container mx-auto px-6 py-8">
+    <!-- My Sections -->
+    <div class="mb-6">
+        <div class="bg-white rounded-xl card-shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">My Sections</h2>
+                    <p class="text-sm text-gray-500 mt-1">Sections you are currently teaching</p>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-lg">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <?php if ($my_sections_result && $my_sections_result->num_rows > 0): ?>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <?php while ($section = $my_sections_result->fetch_assoc()): ?>
+                        <div class="bg-white border-2 border-blue-200 rounded-lg p-5 hover:shadow-lg transition-all cursor-pointer hover:border-blue-400" 
+                             onclick="showSectionStudentsByName('<?= htmlspecialchars($section['section_name']) ?>')">
+                            <div class="flex justify-between items-start mb-3">
+                                <h3 class="text-lg font-bold text-gray-800">
+                                    <?= htmlspecialchars($section['section_name']) ?>
+                                </h3>
+                            </div>
+                            <div class="space-y-2 text-sm text-gray-600">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                    </svg>
+                                    <span><?= $section['student_count'] ?> student(s) assigned</span>
+                                </div>
+                            </div>
+                            <button class="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+                                View Students
+                            </button>
+                        </div>
+                    <?php endwhile; ?>
+                </div>
+            <?php else: ?>
+                <div class="text-center py-8">
+                    <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    <p class="text-gray-400 text-sm">No sections assigned yet</p>
+                    <p class="text-gray-300 text-xs mt-1">Sections will appear here once you add grades for students</p>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <!-- Student Search Section -->
     <div id="student-search-section" class="mb-6">
         <div class="bg-white rounded-xl card-shadow p-6">
@@ -473,6 +543,38 @@ $grades_result = $conn->query($grades_query);
                     <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Save Grade</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Section Students Modal -->
+<div id="sectionStudentsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-800" id="sectionModalTitle">Section Students</h3>
+            <button onclick="hideSectionStudentsModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Search Input -->
+        <div class="mb-4">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input type="text" id="sectionStudentSearch" placeholder="Search students by name, ID number, or program..." 
+                       class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                       onkeyup="filterSectionStudents()">
+            </div>
+        </div>
+        
+        <div id="sectionStudentsList" class="space-y-2 overflow-y-auto flex-1">
+            <!-- Students will be loaded here -->
         </div>
     </div>
 </div>
@@ -996,6 +1098,145 @@ function viewStudentGrades(studentId, studentName, gradeLevelText = '', program 
     document.getElementById('student-grades-view').classList.remove('hidden');
     
     loadStudentGrades(studentId);
+}
+
+// Select student from "My Students" list
+function selectStudentFromList(studentId, studentName, gradeLevel, program) {
+    viewStudentGrades(studentId, studentName, gradeLevel, program);
+}
+
+// Show section students modal by section name
+function showSectionStudentsByName(sectionName) {
+    const modal = document.getElementById('sectionStudentsModal');
+    const title = document.getElementById('sectionModalTitle');
+    const listDiv = document.getElementById('sectionStudentsList');
+    
+    // Set title
+    title.textContent = sectionName;
+    
+    // Show loading
+    listDiv.innerHTML = `
+        <div class="text-center py-8">
+            <div class="spinner mx-auto mb-4"></div>
+            <p class="text-gray-500 text-sm">Loading students...</p>
+        </div>
+    `;
+    
+    modal.classList.remove('hidden');
+    
+    // Fetch students in this section
+    const params = new URLSearchParams({
+        section_name: sectionName
+    });
+    
+    fetch('api/get_section_students.php?' + params.toString())
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.students && data.students.length > 0) {
+                let html = '';
+                data.students.forEach(student => {
+                    const safeName = String(student.student_name).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                    const safeGL = String(student.grade_level || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                    const safeProg = String(student.academic_track || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                    
+                    // Create searchable string for filtering
+                    const searchInfo = `${student.student_name} ${student.id_number} ${student.academic_track || ''} ${student.grade_level || ''}`;
+                    
+                    html += `
+                        <div class="bg-gray-50 hover:bg-blue-50 p-4 rounded-lg cursor-pointer transition-all border border-gray-200 hover:border-blue-300" 
+                             data-student-info="${searchInfo.toLowerCase()}"
+                             onclick="hideSectionStudentsModal(); viewStudentGrades('${student.id_number}', '${safeName}', '${safeGL}', '${safeProg}');">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <div class="bg-blue-100 p-2 rounded-full">
+                                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-800">${student.student_name}</h3>
+                                        <p class="text-sm text-gray-600">ID: ${student.id_number}</p>
+                                    </div>
+                                </div>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    `;
+                });
+                listDiv.innerHTML = html;
+            } else {
+                listDiv.innerHTML = `
+                    <div class="text-center py-8">
+                        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        <p class="text-gray-400 text-sm">No students found in this section</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading section students:', error);
+            listDiv.innerHTML = `
+                <div class="text-center py-8">
+                    <svg class="w-16 h-16 mx-auto text-red-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-red-500 font-medium">Error loading students</p>
+                </div>
+            `;
+        });
+}
+
+// Hide section students modal
+function hideSectionStudentsModal() {
+    document.getElementById('sectionStudentsModal').classList.add('hidden');
+    // Clear search input
+    const searchInput = document.getElementById('sectionStudentSearch');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+}
+
+// Filter section students based on search input
+function filterSectionStudents() {
+    const searchInput = document.getElementById('sectionStudentSearch');
+    const filter = searchInput.value.toLowerCase();
+    const studentsList = document.getElementById('sectionStudentsList');
+    const studentCards = studentsList.querySelectorAll('[data-student-info]');
+    
+    let visibleCount = 0;
+    
+    studentCards.forEach(card => {
+        const studentInfo = card.getAttribute('data-student-info').toLowerCase();
+        if (studentInfo.includes(filter)) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Show "no results" message if no students match
+    const existingNoResults = studentsList.querySelector('.no-results-message');
+    if (existingNoResults) {
+        existingNoResults.remove();
+    }
+    
+    if (visibleCount === 0 && filter !== '') {
+        const noResultsDiv = document.createElement('div');
+        noResultsDiv.className = 'no-results-message text-center py-8';
+        noResultsDiv.innerHTML = `
+            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-gray-500 font-medium">No students found</p>
+            <p class="text-gray-400 text-sm mt-1">Try a different search term</p>
+        `;
+        studentsList.appendChild(noResultsDiv);
+    }
 }
 
 // Load student grades
@@ -1700,18 +1941,9 @@ function loadGradesByTerm() {
 // Store all grades for filtering
 let allGrades = [];
 
-// Handle back navigation based on current view
+// Handle back navigation - always go to dashboard
 function handleBackNavigation() {
-    const studentGradesView = document.getElementById('student-grades-view');
-    const searchSection = document.getElementById('search-section');
-    
-    // If we're viewing student grades, go back to search
-    if (!studentGradesView.classList.contains('hidden')) {
-        showSearchSection();
-    } else {
-        // Otherwise use browser back
-        window.history.back();
-    }
+    window.location.href = 'Dashboard.php';
 }
 
 // Initialize when DOM is ready
