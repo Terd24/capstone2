@@ -1,8 +1,9 @@
 <?php
-// Suppress PHP errors for AJAX requests
+// Enable error reporting for debugging
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    error_reporting(0);
-    ini_set('display_errors', 0);
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+    ini_set('log_errors', 1);
 }
 
 session_start();
@@ -584,7 +585,9 @@ function parseGradeLevel(glText){
 
 function getSemesterFromTermString(termStr){
   const t = String(termStr||'');
-  return /2nd/i.test(t) ? '2nd' : '1st';
+  const result = /2nd/i.test(t) ? '2nd' : '1st';
+  console.log('getSemesterFromTermString - Input:', termStr, '| Output:', result);
+  return result;
 }
 
 function mapStrandFromProgram(program){
@@ -636,57 +639,102 @@ function normalizeGradeLabel(gl){
 }
 
 async function fetchOfferedSubjects(gradeLevelText, program, termValue){
-  // Get the offered subjects for this specific grade/strand/semester
+  // Get the offered subjects for this specific student's grade/strand/semester
   const gradeStr = normalizeGradeLabel(gradeLevelText);
   const isCollege = /(1st|2nd|3rd|4th)\s+Year$/i.test(gradeStr);
   const strand = isCollege ? '' : mapStrandFromProgram(program);
   const semester = getSemesterFromTermString(termValue);
-  const sy = termValue || '';
+  
+  // Don't pass school year - we only want to filter by semester/term
+  // This allows subjects to show for any school year as long as the semester matches
+  const sy = '';
+  
+  console.log('=== FETCH OFFERED SUBJECTS ===');
+  console.log('Input termValue:', termValue);
+  console.log('Extracted semester:', semester);
+  console.log('Fetching subjects for:', {grade: gradeStr, strand, semester, 'school_year': 'ANY (filtering by semester only)'});
+  
   const params = new URLSearchParams({action:'list', grade_level: gradeStr, strand, semester, sy});
+  console.log('API URL:', 'api/subject_offerings.php?'+params.toString());
+  
   const res = await fetch('api/subject_offerings.php?'+params.toString());
   const d = await res.json();
   const offeredSubjects = (d && d.success && Array.isArray(d.items)) ? d.items : [];
+  
+  console.log('API Response:', d);
+  console.log('Offered subjects for student:', offeredSubjects);
   
   // Get teacher's assigned subjects
   const teacherSubjectsRes = await fetch('api/get_teacher_subjects.php');
   const teacherSubjectsData = await teacherSubjectsRes.json();
   const teacherSubjects = teacherSubjectsData.success ? teacherSubjectsData.subjects : [];
   
-  // If teacher has assigned subjects, filter them to only show subjects offered for this grade/strand/semester
-  if (teacherSubjects.length > 0 && offeredSubjects.length > 0) {
-    // Create a map of offered subject names (normalized for comparison)
-    const offeredNames = new Set(offeredSubjects.map(s => s.name.toLowerCase().trim()));
-    
-    // Filter teacher subjects to only include those that are offered for this grade/strand/semester
-    const filteredTeacherSubjects = teacherSubjects.filter(ts => 
-      offeredNames.has(ts.subject_name.toLowerCase().trim())
-    );
-    
-    // Return the filtered subjects
-    return filteredTeacherSubjects.map(subj => ({
-      id: subj.id,
-      name: subj.subject_name,
-      code: ''
-    }));
-  }
+  console.log('Teacher assigned subjects:', teacherSubjects);
   
-  // If teacher has no assigned subjects, return all offered subjects
+  // If teacher has no assigned subjects, return all offered subjects (admin/fallback mode)
   if (teacherSubjects.length === 0) {
+    console.log('Teacher has no assigned subjects, showing all offered subjects');
     return offeredSubjects;
   }
   
-  // If no offered subjects for this grade/strand/semester, return empty
-  return [];
+  // If no subjects are offered for this student's grade/strand/semester, return empty
+  if (offeredSubjects.length === 0) {
+    console.log('No subjects offered for this student grade/strand/semester');
+    return [];
+  }
+  
+  // Find intersection: subjects that are BOTH assigned to teacher AND offered for this student
+  const offeredMap = new Map();
+  offeredSubjects.forEach(s => {
+    const key = s.name.toLowerCase().trim();
+    offeredMap.set(key, s);
+  });
+  
+  const intersection = [];
+  teacherSubjects.forEach(ts => {
+    const key = ts.subject_name.toLowerCase().trim();
+    if (offeredMap.has(key)) {
+      const offered = offeredMap.get(key);
+      intersection.push({
+        id: ts.id,
+        name: ts.subject_name,
+        code: offered.code || ''
+      });
+      console.log('✓ Match found:', ts.subject_name, '- Teacher can grade this subject');
+    } else {
+      console.log('✗ No match:', ts.subject_name, '- Not offered for this student');
+    }
+  });
+  
+  console.log('Final subjects (intersection):', intersection);
+  
+  // Return only subjects that match both criteria
+  return intersection;
 }
 
 async function populateSubjectOptions(info, preselectSubject=null){
   const reqId = ++subjectOptionsRequestId;
   const sel = document.getElementById('subjectSelect');
   if (!sel) return;
+  
+  // Get term from BOTH the hidden combined field AND the visible dropdowns
   const termSel = document.getElementById('modalTermSelect');
-  const termValue = termSel ? termSel.value : '';
+  const yearSel = document.getElementById('modalSchoolYear');
+  const termOnlySel = document.getElementById('modalTermOnly');
+  
+  // Build term value from visible dropdowns if hidden field is empty
+  let termValue = termSel ? termSel.value : '';
+  if (!termValue && yearSel && termOnlySel) {
+    termValue = `${yearSel.value} ${termOnlySel.value}`;
+    console.log('Built termValue from visible dropdowns:', termValue);
+  }
 
-  console.log('Populating subjects for term:', termValue, 'grade:', info?.gradeLevelText, 'program:', info?.program);
+  console.log('=== POPULATE SUBJECT OPTIONS ===');
+  console.log('Hidden field (modalTermSelect):', termSel ? termSel.value : 'N/A');
+  console.log('Year dropdown:', yearSel ? yearSel.value : 'N/A');
+  console.log('Term dropdown:', termOnlySel ? termOnlySel.value : 'N/A');
+  console.log('Final termValue used:', termValue);
+  console.log('Grade:', info?.gradeLevelText, '| Program:', info?.program);
 
   // Clear current selection first to avoid showing invalid subjects
   sel.innerHTML = '<option value="">-- Select Subject --</option>';
@@ -1302,14 +1350,53 @@ function showAddGradeModal() {
             termSelect.setAttribute('data-listener-added', 'true');
         }
         
-        // Get latest term and populate the field
-        getLatestTermAndPopulate();
-        // Immediately default to 1st Term so newly added Term 1 subjects show
+        // Don't call getLatestTermAndPopulate() - we want to default to current year
+        // Immediately default to current year and 1st Term
         setTimeout(()=>{
           try{
             const yearSel = document.getElementById('modalSchoolYear');
             const termOnlySel = document.getElementById('modalTermOnly');
             const combinedSel = document.getElementById('modalTermSelect');
+            
+            // Calculate current academic year (August boundary)
+            const now = new Date();
+            const month = now.getMonth() + 1; // 1..12
+            const startYear = (month >= 8) ? now.getFullYear() : (now.getFullYear() - 1);
+            const curSY = `${startYear}-${startYear+1}`;
+            
+            // Ensure current year option exists in BOTH dropdowns
+            if (yearSel) {
+              const hasCur = Array.from(yearSel.options).some(o=> (o.value||'') === curSY);
+              if (!hasCur){ 
+                const o=document.createElement('option'); 
+                o.value=curSY; 
+                o.textContent=curSY; 
+                yearSel.insertBefore(o, yearSel.firstChild); 
+              }
+              // Set to current year
+              yearSel.value = curSY;
+            }
+            
+            // Also ensure the combined hidden select has the current year options
+            if (combinedSel) {
+              const term1 = `${curSY} 1st Term`;
+              const term2 = `${curSY} 2nd Term`;
+              const hasTerm1 = Array.from(combinedSel.options).some(o=> o.value === term1);
+              const hasTerm2 = Array.from(combinedSel.options).some(o=> o.value === term2);
+              if (!hasTerm1) {
+                const o = document.createElement('option');
+                o.value = term1;
+                o.textContent = term1;
+                combinedSel.insertBefore(o, combinedSel.firstChild);
+              }
+              if (!hasTerm2) {
+                const o = document.createElement('option');
+                o.value = term2;
+                o.textContent = term2;
+                combinedSel.insertBefore(o, combinedSel.firstChild);
+              }
+            }
+            
             if (termOnlySel){ termOnlySel.value = '1st Term'; }
             if (yearSel && termOnlySel && combinedSel){
               combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
@@ -1327,10 +1414,18 @@ function showAddGradeModal() {
             }
             if (termOnlySel && !termOnlySel.hasAttribute('data-sync')){
               termOnlySel.addEventListener('change', ()=>{
-                combinedSel.value = `${yearSel.value} ${termOnlySel.value}`;
+                const newCombinedValue = `${yearSel.value} ${termOnlySel.value}`;
+                combinedSel.value = newCombinedValue;
+                console.log('Term changed! New combined value:', newCombinedValue);
+                console.log('Combined select value after update:', combinedSel.value);
+                console.log('Term only value:', termOnlySel.value);
                 // Clear grade inputs when term changes
                 clearGradeInputs();
-                populateSubjectOptions(currentStudentInfo);
+                // Use setTimeout to ensure the DOM has updated before fetching subjects
+                setTimeout(() => {
+                  console.log('About to populate subjects, combined value is:', combinedSel.value);
+                  populateSubjectOptions(currentStudentInfo);
+                }, 10);
               });
               termOnlySel.setAttribute('data-sync','1');
             }
@@ -1421,15 +1516,20 @@ function showAddGradeModal() {
             const yearSel = document.getElementById('modalSchoolYear');
             const termOnlySel = document.getElementById('modalTermOnly');
             if (yMatch && yearSel && termOnlySel){
-              // Determine current academic SY (August boundary) and ensure dropdown has both current and next SY
+              // Determine current academic SY (August boundary)
               const now = new Date();
               const month = now.getMonth() + 1; // 1..12
               const startYear = (month >= 8) ? now.getFullYear() : (now.getFullYear() - 1);
               const curSY = `${startYear}-${startYear+1}`;
-              // Ensure current SY option exists (do not add next SY)
+              // Ensure current SY option exists
               const hasCur = Array.from(yearSel.options).some(o=> (o.value||'') === curSY);
-              if (!hasCur){ const o=document.createElement('option'); o.value=curSY; o.textContent=curSY; yearSel.insertBefore(o, yearSel.firstChild); }
-              // Select current SY automatically and default to 1st Term
+              if (!hasCur){ 
+                const o=document.createElement('option'); 
+                o.value=curSY; 
+                o.textContent=curSY; 
+                yearSel.insertBefore(o, yearSel.firstChild); 
+              }
+              // ALWAYS select current SY (2025-2026) and default to 1st Term
               yearSel.value = curSY;
               termOnlySel.value = '1st Term';
               // Keep combined hidden in sync and refresh subjects
@@ -1452,7 +1552,7 @@ function showAddGradeModal() {
 
 // Refresh term selector with latest terms from database
 function refreshTermSelector() {
-    fetch('get_student_grades.php', {
+    return fetch('api/get_student_grades.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `student_id=${encodeURIComponent(currentStudentId)}`
@@ -1483,9 +1583,19 @@ document.getElementById('addGradeForm').addEventListener('submit', function(e) {
     const formData = new FormData(this);
     
     // Debug: Log form data
-    console.log('Submitting grade with grading_system:', formData.get('grading_system'));
+    console.log('=== SUBMITTING GRADE ===');
+    console.log('Grading system:', formData.get('grading_system'));
     console.log('Student ID:', formData.get('student_id'));
     console.log('Subject:', formData.get('subject'));
+    console.log('School Year & Term from form:', formData.get('school_year_term'));
+    
+    // Also log the actual dropdown values
+    const yearSel = document.getElementById('modalSchoolYear');
+    const termSel = document.getElementById('modalTermOnly');
+    const combinedSel = document.getElementById('modalTermSelect');
+    console.log('Year dropdown value:', yearSel ? yearSel.value : 'N/A');
+    console.log('Term dropdown value:', termSel ? termSel.value : 'N/A');
+    console.log('Combined hidden field value:', combinedSel ? combinedSel.value : 'N/A');
     
     // Submit to backend
     fetch('ManageGrades.php', {
@@ -1500,11 +1610,39 @@ document.getElementById('addGradeForm').addEventListener('submit', function(e) {
             
             hideAddGradeModal();
             
+            // Get the term that was just used for the grade
+            const savedTerm = formData.get('school_year_term');
+            console.log('Grade saved with term:', savedTerm);
+            
             // Reload grades for current student and refresh terms
             if (currentStudentId) {
-                loadStudentGrades(currentStudentId);
-                // Refresh term selector to include any new terms
-                refreshTermSelector();
+                // First refresh the term selector to include any new terms
+                refreshTermSelector().then(() => {
+                    // After refresh, update the term selector to show the term we just added
+                    const termSelector = document.getElementById('termSelector');
+                    if (termSelector && savedTerm) {
+                        console.log('Available terms in selector:', Array.from(termSelector.options).map(o => o.value));
+                        // Check if this term exists in the dropdown
+                        const termExists = Array.from(termSelector.options).some(opt => opt.value === savedTerm);
+                        console.log('Does saved term exist in dropdown?', termExists);
+                        if (termExists) {
+                            termSelector.value = savedTerm;
+                            console.log('Switched term selector to:', savedTerm);
+                            // Trigger change event to reload grades
+                            termSelector.dispatchEvent(new Event('change'));
+                        } else {
+                            console.log('Term not found in dropdown, reloading with saved term anyway');
+                            loadStudentGrades(currentStudentId, savedTerm);
+                        }
+                    } else {
+                        // No term selector or saved term, just reload
+                        loadStudentGrades(currentStudentId);
+                    }
+                }).catch(err => {
+                    console.error('Error refreshing term selector:', err);
+                    // Fallback: just reload grades
+                    loadStudentGrades(currentStudentId);
+                });
             }
         } else {
             alert('Error: ' + (data.message || 'Failed to save grade'));

@@ -3,7 +3,15 @@ session_start();
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-if (!isset($_SESSION['registrar_id'])) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
+// Allow both Registrar and Department Head to access this API
+$allowed_roles = ['registrar', 'department_head'];
+$user_role = $_SESSION['role'] ?? null;
+$is_authorized = (isset($_SESSION['registrar_id']) || (isset($user_role) && in_array($user_role, $allowed_roles)));
+
+if (!$is_authorized) { 
+    echo json_encode(['success'=>false,'message'=>'Unauthorized']); 
+    exit; 
+}
 
 require_once("../../StudentLogin/db_conn.php");
 

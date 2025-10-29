@@ -71,9 +71,9 @@ $dept_head_name = $_SESSION['dept_head_name'] ?? $_SESSION['username'] ?? 'Depar
     </div>
 
     <!-- Module Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Manage Teacher Schedule Card -->
-        <div class="bg-white rounded-xl shadow-lg p-6 border border-[#0B2C62]/10 hover:shadow-xl transition">
+        <div class="bg-white rounded-xl shadow-lg p-6 border border-[#0B2C62]/10 hover:shadow-xl transition flex flex-col">
             <div class="flex items-center mb-4">
                 <div class="bg-[#0B2C62] p-3 rounded-lg">
                     <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,14 +82,14 @@ $dept_head_name = $_SESSION['dept_head_name'] ?? $_SESSION['username'] ?? 'Depar
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 ml-4">Manage Teacher Schedule</h3>
             </div>
-            <p class="text-gray-600 mb-4">Create and manage teacher work schedules, assign subjects and sections</p>
-            <button onclick="window.location.href='ManageTeacherSchedule.php'" class="w-full px-4 py-3 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium">
+            <p class="text-gray-600 mb-4 flex-grow">Create and manage teacher work schedules, assign subjects and sections</p>
+            <button onclick="window.location.href='ManageTeacherSchedule.php'" class="w-full px-4 py-3 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium mt-auto">
                 Open Schedule Management
             </button>
         </div>
 
         <!-- Teacher Attendance Card -->
-        <div class="bg-white rounded-xl shadow-lg p-6 border border-[#0B2C62]/10 hover:shadow-xl transition">
+        <div class="bg-white rounded-xl shadow-lg p-6 border border-[#0B2C62]/10 hover:shadow-xl transition flex flex-col">
             <div class="flex items-center mb-4">
                 <div class="bg-[#0B2C62] p-3 rounded-lg">
                     <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,9 +98,25 @@ $dept_head_name = $_SESSION['dept_head_name'] ?? $_SESSION['username'] ?? 'Depar
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 ml-4">Teacher Attendance</h3>
             </div>
-            <p class="text-gray-600 mb-4">View and monitor teacher attendance records and reports</p>
-            <button onclick="window.location.href='TeacherAttendance.php'" class="w-full px-4 py-3 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium">
+            <p class="text-gray-600 mb-4 flex-grow">View and monitor teacher attendance records and reports</p>
+            <button onclick="window.location.href='TeacherAttendance.php'" class="w-full px-4 py-3 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium mt-auto">
                 View Attendance Records
+            </button>
+        </div>
+
+        <!-- Manage Subjects Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6 border border-[#0B2C62]/10 hover:shadow-xl transition flex flex-col">
+            <div class="flex items-center mb-4">
+                <div class="bg-[#0B2C62] p-3 rounded-lg">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 ml-4">Manage Student Subjects</h3>
+            </div>
+            <p class="text-gray-600 mb-4 flex-grow">Create, edit, and manage student academic subjects for different grade levels, strands, and terms</p>
+            <button onclick="window.location.href='ManageSubjects.php'" class="w-full px-4 py-3 bg-[#0B2C62] text-white rounded-lg shadow hover:bg-blue-900 transition font-medium mt-auto">
+                Manage Student Subjects
             </button>
         </div>
     </div>

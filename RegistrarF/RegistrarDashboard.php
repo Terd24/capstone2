@@ -246,12 +246,8 @@ function timeAgo($time) {
                       class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
                 Manage Accounts
               </button>
-              <button onclick="window.location.href='ManageSubjects.php'" 
-                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
-                Manage Subjects
-              </button>
               <button onclick="window.location.href='ManageSchedule.php'" 
-                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm">
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
                 Manage Student Schedule
               </button>
               <button onclick="window.location.href='AttendanceRecords.php'" 

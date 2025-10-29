@@ -841,16 +841,104 @@ if (!$sections_result) {
                 <div class="mb-1.5">
                     <label class="block text-sm font-semibold text-gray-700">Subjects <span class="text-red-500">*</span></label>
                 </div>
-                <div class="mb-2">
+                <div class="mb-2 grid grid-cols-2 gap-2">
+                    <select id="gradeLevelFilter" 
+                            class="px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            onchange="handleGradeLevelChange()">
+                        <option value="">All Grade Levels</option>
+                        <option value="Kinder">Kinder 1 & 2</option>
+                        <option value="Grade 1">Grade 1</option>
+                        <option value="Grade 2">Grade 2</option>
+                        <option value="Grade 3">Grade 3</option>
+                        <option value="Grade 4">Grade 4</option>
+                        <option value="Grade 5">Grade 5</option>
+                        <option value="Grade 6">Grade 6</option>
+                        <option value="Grade 7">Grade 7</option>
+                        <option value="Grade 8">Grade 8</option>
+                        <option value="Grade 9">Grade 9</option>
+                        <option value="Grade 10">Grade 10</option>
+                        <option value="Grade 11">Grade 11</option>
+                        <option value="Grade 12">Grade 12</option>
+                        <option value="1st Year">1st Year (College)</option>
+                        <option value="2nd Year">2nd Year (College)</option>
+                        <option value="3rd Year">3rd Year (College)</option>
+                        <option value="4th Year">4th Year (College)</option>
+                    </select>
                     <input type="text" id="subjectSearch" placeholder="Search subjects..." 
-                           class="w-full px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                           class="px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                            onkeyup="filterSubjects()">
                 </div>
+                
+                <!-- Strand/Course and Semester Filters (2 columns) -->
+                <div class="mb-2 grid grid-cols-2 gap-2">
+                    <!-- Strand Filter (for Grade 11-12) -->
+                    <div id="strandFilterContainer" class="hidden">
+                        <select id="strandFilter" 
+                                class="w-full px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                onchange="filterSubjectsByGrade()">
+                            <option value="">All Strands</option>
+                            <option value="STEM">STEM</option>
+                            <option value="ABM">ABM</option>
+                            <option value="HUMSS">HUMSS</option>
+                            <option value="GAS">GAS</option>
+                            <option value="HE">HE (Home Economics)</option>
+                            <option value="ICT">ICT</option>
+                            <option value="SPORTS">SPORTS</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Course Filter (for College) -->
+                    <div id="courseFilterContainer" class="hidden">
+                        <select id="courseFilter" 
+                                class="w-full px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                onchange="filterSubjectsByGrade()">
+                            <option value="">All Courses</option>
+                            <option value="BPED">BPED (Bachelor of Physical Education)</option>
+                            <option value="BECED">BECED (Bachelor of Early Childhood Education)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Semester/Term Filter -->
+                    <div id="semesterFilterContainer" class="hidden">
+                        <select id="semesterFilter" 
+                                class="w-full px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                onchange="filterSubjectsByGrade()">
+                            <option value="">All Semesters</option>
+                            <option value="1st">1st Semester</option>
+                            <option value="2nd">2nd Semester</option>
+                        </select>
+                    </div>
+                </div>
+                
                 <div class="border-2 border-gray-200 rounded-lg p-2 max-h-40 overflow-y-auto bg-gray-50">
                     <div id="subjectsContainer" class="grid grid-cols-2 gap-1.5">
                         <?php if ($subjects_result && $subjects_result->num_rows > 0): ?>
-                            <?php while ($subject = $subjects_result->fetch_assoc()): ?>
-                                <label class="flex items-center gap-1.5 p-1.5 hover:bg-white rounded cursor-pointer transition">
+                            <?php 
+                            // Fetch subject offerings to map subjects to grade levels, strands, and semesters
+                            $subject_offerings_map = [];
+                            $offerings_query = "SELECT subject_id, grade_level, strand, semester FROM subject_offerings";
+                            $offerings_result = $conn->query($offerings_query);
+                            if ($offerings_result) {
+                                while ($offering = $offerings_result->fetch_assoc()) {
+                                    if (!isset($subject_offerings_map[$offering['subject_id']])) {
+                                        $subject_offerings_map[$offering['subject_id']] = [];
+                                    }
+                                    $subject_offerings_map[$offering['subject_id']][] = [
+                                        'grade_level' => $offering['grade_level'],
+                                        'strand' => $offering['strand'],
+                                        'semester' => $offering['semester']
+                                    ];
+                                }
+                            }
+                            
+                            $subjects_result->data_seek(0); // Reset pointer
+                            while ($subject = $subjects_result->fetch_assoc()): 
+                                $offerings = isset($subject_offerings_map[$subject['id']]) ? $subject_offerings_map[$subject['id']] : [];
+                                $offerings_json = !empty($offerings) ? htmlspecialchars(json_encode($offerings)) : '[]';
+                            ?>
+                                <label class="flex items-center gap-1.5 p-1.5 hover:bg-white rounded cursor-pointer transition subject-item" 
+                                       data-offerings='<?= $offerings_json ?>'
+                                       data-subject-name="<?= htmlspecialchars(strtolower($subject['name'])) ?>">
                                     <input type="checkbox" name="subjects[]" value="<?= htmlspecialchars($subject['name']) ?>" 
                                            class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
                                     <span class="text-xs text-gray-700">
@@ -1982,6 +2070,49 @@ function validateSubjects() {
     return true;
 }
 
+// Handle grade level change to show/hide strand and semester filters
+function handleGradeLevelChange() {
+    const gradeFilter = document.getElementById('gradeLevelFilter');
+    const strandContainer = document.getElementById('strandFilterContainer');
+    const courseContainer = document.getElementById('courseFilterContainer');
+    const semesterContainer = document.getElementById('semesterFilterContainer');
+    
+    if (!gradeFilter) return;
+    
+    const selectedGrade = gradeFilter.value.trim();
+    
+    // Show/hide strand filter for Grade 11-12
+    if (selectedGrade === 'Grade 11' || selectedGrade === 'Grade 12') {
+        if (strandContainer) strandContainer.classList.remove('hidden');
+        if (courseContainer) courseContainer.classList.add('hidden');
+        if (semesterContainer) semesterContainer.classList.remove('hidden');
+    } 
+    // Show/hide course filter for College
+    else if (selectedGrade === '1st Year' || selectedGrade === '2nd Year' || 
+             selectedGrade === '3rd Year' || selectedGrade === '4th Year') {
+        if (strandContainer) strandContainer.classList.add('hidden');
+        if (courseContainer) courseContainer.classList.remove('hidden');
+        if (semesterContainer) semesterContainer.classList.remove('hidden');
+    } 
+    // Hide both for other grades
+    else {
+        if (strandContainer) strandContainer.classList.add('hidden');
+        if (courseContainer) courseContainer.classList.add('hidden');
+        if (semesterContainer) semesterContainer.classList.add('hidden');
+    }
+    
+    // Reset dependent filters
+    const strandFilter = document.getElementById('strandFilter');
+    const courseFilter = document.getElementById('courseFilter');
+    const semesterFilter = document.getElementById('semesterFilter');
+    if (strandFilter) strandFilter.value = '';
+    if (courseFilter) courseFilter.value = '';
+    if (semesterFilter) semesterFilter.value = '';
+    
+    // Apply filters
+    filterSubjectsByGrade();
+}
+
 // Filter subjects by search input
 function filterSubjects() {
     const searchInput = document.getElementById('subjectSearch');
@@ -1990,7 +2121,7 @@ function filterSubjects() {
     if (!searchInput || !container) return;
     
     const searchTerm = searchInput.value.toLowerCase().trim();
-    const labels = container.querySelectorAll('label');
+    const labels = container.querySelectorAll('label.subject-item');
     
     labels.forEach(label => {
         const text = label.textContent.toLowerCase();
@@ -2000,6 +2131,101 @@ function filterSubjects() {
             label.style.display = 'none';
         }
     });
+    
+    // Apply grade level filter if active
+    filterSubjectsByGrade();
+}
+
+// Filter subjects by grade level, strand, course, and semester
+function filterSubjectsByGrade() {
+    const gradeFilter = document.getElementById('gradeLevelFilter');
+    const strandFilter = document.getElementById('strandFilter');
+    const courseFilter = document.getElementById('courseFilter');
+    const semesterFilter = document.getElementById('semesterFilter');
+    const searchInput = document.getElementById('subjectSearch');
+    const container = document.getElementById('subjectsContainer');
+    
+    if (!gradeFilter || !container) return;
+    
+    const selectedGrade = gradeFilter.value.trim();
+    const selectedStrand = strandFilter ? strandFilter.value.trim() : '';
+    const selectedCourse = courseFilter ? courseFilter.value.trim() : '';
+    const selectedSemester = semesterFilter ? semesterFilter.value.trim() : '';
+    const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const labels = container.querySelectorAll('label.subject-item');
+    
+    let visibleCount = 0;
+    
+    labels.forEach(label => {
+        const offeringsStr = label.getAttribute('data-offerings') || '[]';
+        const subjectName = label.getAttribute('data-subject-name') || '';
+        
+        let offerings = [];
+        try {
+            offerings = JSON.parse(offeringsStr);
+        } catch (e) {
+            offerings = [];
+        }
+        
+        // Check if subject matches search term
+        const matchesSearch = !searchTerm || subjectName.includes(searchTerm);
+        
+        // Check if subject matches filters
+        let matchesFilters = true;
+        
+        if (selectedGrade || selectedStrand || selectedCourse || selectedSemester) {
+            matchesFilters = offerings.some(offering => {
+                let gradeMatch = true;
+                let strandMatch = true;
+                let semesterMatch = true;
+                
+                // Grade level matching
+                if (selectedGrade) {
+                    if (selectedGrade === 'Kinder') {
+                        gradeMatch = offering.grade_level === 'Kinder 1' || offering.grade_level === 'Kinder 2';
+                    } else {
+                        gradeMatch = offering.grade_level === selectedGrade;
+                    }
+                }
+                
+                // Strand matching (for Grade 11-12)
+                if (selectedStrand) {
+                    strandMatch = offering.strand === selectedStrand;
+                }
+                
+                // Course matching (for College)
+                if (selectedCourse) {
+                    strandMatch = offering.strand === selectedCourse;
+                }
+                
+                // Semester matching
+                if (selectedSemester) {
+                    semesterMatch = offering.semester === selectedSemester;
+                }
+                
+                return gradeMatch && strandMatch && semesterMatch;
+            });
+        }
+        
+        // Show label only if it matches all filters
+        if (matchesSearch && matchesFilters) {
+            label.style.display = 'flex';
+            visibleCount++;
+        } else {
+            label.style.display = 'none';
+        }
+    });
+    
+    // Show "no results" message if no subjects visible
+    const noResultsMsg = container.querySelector('.no-subjects-message');
+    if (visibleCount === 0 && !noResultsMsg) {
+        const msg = document.createElement('p');
+        msg.className = 'no-subjects-message text-xs text-gray-500 col-span-2 p-2';
+        msg.textContent = 'No subjects found matching the selected filters';
+        container.appendChild(msg);
+    } else if (visibleCount > 0 && noResultsMsg) {
+        noResultsMsg.remove();
+    }
 }
 
 // Filter sections by search input

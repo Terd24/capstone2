@@ -3,9 +3,12 @@ session_start();
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-// Allow registrar or teacher to access this endpoint
+// Allow registrar, teacher, or department_head to access this endpoint
 $role = $_SESSION['role'] ?? '';
-if (!isset($_SESSION['registrar_id']) && $role !== 'teacher') {
+$allowed_roles = ['registrar', 'teacher', 'department_head'];
+$is_authorized = (isset($_SESSION['registrar_id']) || in_array($role, $allowed_roles));
+
+if (!$is_authorized) {
   echo json_encode(['success'=>false,'message'=>'Unauthorized']);
   exit;
 }

@@ -8,15 +8,15 @@ if (!isset($_SESSION['parent_id']) || !isset($_SESSION['child_id'])) {
 }
 
 $id_number = $_SESSION['child_id'];
-$full_name = $_SESSION['child_name'] ?? 'Student';
 
-// Get student info for program and year section
-$student_stmt = $conn->prepare("SELECT academic_track, grade_level FROM student_account WHERE id_number = ?");
+// Get student info including name, program and year section
+$student_stmt = $conn->prepare("SELECT CONCAT(first_name, ' ', last_name) as full_name, academic_track, grade_level FROM student_account WHERE id_number = ?");
 $student_stmt->bind_param("s", $id_number);
 $student_stmt->execute();
 $student_result = $student_stmt->get_result();
 $student_info = $student_result->fetch_assoc();
 
+$full_name = $student_info['full_name'] ?? 'Student';
 $program = $student_info['academic_track'] ?? 'N/A';
 $year_section = $student_info['grade_level'] ?? 'N/A';
 
@@ -82,26 +82,28 @@ while ($row = $result->fetch_assoc()) {
       <!-- Student Profile -->
       <div class="lg:col-span-1">
         <div class="bg-white rounded-2xl card-shadow p-6">
+          <div class="mb-4 pb-4 border-b">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Your Child</h3>
+          </div>
           <div class="text-center">
-            <div class="w-20 h-20 mx-auto bg-gray-400 rounded-full flex items-center justify-center mb-4">
+            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center mb-4 shadow-lg">
               <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
               </svg>
             </div>
-            <h3 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($full_name) ?></h3>
-            <p class="text-gray-600 text-sm">ID: <?= htmlspecialchars($id_number) ?></p>
+            <h3 class="text-lg font-bold text-gray-900 mb-1"><?= htmlspecialchars($full_name) ?></h3>
+            <p class="text-gray-500 text-xs mb-4">Student ID: <?= htmlspecialchars($id_number) ?></p>
           </div>
           
-          <div class="mt-6 pt-6 border-t">
-            <div class="space-y-3 text-sm">
-              <div>
-                <span class="text-gray-500 font-medium">Program:</span>
-                <p class="text-gray-800"><?= htmlspecialchars($program) ?></p>
-              </div>
-              <div>
-                <span class="text-gray-500 font-medium">Year & Section:</span>
-                <p class="text-gray-800"><?= htmlspecialchars($year_section) ?></p>
-              </div>
+          <div class="space-y-3 text-sm">
+            <div class="bg-blue-50 rounded-lg p-3">
+              <p class="text-xs font-semibold text-gray-600 mb-1">Program</p>
+              <p class="font-bold text-gray-900"><?= htmlspecialchars($program) ?></p>
+            </div>
+            
+            <div class="bg-blue-50 rounded-lg p-3">
+              <p class="text-xs font-semibold text-gray-600 mb-1">Year & Section</p>
+              <p class="font-bold text-gray-900"><?= htmlspecialchars($year_section) ?></p>
             </div>
           </div>
         </div>
