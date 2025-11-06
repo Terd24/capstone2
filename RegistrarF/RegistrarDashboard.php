@@ -1072,6 +1072,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize all requests pagination
     initializeAllRequests();
     
+    // Restore filter state if returning from ViewStudentInfo
+    const savedFilter = sessionStorage.getItem('registrar_filter_state');
+    const savedPage = sessionStorage.getItem('registrar_page_state');
+    
+    if (savedFilter && savedFilter !== 'all') {
+        // Clear the session storage
+        sessionStorage.removeItem('registrar_filter_state');
+        sessionStorage.removeItem('registrar_page_state');
+        
+        // Apply the saved filter
+        const filterMap = {
+            'pending': 'Pending',
+            'approved': 'Approved',
+            'ready': 'Ready to Claim',
+            'claimed': 'Claimed',
+            'declined': 'Declined'
+        };
+        
+        const filterValue = filterMap[savedFilter] || savedFilter;
+        quickFilterStatus(filterValue);
+        
+        // Restore page number
+        if (savedPage) {
+            currentAllRequestsPage = parseInt(savedPage);
+            renderAllRequestsPage();
+        }
+    }
+    
     // Add event listeners for pagination buttons
     const prevBtn = document.getElementById('allRequestsPrevPage');
     const nextBtn = document.getElementById('allRequestsNextPage');
@@ -1098,6 +1126,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Add viewRequest function for clickable table rows
 function viewRequest(studentId, documentType, status) {
+    // Save current filter state before navigating
+    const currentFilter = document.querySelector('.quick-filter-btn.bg-\\[\\#0B2C62\\]')?.id?.replace('quickFilter-', '') || 'all';
+    sessionStorage.setItem('registrar_filter_state', currentFilter);
+    sessionStorage.setItem('registrar_page_state', currentAllRequestsPage);
+    
     window.location.href = `ViewStudentInfo.php?student_id=${encodeURIComponent(studentId)}&type=requested`;
 }
 
@@ -1555,25 +1588,7 @@ function updateAllRequestsTable(newRequests) {
     initializeAllRequests();
 }
 
-function updateStatusCounts(counts) {
-    // Update quick filter button badges
-    const updateBadge = (btnId, count) => {
-        const btn = document.getElementById(btnId);
-        if (btn) {
-            const badge = btn.querySelector('span');
-            if (badge) {
-                badge.textContent = count || 0;
-            }
-        }
-    };
-
-    updateBadge('quickFilter-all', counts.all);
-    updateBadge('quickFilter-pending', counts.pending);
-    updateBadge('quickFilter-approved', counts.approved);
-    updateBadge('quickFilter-ready', counts.ready);
-    updateBadge('quickFilter-claimed', counts.claimed);
-    updateBadge('quickFilter-declined', counts.declined);
-}
+// Removed duplicate function - using the one at line 909 that counts from DOM rows
 
 function updateUnreadBadge(unreadCount) {
     const badge = document.getElementById('notifBadge');
