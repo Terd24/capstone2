@@ -1431,9 +1431,49 @@ function testPasswordGeneration() {
 }
 
 // Close Add Account modal (used by the × button inside the modal markup)
-function closeModal() {
+function closeModal(event) {
+    // Prevent any default behavior or form submission
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
     const modal = document.getElementById('addAccountModal');
     const modalContent = document.getElementById('modalContent');
+    
+    // Clear any RFID error states
+    const rfidInput = document.getElementById('rfidInput');
+    if (rfidInput) {
+        rfidInput.classList.remove('border-red-500', 'bg-red-50');
+        rfidInput.classList.add('border-gray-300');
+        rfidInput.value = ''; // Clear the value to reset the field
+        
+        // Remove error message
+        const errorMsg = rfidInput.parentElement?.querySelector('.rfid-error-msg');
+        if (errorMsg) {
+            errorMsg.remove();
+        }
+    }
+    
+    // Clear all error messages
+    const allErrorMsgs = modal?.querySelectorAll('.rfid-error-msg');
+    if (allErrorMsgs) {
+        allErrorMsgs.forEach(msg => msg.remove());
+    }
+    
+    // Reset the form to clear any validation states
+    const form = modal?.querySelector('form');
+    if (form) {
+        // Don't use form.reset() as it might trigger navigation
+        // Just clear validation states
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.classList.remove('border-red-500', 'bg-red-50');
+            if (input.classList.contains('border')) {
+                input.classList.add('border-gray-300');
+            }
+        });
+    }
     
     // Instant close - no animation delay
     if (modalContent) {
@@ -1446,7 +1486,11 @@ function closeModal() {
     }
     document.body.style.overflow = '';
     
-    // Prevent any default behavior
+    // Prevent any default behavior and stop event propagation completely
+    if (event) {
+        event.stopImmediatePropagation();
+    }
+    
     return false;
 }
 

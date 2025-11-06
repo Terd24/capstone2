@@ -177,14 +177,41 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !defined('ADD_ACCOUNT_HANDLED')) {
         }
 
         if (!empty($rfid_uid)) {
+            // Check if RFID exists in student_account table
             $check_rfid = $conn->prepare("SELECT rfid_uid FROM student_account WHERE rfid_uid=?");
             $check_rfid->bind_param("s", $rfid_uid);
             $check_rfid->execute();
             $check_rfid->store_result();
             if ($check_rfid->num_rows > 0) {
-                $error_rfid = "RFID already in use!";
+                $error_rfid = "RFID already in use by another student!";
+                $error_msg = "RFID already in use by another student!";
+                $form_data = $_POST;
+                $show_modal = true;
+                $_SESSION['error_msg'] = $error_msg;
+                $_SESSION['error_rfid'] = $error_rfid;
+                $_SESSION['form_data'] = $form_data;
+                $_SESSION['show_modal'] = true;
             }
             $check_rfid->close();
+            
+            // Also check if RFID exists in employees table (teachers/staff)
+            if (empty($error_rfid)) {
+                $check_employee_rfid = $conn->prepare("SELECT rfid_uid FROM employees WHERE rfid_uid=?");
+                $check_employee_rfid->bind_param("s", $rfid_uid);
+                $check_employee_rfid->execute();
+                $check_employee_rfid->store_result();
+                if ($check_employee_rfid->num_rows > 0) {
+                    $error_rfid = "RFID already in use by an employee!";
+                    $error_msg = "RFID already in use by an employee!";
+                    $form_data = $_POST;
+                    $show_modal = true;
+                    $_SESSION['error_msg'] = $error_msg;
+                    $_SESSION['error_rfid'] = $error_rfid;
+                    $_SESSION['form_data'] = $form_data;
+                    $_SESSION['show_modal'] = true;
+                }
+                $check_employee_rfid->close();
+            }
         }
 
         // Validate required fields (middle_name and rfid_uid are optional)
@@ -1059,21 +1086,43 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
         <!-- Header -->
         <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#0B2C62] text-white">
             <h2 class="text-lg font-semibold">Add New Account</h2>
-            <button onclick="closeModal()" class="text-2xl font-bold hover:text-gray-300">&times;</button>
+            <button type="button" onclick="closeModal(event)" class="text-2xl font-bold hover:text-gray-300">&times;</button>
         </div>
 
 
         <!-- Error Messages -->
         <?php if (!empty($error_msg)): ?>
-            <div class="mx-6 mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                <?= $error_msg ?>
+            <div class="mx-6 mt-4 p-4 bg-red-50 border-2 border-red-500 text-red-700 rounded-lg">
+                <div class="flex items-start gap-3">
+                    <svg class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <div class="flex-1">
+                        <h4 class="text-red-800 font-bold text-base mb-1">Error</h4>
+                        <p class="text-red-700 font-medium"><?= $error_msg ?></p>
+                    </div>
+                </div>
             </div>
         <?php endif; ?>
 
         <!-- Unified Student and Parent Form -->
         <div id="unifiedForm" class="account-form">
-            <form method="POST" action="AccountList.php" autocomplete="off" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+            <form method="POST" action="add_account.php" autocomplete="off" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
                 <input type="hidden" name="account_type" value="unified_student_parent">
+                
+                <!-- Error Message Display Area -->
+                <div id="rfidErrorAlert" class="col-span-3 hidden bg-red-50 border-2 border-red-500 rounded-lg p-4 mb-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <h4 class="text-red-800 font-bold text-lg mb-1">RFID Duplicate Error</h4>
+                            <p id="rfidErrorMessage" class="text-red-700 font-medium"></p>
+                        </div>
+                        <button type="button" onclick="closeRfidError()" class="text-red-600 hover:text-red-800 font-bold text-xl">×</button>
+                    </div>
+                </div>
                 
                 <!-- Personal Information Section -->
                 <div class="col-span-3 bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
@@ -1424,7 +1473,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 
                 <!-- Submit Buttons -->
                 <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
-                    <button type="button" onclick="closeModal()" class="px-5 py-2 border border-[#0B2C62] text-[#0B2C62] rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Cancel</button>
+                    <button type="button" onclick="closeModal(event)" class="px-5 py-2 border border-[#0B2C62] text-[#0B2C62] rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Cancel</button>
                     <button type="button" onclick="showConfirmationModal()" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">Review & Create Account</button>
                 </div>
             </form>
@@ -1895,7 +1944,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Date validation and dynamic day updating initialized');
 });
 
-// Confirmation Modal Functions
+// Confirmation Modal Functions - v2.0 with RFID Duplicate Prevention
 function showConfirmationModal() {
     // Trigger the inline validation first
     const form = document.querySelector('#unifiedForm form');
@@ -1913,6 +1962,82 @@ function showConfirmationModal() {
     if (!form.checkValidity()) {
         form.reportValidity();
         return;
+    }
+    
+    // Check RFID for duplicates before showing confirmation
+    const rfidInput = document.getElementById('rfidInput');
+    const rfidValue = rfidInput ? rfidInput.value.trim() : '';
+    
+    if (rfidValue) {
+        // Use XMLHttpRequest with synchronous request to block until response
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'Accounts/check_rfid_duplicate.php', false); // Synchronous request
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        
+        try {
+            xhr.send('rfid_uid=' + encodeURIComponent(rfidValue));
+            
+            console.log('RFID Check Response Status:', xhr.status);
+            console.log('RFID Check Response:', xhr.responseText);
+            
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                
+                console.log('RFID Check Result:', result);
+                
+                if (result.duplicate === true) {
+                    // Show prominent error alert at top of form
+                    const errorAlert = document.getElementById('rfidErrorAlert');
+                    const errorMessage = document.getElementById('rfidErrorMessage');
+                    if (errorAlert && errorMessage) {
+                        errorMessage.textContent = result.message || 'RFID already in use!';
+                        errorAlert.classList.remove('hidden');
+                    }
+                    
+                    // Show error on RFID field
+                    if (rfidInput) {
+                        rfidInput.classList.add('border-red-500', 'bg-red-50');
+                        rfidInput.classList.remove('border-gray-300');
+                        
+                        // Show inline error message
+                        let errorMsg = rfidInput.parentElement.querySelector('.rfid-error-msg');
+                        if (!errorMsg) {
+                            errorMsg = document.createElement('p');
+                            errorMsg.className = 'rfid-error-msg text-red-500 text-sm mt-1 font-medium';
+                            rfidInput.parentElement.appendChild(errorMsg);
+                        }
+                        errorMsg.textContent = result.message || 'RFID already in use!';
+                        
+                        // Scroll to RFID field
+                        rfidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        rfidInput.focus();
+                    }
+                    
+                    // CRITICAL: Stop execution and don't show confirmation modal
+                    console.log('RFID DUPLICATE DETECTED - BLOCKING CONFIRMATION');
+                    return false;
+                } else {
+                    // Clear any previous errors
+                    const errorAlert = document.getElementById('rfidErrorAlert');
+                    if (errorAlert) errorAlert.classList.add('hidden');
+                    
+                    if (rfidInput) {
+                        rfidInput.classList.remove('border-red-500', 'bg-red-50');
+                        rfidInput.classList.add('border-gray-300');
+                        const errorMsg = rfidInput.parentElement.querySelector('.rfid-error-msg');
+                        if (errorMsg) errorMsg.remove();
+                    }
+                }
+            } else {
+                console.error('RFID check failed with status:', xhr.status);
+                alert('Error checking RFID. Please try again.');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error checking RFID:', error);
+            alert('Error checking RFID: ' + error.message);
+            return false;
+        }
     }
     
     // Collect form data
@@ -2178,6 +2303,20 @@ function confirmAndCreateStudent() {
     // Submit the original form
     const form = document.querySelector('#unifiedForm form');
     form.submit();
+}
+
+function closeRfidError() {
+    const errorAlert = document.getElementById('rfidErrorAlert');
+    errorAlert.classList.add('hidden');
+    
+    // Also clear RFID field error styling
+    const rfidInput = document.getElementById('rfidInput');
+    if (rfidInput) {
+        rfidInput.classList.remove('border-red-500', 'bg-red-50');
+        rfidInput.classList.add('border-gray-300');
+        const errorMsg = rfidInput.parentElement.querySelector('.rfid-error-msg');
+        if (errorMsg) errorMsg.remove();
+    }
 }
 
 </script>

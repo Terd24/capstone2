@@ -271,6 +271,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         $validation_errors[] = "Guardian's contact must be exactly 11 digits.";
     }
     
+    // Validate RFID if provided
+    if (!empty($rfid_uid)) {
+        // Check format
+        if (!preg_match('/^[0-9]{10}$/', $rfid_uid)) {
+            $validation_errors[] = "RFID must be exactly 10 digits.";
+        } else {
+            // Check if RFID is already used by another student
+            $check_rfid = $conn->prepare("SELECT id_number FROM student_account WHERE rfid_uid = ? AND id_number != ?");
+            $check_rfid->bind_param("ss", $rfid_uid, $student_id);
+            $check_rfid->execute();
+            $check_rfid->store_result();
+            if ($check_rfid->num_rows > 0) {
+                $validation_errors[] = "RFID already in use by another student!";
+            }
+            $check_rfid->close();
+            
+            // Check if RFID is already used by an employee
+            $check_employee_rfid = $conn->prepare("SELECT id_number FROM employees WHERE rfid_uid = ?");
+            $check_employee_rfid->bind_param("s", $rfid_uid);
+            $check_employee_rfid->execute();
+            $check_employee_rfid->store_result();
+            if ($check_employee_rfid->num_rows > 0) {
+                $validation_errors[] = "RFID already in use by an employee!";
+            }
+            $check_employee_rfid->close();
+        }
+    }
+    
     // If validation fails, redirect back with error message
     if (!empty($validation_errors)) {
         $_SESSION['error_msg'] = implode('<br>', $validation_errors);
@@ -989,15 +1017,34 @@ input[type=number] { -moz-appearance: textfield; }
                         </div>
                      </div>
 
-                    <div class="grid grid-cols-2 gap-6">
-                                                <div>
+                    <div class="grid grid-cols-2 gap-6 mt-4">
+                        <div>
                             <label class="block text-sm font-semibold mb-1">Student ID</label>
                             <input type="number" name="id_number" value="<?= htmlspecialchars($student_data['id_number'] ?? '') ?>" readonly disabled class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field cursor-not-allowed">
                         </div>
-                        <!-- RFID Number -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- RFID Section (Separate like in Add Account) -->
+            <div class="col-span-3 mb-6">
+                <div class="bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                        </svg>
+                        <span class="tracking-wide">STUDENT RFID CARD</span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">RFID Number</label>
-                            <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($student_data['rfid_uid'] ?? '') ?>" readonly pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only" data-maxlen="10" inputmode="numeric">
+                            <label class="block text-sm font-semibold mb-1">Student RFID Number</label>
+                            <input type="text" name="rfid_uid" id="rfidInput" autocomplete="off" value="<?= htmlspecialchars($student_data['rfid_uid'] ?? '') ?>" readonly pattern="^[0-9]{10}$" maxlength="10" title="Please enter exactly 10 digits (optional)" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 student-field digits-only focus:ring-2 focus:ring-[#2F8D46]" data-maxlen="10" inputmode="numeric">
+                            <p class="text-xs text-gray-500 mt-1">
+                                <span class="font-medium">For student use:</span> Attendance tracking, cashier transactions, and other school modules
+                            </p>
+                            <p class="text-xs text-blue-600 mt-1">
+                                📝 Note: For Kinder and Elementary students, parents can request documents through their parent account
+                            </p>
                         </div>
                     </div>
                 </div>
