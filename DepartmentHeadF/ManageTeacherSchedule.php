@@ -814,6 +814,14 @@ if (!$sections_result) {
             </div>
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Sections <span class="text-red-500">*</span></label>
+                
+                <!-- Selected Sections Display -->
+                <div id="selectedSectionsDisplay" class="mb-2 min-h-[40px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+                    <div id="selectedSectionsBadges" class="flex flex-wrap gap-2">
+                        <span class="text-xs text-gray-400 italic">No sections selected</span>
+                    </div>
+                </div>
+                
                 <div class="mb-2">
                     <input type="text" id="sectionSearch" placeholder="Search sections..." 
                            class="w-full px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
@@ -825,7 +833,8 @@ if (!$sections_result) {
                             <?php while ($section = $sections_result->fetch_assoc()): ?>
                                 <label class="flex items-center gap-1.5 p-1.5 hover:bg-white rounded cursor-pointer transition">
                                     <input type="checkbox" name="sections[]" value="<?= htmlspecialchars($section['section_name']) ?>" 
-                                           class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                                           class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4 section-checkbox"
+                                           onchange="updateSelectedSections()">
                                     <span class="text-xs text-gray-700"><?= htmlspecialchars($section['section_name']) ?></span>
                                 </label>
                             <?php endwhile; ?>
@@ -834,18 +843,26 @@ if (!$sections_result) {
                         <?php endif; ?>
                     </div>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Select all sections this teacher will handle</p>
+                <p class="text-xs text-gray-500 mt-1">Check sections to add them</p>
                 <p id="sectionError" class="hidden text-xs text-red-600 mt-1">Please select at least one section.</p>
             </div>
             <div>
                 <div class="mb-1.5">
                     <label class="block text-sm font-semibold text-gray-700">Subjects <span class="text-red-500">*</span></label>
                 </div>
+                
+                <!-- Selected Subjects Display -->
+                <div id="selectedSubjectsDisplay" class="mb-2 min-h-[40px] p-2 border-2 border-gray-200 rounded-lg bg-gray-50">
+                    <div id="selectedSubjectsBadges" class="flex flex-wrap gap-2">
+                        <span class="text-xs text-gray-400 italic">No subjects selected</span>
+                    </div>
+                </div>
+                
                 <div class="mb-2 grid grid-cols-2 gap-2">
                     <select id="gradeLevelFilter" 
                             class="px-3 py-1.5 text-xs border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                             onchange="handleGradeLevelChange()">
-                        <option value="">All Grade Levels</option>
+                        <option value="">-- Select Grade Level --</option>
                         <option value="Kinder">Kinder 1 & 2</option>
                         <option value="Grade 1">Grade 1</option>
                         <option value="Grade 2">Grade 2</option>
@@ -912,6 +929,7 @@ if (!$sections_result) {
                 
                 <div class="border-2 border-gray-200 rounded-lg p-2 max-h-40 overflow-y-auto bg-gray-50">
                     <div id="subjectsContainer" class="grid grid-cols-2 gap-1.5">
+                        <p class="text-xs text-gray-400 italic col-span-2 p-2 text-center">Please select a grade level to view subjects</p>
                         <?php if ($subjects_result && $subjects_result->num_rows > 0): ?>
                             <?php 
                             // Fetch subject offerings to map subjects to grade levels, strands, and semesters
@@ -936,11 +954,12 @@ if (!$sections_result) {
                                 $offerings = isset($subject_offerings_map[$subject['id']]) ? $subject_offerings_map[$subject['id']] : [];
                                 $offerings_json = !empty($offerings) ? htmlspecialchars(json_encode($offerings)) : '[]';
                             ?>
-                                <label class="flex items-center gap-1.5 p-1.5 hover:bg-white rounded cursor-pointer transition subject-item" 
+                                <label class="flex items-center gap-1.5 p-1.5 hover:bg-white rounded cursor-pointer transition subject-item hidden" 
                                        data-offerings='<?= $offerings_json ?>'
                                        data-subject-name="<?= htmlspecialchars(strtolower($subject['name'])) ?>">
                                     <input type="checkbox" name="subjects[]" value="<?= htmlspecialchars($subject['name']) ?>" 
-                                           class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                                           class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4 subject-checkbox"
+                                           onchange="updateSelectedSubjects()">
                                     <span class="text-xs text-gray-700">
                                         <?= htmlspecialchars($subject['name']) ?>
                                         <?php if (!empty($subject['code'])): ?>
@@ -954,7 +973,7 @@ if (!$sections_result) {
                         <?php endif; ?>
                     </div>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Select all subjects this teacher will handle</p>
+                <p class="text-xs text-gray-500 mt-1">Check subjects to add them</p>
                 <p id="subjectsError" class="hidden text-xs text-red-600 mt-1">Please select at least one subject.</p>
             </div>
             <div>
@@ -1116,6 +1135,29 @@ if (!$sections_result) {
                 </button>
                 <button onclick="confirmDelete()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium">
                     Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Item Confirmation Modal -->
+<div id="removeItemModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4">
+        <div class="text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 mb-4">
+                <svg class="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2" id="removeItemTitle">Remove Item</h3>
+            <p class="text-sm text-gray-500 mb-6" id="removeItemMessage">Are you sure you want to remove this item?</p>
+            <div class="flex gap-3">
+                <button onclick="hideRemoveItemModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium">
+                    Cancel
+                </button>
+                <button onclick="confirmRemoveItem()" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg font-medium">
+                    Remove
                 </button>
             </div>
         </div>
@@ -1848,6 +1890,8 @@ function editSchedule(id) {
                     sectionCheckboxes.forEach(checkbox => {
                         checkbox.checked = schedule.sections.includes(checkbox.value);
                     });
+                    // Update the sections badge display
+                    updateSelectedSections();
                 }
                 
                 // Pre-check subject checkboxes
@@ -1856,6 +1900,8 @@ function editSchedule(id) {
                     subjectCheckboxes.forEach(checkbox => {
                         checkbox.checked = schedule.subjects.includes(checkbox.value);
                     });
+                    // Update the subjects badge display
+                    updateSelectedSubjects();
                 }
                 
                 // Set schedule type based on whether it has day-specific schedules
@@ -1956,6 +2002,35 @@ function confirmDelete() {
 
 function viewScheduleStudents(id, sectionName) {
     window.location.href = `view_schedule_students.php?schedule_id=${id}&section_name=${encodeURIComponent(sectionName)}`;
+}
+
+// Custom Remove Item Modal Functions
+let removeItemCallback = null;
+
+function showRemoveItemModal(title, message, onConfirm) {
+    const modal = document.getElementById('removeItemModal');
+    const titleEl = document.getElementById('removeItemTitle');
+    const messageEl = document.getElementById('removeItemMessage');
+    
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    
+    removeItemCallback = onConfirm;
+    
+    if (modal) modal.classList.remove('hidden');
+}
+
+function hideRemoveItemModal() {
+    const modal = document.getElementById('removeItemModal');
+    if (modal) modal.classList.add('hidden');
+    removeItemCallback = null;
+}
+
+function confirmRemoveItem() {
+    if (removeItemCallback) {
+        removeItemCallback();
+    }
+    hideRemoveItemModal();
 }
 
 // View Schedule Details (Students)
@@ -2111,6 +2186,110 @@ function handleGradeLevelChange() {
     
     // Apply filters
     filterSubjectsByGrade();
+}
+
+// Update selected subjects display
+function updateSelectedSubjects() {
+    const checkboxes = document.querySelectorAll('.subject-checkbox:checked');
+    const badgesContainer = document.getElementById('selectedSubjectsBadges');
+    
+    if (!badgesContainer) return;
+    
+    badgesContainer.innerHTML = '';
+    
+    if (checkboxes.length === 0) {
+        badgesContainer.innerHTML = '<span class="text-xs text-gray-400 italic">No subjects selected</span>';
+    } else {
+        checkboxes.forEach(checkbox => {
+            const badge = document.createElement('span');
+            badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium';
+            badge.innerHTML = `
+                ${checkbox.value}
+                <button type="button" onclick="removeSubjectBadge('${checkbox.value.replace(/'/g, "\\'")}'); event.stopPropagation();" class="ml-1 hover:text-green-600">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            `;
+            badgesContainer.appendChild(badge);
+        });
+    }
+    
+    // Hide error if subjects are selected
+    const error = document.getElementById('subjectsError');
+    if (error && checkboxes.length > 0) {
+        error.classList.add('hidden');
+    }
+}
+
+// Remove subject badge and uncheck checkbox
+function removeSubjectBadge(subjectName) {
+    // Show custom confirmation modal
+    showRemoveItemModal(
+        'Remove Subject',
+        `Remove "${subjectName}" from this teacher's subjects?`,
+        () => {
+            const checkboxes = document.querySelectorAll('.subject-checkbox');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.value === subjectName) {
+                    checkbox.checked = false;
+                }
+            });
+            updateSelectedSubjects();
+        }
+    );
+}
+
+// Update selected sections display
+function updateSelectedSections() {
+    const checkboxes = document.querySelectorAll('.section-checkbox:checked');
+    const badgesContainer = document.getElementById('selectedSectionsBadges');
+    
+    if (!badgesContainer) return;
+    
+    badgesContainer.innerHTML = '';
+    
+    if (checkboxes.length === 0) {
+        badgesContainer.innerHTML = '<span class="text-xs text-gray-400 italic">No sections selected</span>';
+    } else {
+        checkboxes.forEach(checkbox => {
+            const badge = document.createElement('span');
+            badge.className = 'inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium';
+            badge.innerHTML = `
+                ${checkbox.value}
+                <button type="button" onclick="removeSectionBadge('${checkbox.value.replace(/'/g, "\\'")}'); event.stopPropagation();" class="ml-1 hover:text-blue-600">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            `;
+            badgesContainer.appendChild(badge);
+        });
+    }
+    
+    // Hide error if sections are selected
+    const error = document.getElementById('sectionError');
+    if (error && checkboxes.length > 0) {
+        error.classList.add('hidden');
+    }
+}
+
+// Remove section badge and uncheck checkbox
+function removeSectionBadge(sectionName) {
+    // Show custom confirmation modal
+    showRemoveItemModal(
+        'Remove Section',
+        `Remove "${sectionName}" from this teacher's sections?`,
+        () => {
+            const checkboxes = document.querySelectorAll('.section-checkbox');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.value === sectionName) {
+                    checkbox.checked = false;
+                }
+            });
+            updateSelectedSections();
+        }
+    );
 }
 
 // Filter subjects by search input

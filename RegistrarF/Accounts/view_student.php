@@ -98,7 +98,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_student'])) {
         }
         
         $_SESSION['success_msg'] = "Student account deleted successfully!";
-        header("Location: /RegistrarF/AccountList.php");
+        header("Location: ../AccountList.php");
         exit;
     } else {
         $error_msg = "Error deleting student account.";
@@ -429,7 +429,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         );
         
         $_SESSION['success_msg'] = "Student information updated successfully!";
-        header("Location: /RegistrarF/AccountList.php?type=student");
+        header("Location: ../AccountList.php?type=student");
         exit;
     } else {
         $error_msg = "Error updating student information.";
@@ -438,7 +438,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
 }
 
 if (!$student_data) {
-    header("Location: /RegistrarF/AccountList.php?type=student");
+    header("Location: ../AccountList.php?type=student");
     exit;
 }
 

@@ -63,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             requester_module VARCHAR(50) NOT NULL,
             target_id VARCHAR(100),
             target_data JSON,
-            request_details JSON,
             status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
             priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
             requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -74,6 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             INDEX idx_type (request_type),
             INDEX idx_requested_at (requested_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        
+        // Add request_details column if it doesn't exist
+        $conn->query("ALTER TABLE owner_approval_requests ADD COLUMN IF NOT EXISTS request_details JSON");
         
         // Prepare request data
         $employee_name = $employee['first_name'] . ' ' . $employee['last_name'];

@@ -7,7 +7,7 @@ $id_number = $_SESSION['id_number'];
 $term_result = $conn->query("SELECT DISTINCT school_year_term FROM student_fee_items WHERE id_number = '$id_number' ORDER BY school_year_term DESC");
 
 // Dropdown selected term
-$selected_term = $_GET['term'] ?? '';
+$selected_term = $_POST['term'] ?? $_GET['term'] ?? '';
 if (!$selected_term && $term_result->num_rows > 0) {
     $row = $term_result->fetch_assoc();
     $selected_term = $row['school_year_term'];
@@ -34,11 +34,27 @@ while ($fee = $fee_result->fetch_assoc()) {
 }
 $remaining_balance = $gross_total - $total_paid;
 
-// Get payments
+// Pagination for payments
+$records_per_page = 10;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = max(1, $page);
+$offset = ($page - 1) * $records_per_page;
+
+// Get total payment count
+$count_query = "SELECT COUNT(*) as total FROM student_payments WHERE id_number = ? AND school_year_term = ?";
+$count_stmt = $conn->prepare($count_query);
+$count_stmt->bind_param("ss", $id_number, $school_year_term);
+$count_stmt->execute();
+$total_records = $count_stmt->get_result()->fetch_assoc()['total'];
+$total_pages = ceil($total_records / $records_per_page);
+
+// Get paginated payments
 $pay_query = "SELECT fee_type, amount, or_number, date FROM student_payments 
-              WHERE id_number = ? AND school_year_term = ? ORDER BY date DESC";
+              WHERE id_number = ? AND school_year_term = ? 
+              ORDER BY date DESC
+              LIMIT ? OFFSET ?";
 $pay_stmt = $conn->prepare($pay_query);
-$pay_stmt->bind_param("ss", $id_number, $school_year_term);
+$pay_stmt->bind_param("ssii", $id_number, $school_year_term, $records_per_page, $offset);
 $pay_stmt->execute();
 $pay_result = $pay_stmt->get_result();
 ?>
@@ -135,7 +151,7 @@ $pay_result = $pay_stmt->get_result();
   <div class="bg-white rounded-2xl card-shadow p-4 sm:p-6 mb-6 sm:mb-8">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <h2 class="text-base sm:text-lg font-semibold text-gray-800">Academic Term</h2>
-      <form method="GET" class="w-full sm:w-auto">
+      <form method="POST" class="w-full sm:w-auto">
         <div class="relative">
           <select name="term" onchange="this.form.submit()"
                   class="w-full sm:w-auto appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-10 text-sm sm:text-base font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-h-[48px]">
@@ -227,17 +243,7 @@ $pay_result = $pay_stmt->get_result();
 
     <?php if ($pay_result->num_rows > 0): ?>
       <div class="p-4 space-y-4">
-        <?php 
-        $payment_records = [];
-        while ($row = $pay_result->fetch_assoc()) {
-          $payment_records[] = $row;
-        }
-        $total_records = count($payment_records);
-        $initial_display = 3; // Show only 3 records initially
-        
-        for ($i = 0; $i < min($initial_display, $total_records); $i++): 
-          $row = $payment_records[$i];
-        ?>
+        <?php while ($row = $pay_result->fetch_assoc()): ?>
           <div class="payment-record border border-gray-200 rounded p-3">
             <div class="flex justify-between items-start mb-3">
               <div>
@@ -257,50 +263,38 @@ $pay_result = $pay_stmt->get_result();
               <span class="font-semibold text-green-600">₱<?= number_format($row['amount'], 2) ?></span>
             </div>
           </div>
-        <?php endfor; ?>
-        
-        <?php if ($total_records > $initial_display): ?>
-          <!-- Hidden records -->
-          <div id="hiddenRecords" style="display: none;">
-            <?php for ($i = $initial_display; $i < $total_records; $i++): 
-              $row = $payment_records[$i];
-            ?>
-              <div class="payment-record border border-gray-200 rounded p-3">
-                <div class="flex justify-between items-start mb-3">
-                  <div>
-                    <div class="font-medium text-gray-800"><?= date('F j, Y', strtotime($row['date'])) ?></div>
-                    <div class="text-sm text-gray-600">OR #<?= htmlspecialchars($row['or_number']) ?></div>
-                  </div>
-                  <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">Paid</span>
-                </div>
-                
-                <div class="flex justify-between text-sm py-1">
-                  <span class="text-gray-600"><?= htmlspecialchars($row['fee_type']) ?></span>
-                  <span class="text-gray-900">₱<?= number_format($row['amount'], 2) ?></span>
-                </div>
-                
-                <div class="flex justify-between pt-2 mt-2 border-t border-gray-200">
-                  <span class="font-semibold text-gray-800">Total Payment</span>
-                  <span class="font-semibold text-green-600">₱<?= number_format($row['amount'], 2) ?></span>
-                </div>
-              </div>
-            <?php endfor; ?>
-          </div>
-          
-          <!-- View More/View Less buttons -->
-          <div class="text-center pt-4 border-t border-gray-200">
-            <button id="viewMoreBtn" onclick="togglePaymentHistory()" 
-                    class="bg-[#0B2C62] hover:bg-blue-900 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">
-              View More (<?= $total_records - $initial_display ?> more)
-            </button>
-            <button id="viewLessBtn" onclick="togglePaymentHistory()" 
-                    class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors" 
-                    style="display: none;">
-              View Less
-            </button>
-          </div>
-        <?php endif; ?>
+        <?php endwhile; ?>
       </div>
+      
+      <!-- Pagination -->
+      <?php if ($total_pages > 1): ?>
+        <div class="px-4 py-4 border-t border-gray-200 bg-gray-50">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-sm text-gray-600">
+              Showing <?= min($offset + 1, $total_records) ?> to <?= min($offset + $records_per_page, $total_records) ?> of <?= $total_records ?> payments
+            </div>
+            <div class="flex gap-2">
+              <?php if ($page > 1): ?>
+                <a href="?page=<?= $page - 1 ?>" class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                  Previous
+                </a>
+              <?php endif; ?>
+              
+              <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                <a href="?page=<?= $i ?>" class="px-4 py-2 <?= $i === $page ? 'bg-[#0B2C62] text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50' ?> rounded-lg text-sm font-medium">
+                  <?= $i ?>
+                </a>
+              <?php endfor; ?>
+              
+              <?php if ($page < $total_pages): ?>
+                <a href="?page=<?= $page + 1 ?>" class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                  Next
+                </a>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+      <?php endif; ?>
     <?php else: ?>
       <div class="p-6 text-center">
         <p class="text-gray-500">No payment records found for this term</p>

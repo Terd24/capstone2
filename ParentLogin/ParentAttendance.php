@@ -72,9 +72,34 @@ $today_attendance_query->bind_param("ss", $id_number, $today);
 $today_attendance_query->execute();
 $today_attendance = $today_attendance_query->get_result()->fetch_assoc();
 
-$startDate = $_GET['start_date'] ?? null;
-$endDate = $_GET['end_date'] ?? null;
+$startDate = $_POST['start_date'] ?? $_GET['start_date'] ?? null;
+$endDate = $_POST['end_date'] ?? $_GET['end_date'] ?? null;
 
+// Pagination setup
+$records_per_page = 10;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = max(1, $page);
+$offset = ($page - 1) * $records_per_page;
+
+// Count total records
+$count_sql = "SELECT COUNT(*) as total
+              FROM attendance_record ar
+              WHERE ar.id_number = ?";
+$count_params = [$id_number];
+
+if ($startDate && $endDate) {
+    $count_sql .= " AND ar.date BETWEEN ? AND ?";
+    $count_params[] = $startDate;
+    $count_params[] = $endDate;
+}
+
+$count_stmt = $conn->prepare($count_sql);
+$count_stmt->bind_param(str_repeat("s", count($count_params)), ...$count_params);
+$count_stmt->execute();
+$total_records = $count_stmt->get_result()->fetch_assoc()['total'];
+$total_pages = ceil($total_records / $records_per_page);
+
+// Get paginated records
 $sql = "SELECT ar.*, cs.start_time, cs.end_time, cs.days, cs.id as schedule_id
         FROM attendance_record ar
         LEFT JOIN student_schedules ss ON ar.id_number = ss.student_id
@@ -88,9 +113,12 @@ if ($startDate && $endDate) {
     $params[] = $endDate;
 }
 
-$sql .= " ORDER BY ar.date DESC";
+$sql .= " ORDER BY ar.date DESC LIMIT ? OFFSET ?";
+$params[] = $records_per_page;
+$params[] = $offset;
+
 $stmt = $conn->prepare($sql);
-$stmt->bind_param(str_repeat("s", count($params)), ...$params);
+$stmt->bind_param(str_repeat("s", count($params) - 2) . "ii", ...$params);
 $stmt->execute();
 $result = $stmt->get_result();
 ?>
@@ -239,7 +267,7 @@ $result = $stmt->get_result();
           <h2 class="text-xl font-bold text-gray-800">Attendance Records</h2>
         </div>
         
-        <form method="get" class="flex flex-col md:flex-row gap-4 items-end">
+        <form method="post" class="flex flex-col md:flex-row gap-4 items-end">
           <div class="flex-1">
             <label for="start-date" class="text-sm font-medium text-gray-700 block mb-2">Start Date</label>
             <input type="date" id="start-date" name="start_date" value="<?= htmlspecialchars($startDate) ?>" 
@@ -354,6 +382,39 @@ $result = $stmt->get_result();
           </tbody>
         </table>
       </div>
+      
+      <!-- Pagination -->
+      <?php if ($total_pages > 1): ?>
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-sm text-gray-600">
+              Showing <?= min($offset + 1, $total_records) ?> to <?= min($offset + $records_per_page, $total_records) ?> of <?= $total_records ?> records
+            </div>
+            <div class="flex gap-2">
+              <?php if ($page > 1): ?>
+                <a href="?page=<?= $page - 1 ?><?= $startDate ? '&start_date=' . urlencode($startDate) : '' ?><?= $endDate ? '&end_date=' . urlencode($endDate) : '' ?>" 
+                   class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                  Previous
+                </a>
+              <?php endif; ?>
+              
+              <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                <a href="?page=<?= $i ?><?= $startDate ? '&start_date=' . urlencode($startDate) : '' ?><?= $endDate ? '&end_date=' . urlencode($endDate) : '' ?>" 
+                   class="px-4 py-2 <?= $i === $page ? 'bg-[#0B2C62] text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50' ?> rounded-lg text-sm font-medium">
+                  <?= $i ?>
+                </a>
+              <?php endfor; ?>
+              
+              <?php if ($page < $total_pages): ?>
+                <a href="?page=<?= $page + 1 ?><?= $startDate ? '&start_date=' . urlencode($startDate) : '' ?><?= $endDate ? '&end_date=' . urlencode($endDate) : '' ?>" 
+                   class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                  Next
+                </a>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 

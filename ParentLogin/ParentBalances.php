@@ -12,7 +12,7 @@ $id_number = $_SESSION['child_id'];
 $term_result = $conn->query("SELECT DISTINCT school_year_term FROM student_fee_items WHERE id_number = '$id_number' ORDER BY school_year_term DESC");
 
 // Dropdown selected term
-$selected_term = $_GET['term'] ?? '';
+$selected_term = $_POST['term'] ?? $_GET['term'] ?? '';
 if (!$selected_term && $term_result->num_rows > 0) {
     $row = $term_result->fetch_assoc();
     $selected_term = $row['school_year_term'];
@@ -95,12 +95,34 @@ $pay_result = $pay_stmt->get_result();
   <div class="bg-white rounded-2xl card-shadow p-6 mb-8">
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-semibold text-gray-800">Academic Term</h2>
-      <form method="GET" class="flex items-center space-x-3">
+      <form method="POST" class="flex items-center space-x-3">
         <select name="term" onchange="this.form.submit()" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-          <?php while ($term_row = $term_result->fetch_assoc()): ?>
-            <option value="<?= htmlspecialchars($term_row['school_year_term']) ?>" 
-                    <?= $term_row['school_year_term'] === $selected_term ? 'selected' : '' ?>>
-              <?= htmlspecialchars($term_row['school_year_term']) ?>
+          <?php 
+          $displayed_terms = []; // Track displayed terms to avoid duplicates
+          while ($term_row = $term_result->fetch_assoc()): 
+            $raw_term = $term_row['school_year_term'];
+            
+            // Normalize the display format
+            $display_term = $raw_term;
+            
+            // Convert "2025-2026 - 1st" to "2025-2026 1st Semester"
+            if (preg_match('/^(\d{4}-\d{4})\s*-\s*(1st|2nd)$/i', $raw_term, $matches)) {
+              $display_term = $matches[1] . ' ' . $matches[2] . ' Semester';
+            }
+            // Convert "2025-2026 1st" to "2025-2026 1st Semester" (if missing "Semester")
+            else if (preg_match('/^(\d{4}-\d{4})\s+(1st|2nd)$/i', $raw_term, $matches)) {
+              $display_term = $matches[1] . ' ' . $matches[2] . ' Semester';
+            }
+            
+            // Skip if we've already displayed this normalized term
+            if (in_array($display_term, $displayed_terms)) {
+              continue;
+            }
+            $displayed_terms[] = $display_term;
+          ?>
+            <option value="<?= htmlspecialchars($raw_term) ?>" 
+                    <?= $raw_term === $selected_term ? 'selected' : '' ?>>
+              <?= htmlspecialchars($display_term) ?>
             </option>
           <?php endwhile; ?>
         </select>

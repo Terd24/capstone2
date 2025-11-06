@@ -9,7 +9,7 @@ include '../StudentLogin/db_conn.php';
 
 $id_number = $_SESSION['child_id'];
 
-$selected_term = isset($_GET['term']) ? $_GET['term'] : null;
+$selected_term = isset($_POST['term']) ? $_POST['term'] : (isset($_GET['term']) ? $_GET['term'] : null);
 
 // Fetch all available terms for the dropdown
 $term_query = $conn->prepare("SELECT DISTINCT school_year_term FROM grades_record WHERE id_number = ? ORDER BY school_year_term DESC");
@@ -26,7 +26,7 @@ if (!$selected_term && count($terms) > 0) {
     $selected_term = $terms[0];
 }
 
-$stmt = $conn->prepare("SELECT subject, teacher_name, prelim, midterm, pre_finals, finals FROM grades_record WHERE id_number = ? AND school_year_term = ?");
+$stmt = $conn->prepare("SELECT subject, teacher_name, grading_system, prelim, midterm, pre_finals, finals, first_quarter, second_quarter, third_quarter, fourth_quarter FROM grades_record WHERE id_number = ? AND school_year_term = ?");
 $stmt->bind_param("ss", $id_number, $selected_term);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -67,7 +67,7 @@ while ($row = $result->fetch_assoc()) {
   <!-- Term Selection -->
   <div class="container mx-auto px-6 py-6">
     <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-      <form method="get" class="flex flex-col md:flex-row md:items-center gap-4">
+      <form method="post" class="flex flex-col md:flex-row md:items-center gap-4">
         <label class="font-semibold text-gray-700" for="term">School Year & Term:</label>
         <select name="term" id="term" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="this.form.submit()">
           <?php if (empty($terms)): ?>
@@ -94,37 +94,44 @@ while ($row = $result->fetch_assoc()) {
           </div>
           
           <div class="border-t pt-4">
+            <?php 
+            // Determine which grading system to display
+            $is_k12 = ($grade['grading_system'] ?? 'College') === 'K12';
+            
+            if ($is_k12): 
+              // K-12 Grading System (Quarters)
+              $periods = [
+                'first_quarter' => '1ST QUARTER',
+                'second_quarter' => '2ND QUARTER', 
+                'third_quarter' => '3RD QUARTER',
+                'fourth_quarter' => '4TH QUARTER'
+              ];
+            else:
+              // College Grading System (Semesters)
+              $periods = [
+                'prelim' => 'PRELIM',
+                'midterm' => 'MIDTERM',
+                'pre_finals' => 'PRE-FINALS',
+                'finals' => 'FINALS'
+              ];
+            endif;
+            ?>
+            
             <div class="grid grid-cols-4 gap-2 mb-3">
+              <?php foreach ($periods as $key => $label): ?>
               <div class="text-center">
-                <div class="text-xs font-medium text-gray-500 mb-1">PRELIM</div>
+                <div class="text-xs font-medium text-gray-500 mb-1"><?= $label ?></div>
                 <div class="bg-gray-50 rounded-lg py-2 px-1">
-                  <span class="text-lg font-bold text-black"><?= $grade['prelim'] ?? '-' ?></span>
+                  <span class="text-lg font-bold text-black"><?= $grade[$key] ?? '-' ?></span>
                 </div>
               </div>
-              <div class="text-center">
-                <div class="text-xs font-medium text-gray-500 mb-1">MIDTERM</div>
-                <div class="bg-gray-50 rounded-lg py-2 px-1">
-                  <span class="text-lg font-bold text-black"><?= $grade['midterm'] ?? '-' ?></span>
-                </div>
-              </div>
-              <div class="text-center">
-                <div class="text-xs font-medium text-gray-500 mb-1">PRE-FINALS</div>
-                <div class="bg-gray-50 rounded-lg py-2 px-1">
-                  <span class="text-lg font-bold text-black"><?= $grade['pre_finals'] ?? '-' ?></span>
-                </div>
-              </div>
-              <div class="text-center">
-                <div class="text-xs font-medium text-gray-500 mb-1">FINALS</div>
-                <div class="bg-gray-50 rounded-lg py-2 px-1">
-                  <span class="text-lg font-bold text-black"><?= $grade['finals'] ?? '-' ?></span>
-                </div>
-              </div>
+              <?php endforeach; ?>
             </div>
             
             <?php 
             $total_grades = 0;
             $grade_count = 0;
-            foreach (['prelim', 'midterm', 'pre_finals', 'finals'] as $period) {
+            foreach (array_keys($periods) as $period) {
               if (!empty($grade[$period]) && is_numeric($grade[$period])) {
                 $total_grades += $grade[$period];
                 $grade_count++;

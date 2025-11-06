@@ -25,6 +25,7 @@ $phone = $_POST['phone'] ?? '';
 $address = $_POST['address'] ?? '';
 $hire_date = $_POST['hire_date'] ?? '';
 $password = $_POST['password'] ?? '';
+$rfid_uid = $_POST['rfid_uid'] ?? null;
 
 if (empty($employee_id) || empty($first_name) || empty($last_name) || empty($position) || empty($department) || empty($hire_date)) {
     echo json_encode(['success' => false, 'message' => 'Required fields are missing']);
@@ -99,8 +100,28 @@ if (strlen($address) < 20) {
     }
 }
 
+// Validate RFID if provided
+if (!empty($rfid_uid)) {
+    // Check if RFID is exactly 10 digits
+    if (!preg_match('/^\d{10}$/', $rfid_uid)) {
+        echo json_encode(['success' => false, 'message' => 'RFID must be exactly 10 digits']);
+        exit;
+    }
+    
+    // Check if RFID is already used by another employee
+    $check_rfid = $conn->prepare("SELECT id_number FROM employees WHERE rfid_uid = ? AND id_number != ?");
+    $check_rfid->bind_param("ss", $rfid_uid, $employee_id);
+    $check_rfid->execute();
+    $rfid_result = $check_rfid->get_result();
+    
+    if ($rfid_result->num_rows > 0) {
+        echo json_encode(['success' => false, 'message' => 'This RFID is already assigned to another employee']);
+        exit;
+    }
+}
+
 // Update employee
-$sql = "UPDATE employees SET first_name = ?, middle_name = ?, last_name = ?, position = ?, department = ?, email = ?, phone = ?, address = ?, hire_date = ? WHERE id_number = ?";
+$sql = "UPDATE employees SET first_name = ?, middle_name = ?, last_name = ?, position = ?, department = ?, email = ?, phone = ?, address = ?, hire_date = ?, rfid_uid = ? WHERE id_number = ?";
 $stmt = $conn->prepare($sql);
 
 if (!$stmt) {
@@ -110,7 +131,7 @@ if (!$stmt) {
     exit;
 }
 
-$stmt->bind_param("ssssssssss", $first_name, $middle_name, $last_name, $position, $department, $email, $phone, $address, $hire_date, $employee_id);
+$stmt->bind_param("sssssssssss", $first_name, $middle_name, $last_name, $position, $department, $email, $phone, $address, $hire_date, $rfid_uid, $employee_id);
 
 if ($stmt->execute()) {
     // Update password if provided

@@ -4,12 +4,28 @@ include("db_conn.php");
 
 $id_number = $_SESSION['id_number'];
 
+// Pagination
+$records_per_page = 10;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = max(1, $page);
+$offset = ($page - 1) * $records_per_page;
+
+// Get total count
+$count_sql = "SELECT COUNT(*) as total FROM document_requests WHERE student_id = ?";
+$count_stmt = $conn->prepare($count_sql);
+$count_stmt->bind_param("s", $id_number);
+$count_stmt->execute();
+$total_records = $count_stmt->get_result()->fetch_assoc()['total'];
+$total_pages = ceil($total_records / $records_per_page);
+
+// Get paginated results
 $sql = "SELECT document_type, date_requested, date_claimed, student_id, status 
         FROM document_requests 
         WHERE student_id = ? 
-        ORDER BY date_requested DESC";
+        ORDER BY date_requested DESC
+        LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("s", $id_number);
+$stmt->bind_param("sii", $id_number, $records_per_page, $offset);
 $stmt->execute();
 $result = $stmt->get_result();
 ?>
@@ -332,6 +348,36 @@ $result = $stmt->get_result();
             </div>
           <?php endif; ?>
         </div>
+        
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+          <div class="px-4 py-4 border-t border-gray-200 bg-gray-50">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div class="text-sm text-gray-600">
+                Showing <?= min($offset + 1, $total_records) ?> to <?= min($offset + $records_per_page, $total_records) ?> of <?= $total_records ?> requests
+              </div>
+              <div class="flex gap-2">
+                <?php if ($page > 1): ?>
+                  <a href="?page=<?= $page - 1 ?>" class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                    Previous
+                  </a>
+                <?php endif; ?>
+                
+                <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                  <a href="?page=<?= $i ?>" class="px-4 py-2 <?= $i === $page ? 'bg-[#0B2C62] text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50' ?> rounded-lg text-sm font-medium">
+                    <?= $i ?>
+                  </a>
+                <?php endfor; ?>
+                
+                <?php if ($page < $total_pages): ?>
+                  <a href="?page=<?= $page + 1 ?>" class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+                    Next
+                  </a>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>

@@ -842,26 +842,22 @@ function formatPhilippinePhone(input) {
         value = value.replace(/\+/g, '');
     }
     
-    // If starts with 0, convert to +63
+    // Remove any existing +63 or + prefix for processing
+    value = value.replace(/^\+63/, '').replace(/^\+/, '');
+    
+    // If starts with 63 (database format), remove it
+    if (value.startsWith('63') && value.length === 12) {
+        value = value.slice(2); // Remove the 63 prefix
+    }
+    
+    // If starts with 0, remove it (local format)
     if (value.startsWith('0')) {
-        value = '+63' + value.slice(1);
+        value = value.slice(1);
     }
     
-    // If doesn't start with +63, add it
-    if (!value.startsWith('+63') && !value.startsWith('+')) {
-        value = '+63' + value;
-    }
-    
-    // Ensure it starts with +63
-    if (value.startsWith('+') && !value.startsWith('+63')) {
-        value = '+63' + value.slice(1);
-    }
-    
-    // Remove +63 prefix for processing
-    let digits = value.replace('+63', '');
-    
-    // Limit to 10 digits (after +63)
-    digits = digits.slice(0, 10);
+    // Now we should have 10 digits (9XXXXXXXXX)
+    // Limit to 10 digits
+    let digits = value.slice(0, 10);
     
     // Format as +63 9XX-XXX-XXXX
     let formatted = '+63';
@@ -1027,7 +1023,7 @@ async function showEmployeeDetailsModal(employee) {
                         ${employee.account_role === 'teacher' ? `
                         <div>
                             <label class="block text-sm font-semibold mb-1">RFID</label>
-                            <input type="text" id="rfid_uid" name="rfid_uid" autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" data-maxlen="10" title="Please enter exactly 10 digits">
+                            <input type="text" id="rfid_uid_${employee.id_number}" name="rfid_uid" value="${employee.rfid_uid || ''}" readonly autocomplete="off" class="w-full border border-gray-300 px-3 py-2 rounded-lg bg-gray-50 employee-field digits-only" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" data-maxlen="10" title="Please enter exactly 10 digits">
                         </div>
                         ` : ''}
                     </div>
@@ -1424,6 +1420,7 @@ function saveEmployeeChanges() {
     const phone = document.getElementById(`phone_${currentEmployeeId}`)?.value;
     const address = document.getElementById(`address_${currentEmployeeId}`)?.value;
     const hireDate = document.getElementById(`hire_date_${currentEmployeeId}`)?.value;
+    const rfidUid = document.getElementById(`rfid_uid_${currentEmployeeId}`)?.value;
     
     // Clear all previous errors
     const fields = [
@@ -1499,10 +1496,10 @@ function saveEmployeeChanges() {
     
     // Prepare form data
     // Show confirmation dialog before saving
-    showEmployeeSaveConfirmation(firstName, middleName, lastName, position, department, email, phone, address, hireDate);
+    showEmployeeSaveConfirmation(firstName, middleName, lastName, position, department, email, phone, address, hireDate, rfidUid);
 }
 
-function showEmployeeSaveConfirmation(firstName, middleName, lastName, position, department, email, phone, address, hireDate) {
+function showEmployeeSaveConfirmation(firstName, middleName, lastName, position, department, email, phone, address, hireDate, rfidUid) {
     const c = document.createElement('div');
     c.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[2147483647]';
     c.innerHTML = `
@@ -1519,11 +1516,11 @@ function showEmployeeSaveConfirmation(firstName, middleName, lastName, position,
     c.querySelector('#cCancel').onclick = () => c.remove();
     c.querySelector('#cSave').onclick = () => {
         c.remove();
-        performEmployeeSave(firstName, middleName, lastName, position, department, email, phone, address, hireDate);
+        performEmployeeSave(firstName, middleName, lastName, position, department, email, phone, address, hireDate, rfidUid);
     };
 }
 
-function performEmployeeSave(firstName, middleName, lastName, position, department, email, phone, address, hireDate) {
+function performEmployeeSave(firstName, middleName, lastName, position, department, email, phone, address, hireDate, rfidUid) {
     const password = document.getElementById(`password_${currentEmployeeId}`)?.value;
     
     const formData = new FormData();
@@ -1537,6 +1534,9 @@ function performEmployeeSave(firstName, middleName, lastName, position, departme
     formData.append('phone', phone || '');
     formData.append('address', address);
     formData.append('hire_date', hireDate);
+    if (rfidUid) {
+        formData.append('rfid_uid', rfidUid);
+    }
     if (password) {
         formData.append('password', password);
     }
