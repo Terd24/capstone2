@@ -1601,6 +1601,10 @@ function initRegistrarInlineValidation() {
 
         ['father_contact','mother_contact','guardian_contact'].forEach(n => { const el = findField(n); if (el && el.value && !/^[0-9]{11}$/.test(el.value.trim())) { setError(el, 'Contact must be exactly 11 digits.'); ok = false; } });
 
+        // LRN validation - must be exactly 12 digits
+        const lrnEl = findField('lrn');
+        if (lrnEl && lrnEl.value && !/^[0-9]{12}$/.test(lrnEl.value.trim())) { setError(lrnEl, 'LRN must be exactly 12 digits.'); ok = false; }
+
         // Additional address validation for completeness
         const addressEl = findField('address');
         if (addressEl && addressEl.value) {
@@ -1786,6 +1790,26 @@ function setupQRCodeFunctionality() {
         // Add event listener for RFID input
         rfidInput.removeEventListener('input', handleRFIDInput); // Remove existing listener
         rfidInput.addEventListener('input', handleRFIDInput);
+        
+        // Add event listener to clear RFID errors when user types
+        rfidInput.addEventListener('input', function() {
+            // Clear error styling
+            this.classList.remove('border-red-500', 'bg-red-50');
+            this.classList.add('border-gray-300');
+            
+            // Remove error message
+            const errorMsg = this.parentElement?.querySelector('.rfid-error-msg');
+            if (errorMsg) {
+                errorMsg.remove();
+            }
+            
+            // Clear error alert at top
+            const errorAlert = document.getElementById('rfidErrorAlert');
+            if (errorAlert) {
+                errorAlert.classList.add('hidden');
+            }
+        });
+        
         console.log('Event listener added to RFID input'); // Debug log
     } else {
         console.log('RFID input not found yet'); // Debug log

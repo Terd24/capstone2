@@ -256,9 +256,11 @@ if (!empty($dob)) {
 // Server-side validation for data types
 $validation_errors = [];
 
-        // Validate LRN (numbers only)
+        // Validate LRN (numbers only, exactly 12 digits)
         if (!preg_match('/^[0-9]+$/', $lrn)) {
             $validation_errors[] = "LRN must contain numbers only.";
+        } elseif (strlen($lrn) !== 12) {
+            $validation_errors[] = "LRN must be exactly 12 digits.";
         }
 
         // Validate names (letters and spaces only)
@@ -1086,7 +1088,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
         <!-- Header -->
         <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4 bg-[#0B2C62] text-white">
             <h2 class="text-lg font-semibold">Add New Account</h2>
-            <button type="button" onclick="closeModal(event)" class="text-2xl font-bold hover:text-gray-300">&times;</button>
+            <button type="button" onclick="closeModal(event); return false;" class="text-2xl font-bold hover:text-gray-300">&times;</button>
         </div>
 
 
@@ -1107,7 +1109,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
 
         <!-- Unified Student and Parent Form -->
         <div id="unifiedForm" class="account-form">
-            <form method="POST" action="add_account.php" autocomplete="off" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
+            <form method="POST" action="AccountList.php" autocomplete="off" class="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[80vh] no-scrollbar">
                 <input type="hidden" name="account_type" value="unified_student_parent">
                 
                 <!-- Error Message Display Area -->
@@ -1473,7 +1475,7 @@ if (!preg_match('/^[a-z]+[0-9]{6}muzon@student\.cci\.edu\.ph$/i', $username)) {
                 
                 <!-- Submit Buttons -->
                 <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
-                    <button type="button" onclick="closeModal(event)" class="px-5 py-2 border border-[#0B2C62] text-[#0B2C62] rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Cancel</button>
+                    <button type="button" onclick="closeModal(event); return false;" class="px-5 py-2 border border-[#0B2C62] text-[#0B2C62] rounded-xl hover:bg-[#0B2C62] hover:text-white transition">Cancel</button>
                     <button type="button" onclick="showConfirmationModal()" class="px-5 py-2 bg-[#2F8D46] text-white rounded-xl shadow hover:bg-[#256f37] transition">Review & Create Account</button>
                 </div>
             </form>
@@ -1962,6 +1964,38 @@ function showConfirmationModal() {
     if (!form.checkValidity()) {
         form.reportValidity();
         return;
+    }
+    
+    // Check LRN length before proceeding
+    const lrnInput = document.querySelector('input[name="lrn"]');
+    if (lrnInput) {
+        const lrnValue = lrnInput.value.trim();
+        if (lrnValue.length !== 12) {
+            // Show error on LRN field
+            lrnInput.classList.add('border-red-500', 'bg-red-50');
+            lrnInput.classList.remove('border-gray-300');
+            
+            // Show inline error message
+            let errorMsg = lrnInput.parentElement.querySelector('.lrn-error-msg');
+            if (!errorMsg) {
+                errorMsg = document.createElement('p');
+                errorMsg.className = 'lrn-error-msg text-red-500 text-sm mt-1 font-medium';
+                lrnInput.parentElement.appendChild(errorMsg);
+            }
+            errorMsg.textContent = 'LRN must be exactly 12 digits. Currently ' + lrnValue.length + ' digits.';
+            
+            // Scroll to LRN field
+            lrnInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            lrnInput.focus();
+            
+            return false;
+        } else {
+            // Clear any previous errors
+            lrnInput.classList.remove('border-red-500', 'bg-red-50');
+            lrnInput.classList.add('border-gray-300');
+            const errorMsg = lrnInput.parentElement.querySelector('.lrn-error-msg');
+            if (errorMsg) errorMsg.remove();
+        }
     }
     
     // Check RFID for duplicates before showing confirmation
