@@ -243,15 +243,15 @@ function timeAgo($time) {
             
             <div class="mt-4 pt-4 border-t">
               <button onclick="window.location.href='AccountList.php'" 
-                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-3 rounded-lg font-medium transition-colors text-base mb-3">
                 Manage Accounts
               </button>
               <button onclick="window.location.href='ManageSchedule.php'" 
-                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mb-2">
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-3 rounded-lg font-medium transition-colors text-base mb-3">
                 Manage Student Schedule
               </button>
               <button onclick="window.location.href='AttendanceRecords.php'" 
-                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-2 rounded-lg font-medium transition-colors text-sm mt-2">
+                      class="w-full bg-[#0B2C62] hover:bg-blue-900 text-white py-3 rounded-lg font-medium transition-colors text-base">
                 Attendance Record
               </button>
               <!-- Manage Employee Schedule moved to HR portal -->
@@ -1427,7 +1427,9 @@ let lastCheckTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
 let pollingInterval = null;
 
 function startRequestPolling() {
-    // Poll every 5 seconds
+    // Check immediately on start
+    checkForNewRequests();
+    // Then poll every 5 seconds
     pollingInterval = setInterval(checkForNewRequests, 5000);
 }
 
@@ -1438,39 +1440,7 @@ function stopRequestPolling() {
     }
 }
 
-async function checkForNewRequests() {
-    try {
-        const response = await fetch(`check_new_requests.php?last_check=${encodeURIComponent(lastCheckTime)}`);
-        const data = await response.json();
-
-        if (!data.success) {
-            console.error('Failed to check for new requests:', data.error);
-            return;
-        }
-
-        // Update last check time
-        lastCheckTime = data.current_time;
-
-        // If there are new requests, update the UI
-        if (data.new_requests && data.new_requests.length > 0) {
-            console.log(`Found ${data.new_requests.length} new request(s)`);
-            
-            // Update recent requests section
-            updateRecentRequests(data.new_requests);
-            
-            // Update all requests table
-            updateAllRequestsTable(data.new_requests);
-            
-            // Update status counts
-            updateStatusCounts(data.counts);
-            
-            // Update unread badge
-            updateUnreadBadge(data.unread_count);
-        }
-    } catch (error) {
-        console.error('Error checking for new requests:', error);
-    }
-}
+async function checkForNewRequests(){try{console.log('Checking for new requests...');const r=await fetch(`check_new_requests.php?last_check=${encodeURIComponent(lastCheckTime)}`);const d=await r.json();console.log('Response:',d);if(!d.success){console.error('Failed:',d.error);return;}lastCheckTime=d.current_time;if(d.new_requests&&d.new_requests.length>0){console.log(`Found ${d.new_requests.length} new request(s)`);updateRecentRequests(d.new_requests);updateAllRequestsTable(d.new_requests);updateCountBadges(d.counts);updateUnreadBadge(d.unread_count);}}catch(e){console.error('Error:',e);}}function updateCountBadges(c){if(!c)return;const u=(id,v)=>{const b=document.getElementById(id);if(b){const s=b.querySelector('span');if(s)s.textContent=v;}};u('quickFilter-all',c.all||0);u('quickFilter-pending',c.pending||0);u('quickFilter-approved',c.approved||0);u('quickFilter-ready',c.ready||0);u('quickFilter-claimed',c.claimed||0);u('quickFilter-declined',c.declined||0);}
 
 function updateRecentRequests(newRequests) {
     const recentContent = document.getElementById('recentContent');
@@ -1634,11 +1604,26 @@ document.head.appendChild(style);
 
 // Start polling when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Starting real-time request polling...');
+    console.log('Starting real-time request polling (DOMContentLoaded)...');
     startRequestPolling();
 });
 
-// Stop polling when page unloads
+// Restart polling when page becomes visible (e.g., back button)
+window.addEventListener('pageshow', function(event) {
+    // event.persisted is true when page is loaded from bfcache
+    if (event.persisted || !pollingInterval) {
+        console.log('Page shown (back button or cache), restarting polling...');
+        stopRequestPolling(); // Clear any existing interval
+        startRequestPolling();
+    }
+});
+
+// Stop polling when page is hidden or unloaded
+window.addEventListener('pagehide', function() {
+    console.log('Page hidden, stopping polling...');
+    stopRequestPolling();
+});
+
 window.addEventListener('beforeunload', function() {
     stopRequestPolling();
 });

@@ -1342,9 +1342,9 @@ if ($check_pending && $check_pending->num_rows > 0) {
                     </div>
                     
                     <!-- Pagination for Deleted Students -->
-                    <div id="deleted-students-pagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <div id="students-pagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                         <div class="text-sm text-gray-700">
-                            Showing <span id="deleted-students-start">1</span> to <span id="deleted-students-end">5</span> of <span id="deleted-students-total"><?= count($deleted_students) ?></span> students
+                            Showing <span id="students-start">1</span> to <span id="students-end">5</span> of <span id="students-total"><?= count($deleted_students) ?></span> students
                         </div>
                         <div class="flex gap-2">
                             <button id="students-prev" onclick="changeStudentsPage(-1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -5089,17 +5089,10 @@ function deletePermanently(recordId, recordType) {
                     
                     updatePagination(type, page, total);
                     
-                    // Show pagination if there are items and more than one page
-                    if (total > 0 && total > notLoggedInItemsPerPage) {
+                    if (total > notLoggedInItemsPerPage) {
                         pagination.classList.remove('hidden');
-                        pagination.style.display = 'flex';
-                    } else if (total > 0) {
-                        // Show pagination even for single page to show count
-                        pagination.classList.remove('hidden');
-                        pagination.style.display = 'flex';
                     } else {
                         pagination.classList.add('hidden');
-                        pagination.style.display = 'none';
                     }
                 }
                 
@@ -7143,9 +7136,6 @@ function deletePermanently(recordId, recordType) {
                     
                     // Add the restored employee to HR Accounts table
                     addHRAccountRow(employee);
-                    
-                    // Show toast notification
-                    showToast(`Employee ${employee.first_name} ${employee.last_name} has been restored`, 'success');
                 });
                 
                 // Update last check time
@@ -7187,11 +7177,6 @@ function deletePermanently(recordId, recordType) {
                 } else {
                     filterDeletedEmployees();
                 }
-                
-                // Show toast notification
-                const actionText = action === 'restored' ? 'restored' : 'archived';
-                const typeText = type === 'student' ? 'Student' : 'Employee';
-                showToast(`${typeText} ${idNumber} has been ${actionText}`, 'success');
             }, 500);
         }
     }

@@ -2751,12 +2751,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function checkForNewRequests() {
-    // Only check if we're on the approval-requests section
-    const approvalSection = document.getElementById('approval-requests-section');
-    if (!approvalSection || approvalSection.classList.contains('hidden')) {
-        return;
-    }
-    
     try {
         const response = await fetch(`check_new_requests.php?last_check=${encodeURIComponent(lastRequestCheck)}`);
         if (!response.ok) return;
@@ -2773,6 +2767,7 @@ async function checkForNewRequests() {
             if (data.new_requests && data.new_requests.length > 0) {
                 data.new_requests.forEach(request => {
                     showNewRequestNotification(request);
+                    // Always add to list, even if not viewing the section
                     addRequestToList(request);
                 });
             }
@@ -2811,11 +2806,22 @@ function updateRequestCounts(counts) {
     }
     
     // Update badge in sidebar
-    const badge = document.querySelector('.nav-item [onclick*="approval-requests"] .bg-yellow-500');
-    if (badge && counts.pending_requests > 0) {
-        badge.textContent = counts.pending_requests;
-    } else if (badge && counts.pending_requests === 0) {
-        badge.style.display = 'none';
+    const approvalLink = document.querySelector('a[href="#approval-requests"]');
+    if (approvalLink) {
+        let badge = approvalLink.querySelector('.bg-yellow-500');
+        
+        if (counts.pending_requests > 0) {
+            if (!badge) {
+                // Create badge if it doesn't exist
+                badge = document.createElement('span');
+                badge.className = 'bg-yellow-500 text-white text-xs rounded-full px-2 py-1 ml-auto';
+                approvalLink.appendChild(badge);
+            }
+            badge.textContent = counts.pending_requests;
+            badge.style.display = '';
+        } else if (badge) {
+            badge.style.display = 'none';
+        }
     }
     
     // Update header pending count

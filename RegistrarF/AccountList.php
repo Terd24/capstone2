@@ -1456,24 +1456,21 @@ function closeModal(event) {
     }
     
     // Clear all error messages
-    const allErrorMsgs = modal?.querySelectorAll('.rfid-error-msg, .lrn-error-msg, .error-text');
+    const allErrorMsgs = modal?.querySelectorAll('.rfid-error-msg');
     if (allErrorMsgs) {
         allErrorMsgs.forEach(msg => msg.remove());
     }
     
-    // Clear validation states but PRESERVE form values (don't reset the form)
+    // Reset the form to clear any validation states
     const form = modal?.querySelector('form');
     if (form) {
-        // Just clear validation states, don't clear values
+        // Don't use form.reset() as it might trigger navigation
+        // Just clear validation states
         const inputs = form.querySelectorAll('input, select, textarea');
         inputs.forEach(input => {
-            input.classList.remove('border-red-500', 'bg-red-50', 'field-error');
+            input.classList.remove('border-red-500', 'bg-red-50');
             if (input.classList.contains('border')) {
                 input.classList.add('border-gray-300');
-            }
-            // Remove custom validity messages
-            if (input.setCustomValidity) {
-                input.setCustomValidity('');
             }
         });
     }

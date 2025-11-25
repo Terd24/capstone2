@@ -25,12 +25,12 @@ $response = [
 ];
 
 // Check for approved restore/archive requests since last check
-$stmt = $conn->prepare("SELECT id, request_type, target_id, approved_at 
+$stmt = $conn->prepare("SELECT id, request_type, target_id, reviewed_at as approved_at 
                         FROM owner_approval_requests 
                         WHERE status = 'approved' 
-                        AND approved_at > ? 
+                        AND reviewed_at > ? 
                         AND request_type IN ('restore_student', 'restore_employee', 'archive_student', 'archive_employee')
-                        ORDER BY approved_at DESC");
+                        ORDER BY reviewed_at DESC");
 
 if ($stmt) {
     $stmt->bind_param("s", $lastCheck);
@@ -83,7 +83,7 @@ $stmt = $conn->prepare("SELECT s.id_number
                             WHERE oar.target_id = s.id_number
                             AND oar.request_type = 'restore_student'
                             AND oar.status = 'approved'
-                            AND oar.approved_at > ?
+                            AND oar.reviewed_at > ?
                         )");
 if ($stmt) {
     $stmt->bind_param("s", $lastCheck);
@@ -119,7 +119,7 @@ $stmt = $conn->prepare("SELECT e.id_number
                             WHERE oar.target_id = e.id_number
                             AND oar.request_type = 'restore_employee'
                             AND oar.status = 'approved'
-                            AND oar.approved_at > ?
+                            AND oar.reviewed_at > ?
                         )");
 if ($stmt) {
     $stmt->bind_param("s", $lastCheck);

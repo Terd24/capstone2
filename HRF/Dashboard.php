@@ -117,7 +117,7 @@ $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as 
 $count_result = $conn->query("SELECT COUNT(*) as total_employees FROM employees WHERE deleted_at IS NULL AND department != 'Human Resources'");
 $total_employees = $count_result->fetch_assoc()['total_employees'];
 
-$columns = ['No.', 'ID Number', 'Full Name', 'Position', 'Department', 'Account Status'];
+$columns = ['ID Number', 'Full Name', 'Position', 'Department', 'Account Status'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -265,15 +265,12 @@ button[id^="resetPasswordBtn_"][disabled] {
             </thead>
             <tbody id="employeeTable" class="divide-y divide-gray-200">
                 <?php if ($result && $result->num_rows > 0): ?>
-                    <?php 
-                    $row_number = 1;
-                    while ($row = $result->fetch_assoc()): ?>
+                    <?php while ($row = $result->fetch_assoc()): ?>
                         <?php 
                         $has_pending = in_array($row['id_number'], $pending_deletions);
                         $row_class = $has_pending ? 'hover:bg-blue-50 transition cursor-pointer bg-orange-50 border-l-4 border-orange-500' : 'hover:bg-blue-50 transition cursor-pointer';
                         ?>
                         <tr class="<?= $row_class ?>" onclick="viewEmployee('<?= $row['id_number'] ?>')" data-role="<?= htmlspecialchars($row['account_role'] ?? '') ?>">
-                            <td class="px-4 py-3 text-center font-semibold"><?= $row_number++ ?></td>
                             <td class="px-4 py-3">
                                 <?= htmlspecialchars($row['id_number']) ?>
                                 <?php if ($has_pending): ?>

@@ -228,11 +228,9 @@ $all_stmt->close();
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
               </svg>
-              <?php if ($unread_count > 0): ?>
-                <span id="notifBellCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  <?= $unread_count > 9 ? '9+' : $unread_count ?>
-                </span>
-              <?php endif; ?>
+              <span id="notifBellCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 items-center justify-center <?= $unread_count > 0 ? 'flex' : 'hidden' ?>">
+                <?= $unread_count > 9 ? '9+' : $unread_count ?>
+              </span>
             </button>
             
             <!-- Notifications Dropdown -->
@@ -246,11 +244,9 @@ $all_stmt->close();
                     </svg>
                     Notifications
                   </h3>
-                  <?php if ($unread_count > 0): ?>
-                    <span id="notifHeaderCount" class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                      <?= $unread_count ?>
-                    </span>
-                  <?php endif; ?>
+                  <span id="notifHeaderCount" class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full <?= $unread_count > 0 ? 'inline-flex' : 'hidden' ?>">
+                    <?= $unread_count ?>
+                  </span>
                 </div>
               </div>
               
@@ -492,7 +488,7 @@ $all_stmt->close();
     });
 
     // Store all notifications data
-    const allNotifications = <?= json_encode($all_notifications_array) ?>;
+    let allNotifications = <?= json_encode($all_notifications_array) ?>;
     let currentlyShowing = 5;
     let lastNotificationCheck = 0;
     let notificationPollingInterval = null;
@@ -537,11 +533,14 @@ $all_stmt->close();
     }
 
     // Notifications functions
-    function toggleNotifications() {
+    async function toggleNotifications() {
       const dropdown = document.getElementById('notificationsDropdown');
       const button = document.getElementById('notificationBtn');
 
       if (dropdown.classList.contains('hidden')) {
+        // Fetch latest notifications before opening
+        await checkForNewNotifications();
+        
         const rect = button.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
         const dropdownHeight = 400;
@@ -572,6 +571,9 @@ $all_stmt->close();
         } else {
           dropdown.style.width = dropdownWidth + 'px';
         }
+        
+        // Refresh the notification list
+        refreshNotificationsList();
       }
 
       dropdown.classList.toggle('hidden');
@@ -653,7 +655,7 @@ $all_stmt->close();
 
     async function checkForNewNotifications() {
       try {
-        const response = await fetch('check_new_notifications.php');
+        const response = await fetch('get_all_notifications.php');
         const data = await response.json();
 
         if (data.error) {
@@ -661,19 +663,50 @@ $all_stmt->close();
           return;
         }
 
+        // Update badge count
         updateNotificationBadge(data.unread_count);
 
-        const dropdown = document.getElementById('notificationsDropdown');
-        if (dropdown && !dropdown.classList.contains('hidden')) {
-          const now = Math.floor(Date.now() / 1000);
-          if (now - lastNotificationCheck > 30) {
-            loadMoreNotifications();
-            lastNotificationCheck = now;
+        // Check if notifications have changed (by comparing JSON strings)
+        if (data.notifications) {
+          const newNotificationsJSON = JSON.stringify(data.notifications);
+          const oldNotificationsJSON = JSON.stringify(allNotifications);
+          
+          // Update if notifications are different (new ones added OR existing ones changed)
+          if (newNotificationsJSON !== oldNotificationsJSON) {
+            // Update the allNotifications array
+            allNotifications.length = 0;
+            allNotifications.push(...data.notifications);
+
+            // If dropdown is open, refresh the visible notifications
+            const dropdown = document.getElementById('notificationsDropdown');
+            if (dropdown && !dropdown.classList.contains('hidden')) {
+              refreshNotificationsList();
+            }
           }
         }
       } catch (error) {
         console.error('Error checking notifications:', error);
       }
+    }
+
+    function refreshNotificationsList() {
+      const notificationsList = document.getElementById('notificationsList');
+      const viewMoreBtn = document.getElementById('viewMoreBtn');
+      if (!notificationsList) return;
+
+      // Clear current list
+      notificationsList.innerHTML = '';
+
+      // Reset counter
+      currentlyShowing = 0;
+
+      // Show/hide View More button based on notification count
+      if (viewMoreBtn) {
+        viewMoreBtn.style.display = allNotifications.length > 5 ? 'block' : 'none';
+      }
+
+      // Load first batch
+      loadMoreNotifications();
     }
 
     function updateNotificationBadge(unreadCount) {
@@ -683,15 +716,23 @@ $all_stmt->close();
       if (unreadCount > 0) {
         if (bellCount) {
           bellCount.textContent = unreadCount > 9 ? '9+' : unreadCount;
-          bellCount.style.display = 'flex';
+          bellCount.classList.remove('hidden');
+          bellCount.classList.add('flex');
         }
         if (headerCount) {
           headerCount.textContent = unreadCount;
-          headerCount.style.display = 'inline-flex';
+          headerCount.classList.remove('hidden');
+          headerCount.classList.add('inline-flex');
         }
       } else {
-        if (bellCount) bellCount.style.display = 'none';
-        if (headerCount) headerCount.style.display = 'none';
+        if (bellCount) {
+          bellCount.classList.add('hidden');
+          bellCount.classList.remove('flex');
+        }
+        if (headerCount) {
+          headerCount.classList.add('hidden');
+          headerCount.classList.remove('inline-flex');
+        }
       }
     }
 

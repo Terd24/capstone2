@@ -193,7 +193,7 @@ $records = $stmt->get_result();
         <?php elseif ($search_name !== ''): ?>
             Search results for "<?= htmlspecialchars($search_name) ?>" on <?= date('F j, Y', strtotime($today)) ?>
         <?php else: ?>
-            Real-time attendance tracking for <?= date('F j, Y', strtotime($today)) ?>
+            Attendance for <?= date('F j, Y', strtotime($today)) ?>
         <?php endif; ?>
       </p>
     </div>
