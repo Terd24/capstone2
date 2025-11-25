@@ -109,14 +109,15 @@ $pending_stmt->close();
 // Fetch only active employees (not soft-deleted) excluding HR department
 // HR staff cannot see or edit HR employees - only Super Admin can manage HR accounts
 $result = $conn->query("SELECT id_number, CONCAT(first_name, ' ', last_name) as full_name, position, department, 
-                       (SELECT username FROM employee_accounts WHERE employee_accounts.employee_id = employees.id_number) as username 
+                       (SELECT username FROM employee_accounts WHERE employee_accounts.employee_id = employees.id_number) as username,
+                       (SELECT role FROM employee_accounts WHERE employee_accounts.employee_id = employees.id_number) as account_role 
                        FROM employees WHERE deleted_at IS NULL AND department != 'Human Resources' ORDER BY id_number ASC");
 
 // Get total active employee count (excluding HR department)
 $count_result = $conn->query("SELECT COUNT(*) as total_employees FROM employees WHERE deleted_at IS NULL AND department != 'Human Resources'");
 $total_employees = $count_result->fetch_assoc()['total_employees'];
 
-$columns = ['ID Number', 'Full Name', 'Position', 'Department', 'Account Status'];
+$columns = ['No.', 'ID Number', 'Full Name', 'Position', 'Department', 'Account Status'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -233,6 +234,15 @@ button[id^="resetPasswordBtn_"][disabled] {
         </div>
         
         <div class="flex items-center gap-3">
+            <select id="roleFilter" class="border border-[#0B2C62]/30 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] bg-white">
+                <option value="">All Roles</option>
+                <option value="teacher">Teacher</option>
+                <option value="registrar">Registrar</option>
+                <option value="cashier">Cashier</option>
+                <option value="guidance">Guidance</option>
+                <option value="attendance">Attendance</option>
+                <option value="department_head">Department Head</option>
+            </select>
             <input type="text" id="searchInput" placeholder="Search by name or ID..." class="w-full sm:w-64 border border-[#0B2C62]/30 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-[#0B2C62] focus:border-[#0B2C62] placeholder-gray-400"/>
             <button onclick="openModal()" class="px-4 py-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition flex items-center gap-2 font-medium whitespace-nowrap">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,12 +265,15 @@ button[id^="resetPasswordBtn_"][disabled] {
             </thead>
             <tbody id="employeeTable" class="divide-y divide-gray-200">
                 <?php if ($result && $result->num_rows > 0): ?>
-                    <?php while ($row = $result->fetch_assoc()): ?>
+                    <?php 
+                    $row_number = 1;
+                    while ($row = $result->fetch_assoc()): ?>
                         <?php 
                         $has_pending = in_array($row['id_number'], $pending_deletions);
                         $row_class = $has_pending ? 'hover:bg-blue-50 transition cursor-pointer bg-orange-50 border-l-4 border-orange-500' : 'hover:bg-blue-50 transition cursor-pointer';
                         ?>
-                        <tr class="<?= $row_class ?>" onclick="viewEmployee('<?= $row['id_number'] ?>')">
+                        <tr class="<?= $row_class ?>" onclick="viewEmployee('<?= $row['id_number'] ?>')" data-role="<?= htmlspecialchars($row['account_role'] ?? '') ?>">
+                            <td class="px-4 py-3 text-center font-semibold"><?= $row_number++ ?></td>
                             <td class="px-4 py-3">
                                 <?= htmlspecialchars($row['id_number']) ?>
                                 <?php if ($has_pending): ?>
@@ -766,6 +779,25 @@ function setupUsernameAndPasswordGeneration() {
 document.addEventListener('DOMContentLoaded', function() {
     setupFieldValidationListeners();
     setupUsernameAndPasswordGeneration();
+    
+    // Add event listener to email field to clear verification status when email is changed
+    const emailField = document.getElementById('employeeEmail');
+    const statusDisplay = document.getElementById('emailVerificationStatus');
+    const verifyBtn = document.getElementById('verifyEmailBtn');
+    
+    if (emailField && statusDisplay && verifyBtn) {
+        emailField.addEventListener('input', function() {
+            // Reset verification status when email is modified
+            emailVerified = false;
+            statusDisplay.textContent = '';
+            statusDisplay.className = 'text-sm mt-1 font-medium hidden';
+            
+            // Reset verify button
+            verifyBtn.textContent = 'Verify Email';
+            verifyBtn.disabled = false;
+            verifyBtn.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap';
+        });
+    }
 });
 
 // Show/hide account fields and RFID when needed
@@ -1057,6 +1089,7 @@ async function showEmployeeDetailsModal(employee) {
                                     <option value="guidance" ${employee.account_role === 'guidance' ? 'selected' : ''}>Guidance</option>
                                     <option value="attendance" ${employee.account_role === 'attendance' ? 'selected' : ''}>Attendance</option>
                                     <option value="teacher" ${employee.account_role === 'teacher' ? 'selected' : ''}>Teacher</option>
+                                    <option value="department_head" ${employee.account_role === 'department_head' ? 'selected' : ''}>Department Head</option>
                                 </select>
                             </div>
                         </div>
@@ -2208,6 +2241,7 @@ if (notificationElement) {
 
 // Search and pagination functionality (10 per page)
 const searchInput = document.getElementById('searchInput');
+const roleFilter = document.getElementById('roleFilter');
 const tableBody = document.getElementById('employeeTable');
 const prevBtn = document.getElementById('prevPage');
 const nextBtn = document.getElementById('nextPage');
@@ -2217,11 +2251,22 @@ let currentPage = 1;
 let allRows = Array.from(tableBody.querySelectorAll('tr'));
 
 function renderPage() {
-    // Filter rows based on search
+    // Filter rows based on search and role
     const searchTerm = searchInput.value.toLowerCase();
+    const selectedRole = roleFilter.value.toLowerCase();
+    
     const filteredRows = allRows.filter(row => {
         const text = row.textContent.toLowerCase();
-        return text.includes(searchTerm);
+        const matchesSearch = text.includes(searchTerm);
+        
+        // Check if row matches selected role (if any role is selected)
+        let matchesRole = true;
+        if (selectedRole) {
+            const rowRole = row.getAttribute('data-role') || '';
+            matchesRole = rowRole.toLowerCase() === selectedRole;
+        }
+        
+        return matchesSearch && matchesRole;
     });
     
     // Calculate pagination
@@ -2247,6 +2292,13 @@ function renderPage() {
 // Event listeners
 if (searchInput) {
     searchInput.addEventListener('input', () => {
+        currentPage = 1;
+        renderPage();
+    });
+}
+
+if (roleFilter) {
+    roleFilter.addEventListener('change', () => {
         currentPage = 1;
         renderPage();
     });

@@ -1506,7 +1506,7 @@ $history_result = $conn->query($history_query);
                     </div>
                     <div>
                         <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
-                        <p class="text-blue-100 text-sm">Students & Parents</p>
+                        <p class="text-blue-100 text-sm">Students</p>
                     </div>
                 </div>
                 <!-- Student Filters -->
@@ -1534,10 +1534,10 @@ $history_result = $conn->query($history_query);
                     </ul>
                     <div id="students-loading" class="text-center py-8">
                         <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"></div>
-                        <p class="text-gray-500 text-sm mt-2">Loading students & parents...</p>
+                        <p class="text-gray-500 text-sm mt-2">Loading students...</p>
                     </div>
                 </div>
-                <!-- Pagination for Students & Parents -->
+                <!-- Pagination for Students -->
                 <div id="students-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
                     <div class="text-sm text-gray-600">
                         Showing <span id="students-start" class="font-semibold text-gray-900">1</span> to <span id="students-end" class="font-semibold text-gray-900">10</span> of <span id="students-total" class="font-semibold text-gray-900">0</span> users
@@ -2553,10 +2553,42 @@ function renderRequests(requests) {
                             </div>
                         </div>
                         <div class="flex-shrink-0">
-                            <button onclick="alert('View Details - Request ID: ${request.id}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm">
+                            <button onclick="event.stopPropagation(); openRequestModal(${request.id});" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm">
                                 View Details
                             </button>
                         </div>
+                    </div>
+                </div>
+                <div id="details-${request.id}" class="hidden border-t-2 border-${statusColor}-200 bg-white p-6">
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div class="flex items-start gap-2 mb-2">
+                                <svg class="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold text-gray-700 mb-1">Request Details</p>
+                                    <p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(request.request_description || 'No description provided')}</p>
+                                </div>
+                            </div>
+                        </div>
+                        ${request.reason ? `
+                        <div class="bg-yellow-50 rounded-lg p-4 border-2 border-yellow-300">
+                            <div class="flex items-start gap-2">
+                                <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold text-yellow-800 mb-2">Reason for Request</p>
+                                    <p class="text-sm text-yellow-900 leading-relaxed bg-white px-3 py-2 rounded border border-yellow-200">${escapeHtml(request.reason)}</p>
+                                </div>
+                            </div>
+                        </div>` : ''}
+                        ${request.target_data ? `
+                        <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                            <p class="text-sm font-bold text-gray-700 mb-2">Target Information</p>
+                            <pre class="text-xs text-gray-600 bg-white p-3 rounded border border-blue-200 overflow-auto">${escapeHtml(JSON.stringify(JSON.parse(request.target_data), null, 2))}</pre>
+                        </div>` : ''}
                     </div>
                 </div>
             </div>
@@ -4140,9 +4172,52 @@ function saveFeeType(event) {
 }
 
 function deleteFeeType(id, name) {
-    if (!confirm(`Are you sure you want to delete "${name}"?\n\nThis will remove the fee type from the system.`)) {
-        return;
-    }
+    // Create modal backdrop
+    const modal = document.createElement('div');
+    modal.id = 'deleteConfirmModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4';
+    
+    // Create modal content
+    modal.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all">
+            <div class="flex flex-col items-center text-center">
+                <!-- Warning Icon -->
+                <div class="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mb-6">
+                    <svg class="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                
+                <!-- Title -->
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">Delete Fee Type</h3>
+                
+                <!-- Message -->
+                <p class="text-gray-600 mb-8 leading-relaxed">
+                    Are you sure you want to delete "<span class="font-semibold text-gray-900">${name}</span>"?<br><br>
+                    This will remove the fee type from the system.
+                </p>
+                
+                <!-- Buttons -->
+                <div class="flex gap-3 w-full">
+                    <button onclick="document.getElementById('deleteConfirmModal').remove()" 
+                            class="flex-1 px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-lg">
+                        Cancel
+                    </button>
+                    <button onclick="confirmDeleteFeeType(${id})" 
+                            class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors text-lg">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function confirmDeleteFeeType(id) {
+    // Close modal
+    document.getElementById('deleteConfirmModal').remove();
     
     const formData = new FormData();
     formData.append('action', 'delete');
@@ -5019,7 +5094,7 @@ async function loadNotLoggedIn(type, page = 1) {
             const emptyIcon = type === 'employees' 
                 ? '<svg class="w-12 h-12 mx-auto mb-2 text-orange-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>'
                 : '<svg class="w-12 h-12 mx-auto mb-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>';
-            const message = type === 'employees' ? 'All employees have logged in today!' : 'All students & parents have logged in today!';
+            const message = type === 'employees' ? 'All employees have logged in today!' : 'All students have logged in today!';
             list.innerHTML = `<li class="text-center py-8">${emptyIcon}<p class="text-gray-500 font-medium">${message}</p><p class="text-gray-400 text-sm mt-1">Great attendance 🎉</p></li>`;
             pagination.classList.add('hidden');
         } else {
@@ -5224,7 +5299,7 @@ function displayFilteredStudents(students) {
             <svg class="w-12 h-12 mx-auto mb-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
             </svg>
-            <p class="text-gray-500 font-medium">No students or parents found</p>
+            <p class="text-gray-500 font-medium">No students found</p>
             <p class="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
         </li>`;
         pagination.classList.add('hidden');

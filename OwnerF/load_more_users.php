@@ -71,66 +71,37 @@ if ($type === 'employees') {
     }
     
 } elseif ($type === 'students') {
-    // Get students AND parents who haven't logged in today
+    // Get only students who haven't logged in today (excluding parents)
     $query = "
-        (
-            SELECT DISTINCT s.id_number, s.first_name, s.last_name, s.middle_name, 'Student' as user_type
-            FROM student_account s
-            LEFT JOIN login_activity la ON s.id_number = la.id_number AND DATE(la.login_time) = ? AND la.user_type = 'student'
-            WHERE la.id_number IS NULL AND (s.deleted_at IS NULL OR s.deleted_at = '')
-        )
-        UNION
-        (
-            SELECT DISTINCT pa.child_id as id_number, 
-                   CONCAT('Parent of ', sc.first_name, ' ', sc.last_name) as first_name,
-                   '' as last_name, 
-                   '' as middle_name, 
-                   'Parent' as user_type
-            FROM parent_account pa
-            INNER JOIN student_account sc ON pa.child_id = sc.id_number
-            LEFT JOIN login_activity la ON pa.child_id = la.id_number AND DATE(la.login_time) = ? AND la.user_type = 'parent'
-            WHERE la.id_number IS NULL
-        )
-        ORDER BY last_name, first_name
+        SELECT DISTINCT s.id_number, s.first_name, s.last_name, s.middle_name, 'Student' as user_type
+        FROM student_account s
+        LEFT JOIN login_activity la ON s.id_number = la.id_number AND DATE(la.login_time) = ? AND la.user_type = 'student'
+        WHERE la.id_number IS NULL AND (s.deleted_at IS NULL OR s.deleted_at = '')
+        ORDER BY s.last_name, s.first_name
         LIMIT ? OFFSET ?
     ";
     
     if ($stmt = $conn->prepare($query)) {
-        $stmt->bind_param('ssii', $today, $today, $limit, $offset);
+        $stmt->bind_param('sii', $today, $limit, $offset);
         $stmt->execute();
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            if ($row['user_type'] === 'Parent') {
-                $full_name = $row['first_name'];
-            } else {
-                $full_name = trim($row['first_name'] . ', ' . $row['last_name']);
-            }
+            $full_name = trim($row['first_name'] . ', ' . $row['last_name']);
             $type_label = $row['user_type'];
             $response['items'][] = "• {$full_name} ({$row['id_number']}) - {$type_label}";
         }
         
-        // Count both students and parents
+        // Count only students (excluding parents)
         $count_query = "
-            SELECT COUNT(*) FROM (
-                (
-                    SELECT DISTINCT s.id_number
-                    FROM student_account s
-                    LEFT JOIN login_activity la ON s.id_number = la.id_number AND DATE(la.login_time) = ? AND la.user_type = 'student'
-                    WHERE la.id_number IS NULL AND (s.deleted_at IS NULL OR s.deleted_at = '')
-                )
-                UNION
-                (
-                    SELECT DISTINCT pa.child_id as id_number
-                    FROM parent_account pa
-                    LEFT JOIN login_activity la ON pa.child_id = la.id_number AND DATE(la.login_time) = ? AND la.user_type = 'parent'
-                    WHERE la.id_number IS NULL
-                )
-            ) as combined
+            SELECT COUNT(DISTINCT s.id_number)
+            FROM student_account s
+            LEFT JOIN login_activity la ON s.id_number = la.id_number AND DATE(la.login_time) = ? AND la.user_type = 'student'
+            WHERE la.id_number IS NULL AND (s.deleted_at IS NULL OR s.deleted_at = '')
         ";
         
         if ($count_stmt = $conn->prepare($count_query)) {
-            $count_stmt->bind_param('ss', $today, $today);
+            $count_stmt->bind_param('s', $today);
             $count_stmt->execute();
             $count_result = $count_stmt->get_result();
             $total = $count_result->fetch_row()[0];

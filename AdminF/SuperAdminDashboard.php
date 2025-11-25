@@ -821,7 +821,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                 </div>
                                 <div>
                                     <h3 class="text-lg font-bold text-white">Not Logged In Today</h3>
-                                    <p class="text-blue-100 text-sm">Students & Parents</p>
+                                    <p class="text-blue-100 text-sm">Students</p>
                                 </div>
                             </div>
                             <!-- Student Filters -->
@@ -849,10 +849,10 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                 </ul>
                                 <div id="students-loading" class="text-center py-8">
                                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"></div>
-                                    <p class="text-gray-500 text-sm mt-2">Loading students & parents...</p>
+                                    <p class="text-gray-500 text-sm mt-2">Loading students...</p>
                                 </div>
                             </div>
-                            <!-- Pagination for Students & Parents -->
+                            <!-- Pagination for Students -->
                             <div id="students-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 hidden">
                                 <div class="text-sm text-gray-600">
                                     Showing <span id="students-start" class="font-semibold text-gray-900">1</span> to <span id="students-end" class="font-semibold text-gray-900">10</span> of <span id="students-total" class="font-semibold text-gray-900">0</span> users
@@ -1342,9 +1342,9 @@ if ($check_pending && $check_pending->num_rows > 0) {
                     </div>
                     
                     <!-- Pagination for Deleted Students -->
-                    <div id="students-pagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <div id="deleted-students-pagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                         <div class="text-sm text-gray-700">
-                            Showing <span id="students-start">1</span> to <span id="students-end">5</span> of <span id="students-total"><?= count($deleted_students) ?></span> students
+                            Showing <span id="deleted-students-start">1</span> to <span id="deleted-students-end">5</span> of <span id="deleted-students-total"><?= count($deleted_students) ?></span> students
                         </div>
                         <div class="flex gap-2">
                             <button id="students-prev" onclick="changeStudentsPage(-1)" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -2740,7 +2740,7 @@ if ($check_pending && $check_pending->num_rows > 0) {
                                 
                                 <!-- Email Field (Full Width with Verification) -->
                                 <div class="mt-6">
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Email * <span class="text-xs text-gray-500">(Gmail only - verification required)</span></label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
                                     <div class="flex gap-2">
                                         <input type="email" name="email" id="hrEmployeeEmail" autocomplete="off" required class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0B2C62] focus:border-[#0B2C62] text-sm" pattern="[a-zA-Z0-9._%+-]+@gmail\.com$" title="Please enter a valid Gmail address">
                                         <button type="button" id="verifyHREmailBtn" onclick="sendHRVerificationCode()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition whitespace-nowrap text-sm">
@@ -5012,7 +5012,7 @@ function deletePermanently(recordId, recordType) {
                     const emptyIcon = type === 'employees' 
                         ? '<svg class="w-12 h-12 mx-auto mb-2 text-orange-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>'
                         : '<svg class="w-12 h-12 mx-auto mb-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>';
-                    const message = type === 'employees' ? 'All employees have logged in today!' : 'All students & parents have logged in today!';
+                    const message = type === 'employees' ? 'All employees have logged in today!' : 'All students have logged in today!';
                     list.innerHTML = `<li class="text-center py-8">${emptyIcon}<p class="text-gray-500 font-medium">${message}</p><p class="text-gray-400 text-sm mt-1">Great attendance 🎉</p></li>`;
                     pagination.classList.add('hidden');
                 } else {
@@ -5089,10 +5089,17 @@ function deletePermanently(recordId, recordType) {
                     
                     updatePagination(type, page, total);
                     
-                    if (total > notLoggedInItemsPerPage) {
+                    // Show pagination if there are items and more than one page
+                    if (total > 0 && total > notLoggedInItemsPerPage) {
                         pagination.classList.remove('hidden');
+                        pagination.style.display = 'flex';
+                    } else if (total > 0) {
+                        // Show pagination even for single page to show count
+                        pagination.classList.remove('hidden');
+                        pagination.style.display = 'flex';
                     } else {
                         pagination.classList.add('hidden');
+                        pagination.style.display = 'none';
                     }
                 }
                 
@@ -7541,6 +7548,36 @@ function deletePermanently(recordId, recordType) {
 <script>
 let hrVerificationTimer;
 let hrEmailVerified = false;
+
+// Function to setup email field listener
+function setupHREmailListener() {
+    const emailField = document.getElementById('hrEmployeeEmail');
+    const statusDisplay = document.getElementById('hrEmailVerificationStatus');
+    const verifyBtn = document.getElementById('verifyHREmailBtn');
+    
+    if (emailField && statusDisplay && verifyBtn) {
+        emailField.addEventListener('input', function() {
+            // Reset verification status when email is modified
+            hrEmailVerified = false;
+            statusDisplay.textContent = '';
+            statusDisplay.className = 'text-sm mt-1 font-medium hidden';
+            
+            // Reset verify button
+            verifyBtn.textContent = 'Verify Email';
+            verifyBtn.disabled = false;
+            verifyBtn.className = 'px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition whitespace-nowrap text-sm';
+        });
+    }
+}
+
+// Try to setup immediately
+setupHREmailListener();
+
+// Also try on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', setupHREmailListener);
+
+// Also try with a small delay to ensure modal is loaded
+setTimeout(setupHREmailListener, 500);
 
 function sendHRVerificationCode() {
     const emailInput = document.getElementById('hrEmployeeEmail');

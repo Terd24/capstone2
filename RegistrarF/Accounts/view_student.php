@@ -176,7 +176,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
     $validation_errors = [];
     
     // Validate required fields
-    if (empty(trim($lrn))) $validation_errors[] = "LRN is required.";
+    if (empty(trim($lrn))) {
+        $validation_errors[] = "LRN is required.";
+    } elseif (strlen($lrn) !== 12) {
+        $validation_errors[] = "LRN must be exactly 12 digits.";
+    } elseif (!preg_match('/^[0-9]{12}$/', $lrn)) {
+        $validation_errors[] = "LRN must contain only digits.";
+    }
     if (empty(trim($last_name))) $validation_errors[] = "Last name is required.";
     if (empty(trim($first_name))) $validation_errors[] = "First name is required.";
     if (empty(trim($birthplace))) $validation_errors[] = "Birthplace is required.";
@@ -1923,6 +1929,19 @@ document.addEventListener('input', function(e){
         if (max > 0 && el.value.length > max) {
             el.value = el.value.slice(0, max);
         }
+        
+        // Clear any validation errors when user types
+        if (el.classList.contains('field-error')) {
+            el.classList.remove('field-error', 'border-red-500');
+            el.classList.add('border-gray-300');
+            
+            // Remove error message
+            const container = el.closest('div');
+            if (container) {
+                const errorMsg = container.querySelector('.error-text');
+                if (errorMsg) errorMsg.remove();
+            }
+        }
     }
 });
 
@@ -2071,6 +2090,28 @@ function validateStudentForm() {
         }
     });
     
+    // Validate LRN (must be exactly 12 digits)
+    const lrnField = form.querySelector('[name="lrn"]');
+    if (lrnField && lrnField.value.trim()) {
+        const lrnValue = lrnField.value.trim();
+        if (!/^[0-9]{12}$/.test(lrnValue)) {
+            setFieldError(lrnField, 'LRN must be exactly 12 digits');
+            isValid = false;
+            if (!firstErrorField) firstErrorField = lrnField;
+        }
+    }
+    
+    // Validate RFID if provided (must be exactly 10 digits)
+    const rfidField = form.querySelector('[name="rfid_uid"]');
+    if (rfidField && rfidField.value.trim()) {
+        const rfidValue = rfidField.value.trim();
+        if (!/^[0-9]{10}$/.test(rfidValue)) {
+            setFieldError(rfidField, 'RFID must be exactly 10 digits');
+            isValid = false;
+            if (!firstErrorField) firstErrorField = rfidField;
+        }
+    }
+    
     // Validate complete address (minimum 20 characters and must have multiple components)
     const addressField = form.querySelector('[name="address"]');
     if (addressField && addressField.value.trim()) {
@@ -2145,19 +2186,39 @@ function showSaveConfirmation() {
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('studentForm');
     if (form) {
-        // Clear error when user types in any field
+        // Clear error when user types in any field (always clear, not just when field-error class exists)
         form.addEventListener('input', function(e) {
-            if (e.target.classList.contains('field-error')) {
-                clearFieldError(e.target);
-            }
+            clearFieldError(e.target);
         });
         
         // Clear error when user changes select/radio
         form.addEventListener('change', function(e) {
-            if (e.target.classList.contains('field-error')) {
-                clearFieldError(e.target);
-            }
+            clearFieldError(e.target);
         });
+        
+        // Specifically handle LRN and RFID fields to clear errors immediately
+        const lrnField = form.querySelector('[name="lrn"]');
+        const rfidField = form.querySelector('[name="rfid_uid"]');
+        
+        if (lrnField) {
+            lrnField.addEventListener('input', function() {
+                clearFieldError(this);
+            });
+            // Also clear on keyup to catch all input events
+            lrnField.addEventListener('keyup', function() {
+                clearFieldError(this);
+            });
+        }
+        
+        if (rfidField) {
+            rfidField.addEventListener('input', function() {
+                clearFieldError(this);
+            });
+            // Also clear on keyup to catch all input events
+            rfidField.addEventListener('keyup', function() {
+                clearFieldError(this);
+            });
+        }
     }
 });
 
