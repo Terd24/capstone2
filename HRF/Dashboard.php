@@ -632,6 +632,25 @@ document.addEventListener('DOMContentLoaded', function() {
 // Modal functions
 function openModal() {
     document.getElementById('addEmployeeModal').classList.remove('hidden');
+    
+    // Add RFID error clearing listener
+    setTimeout(() => {
+        const rfidInput = document.getElementById('rfid_uid');
+        if (rfidInput && !rfidInput._rfidListenerAdded) {
+            rfidInput.addEventListener('input', function() {
+                // Clear error styling
+                this.classList.remove('border-red-500', 'bg-red-50');
+                this.classList.add('border-gray-300');
+                
+                // Remove error message
+                const errorMsg = this.parentElement?.querySelector('.text-red-600');
+                if (errorMsg) {
+                    errorMsg.remove();
+                }
+            });
+            rfidInput._rfidListenerAdded = true;
+        }
+    }, 100);
 }
 
 function closeModal() {
@@ -1309,6 +1328,22 @@ function toggleEditMode() {
     // Setup input restrictions after enabling fields
     setTimeout(() => {
         setupInputRestrictions();
+        
+        // Add RFID error clearing listener
+        const rfidField = document.querySelector(`[id^="rfid_uid_"]`);
+        if (rfidField) {
+            rfidField.addEventListener('input', function() {
+                // Clear error styling
+                this.classList.remove('border-red-500', 'bg-red-50');
+                this.classList.add('border-gray-300');
+                
+                // Remove error message
+                const errorMsg = this.parentElement?.querySelector('.rfid-error-msg');
+                if (errorMsg) {
+                    errorMsg.remove();
+                }
+            });
+        }
     }, 100);
 }
 
@@ -1522,6 +1557,47 @@ function saveEmployeeChanges() {
     
     if (hasErrors) {
         return;
+    }
+    
+    // Check RFID for duplicates if provided
+    if (rfidUid && rfidUid.trim().length === 10) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '../RegistrarF/Accounts/check_rfid_duplicate.php', false); // Synchronous request
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        
+        try {
+            xhr.send('rfid_uid=' + encodeURIComponent(rfidUid) + '&current_id=' + encodeURIComponent(currentEmployeeId));
+            
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                
+                if (result.duplicate) {
+                    // Show error on RFID field
+                    const rfidField = document.getElementById(`rfid_uid_${currentEmployeeId}`);
+                    if (rfidField) {
+                        rfidField.classList.add('border-red-500', 'bg-red-50');
+                        rfidField.classList.remove('border-gray-300');
+                        
+                        // Add error message below field
+                        let errorMsg = rfidField.parentElement?.querySelector('.rfid-error-msg');
+                        if (!errorMsg) {
+                            errorMsg = document.createElement('p');
+                            errorMsg.className = 'rfid-error-msg text-red-600 text-sm mt-1';
+                            rfidField.parentElement.appendChild(errorMsg);
+                        }
+                        errorMsg.textContent = result.message || 'RFID already in use!';
+                        
+                        // Scroll to RFID field
+                        rfidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        rfidField.focus();
+                    }
+                    
+                    return false;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking RFID:', error);
+        }
     }
     
     // Prepare form data
@@ -2039,6 +2115,24 @@ function showCreateAccountModal(employee) {
         modalEl.addEventListener('keydown', (e) => { e.stopPropagation(); }, true);
         modalEl._keydownBound = true;
     }
+    
+    // Add RFID error clearing listener
+    setTimeout(() => {
+        const rfidInput = document.getElementById('ca_rfid_uid');
+        if (rfidInput) {
+            rfidInput.addEventListener('input', function() {
+                // Clear error styling
+                this.classList.remove('border-red-500', 'bg-red-50');
+                this.classList.add('border-gray-300');
+                
+                // Remove error message
+                const errorMsg = this.parentElement?.querySelector('.rfid-error-msg');
+                if (errorMsg) {
+                    errorMsg.remove();
+                }
+            });
+        }
+    }, 100);
 }
 
 function closeEditAccountModal() {
@@ -2075,6 +2169,7 @@ function createNewAccount(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
     formData.append('create_account', '1');
+    
     // Clear previous username error styles/messages
     const u = document.getElementById('ca_username');
     const uErr = document.getElementById('ca_username_error');
@@ -2084,6 +2179,49 @@ function createNewAccount(event) {
     if (uErr) {
         uErr.textContent = '';
         uErr.classList.add('hidden');
+    }
+    
+    // Check RFID for duplicates if provided
+    const rfidInput = document.getElementById('ca_rfid_uid');
+    const rfidValue = rfidInput ? rfidInput.value.trim() : '';
+    
+    if (rfidValue && rfidValue.length === 10) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '../RegistrarF/Accounts/check_rfid_duplicate.php', false); // Synchronous request
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        
+        try {
+            xhr.send('rfid_uid=' + encodeURIComponent(rfidValue));
+            
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                
+                if (result.duplicate) {
+                    // Show error on RFID field
+                    if (rfidInput) {
+                        rfidInput.classList.add('border-red-500', 'bg-red-50');
+                        rfidInput.classList.remove('border-gray-300');
+                        
+                        // Add error message below field
+                        let errorMsg = rfidInput.parentElement?.querySelector('.rfid-error-msg');
+                        if (!errorMsg) {
+                            errorMsg = document.createElement('p');
+                            errorMsg.className = 'rfid-error-msg text-red-600 text-sm mt-1';
+                            rfidInput.parentElement.appendChild(errorMsg);
+                        }
+                        errorMsg.textContent = result.message || 'RFID already in use!';
+                        
+                        // Scroll to RFID field
+                        rfidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        rfidInput.focus();
+                    }
+                    
+                    return false;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking RFID:', error);
+        }
     }
     
     fetch('create_account.php', {
@@ -2447,6 +2585,32 @@ function confirmAddEmployee() {
         }
     }
     if (hasErrors) return;
+    
+    // Check RFID for duplicates if provided
+    if (rfid && rfid.length === 10) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '../RegistrarF/Accounts/check_rfid_duplicate.php', false); // Synchronous request
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        
+        try {
+            xhr.send('rfid_uid=' + encodeURIComponent(rfid));
+            
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                
+                if (result.duplicate) {
+                    // Show error on RFID field
+                    const rfidField = form.querySelector('#rfid_uid');
+                    if (rfidField) {
+                        highlightFieldError(rfidField, result.message || 'RFID already in use!');
+                    }
+                    return false;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking RFID:', error);
+        }
+    }
 
     const fullName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`;
     const formattedDate = hireDate ? new Date(hireDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';

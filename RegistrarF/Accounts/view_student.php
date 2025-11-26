@@ -284,8 +284,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
             $validation_errors[] = "RFID must be exactly 10 digits.";
         } else {
             // Check if RFID is already used by another student
-            $check_rfid = $conn->prepare("SELECT id_number FROM student_account WHERE rfid_uid = ? AND id_number != ?");
-            $check_rfid->bind_param("ss", $rfid_uid, $student_id);
+            $check_rfid = $conn->prepare("SELECT id_number FROM student_account WHERE rfid_uid = ? AND id_number != ? AND deleted_at IS NULL");
+            $check_rfid->bind_param("ss", $rfid_uid, $id_number);
             $check_rfid->execute();
             $check_rfid->store_result();
             if ($check_rfid->num_rows > 0) {
@@ -463,7 +463,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
         );
         
         $_SESSION['success_msg'] = "Student information updated successfully!";
-        header("Location: ../AccountList.php?type=student");
+        
+        // Use absolute path from document root
+        header("Location: /onecci/RegistrarF/AccountList.php");
         exit;
     } else {
         $error_msg = "Error updating student information.";
@@ -472,7 +474,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_student'])) {
 }
 
 if (!$student_data) {
-    header("Location: ../AccountList.php?type=student");
+    header("Location: /onecci/RegistrarF/AccountList.php");
     exit;
 }
 
@@ -1058,7 +1060,7 @@ input[type=number] { -moz-appearance: textfield; }
 
             <!-- Footer Buttons (no Save here; Save moved to header) -->
             <div class="col-span-3 flex justify-end gap-4 pt-6 border-t border-gray-200">
-                <a href="/RegistrarF/AccountList.php?type=student" onclick="return closeModalEmbedAware(event);" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition inline-flex items-center justify-center">Back to List</a>
+                <a href="/onecci/RegistrarF/AccountList.php" onclick="return closeModalEmbedAware(event);" class="px-5 py-2 border border-blue-600 text-blue-900 rounded-xl hover:bg-[#0B2C62] hover:text-white transition inline-flex items-center justify-center">Back to List</a>
             </div>
         </form>
     </div>
@@ -1643,7 +1645,7 @@ function closeModal() {
         if (overlay) overlay.remove();
     } else {
         // Standalone page: navigate back to account list (absolute path)
-        window.location.href = '/RegistrarF/AccountList.php?type=student';
+        window.location.href = '/onecci/RegistrarF/AccountList.php';
     }
 }
 
@@ -2014,7 +2016,7 @@ function clearFieldError(field) {
     if (!field) return;
     
     // Remove error class
-    field.classList.remove('field-error', 'border-red-500');
+    field.classList.remove('field-error', 'border-red-500', 'bg-red-50');
     field.classList.add('border-gray-300');
     
     // Remove error message
@@ -2022,6 +2024,18 @@ function clearFieldError(field) {
     if (container) {
         const errorMsg = container.querySelector('.error-text');
         if (errorMsg) errorMsg.remove();
+        
+        // Also remove RFID-specific error message
+        const rfidErrorMsg = container.querySelector('.rfid-error-msg');
+        if (rfidErrorMsg) rfidErrorMsg.remove();
+    }
+    
+    // If this is the RFID field, also hide the error alert at top
+    if (field.name === 'rfid_uid') {
+        const errorAlert = document.getElementById('rfidErrorAlert');
+        if (errorAlert) {
+            errorAlert.classList.add('hidden');
+        }
     }
 }
 
@@ -2162,6 +2176,56 @@ function showSaveConfirmation() {
         return;
     }
     
+    // Check RFID for duplicates before showing confirmation
+    const rfidInput = document.querySelector('input[name="rfid_uid"]');
+    const rfidValue = rfidInput ? rfidInput.value.trim() : '';
+    const currentStudentId = document.querySelector('input[name="id_number"]').value;
+    
+    if (rfidValue && rfidValue.length === 10) {
+        // Use XMLHttpRequest with synchronous request to block until response
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'Accounts/check_rfid_duplicate.php', false); // Synchronous request
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        
+        try {
+            xhr.send('rfid_uid=' + encodeURIComponent(rfidValue) + '&current_id=' + encodeURIComponent(currentStudentId));
+            
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                
+                if (result.duplicate) {
+                    // Show error styling on RFID field
+                    if (rfidInput) {
+                        rfidInput.classList.add('border-red-500', 'bg-red-50');
+                        rfidInput.classList.remove('border-gray-300');
+                        
+                        // Add error message below field
+                        let errorMsg = rfidInput.parentElement?.querySelector('.rfid-error-msg');
+                        if (!errorMsg) {
+                            errorMsg = document.createElement('p');
+                            errorMsg.className = 'rfid-error-msg text-red-600 text-sm mt-1';
+                            rfidInput.parentElement.appendChild(errorMsg);
+                        }
+                        errorMsg.textContent = result.message || 'RFID already in use!';
+                        
+                        // Scroll to RFID field
+                        rfidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        rfidInput.focus();
+                    }
+                    
+                    // Show alert at top
+                    showRFIDError(result.message || 'RFID already in use!');
+                    
+                    // CRITICAL: Stop execution and don't show confirmation modal
+                    console.log('RFID DUPLICATE DETECTED - BLOCKING SAVE');
+                    return false;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking RFID:', error);
+        }
+    }
+    
     const c = document.createElement('div');
     c.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[2147483647]';
     c.innerHTML = `
@@ -2180,6 +2244,38 @@ function showSaveConfirmation() {
         c.remove();
         document.getElementById('studentForm').submit();
     };
+}
+
+function showRFIDError(message) {
+    // Create or update error alert at top of form
+    let errorAlert = document.getElementById('rfidErrorAlert');
+    if (!errorAlert) {
+        errorAlert = document.createElement('div');
+        errorAlert.id = 'rfidErrorAlert';
+        errorAlert.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-lg flex items-start';
+        errorAlert.innerHTML = `
+            <svg class="w-6 h-6 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+            </svg>
+            <div class="flex-1">
+                <h4 class="text-red-800 font-bold text-lg mb-1">RFID Duplicate Error</h4>
+                <p id="rfidErrorMessage" class="text-red-700 font-medium"></p>
+            </div>
+        `;
+        const form = document.getElementById('studentForm');
+        if (form) {
+            form.insertBefore(errorAlert, form.firstChild);
+        }
+    }
+    
+    const errorMessage = document.getElementById('rfidErrorMessage');
+    if (errorMessage) {
+        errorMessage.textContent = message;
+    }
+    errorAlert.classList.remove('hidden');
+    
+    // Scroll to top to show error
+    errorAlert.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Add event listeners to clear errors when user types
